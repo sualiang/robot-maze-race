@@ -68,17 +68,14 @@ deploy_backend() {
     echo '  当前 commit: ' \$(git rev-parse --short HEAD)
 
     echo '🔧 Step 2: 安装依赖 + 编译后端...'
+    cd $REMOTE_REPO
+    # 用 pnpm 安装全部依赖（含 devDep）
+    pnpm install --no-optional 2>&1 | tail -5
     cd $REMOTE_SERVER_DIR
-    # 先准备 shared 模块（workspace 协议需要）
-    mkdir -p node_modules/@robot-race
-    rm -rf node_modules/@robot-race/shared
-    cp -r $REMOTE_REPO/packages/shared/dist node_modules/@robot-race/shared/
-    # 安装依赖（含 devDep for tsc）
-    npm install 2>&1 | tail -5
     # 拷贝 schema.sql 到 dist（tsc 不处理 .sql 文件）
     cp src/db/schema.sql dist/db/schema.sql 2>/dev/null || true
-    # 用本地 tsc
-    ./node_modules/.bin/tsc 2>&1 || { echo '❌ 编译失败'; exit 1; }
+    # 用 pnpm exec tsc（使用工作区的本地 typescript）
+    pnpm exec tsc 2>&1 || { echo '❌ 编译失败'; exit 1; }
     echo '  ✅ 编译成功'
 
     echo '📦 Step 3: 准备 shared 模块...'
