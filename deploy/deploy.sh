@@ -68,14 +68,19 @@ deploy_backend() {
     echo '  当前 commit: ' \$(git rev-parse --short HEAD)
 
     echo '🔧 Step 2: 安装依赖 + 编译后端...'
-    cd $REMOTE_REPO
-    # 用 pnpm 安装全部依赖（含 devDep）
-    pnpm install --ignore-scripts 2>&1 | tail -5
     cd $REMOTE_SERVER_DIR
+    # 确保 node_modules 存在
+    if [ ! -d node_modules/.bin ]; then
+      # 首次需要 pnpm install
+      cd $REMOTE_REPO && pnpm install 2>&1 | tail -5
+      cd $REMOTE_SERVER_DIR
+    else
+      echo '  ⚡ node_modules 已存在，跳过 install'
+    fi
     # 拷贝 schema.sql 到 dist（tsc 不处理 .sql 文件）
     cp src/db/schema.sql dist/db/schema.sql 2>/dev/null || true
     # 用 pnpm exec tsc（使用工作区的本地 typescript）
-    pnpm exec tsc 2>&1 || { echo '❌ 编译失败'; exit 1; }
+    pnpm exec tsc --outDir dist 2>&1 || { echo '❌ 编译失败'; exit 1; }
     echo '  ✅ 编译成功'
 
     echo '📦 Step 3: 准备 shared 模块...'
