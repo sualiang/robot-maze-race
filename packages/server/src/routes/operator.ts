@@ -112,8 +112,9 @@ let OPERATOR_ROLES: Array<{ key: string; name: string; permissions: string[] }> 
  */
 router.get('/rbac/roles', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
+    // 运营商后台看到其可分配的角色：scope='operator' 或 scope='admin' 中非 super_admin 的角色
     const roles = await query<any>(
-      `SELECT id AS key, name, label, permissions FROM admin_roles WHERE scope = 'operator'  ORDER BY name ASC`
+      `SELECT id AS key, name, label, permissions FROM admin_roles WHERE (scope = 'operator' OR (scope = 'admin' AND name != 'super_admin')) ORDER BY name ASC`
     );
     const result = roles.map((r: any) => {
       let perms: string[] = [];
@@ -232,12 +233,25 @@ router.post('/rbac/users', authMiddleware, operatorOnly, async (req: Request, re
       [id, phone, hashedPassword, '', '', phone, role_key, operatorId]
     );
 
+    // 查角色名称和权限说明
+    let roleLabel = '';
+    let rolePermissions: string[] = [];
+    try {
+      const roleInfo = await queryOne('SELECT label, permissions FROM admin_roles WHERE id = $1', [role_key]);
+      if (roleInfo) {
+        roleLabel = roleInfo.label || '';
+        rolePermissions = roleInfo.permissions || [];
+      }
+    } catch {}
+
     return res.status(201).json({
       code: 0,
       message: '成员创建成功',
       data: {
         account: phone,
         password: plainPassword,
+        role_name: roleLabel,
+        role_permissions: rolePermissions,
       }
     });
   } catch (error: any) {
