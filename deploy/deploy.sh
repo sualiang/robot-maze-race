@@ -79,11 +79,8 @@ deploy_backend() {
     fi
     # 拷贝 schema.sql 到 dist（tsc 不处理 .sql 文件）
     cp src/db/schema.sql dist/db/schema.sql 2>/dev/null || true
-    # 用 npx 找本地 tsc（跳过 pnpm 构建检查）
-    npx --no-install tsc 2>&1 || { 
-      echo '  ⚠️ npx 方式失败，尝试 pnpm exec...'
-      pnpm exec tsc 2>&1 || { echo '❌ 编译失败'; exit 1; }
-    }
+    # 用本地 tsc 编译（直接调用 node_modules 的 tsc，绕过 pnpm 构建检查）
+    ./node_modules/.bin/tsc 2>&1 || { echo '❌ 编译失败'; exit 1; }
     echo '  ✅ 编译成功'
 
     echo '📦 Step 3: 准备 shared 模块...'
