@@ -22,7 +22,6 @@ screenshots/
 screenshots-all.js
 screenshots-operator.js
 
-# 冗余文档
+# OpenClaw memory 日志（项目无关）
 memory/
-*.md
-!README.md
+.help-rules-checklist.md
