@@ -134,7 +134,7 @@ router.get('/rbac/roles', authMiddleware, operatorOnly, async (req: Request, res
  */
 router.get('/rbac/users', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
-    const operatorId = req.user!.userId;
+    const operatorId = req.user!.operatorId;
     const {
       search,
       page: pageStr = '1',
@@ -198,7 +198,7 @@ router.get('/rbac/users', authMiddleware, operatorOnly, async (req: Request, res
  */
 router.post('/rbac/users', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
-    const operatorId = req.user!.userId;
+    const operatorId = req.user!.operatorId;
     const { phone, role_key } = req.body;
 
     if (!role_key) {
@@ -269,7 +269,7 @@ router.post('/rbac/users', authMiddleware, operatorOnly, async (req: Request, re
  */
 router.put('/rbac/users/:id', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
-    const operatorId = req.user!.userId;
+    const operatorId = req.user!.operatorId;
     const { id } = req.params;
     const { nickname, email, phone, role_key, status, password } = req.body;
 
@@ -344,7 +344,7 @@ router.put('/rbac/users/:id', authMiddleware, operatorOnly, async (req: Request,
  */
 router.delete('/rbac/users/:id', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
-    const operatorId = req.user!.userId;
+    const operatorId = req.user!.operatorId;
     const { id } = req.params;
 
     const existing = await queryOne<{ id: string; operator_id: string; role_id: string }>(
@@ -381,7 +381,7 @@ router.delete('/rbac/users/:id', authMiddleware, operatorOnly, async (req: Reque
  */
 router.post('/rbac/users/:id/reset-password', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
-    const operatorId = req.user!.userId;
+    const operatorId = req.user!.operatorId;
     const { id } = req.params;
     const { password } = req.body;
 
@@ -548,7 +548,7 @@ router.post('/verify', authMiddleware, operatorOnly, async (req: Request, res: R
  */
 router.get('/profile', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
-    const operatorId = req.user!.userId;
+    const operatorId = req.user!.operatorId;
 
     const operator = await queryOne<{
       id: string;
@@ -602,7 +602,7 @@ router.get('/profile', authMiddleware, operatorOnly, async (req: Request, res: R
  */
 router.get('/venues', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
-    const operatorId = req.user!.userId;
+    const operatorId = req.user!.operatorId;
 
     const rows = await query<any>(
       `SELECT id, name, address, city, district, status, open_time, close_time,
@@ -757,7 +757,7 @@ router.put('/venue/:id/status', authMiddleware, operatorOnly, async (req: Reques
  */
 router.get('/finance/revenue', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
-    const operatorId = req.user!.userId;
+    const operatorId = req.user!.operatorId;
     const { start_date, end_date } = req.query as { start_date?: string; end_date?: string };
 
     // 查询该运营商下所有场馆的每日营收统计
@@ -800,7 +800,7 @@ router.get('/finance/revenue', authMiddleware, operatorOnly, async (req: Request
  */
 router.get('/finance/settlements', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
-    const operatorId = req.user!.userId;
+    const operatorId = req.user!.operatorId;
 
     const rows = await query<any>(
       `SELECT id, period, amount_cents as amount, status, settled_at, created_at
@@ -835,7 +835,7 @@ router.get('/finance/settlements', authMiddleware, operatorOnly, async (req: Req
  */
 router.get('/finance/payments', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
-    const operatorId = req.user!.userId;
+    const operatorId = req.user!.operatorId;
     const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string, 10) || 20));
 
     const rows = await query<any>(
@@ -875,7 +875,7 @@ router.get('/finance/payments', authMiddleware, operatorOnly, async (req: Reques
  */
 router.post('/finance/withdraw', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
-    const operatorId = req.user!.userId;
+    const operatorId = req.user!.operatorId;
     const { amount } = req.body;
 
     if (!amount || amount <= 0) {
@@ -922,7 +922,7 @@ router.post('/finance/withdraw', authMiddleware, operatorOnly, async (req: Reque
  */
 router.get('/finance/export', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
-    const operatorId = req.user!.userId;
+    const operatorId = req.user!.operatorId;
 
     const rows = await query<any>(
       `SELECT
