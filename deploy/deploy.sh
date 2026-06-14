@@ -67,10 +67,14 @@ deploy_backend() {
     git pull origin main
     echo '  当前 commit: ' \$(git rev-parse --short HEAD)
 
-    echo '🔧 Step 2: 编译后端...'
+    echo '🔧 Step 2: 安装依赖 + 编译后端...'
     cd $REMOTE_SERVER_DIR
+    # 装 devDep（包括 @types/node、typescript 等）
+    npm install 2>&1 | tail -3
+    # 拷贝 schema.sql 到 dist（tsc 不处理 .sql 文件）
     cp src/db/schema.sql dist/db/schema.sql 2>/dev/null || true
-    npx tsc 2>&1 || { echo '❌ 编译失败'; exit 1; }
+    # 用项目本地的 tsc（非全局 tsc）
+    ./node_modules/.bin/tsc 2>&1 || { echo '❌ 编译失败'; exit 1; }
     echo '  ✅ 编译成功'
 
     echo '📦 Step 3: 准备 shared 模块...'
