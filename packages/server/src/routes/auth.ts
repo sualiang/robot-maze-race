@@ -419,10 +419,11 @@ router.post('/login', async (req: Request, res: Response) => {
 
       const passwordChangeRequired = operator.password_change_required === 1;
 
-      const payload: AuthPayload = {
+      const payload: AuthPayload & { passwordChangeRequired?: boolean; permissions?: string[] } = {
         userId: operator.id,
         openid: '',
         role: 'operator',
+        permissions: ['*'],
       };
 
       const token = jwt.sign(
