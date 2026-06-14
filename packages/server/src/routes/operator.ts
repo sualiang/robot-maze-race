@@ -119,7 +119,9 @@ router.get('/rbac/roles', authMiddleware, operatorOnly, async (req: Request, res
     const result = roles.map((r: any) => {
       let perms: string[] = [];
       try { perms = JSON.parse(r.permissions); } catch(e) { perms = []; }
-      return { ...r, permissions: perms };
+      // 运营商后台角色名称简写
+      const labelShort: Record<string, string> = { ops_admin: '运营', finance_admin: '财务' };
+      return { ...r, label: labelShort[r.name] || r.label, permissions: perms };
     });
     return res.json({ code: 0, message: 'ok', data: result });
   } catch (error: any) {
