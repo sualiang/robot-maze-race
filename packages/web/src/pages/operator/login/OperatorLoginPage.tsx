@@ -109,7 +109,7 @@ export default function OperatorLoginPage() {
       <div style={styles.box}>
         {/* Logo */}
         <div style={styles.logo}>
-          <div style={{ width: 160, height: 160, borderRadius: 12, background: '#1677ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 60 }}>🐕</div>
+          <img src="/logo-avatar.png" alt="铁甲快狗" style={{ width: 160, height: 160 }} />
         </div>
 
         {/* 角色标识 */}
