@@ -423,6 +423,7 @@ router.post('/login', async (req: Request, res: Response) => {
         userId: operator.id,
         openid: '',
         role: 'operator',
+        operatorId: operator.id,
         permissions: ['*'],
       };
 
