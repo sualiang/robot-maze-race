@@ -92,8 +92,8 @@ export default function OperatorManage() {
   // 从 localStorage 获取当前用户角色和权限
   const adminUser = JSON.parse(localStorage.getItem('admin_user') || '{}');
   const roleName: string = adminUser.role_name || adminUser.admin_role_name || '';
-  const isSuperAdmin = roleName === 'super_admin' || permissions.includes('*');
   const permissions: string[] = adminUser.permissions || [];
+  const isSuperAdmin = roleName === 'super_admin' || permissions.includes('*');
   const canEdit = permissions.includes('*') || permissions.includes('operators:edit') || roleName === 'super_admin' || roleName === 'ops_admin';
   // 🔓 临时全部放开：菜单可见即可操作，后续按需收紧
   const canOperate = true;
