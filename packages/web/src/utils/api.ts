@@ -26,12 +26,15 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       console.warn('[API] 401 未授权');
-      // 非登录页才清除 token 并跳转
-      if (!window.location.pathname.startsWith('/operator/login')) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('userInfo');
-        window.location.href = '/operator/login';
+      // 非登录页和裁判页才清除 token 并跳转
+      const path = window.location.pathname;
+      if (path.startsWith('/operator/login') || path.startsWith('/referee')) {
+        // 裁判页面不自动跳转运营商登录
+        return Promise.reject(error);
       }
+      localStorage.removeItem('token');
+      localStorage.removeItem('userInfo');
+      window.location.href = '/operator/login';
     } else if (error.response?.status === 403) {
       const msg = error.response?.data?.message || '无权限操作';
       console.warn('[API] 403 禁止:', msg);
