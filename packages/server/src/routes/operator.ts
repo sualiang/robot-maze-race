@@ -114,14 +114,12 @@ router.get('/rbac/roles', authMiddleware, operatorOnly, async (req: Request, res
   try {
     // 运营商后台看到其可分配的角色：scope='operator' 或 scope='admin' 中非 super_admin 的角色
     const roles = await query<any>(
-      `SELECT id AS key, name, label, permissions FROM admin_roles WHERE (scope = 'operator' OR (scope = 'admin' AND name != 'super_admin')) ORDER BY name ASC`
+      `SELECT id AS key, name, label, permissions FROM admin_roles WHERE scope = 'operator' ORDER BY name ASC`
     );
     const result = roles.map((r: any) => {
       let perms: string[] = [];
       try { perms = JSON.parse(r.permissions); } catch(e) { perms = []; }
-      // 运营商后台角色名称简写
-      const labelShort: Record<string, string> = { ops_admin: '运营', finance_admin: '财务' };
-      return { ...r, label: labelShort[r.name] || r.label, permissions: perms };
+      return { ...r, permissions: perms };
     });
     return res.json({ code: 0, message: 'ok', data: result });
   } catch (error: any) {
@@ -167,8 +165,9 @@ router.get('/rbac/users', authMiddleware, operatorOnly, async (req: Request, res
     // 分页数据（不返回 password）
     const users = await query<any>(
       `SELECT au.id, au.name AS username, au.nickname, au.phone,
-              au.role_id as role_key, au.status, au.created_at
+              au.role_id as role_key, COALESCE(arr.label, '') as role_name, au.status, au.created_at
        FROM operator_members au
+       LEFT JOIN admin_roles arr ON au.role_id = arr.id
        ${whereClause}
        ORDER BY au.created_at ASC
        LIMIT ? OFFSET ?`,
@@ -239,9 +238,11 @@ router.post('/rbac/users', authMiddleware, operatorOnly, async (req: Request, re
     let roleLabel = '';
     let rolePermissions: string[] = [];
     try {
-      const roleInfo = await queryOne('SELECT label, permissions FROM admin_roles WHERE id = $1', [role_key]);
+      const roleInfo = await queryOne('SELECT name, label, permissions FROM admin_roles WHERE id = $1', [role_key]);
       if (roleInfo) {
-        roleLabel = roleInfo.label || '';
+        // 运营商后台角色名称简写
+        const labelShort: Record<string, string> = { ops_admin: '运营', finance_admin: '财务' };
+        roleLabel = labelShort[roleInfo.name] || roleInfo.label || '';
         rolePermissions = roleInfo.permissions || [];
       }
     } catch {}
@@ -317,8 +318,10 @@ router.put('/rbac/users/:id', authMiddleware, operatorOnly, async (req: Request,
 
     const updated = await queryOne<any>(
       `SELECT au.id, au.name AS username, au.nickname, au.phone,
-              au.role_id as role_key, au.status, au.created_at
-       FROM operator_members au WHERE au.id = ?`,
+              au.role_id as role_key, COALESCE(arr.label, '') as role_name, au.status, au.created_at
+       FROM operator_members au
+       LEFT JOIN admin_roles arr ON au.role_id = arr.id
+       WHERE au.id = ?`,
       [id]
     );
 
@@ -1099,7 +1102,7 @@ router.get('/settings', authMiddleware, async (req: Request, res: Response) => {
 async function initOperatorRoles() {
   try {
     const roles = await query<any>(
-      `SELECT id AS key, label AS name, label, permissions FROM admin_roles WHERE (scope = 'operator' OR (scope = 'admin' AND name != 'super_admin')) ORDER BY name ASC`
+      `SELECT id AS key, label AS name, label, permissions FROM admin_roles WHERE scope = 'operator' ORDER BY name ASC`
     );
     OPERATOR_ROLES = roles.map((r: any) => ({
       ...r,
