@@ -227,7 +227,7 @@ function VenueTab() {
 
   const handleScreenUrl = (record: VenueItem) => {
     const url = `http://175.24.200.63/screen/display?venueId=${record.id}`;
-    Modal.success({
+    const modal = Modal.info({
       title: '现场大屏网址',
       content: (
         <div>
@@ -240,26 +240,26 @@ function VenueTab() {
             fontSize: 13,
             marginBottom: 12,
           }}>{url}</div>
-          <Button
-            type="primary"
-            onClick={() => {
-              navigator.clipboard.writeText(url).then(() => {
-                message.success('链接已复制');
-                Modal.destroyAll();
-              });
-            }}
-          >
-            复制链接
-          </Button>
-          <Button
-            style={{ marginLeft: 8 }}
-            onClick={() => window.open(url, '_blank')}
-          >
-            打开大屏
-          </Button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button
+              type="primary"
+              onClick={() => {
+                navigator.clipboard.writeText(url).then(() => {
+                  message.success('链接已复制');
+                  modal.destroy();
+                });
+              }}
+            >
+              复制链接
+            </Button>
+            <Button onClick={() => window.open(url, '_blank')}>
+              打开大屏
+            </Button>
+          </div>
         </div>
       ),
-      footer: null,
+      okText: '关闭',
+      onOk: () => modal.destroy(),
     });
   };
 
