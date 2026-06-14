@@ -4,6 +4,7 @@ import { LogoutOutlined } from '@ant-design/icons';
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { HomeOutlined, TeamOutlined, ShopOutlined, GiftOutlined, DollarOutlined, UserOutlined, SafetyCertificateOutlined, UserSwitchOutlined } from '@ant-design/icons';
+import api from '../utils/api';
 
 const { Header, Sider, Content } = Layout;
 
@@ -23,11 +24,38 @@ export default function OperatorLayout() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // 获取用户权限
-  const raw = localStorage.getItem('operator_user_info');
-  console.log('[D] raw operator_user_info:', raw);
-  const userInfo = JSON.parse(raw || '{}');
-  const permissions: string[] = userInfo.permissions || [];
+  // 获取用户权限（优先从 localStorage，同时保底从后端获取）
+  const [permissions, setPermissions] = useState<string[]>(() => {
+    const raw = localStorage.getItem('operator_user_info');
+    console.log('[D] raw operator_user_info:', raw);
+    if (raw) {
+      try {
+        const info = JSON.parse(raw);
+        return info.permissions || [];
+      } catch {}
+    }
+    return [];
+  });
+  const [userInfoLoaded, setUserInfoLoaded] = useState(() => !!localStorage.getItem('operator_user_info'));
+
+  // 如果 localStorage 没有用户信息但 token 存在，从后端拉取
+  const token = localStorage.getItem('token');
+  useEffect(() => {
+    if (userInfoLoaded || !token) return;
+    (async () => {
+      try {
+        const res: any = await api.get('/auth/me');
+        if (res?.data) {
+          localStorage.setItem('operator_user_info', JSON.stringify(res.data));
+          setPermissions(res.data.permissions || []);
+          setUserInfoLoaded(true);
+        }
+      } catch (e) {
+        console.error('[OperatorLayout] 获取用户信息失败:', e);
+      }
+    })();
+  }, [token, userInfoLoaded]);
+
   console.log('[D] permissions:', permissions);
   console.log('[D] includes *:', permissions.includes('*'));
 
@@ -35,7 +63,6 @@ export default function OperatorLayout() {
   const menuItems = React.useMemo(() => {
     const result = allMenuItems.filter(item => {
       if (!item.perms || item.perms.length === 0) return true;
-      // 超级管理员显示全部
       if (permissions.includes('*')) return true;
       return item.perms.some(perm => permissions.includes(perm));
     });
@@ -44,7 +71,7 @@ export default function OperatorLayout() {
     return result;
   }, [permissions]);
 
-  // 路由守卫：如果当前页面需要权限但用户没有，跳转到个人中心
+  // 路由守卫
   const currentMenuItem = allMenuItems.find(item => item.key === location.pathname);
   const hasAccess = React.useMemo(() => {
     if (!currentMenuItem || !currentMenuItem.perms || currentMenuItem.perms.length === 0) return true;

@@ -9,6 +9,8 @@ export interface AuthPayload {
   admin_role_id?: string;
   admin_role_name?: string;
   permissions?: string[];
+  operatorId?: string;
+  operator_name?: string;
 }
 
 // 扩展 Express Request 类型

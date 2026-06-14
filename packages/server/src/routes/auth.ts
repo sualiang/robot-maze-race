@@ -293,7 +293,7 @@ router.post('/operator-member-login', async (req: Request, res: Response) => {
 
     // 查 operator_members 表
     const user = await queryOne<any>(
-      `SELECT m.id, m.password, m.nickname, m.phone,
+      `SELECT m.id, m.password_hash as password, m.nickname, m.phone,
               m.role_id, m.status, ar.label as role_name, ar.name as admin_role_name, ar.permissions,
               m.operator_id,
               o.name as operator_name,
@@ -781,7 +781,7 @@ router.post('/member/change-password', authMiddleware, async (req: Request, res:
 
     // 先查 admin_users 表（总部管理员和运营商角色成员）
     let user = await queryOne<{ id: string; password: string }>(
-      'SELECT id, password FROM operator_members WHERE id = $1',
+      'SELECT id, password_hash as password FROM operator_members WHERE id = $1',
       [userId]
     );
     let isOperatorSuperAdmin = false;
@@ -814,7 +814,7 @@ router.post('/member/change-password', authMiddleware, async (req: Request, res:
     } else {
       // 运营商角色成员 → 更新 operator_members 表
       await query(
-        "UPDATE operator_members SET password = $1, first_login = 0, updated_at = datetime('now') WHERE id = $2",
+        "UPDATE operator_members SET password_hash = $1, first_login = 0, updated_at = datetime('now') WHERE id = $2",
         [hashedPassword, userId]
       );
     }

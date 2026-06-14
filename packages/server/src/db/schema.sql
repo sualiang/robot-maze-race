@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS venues (
   city TEXT DEFAULT '',
   district TEXT DEFAULT '',
   description TEXT,
+  profit_share_rate REAL DEFAULT 0,
   operator_id TEXT REFERENCES operators(id),
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))

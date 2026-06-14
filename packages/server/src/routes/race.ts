@@ -17,6 +17,63 @@ function operatorOnly(req: Request, res: Response, next: Function): void {
 }
 
 /**
+ * POST /api/v1/operator/races
+ * 运营商创建赛事
+ * @body venueId - 场馆 ID（必填）
+ * @body name - 赛事名称
+ * @body maxParticipants - 最大参赛人数
+ * @body startTime - 开始时间
+ * @body endTime - 结束时间
+ * @body entryFee - 报名费（分）
+ */
+router.post('/races', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
+  try {
+    const { venueId, name, maxParticipants, startTime, endTime, entryFee } = req.body;
+
+    if (!venueId || !name) {
+      return res.status(400).json({ code: 400, message: '缺少必填参数（venueId, name）', data: null });
+    }
+
+    // 验证场馆属于该运营商
+    const venue = await queryOne<{ id: string; operator_id: string }>(
+      'SELECT id, operator_id FROM venues WHERE id = $1',
+      [venueId]
+    );
+    if (!venue) {
+      return res.status(404).json({ code: 404, message: '场馆不存在', data: null });
+    }
+    if (venue.operator_id !== req.user?.operatorId) {
+      return res.status(403).json({ code: 403, message: '无权操作该场馆', data: null });
+    }
+
+    const raceId = require('uuid').v4();
+    const now = new Date().toISOString();
+
+    await query(
+      `INSERT INTO races (id, venue_id, name, status, max_participants, entry_fee, start_time, end_time, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [
+        raceId, venueId, name, 'pending',
+        maxParticipants || 20,
+        entryFee || 0,
+        startTime || now,
+        endTime || now,
+        now, now
+      ]
+    );
+
+    return res.json({
+      code: 0,
+      message: '赛事创建成功',
+      data: { id: raceId, name },
+    });
+  } catch (error: any) {
+    console.error('[Operator] race create error:', error.message);
+    return res.status(500).json({ code: 500, message: '创建赛事失败', data: null });
+  }
+});
+
+/**
  * GET /api/v1/operator/races
  * 运营商赛事列表（按场馆筛选）
  * @query venueId - 场馆 ID（必填）
