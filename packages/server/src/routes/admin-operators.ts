@@ -410,11 +410,38 @@ router.delete('/:id', authMiddleware, checkPermission('operators:delete'), async
       return res.status(404).json({ code: 404, message: '运营商不存在', data: null });
     }
 
-    // 删除该运营商下的所有 admin_users（运营商店员）
+    // 级联删除运营商关联的所有数据
     await query('DELETE FROM admin_users WHERE operator_id = $1', [id]);
-    // 删除该运营商下的所有场馆
+    await query('DELETE FROM auth_sessions WHERE operator_id = $1', [id]);
+    await query('DELETE FROM operator_members WHERE operator_id = $1', [id]);
+    await query('DELETE FROM operator_sessions WHERE operator_id = $1', [id]);
+    await query('DELETE FROM client_logs WHERE operator_id = $1', [id]);
+
+    // 删除场馆及相关数据
+    const venuesRs = await query<{ id: string }>('SELECT id FROM venues WHERE operator_id = $1', [id]);
+    const venueIds = (venuesRs || []).map((r: any) => r.id);
+    for (const vid of venueIds) {
+      await query('UPDATE referees SET venue_id = NULL WHERE venue_id = $1', [vid]);
+      await query('DELETE FROM races WHERE venue_id = $1', [vid]);
+      await query('DELETE FROM race_records WHERE venue_id = $1', [vid]);
+      await query('DELETE FROM race_attendance WHERE venue_id = $1', [vid]);
+    }
     await query('DELETE FROM venues WHERE operator_id = $1', [id]);
-    // 删除运营商
+
+    // 删除裁判（保留 users 记录但置空 role）
+    const refRs = await query<{ user_id: string }>('SELECT user_id FROM referees WHERE operator_id = $1', [id]);
+    const refereeUserIds = (refRs || []).map((r: any) => r.user_id);
+    await query('DELETE FROM referees WHERE operator_id = $1', [id]);
+    for (const uid of refereeUserIds) {
+      await query('UPDATE users SET role = NULL WHERE id = $1', [uid]);
+    }
+
+    // 删除参赛包、票务
+    await query('DELETE FROM race_packages WHERE operator_id = $1', [id]);
+    await query('DELETE FROM user_tickets WHERE operator_id = $1', [id]);
+    await query('DELETE FROM ticket_redemptions WHERE operator_id = $1', [id]);
+
+    // 最后删除运营商本身
     await query('DELETE FROM operators WHERE id = $1', [id]);
 
     return res.json({ code: 0, message: '删除成功', data: null });
