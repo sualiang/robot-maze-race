@@ -1,0 +1,98 @@
+<!-- pages/dashboard/dashboard.wxml -->
+<!-- 运营商首页：场馆概览 + 今日数据 + 快捷入口 -->
+
+<view class="container">
+  <!-- ========== 未登录提示 ========== -->
+  <view wx:if="{{showLogin}}" class="login-banner card">
+    <view class="login-icon">🏢</view>
+    <text class="login-title">欢迎使用运营商管理</text>
+    <text class="login-desc">请先登录以管理您的场馆</text>
+    <view class="btn btn-primary mt-base" style="width:100%" bindtap="handleLogin">
+      前往登录
+    </view>
+  </view>
+
+  <!-- ========== 已登录内容 ========== -->
+  <block wx:if="{{!showLogin}}">
+    <!-- 场馆信息卡片 -->
+    <view class="venue-header card">
+      <view class="venue-top flex-between">
+        <view class="flex-column flex-1">
+          <text class="venue-name">{{venueName}}</text>
+          <text class="venue-address">📍 {{venueAddress}}</text>
+        </view>
+        <view class="venue-status {{venueStatusClass}}">
+          <view class="status-dot"></view>
+          <text>{{venueStatusText}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 今日数据面板 -->
+    <view class="section-title">📊 今日数据</view>
+    <view class="stats-grid">
+      <view class="stat-card card">
+        <view class="stat-icon-wrap icon-players">
+          <text class="stat-emoji">👥</text>
+        </view>
+        <text class="stat-value">{{todayPlayersText}}</text>
+        <text class="stat-label">参战人数</text>
+      </view>
+      <view class="stat-card card">
+        <view class="stat-icon-wrap icon-rate">
+          <text class="stat-emoji">✅</text>
+        </view>
+        <text class="stat-value">{{completionRateText}}</text>
+        <text class="stat-label">完成率</text>
+      </view>
+      <view class="stat-card card">
+        <view class="stat-icon-wrap icon-avg">
+          <text class="stat-emoji">⏱️</text>
+        </view>
+        <text class="stat-value">{{avgScoreText}}</text>
+        <text class="stat-label">平均成绩</text>
+      </view>
+    </view>
+
+    <!-- 快捷入口 -->
+    <view class="section-title">⚡ 快捷操作</view>
+    <view class="action-row">
+      <view class="action-card card" bindtap="handleScan">
+        <view class="action-icon-wrap icon-scan">
+          <text class="action-emoji">📷</text>
+        </view>
+        <view class="action-info">
+          <text class="action-name">扫选手码</text>
+          <text class="action-desc">扫码核销参赛次数</text>
+        </view>
+        <text class="action-arrow">›</text>
+      </view>
+
+      <view class="action-card card" bindtap="toggleVenueStatus">
+        <view class="action-icon-wrap {{venueStatus === 'open' ? 'icon-close' : 'icon-open'}}">
+          <text class="action-emoji">{{venueStatus === 'open' ? '🔒' : '🔓'}}</text>
+        </view>
+        <view class="action-info">
+          <text class="action-name">{{venueStatus === 'open' ? '关闭场馆' : '开放场馆'}}</text>
+          <text class="action-desc">{{venueStatus === 'open' ? '暂停营业' : '开始营业'}}</text>
+        </view>
+        <text class="action-arrow">›</text>
+      </view>
+    </view>
+
+    <!-- 场馆二维码展示 -->
+    <view class="section-title">🏟️ 场馆码</view>
+    <view class="qrcode-card card flex-center flex-column">
+      <view class="qrcode-placeholder flex-center">
+        <text class="qrcode-emoji">🏟️</text>
+      </view>
+      <text class="qrcode-tip">让选手扫描此码进入场馆</text>
+      <text class="qrcode-venue">{{venueName}}</text>
+    </view>
+  </block>
+
+  <!-- loading -->
+  <view wx:if="{{loading && !showLogin}}" class="loading-wrapper">
+    <text class="text-light">加载中...</text>
+  </view>
+</view>

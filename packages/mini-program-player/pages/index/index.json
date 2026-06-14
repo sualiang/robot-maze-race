@@ -1,0 +1,6 @@
+{
+  "usingComponents": {},
+  "navigationBarTitleText": "机器狗迷宫竞速",
+  "enablePullDownRefresh": true,
+  "backgroundColor": "#1a1a2e"
+}

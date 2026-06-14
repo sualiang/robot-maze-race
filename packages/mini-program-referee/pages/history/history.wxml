@@ -1,0 +1,148 @@
+<!--
+  裁判端小程序 - 比赛历史记录页
+  记录列表 · 日期筛选 · 成绩查看 · 上拉加载
+-->
+<view class="container history-page">
+  <!-- ==================== 顶部统计 ==================== -->
+  <view class="stats-bar">
+    <view class="stat-item">
+      <text class="stat-value">{{total}}</text>
+      <text class="stat-label">总记录</text>
+    </view>
+    <view class="stat-divider"></view>
+    <view class="stat-item" bindtap="handleClearFilter">
+      <text class="stat-value">{{filterDate || '全部'}}</text>
+      <text class="stat-label">日期筛选{{filterDate ? ' ✕' : ''}}</text>
+    </view>
+  </view>
+
+  <!-- ==================== 日期筛选 ==================== -->
+  <view class="filter-section">
+    <picker
+      mode="date"
+      value="{{filterDate}}"
+      end="{{today}}"
+      bindchange="handleDateChange"
+    >
+      <view class="filter-picker">
+        <text class="filter-icon">📅</text>
+        <text class="filter-text">
+          {{filterDate ? filterDate : '选择日期筛选'}}
+        </text>
+        <text class="filter-arrow">▼</text>
+      </view>
+    </picker>
+  </view>
+
+  <!-- ==================== 记录列表 ==================== -->
+  <view class="records-list">
+    <!-- 空状态 -->
+    <view wx:if="{{records.length === 0 && !pageLoading}}" class="empty-state">
+      <text class="empty-state-icon">📋</text>
+      <text class="empty-state-text">
+        {{filterDate ? '该日期暂无比赛记录' : '暂无比赛记录'}}
+      </text>
+    </view>
+
+    <!-- 记录项 -->
+    <view
+      wx:for="{{records}}"
+      wx:key="id"
+      class="record-item"
+      data-id="{{item.id}}"
+      bindtap="handleRecordTap"
+    >
+      <!-- 排名 -->
+      <view class="record-rank">
+        <text wx:if="{{item.rank}}" class="rank-badge rank-{{item.rank <= 3 ? 'top' : 'normal'}}">
+          {{item.rank <= 3 ? '🏆' : '#'}}{{item.rank}}
+        </text>
+        <text wx:else class="rank-badge rank-none">-</text>
+      </view>
+
+      <!-- 信息 -->
+      <view class="record-info">
+        <view class="record-top">
+          <text class="record-name">{{item.nickname}}</text>
+          <text class="tag {{item.statusClass}}">{{item.statusText}}</text>
+        </view>
+        <view class="record-detail">
+          <text class="record-robot">{{item.robotName}}</text>
+          <text class="record-time">{{formatDateTime(item.startedAt)}}</text>
+        </view>
+      </view>
+
+      <!-- 成绩 -->
+      <view class="record-score">
+        <text class="score-value">{{item.scoreText}}</text>
+        <text class="score-duration">{{item.durationText}}</text>
+      </view>
+
+      <!-- 箭头 -->
+      <view class="record-arrow">›</view>
+    </view>
+
+    <!-- 加载更多 -->
+    <view wx:if="{{loadingMore}}" class="loading-more">
+      <text>加载中...</text>
+    </view>
+
+    <!-- 没有更多 -->
+    <view wx:elif="{{!hasMore && records.length > 0}}" class="loading-more">
+      <text class="no-more">—— 共 {{total}} 条记录 ——</text>
+    </view>
+  </view>
+
+  <!-- ==================== 详情弹窗 ==================== -->
+  <view wx:if="{{selectedRecord}}" class="detail-overlay" bindtap="handleCloseDetail">
+    <view class="detail-card" catchtap="">
+      <text class="detail-title">比赛详情</text>
+
+      <view class="detail-grid">
+        <view class="detail-row">
+          <text class="detail-label">选手</text>
+          <text class="detail-value">{{selectedRecord.nickname}}</text>
+        </view>
+        <view class="detail-row">
+          <text class="detail-label">机器狗</text>
+          <text class="detail-value">{{selectedRecord.robotName}}</text>
+        </view>
+        <view class="detail-row">
+          <text class="detail-label">成绩</text>
+          <text class="detail-value detail-score">{{selectedRecord.scoreText}}</text>
+        </view>
+        <view class="detail-row">
+          <text class="detail-label">状态</text>
+          <text class="detail-value">
+            <text class="tag {{selectedRecord.statusClass}}">{{selectedRecord.statusText}}</text>
+          </text>
+        </view>
+        <view wx:if="{{selectedRecord.rank}}" class="detail-row">
+          <text class="detail-label">排名</text>
+          <text class="detail-value detail-rank">第 {{selectedRecord.rank}} 名</text>
+        </view>
+        <view class="detail-row">
+          <text class="detail-label">开始时间</text>
+          <text class="detail-value">{{formatDateTime(selectedRecord.startedAt)}}</text>
+        </view>
+        <view wx:if="{{selectedRecord.finishedAt}}" class="detail-row">
+          <text class="detail-label">结束时间</text>
+          <text class="detail-value">{{formatDateTime(selectedRecord.finishedAt)}}</text>
+        </view>
+        <view class="detail-row">
+          <text class="detail-label">用时</text>
+          <text class="detail-value">{{selectedRecord.durationText}}</text>
+        </view>
+      </view>
+
+      <button class="btn btn-primary btn-block" bindtap="handleCloseDetail">
+        关闭
+      </button>
+    </view>
+  </view>
+
+  <!-- 加载中 -->
+  <view wx:if="{{pageLoading}}" class="loading-mask">
+    <view class="loading-spinner">加载中...</view>
+  </view>
+</view>

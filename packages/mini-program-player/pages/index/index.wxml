@@ -1,0 +1,130 @@
+<!-- pages/index/index.wxml -->
+<!-- 赛事首页：banner图文、数据概览、快捷入口 -->
+
+<view class="container">
+  <!-- ========== Hero Banner ========== -->
+  <view class="hero-banner">
+    <image class="hero-bg" src="/assets/images/banner.png" mode="aspectFill" />
+    <view class="hero-overlay">
+      <view class="hero-tag">🏆 机器狗迷宫竞速大赛</view>
+      <text class="hero-title">速度 × 智慧</text>
+      <text class="hero-subtitle">操控你的机器狗，穿越迷宫、挑战极限！</text>
+    </view>
+  </view>
+
+  <!-- ========== 赛事统计数据 ========== -->
+  <view class="stats-row">
+    <view class="stats-card card">
+      <view class="stat-item">
+        <text class="stat-value">{{raceCount}}</text>
+        <text class="stat-label">今日已参赛</text>
+      </view>
+      <view class="stat-divider"></view>
+      <view class="stat-item">
+        <text class="stat-value">{{totalPlayersText}}</text>
+        <text class="stat-label">累计玩家</text>
+      </view>
+      <view class="stat-divider"></view>
+      <view class="stat-item">
+        <view class="arena-status {{arenaStatus === 'open' ? 'status-open' : 'status-closed'}}">
+          <view class="status-dot"></view>
+          <text>{{arenaStatus === 'open' ? '开放中' : '已关闭'}}</text>
+        </view>
+        <text class="stat-label">{{arenaName}}</text>
+      </view>
+    </view>
+
+    <!-- 我的参赛次数 -->
+    <view wx:if="{{isLoggedIn}}" class="race-count-card card flex-between">
+      <view class="flex-column">
+        <text class="race-count-label">我的参赛次数</text>
+        <text class="race-count-tip">可用于签到参赛</text>
+      </view>
+      <text class="race-count-value">{{remainCount}}</text>
+    </view>
+  </view>
+
+  <!-- ========== 赛事公告 ========== -->
+  <view wx:if="{{announcements.length > 0}}" class="notice-bar card">
+    <text class="notice-icon">📢</text>
+    <swiper class="notice-swiper" autoplay vertical circular interval="3000">
+      <swiper-item wx:for="{{announcements}}" wx:key="*this">
+        <text class="notice-text">{{item}}</text>
+      </swiper-item>
+    </swiper>
+  </view>
+
+  <!-- ========== 快捷入口 ========== -->
+  <view class="section-title">快速入口</view>
+  <view class="action-grid">
+    <view class="action-item card" bindtap="goToCheckin">
+      <view class="action-icon-wrap icon-race">
+        <text class="action-emoji">🏁</text>
+      </view>
+      <text class="action-name">立即参赛</text>
+      <text class="action-desc">扫码签到</text>
+    </view>
+
+    <view class="action-item card" bindtap="goToPackages">
+      <view class="action-icon-wrap icon-package">
+        <text class="action-emoji">🎫</text>
+      </view>
+      <text class="action-name">参赛包</text>
+      <text class="action-desc">购买次数</text>
+    </view>
+
+    <view class="action-item card" bindtap="goToLeaderboard">
+      <view class="action-icon-wrap icon-rank">
+        <text class="action-emoji">🏆</text>
+      </view>
+      <text class="action-name">排行榜</text>
+      <text class="action-desc">日/月/年</text>
+    </view>
+
+    <view class="action-item card" bindtap="goToHelp">
+      <view class="action-icon-wrap icon-help">
+        <text class="action-emoji">🤝</text>
+      </view>
+      <text class="action-name">好友助力</text>
+      <text class="action-desc">免费得次数</text>
+    </view>
+  </view>
+
+  <!-- ========== 赛事介绍区 ========== -->
+  <view class="section-title">赛事亮点</view>
+  <view class="intro-list">
+    <view class="intro-card card">
+      <view class="intro-icon">🤖</view>
+      <view class="intro-content">
+        <text class="intro-title">AI 机器狗操控</text>
+        <text class="intro-desc">调用 API 接口，编写代码让机器狗自主穿越迷宫，体验真实机器人编程乐趣</text>
+      </view>
+    </view>
+    <view class="intro-card card">
+      <view class="intro-icon">🗺️</view>
+      <view class="intro-content">
+        <text class="intro-title">随机迷宫生成</text>
+        <text class="intro-desc">每场比赛生成全新迷宫地图，考验你的算法设计与实时应变能力</text>
+      </view>
+    </view>
+    <view class="intro-card card">
+      <view class="intro-icon">⚡</view>
+      <view class="intro-content">
+        <text class="intro-title">速度竞技排位</text>
+        <text class="intro-desc">按照通过时间排名，日/月/年榜单同步更新，冲击赛季冠军</text>
+      </view>
+    </view>
+    <view class="intro-card card">
+      <view class="intro-icon">🎁</view>
+      <view class="intro-content">
+        <text class="intro-title">丰厚奖励激励</text>
+        <text class="intro-desc">参赛包、膨胀券、好友助力，多种方式获取参赛次数和奖励</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- ========== 底部 ========== -->
+  <view class="page-footer">
+    <text class="footer-text">机器狗迷宫竞速 © 2026</text>
+  </view>
+</view>

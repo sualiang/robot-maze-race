@@ -1,0 +1,97 @@
+<!-- pages/race-detail/race-detail.wxml -->
+<!-- 赛事详情：选手列表 + 排名 + 赛事操作 -->
+
+<view class="container">
+  <!-- ========== 赛事头部 ========== -->
+  <view class="race-header card">
+    <view class="race-header-top flex-between">
+      <view class="flex-column flex-1">
+        <text class="race-title">{{raceName}}</text>
+        <text class="race-time">{{raceTime}}</text>
+      </view>
+      <view class="tag {{raceStatusClass}}">
+        {{raceStatusText}}
+      </view>
+    </view>
+    <view wx:if="{{raceDesc}}" class="race-desc-text">
+      <text>{{raceDesc}}</text>
+    </view>
+  </view>
+
+  <!-- ========== 赛事操作按钮 ========== -->
+  <view class="race-actions">
+    <view wx:if="{{raceStatus === 'running'}}" class="btn btn-warning btn-action" bindtap="pauseRace">
+      ⏸ 暂停赛事
+    </view>
+    <view wx:if="{{raceStatus === 'paused'}}" class="btn btn-success btn-action" bindtap="resumeRace">
+      ▶ 恢复赛事
+    </view>
+    <view wx:if="{{raceStatus === 'running' || raceStatus === 'paused'}}" class="btn btn-danger btn-action" bindtap="finishRace">
+      ⏹ 结束赛事
+    </view>
+  </view>
+
+  <!-- ========== 统计 ========== -->
+  <view class="stats-bar card">
+    <view class="stats-item">
+      <text class="stats-num">{{totalPlayers}}</text>
+      <text class="stats-label">参赛总人数</text>
+    </view>
+  </view>
+
+  <!-- ========== 选手列表标题 ========== -->
+  <view class="section-title">🏃 参赛选手</view>
+
+  <!-- ========== 选手列表 ========== -->
+  <view wx:if="{{players.length > 0}}" class="player-list">
+    <!-- 表头 -->
+    <view class="player-header flex-between">
+      <text class="col-rank">排名</text>
+      <text class="col-name">选手</text>
+      <text class="col-score">成绩</text>
+      <text class="col-status">状态</text>
+    </view>
+
+    <view
+      wx:for="{{players}}"
+      wx:key="id"
+      class="player-card flex-between"
+    >
+      <view class="col-rank">
+        <text wx:if="{{item.rank && item.rank <= 3}}" class="rank-medal rank-{{item.rank}}">
+          {{item.rank === 1 ? '🥇' : (item.rank === 2 ? '🥈' : '🥉')}}
+        </text>
+        <text wx:else class="rank-text">{{item.rankText}}</text>
+      </view>
+      <view class="col-name flex-column">
+        <text class="player-name">{{item.nickname || item.name || '选手' + item.id}}</text>
+        <text class="player-id text-xs text-light">{{item.playerId || ''}}</text>
+      </view>
+      <view class="col-score">
+        <text class="score-text">{{item.scoreText}}</text>
+      </view>
+      <view class="col-status">
+        <view class="tag tag-sm {{item.finishClass}}">
+          {{item.finishText}}
+        </view>
+      </view>
+    </view>
+
+    <!-- 加载更多 -->
+    <view wx:if="{{loading}}" class="loading-wrapper">
+      <text class="text-light">加载中...</text>
+    </view>
+    <view wx:if="{{!playerHasMore && players.length > 0}}" class="loading-wrapper">
+      <text class="text-light">— 已加载全部 —</text>
+    </view>
+  </view>
+
+  <!-- ========== 空状态 ========== -->
+  <view wx:if="{{isEmpty && !loading}}" class="empty-state">
+    <text class="empty-icon">👤</text>
+    <text class="empty-text">暂无参赛选手</text>
+  </view>
+
+  <!-- 安全区 -->
+  <view class="safe-area-bottom"></view>
+</view>

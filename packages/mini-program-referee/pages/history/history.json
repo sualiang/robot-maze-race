@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "比赛记录",
+  "enablePullDownRefresh": true,
+  "onReachBottomDistance": 100,
+  "backgroundTextStyle": "dark",
+  "usingComponents": {}
+}

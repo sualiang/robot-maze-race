@@ -1,0 +1,260 @@
+/* pages/dashboard/dashboard.wxss */
+/* 场馆概览样式 */
+
+.container {
+  min-height: 100vh;
+  padding: var(--spacing-base);
+  background-color: var(--color-bg);
+}
+
+/* ===== 登录提示 ===== */
+.login-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--spacing-xl) var(--spacing-base);
+  margin-top: var(--spacing-xl);
+  text-align: center;
+}
+
+.login-icon {
+  font-size: 80rpx;
+  margin-bottom: var(--spacing-base);
+}
+
+.login-title {
+  font-size: var(--font-size-xl);
+  font-weight: bold;
+  color: var(--color-text);
+  margin-bottom: var(--spacing-xs);
+}
+
+.login-desc {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-base);
+}
+
+/* ===== 场馆信息卡片 ===== */
+.venue-header {
+  background: linear-gradient(135deg, #0f3460, #1a508b);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+}
+
+.venue-top {
+  gap: var(--spacing-base);
+}
+
+.venue-name {
+  font-size: var(--font-size-xl);
+  font-weight: bold;
+  color: #ffffff;
+  display: block;
+  margin-bottom: var(--spacing-xs);
+}
+
+.venue-address {
+  font-size: var(--font-size-sm);
+  color: rgba(255, 255, 255, 0.75);
+  display: block;
+}
+
+.venue-status {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 8rpx 20rpx;
+  border-radius: 20rpx;
+  font-size: var(--font-size-xs);
+  font-weight: bold;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(4rpx);
+}
+
+.status-open {
+  color: #52c41a;
+}
+
+.status-closed {
+  color: #ff4d4f;
+}
+
+.status-dot {
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  background-color: currentColor;
+}
+
+/* ===== 分区标题 ===== */
+.section-title {
+  font-size: var(--font-size-base);
+  font-weight: bold;
+  color: var(--color-text);
+  margin-bottom: var(--spacing-base);
+  margin-top: var(--spacing-xs);
+}
+
+/* ===== 今日数据 ===== */
+.stats-grid {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-base);
+}
+
+.stat-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--spacing-lg) var(--spacing-sm);
+  margin-bottom: 0;
+  text-align: center;
+}
+
+.stat-icon-wrap {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--spacing-sm);
+}
+
+.icon-players {
+  background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+}
+
+.icon-rate {
+  background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+}
+
+.icon-avg {
+  background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+}
+
+.stat-emoji {
+  font-size: 32rpx;
+}
+
+.stat-value {
+  font-size: var(--font-size-xl);
+  font-weight: bold;
+  color: var(--color-primary);
+  margin-bottom: 4rpx;
+}
+
+.stat-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+/* ===== 快捷操作 ===== */
+.action-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-base);
+}
+
+.action-card {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-base);
+  padding: var(--spacing-base) var(--spacing-lg);
+  margin-bottom: 0;
+}
+
+.action-icon-wrap {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: var(--radius-base);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.icon-scan {
+  background: linear-gradient(135deg, #e94560, #ff6b81);
+}
+
+.icon-open {
+  background: linear-gradient(135deg, #52c41a, #73d13d);
+}
+
+.icon-close {
+  background: linear-gradient(135deg, #ff4d4f, #ff7875);
+}
+
+.action-emoji {
+  font-size: 36rpx;
+}
+
+.action-info {
+  flex: 1;
+}
+
+.action-name {
+  font-size: var(--font-size-base);
+  font-weight: bold;
+  color: var(--color-text);
+  display: block;
+  margin-bottom: 4rpx;
+}
+
+.action-desc {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  display: block;
+}
+
+.action-arrow {
+  font-size: var(--font-size-xxl);
+  color: var(--color-text-light);
+  flex-shrink: 0;
+}
+
+/* ===== 场馆二维码 ===== */
+.qrcode-card {
+  padding: var(--spacing-xl) var(--spacing-base);
+  text-align: center;
+}
+
+.qrcode-placeholder {
+  width: 240rpx;
+  height: 240rpx;
+  border-radius: var(--radius-base);
+  background: linear-gradient(135deg, #e8eaed, #f8f9fa);
+  border: 2rpx dashed var(--color-border);
+  margin-bottom: var(--spacing-base);
+}
+
+.qrcode-emoji {
+  font-size: 100rpx;
+  opacity: 0.6;
+}
+
+.qrcode-tip {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  display: block;
+  margin-bottom: var(--spacing-xs);
+}
+
+.qrcode-venue {
+  font-size: var(--font-size-base);
+  color: var(--color-primary);
+  font-weight: bold;
+}
+
+/* ===== loading ===== */
+.loading-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl) 0;
+}

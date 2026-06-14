@@ -1,0 +1,145 @@
+<!--
+  裁判端小程序 - 签到签退管理页
+  GPS 定位 · 签到激活赛场 · 签退暂停 · 考勤记录
+-->
+<view class="container attendance-page">
+  <!-- ==================== GPS 定位卡片 ==================== -->
+  <view class="location-card card">
+    <view class="card-title">
+      📍 GPS 定位
+      <text wx:if="{{locationReady}}" class="tag tag-success" style="margin-left: 12rpx;">已定位</text>
+      <text wx:else class="tag tag-warning" style="margin-left: 12rpx;">未定位</text>
+    </view>
+
+    <view wx:if="{{location}}" class="location-info">
+      <text class="location-address">{{location.address}}</text>
+      <text class="location-coords">
+        经度 {{formatCoord(location.longitude)}} · 纬度 {{formatCoord(location.latitude)}}
+      </text>
+      <text wx:if="{{location.accuracy}}" class="location-accuracy">
+        精度 ±{{location.accuracyText}}m
+      </text>
+    </view>
+
+    <!-- GPS 未就绪时的引导 -->
+    <view wx:else class="location-missing">
+      <text class="location-missing-text">无法获取位置，请开启 GPS 权限</text>
+      <button
+        class="btn btn-outline btn-sm"
+        bindtap="requestLocationPermission"
+      >
+        开启定位
+      </button>
+    </view>
+  </view>
+
+  <!-- ==================== 签到状态卡片 ==================== -->
+  <view class="status-card card">
+    <!-- 签到状态指示 -->
+    <view class="attendance-status-badge">
+      <view class="status-dot {{status === 'checked' ? 'dot-active' : (status === 'loading' ? 'dot-loading' : 'dot-inactive')}}"></view>
+      <text class="status-label">
+        {{status === 'checked' ? '已签到 · 赛场激活中' : (status === 'loading' ? '签到中...' : '未签到')}}
+      </text>
+    </view>
+
+    <!-- 签到操作按钮 -->
+    <button
+      wx:if="{{status === 'unchecked'}}"
+      class="btn btn-success btn-block btn-lg"
+      bindtap="checkIn"
+      loading="{{actionLoading}}"
+      disabled="{{!locationReady}}"
+    >
+      {{locationReady ? '📍 签到激活赛场' : '🔍 等待GPS定位...'}}
+    </button>
+
+    <button
+      wx:elif="{{status === 'checked'}}"
+      class="btn btn-danger btn-block btn-lg"
+      bindtap="checkOut"
+      loading="{{actionLoading}}"
+    >
+      🏁 签退暂停赛场
+    </button>
+
+    <button
+      wx:elif="{{status === 'loading'}}"
+      class="btn btn-primary btn-block btn-lg"
+      disabled
+    >
+      ⏳ 处理中...
+    </button>
+  </view>
+
+  <!-- ==================== 赛场信息（签到后显示） ==================== -->
+  <view wx:if="{{status === 'checked' && venueInfo}}" class="venue-card card">
+    <text class="card-title">🏟 当前赛场</text>
+
+    <view class="venue-info-grid">
+      <view class="venue-info-row">
+        <text class="venue-label">赛场名称</text>
+        <text class="venue-value">{{venueInfo.name}}</text>
+      </view>
+      <view class="venue-info-row">
+        <text class="venue-label">地址</text>
+        <text class="venue-value">{{venueInfo.address}}</text>
+      </view>
+      <view class="venue-info-row">
+        <text class="venue-label">签到时间</text>
+        <text class="venue-value">{{checkInTime}}</text>
+      </view>
+      <view wx:if="{{durationText}}" class="venue-info-row">
+        <text class="venue-label">已签到</text>
+        <text class="venue-value venue-highlight">{{durationText}}</text>
+      </view>
+      <view wx:if="{{distanceFromVenue !== null}}" class="venue-info-row">
+        <text class="venue-label">距赛场</text>
+        <text class="venue-value {{withinRange ? 'text-success' : 'text-danger'}}">
+          {{formatDistance(distanceFromVenue)}}
+          {{withinRange ? ' ✅ 范围内' : ' ⚠️ 超出范围'}}
+        </text>
+      </view>
+      <view class="venue-info-row">
+        <text class="venue-label">赛场状态</text>
+        <text class="tag tag-success">活跃</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- ==================== 考勤记录 ==================== -->
+  <view class="records-section">
+    <text class="section-title">📋 今日考勤记录</text>
+
+    <view wx:if="{{records.length === 0}}" class="empty-state">
+      <text class="empty-state-icon">📭</text>
+      <text class="empty-state-text">暂无今日考勤记录</text>
+    </view>
+
+    <view wx:else class="records-list">
+      <view
+        wx:for="{{records}}"
+        wx:key="id"
+        class="record-item"
+      >
+        <view class="record-left">
+          <text class="record-time">{{item.time}}</text>
+        </view>
+        <view class="record-center">
+          <text class="tag {{item.type === 'in' ? 'tag-success' : 'tag-danger'}}">
+            {{item.type === 'in' ? '✅ 签到' : '🏁 签退'}}
+          </text>
+        </view>
+        <view class="record-right">
+          <text class="record-location">{{item.address || '-'}}</text>
+          <text wx:if="{{item.duration}}" class="record-duration">时长: {{item.duration}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 加载中 -->
+  <view wx:if="{{pageLoading}}" class="loading-mask">
+    <view class="loading-spinner">加载中...</view>
+  </view>
+</view>

@@ -1,0 +1,191 @@
+<!-- pages/profile/profile.wxml -->
+<!-- 个人中心：头像昵称、数据面板、参赛记录/助力/优惠券 -->
+
+<view class="container">
+  <!-- ===== 未登录状态 ===== -->
+  <view wx:if="{{!isLoggedIn}}" class="not-login card">
+    <image class="default-avatar" src="/assets/images/default-avatar.png" mode="aspectFill" />
+    <text class="login-prompt">登录后查看个人数据</text>
+    <view class="btn btn-primary login-btn" bindtap="doLogin">
+      微信一键登录
+    </view>
+  </view>
+
+  <!-- ===== 已登录状态 ===== -->
+  <block wx:if="{{isLoggedIn}}">
+    <!-- 个人资料区 -->
+    <view class="profile-header card">
+      <view class="profile-top">
+        <image class="profile-avatar" src="{{userInfo.avatarUrl || '/assets/images/default-avatar.png'}}" mode="aspectFill" />
+        <view class="profile-info">
+          <text class="profile-nickname">{{userInfo.nickname || '玩家'}}</text>
+          <text wx:if="{{userInfo.phone}}" class="profile-phone">{{userInfo.phone}}</text>
+        </view>
+        <view class="edit-btn" bindtap="onEditProfile">
+          <text>✏️</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 数据面板 -->
+    <view class="stats-row">
+      <view class="stats-col card">
+        <text class="stats-num">{{stats.totalRaces}}</text>
+        <text class="stats-label">总参赛</text>
+      </view>
+      <view class="stats-col card">
+        <text class="stats-num">{{bestScoreText}}</text>
+        <text class="stats-label">最佳成绩</text>
+      </view>
+      <view class="stats-col card">
+        <text class="stats-num">{{stats.rankCount}}</text>
+        <text class="stats-label">上榜次数</text>
+      </view>
+    </view>
+
+    <!-- 内容 Tab -->
+    <view class="content-tabs">
+      <view
+        wx:for="{{tabs}}"
+        wx:key="key"
+        class="ctab-item {{tabIndex === index ? 'ctab-active' : ''}}"
+        data-index="{{index}}"
+        bindtap="onTabChange"
+      >
+        {{item.label}}
+        <view wx:if="{{tabIndex === index}}" class="ctab-line"></view>
+      </view>
+    </view>
+
+    <!-- 参赛记录 Tab -->
+    <view wx:if="{{tabIndex === 0}}" class="tab-content">
+      <view wx:if="{{!recordsLoading && !recordsEmpty}}" class="record-list">
+        <view wx:for="{{raceRecords}}" wx:key="id" class="record-item card">
+          <view class="record-row">
+            <view class="record-left">
+              <text class="record-arena">{{item.arenaName}}</text>
+              <text class="record-date">{{item.createdAt}}</text>
+            </view>
+            <view class="record-right">
+              <text class="record-score">{{item.scoreText}}</text>
+              <text wx:if="{{item.rank}}" class="record-rank">第 {{item.rank}} 名</text>
+            </view>
+          </view>
+        </view>
+      </view>
+      <view wx:if="{{!recordsLoading && recordsEmpty}}" class="empty-tab">
+        <text class="empty-icon">🏁</text>
+        <text class="empty-text">暂无参赛记录</text>
+        <text class="empty-hint">快去签到参加比赛吧</text>
+      </view>
+      <view wx:if="{{recordsLoading}}" class="loading-tab">
+        <text>加载中...</text>
+      </view>
+    </view>
+
+    <!-- 助力记录 Tab -->
+    <view wx:if="{{tabIndex === 1}}" class="tab-content">
+      <view wx:if="{{!helpsLoading && !helpsEmpty}}" class="help-list">
+        <view
+          wx:for="{{helpActivities}}"
+          wx:key="id"
+          class="help-item card"
+          data-id="{{item.id}}"
+          bindtap="goToHelpDetail"
+        >
+          <view class="help-row">
+            <view class="help-left">
+              <text class="help-pkg-name">🎁 {{item.targetPackageName}}</text>
+              <text class="help-progress">
+                助力进度 {{item.currentHelpCount}}/{{item.requiredHelpCount}}
+              </text>
+            </view>
+            <view class="help-right">
+              <view class="help-status-tag {{item.status === 'completed' ? 'tag-done' : item.status === 'expired' ? 'tag-expired' : 'tag-active'}}">
+                {{item.status === 'active' ? '进行中' : item.status === 'completed' ? '已完成' : '已过期'}}
+              </view>
+              <text class="help-arrow">›</text>
+            </view>
+          </view>
+        </view>
+      </view>
+      <view wx:if="{{!helpsLoading && helpsEmpty}}" class="empty-tab">
+        <text class="empty-icon">🤝</text>
+        <text class="empty-text">暂无助力记录</text>
+        <text class="empty-hint">邀请好友助力获取免费次数</text>
+      </view>
+      <view wx:if="{{helpsLoading}}" class="loading-tab">
+        <text>加载中...</text>
+      </view>
+    </view>
+
+    <!-- 优惠券 Tab -->
+    <view wx:if="{{tabIndex === 2}}" class="tab-content">
+      <view wx:if="{{!couponsLoading && !couponsEmpty}}" class="coupon-list">
+        <view wx:for="{{coupons}}" wx:key="id" class="coupon-item card {{item.status === 'expired' || item.status === 'used' ? 'coupon-disabled' : ''}}">
+          <view class="coupon-left">
+            <text class="coupon-value">{{item.couponValueText}}</text>
+            <text class="coupon-name">{{item.name}}</text>
+          </view>
+          <view class="coupon-right">
+            <text class="coupon-condition">满 ¥{{item.minAmountText}} 可用</text>
+            <text class="coupon-valid">{{item.validFrom}} ~ {{item.validTo}}</text>
+            <view class="coupon-status-tag">
+              <text wx:if="{{item.status === 'available'}}" class="tag-available">可使用</text>
+              <text wx:elif="{{item.status === 'used'}}" class="tag-used">已使用</text>
+              <text wx:else class="tag-expired">已过期</text>
+            </view>
+          </view>
+        </view>
+      </view>
+      <view wx:if="{{!couponsLoading && couponsEmpty}}" class="empty-tab">
+        <text class="empty-icon">🎫</text>
+        <text class="empty-text">暂无优惠券</text>
+        <text class="empty-hint">参与助力活动获取膨胀券</text>
+      </view>
+      <view wx:if="{{couponsLoading}}" class="loading-tab">
+        <text>加载中...</text>
+      </view>
+    </view>
+
+    <!-- 退出登录 -->
+    <view class="logout-section">
+      <view class="btn btn-ghost logout-btn" bindtap="doLogout">
+        退出登录
+      </view>
+    </view>
+  </block>
+
+  <!-- ===== 编辑资料弹窗 ===== -->
+  <view wx:if="{{showEditModal}}" class="modal-mask" bindtap="onCloseEditModal">
+    <view class="modal-content" catchtap>
+      <text class="modal-title">编辑资料</text>
+
+      <!-- 头像 -->
+      <view class="form-row">
+        <text class="form-label">头像</text>
+        <button class="avatar-pick-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+          <image class="avatar-preview" src="{{editForm.avatarUrl || '/assets/images/default-avatar.png'}}" mode="aspectFill" />
+        </button>
+      </view>
+
+      <!-- 昵称 -->
+      <view class="form-row">
+        <text class="form-label">昵称</text>
+        <input class="form-input" placeholder="输入昵称" value="{{editForm.nickname}}" bindinput="onNicknameInput" maxlength="20" />
+      </view>
+
+      <!-- 手机号 -->
+      <view class="form-row">
+        <text class="form-label">手机号</text>
+        <input class="form-input" type="number" placeholder="输入手机号（选填）" value="{{editForm.phone}}" bindinput="onPhoneInput" maxlength="11" />
+      </view>
+
+      <!-- 按钮 -->
+      <view class="modal-btns">
+        <view class="btn btn-ghost modal-cancel" bindtap="onCloseEditModal">取消</view>
+        <view class="btn btn-primary modal-save" bindtap="onSubmitProfile">保存</view>
+      </view>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,28 @@
+node_modules/
+dist/
+.DS_Store
+*.db
+*.db-backup.*
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.log
+.env
+.env.*
+
+# 大文件 - 省市区GeoJSON
+geojson_data/
+packages/server/src/geojson_data/
+packages/server/src/banks.json
+
+# 截图
+screenshots/
+screenshots-all.js
+screenshots-operator.js
+
+# 冗余文档
+memory/
+*.md
+!README.md

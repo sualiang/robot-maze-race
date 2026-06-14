@@ -1,0 +1,17 @@
+{
+  "name": "@robot-race/mini-program-player",
+  "version": "1.0.0",
+  "description": "机器狗迷宫竞速赛事 - 玩家端微信小程序",
+  "scripts": {
+    "dev": "echo '使用微信开发者工具打开此目录进行开发'",
+    "build": "tsc",
+    "lint": "eslint . --ext .ts"
+  },
+  "dependencies": {
+    "@robot-race/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "miniprogram-api-typings": "^3.12.2"
+  }
+}

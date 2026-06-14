@@ -1,0 +1,21 @@
+{
+  "name": "robot-maze-race",
+  "version": "1.0.0",
+  "private": true,
+  "description": "机器狗迷宫竞速赛事 - 全平台系统 monorepo",
+  "scripts": {
+    "dev:server": "cd packages/server && npm run dev",
+    "dev:player": "cd packages/mini-program-player && npm run dev",
+    "dev:referee": "cd packages/mini-program-referee && npm run dev",
+    "dev:operator": "cd packages/mini-program-operator && npm run dev",
+    "dev:web": "cd packages/web && npm run dev",
+    "build:shared": "cd packages/shared && npm run build",
+    "test": "cd packages/server && npm test",
+    "lint": "npm run lint:server && npm run lint:shared",
+    "lint:server": "cd packages/server && npm run lint",
+    "lint:shared": "cd packages/shared && npm run lint"
+  },
+  "workspaces": [
+    "packages/*"
+  ]
+}

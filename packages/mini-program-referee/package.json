@@ -1,0 +1,17 @@
+{
+  "name": "@robot-race/mini-program-referee",
+  "version": "1.0.0",
+  "description": "机器狗迷宫竞速赛事 - 裁判端微信小程序",
+  "scripts": {
+    "dev": "echo 'Use WeChat DevTools to open this project'",
+    "build": "tsc --noEmit",
+    "lint": "eslint . --ext .ts"
+  },
+  "dependencies": {
+    "@robot-race/shared": "1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "miniprogram-api-typings": "^3.12.0"
+  }
+}

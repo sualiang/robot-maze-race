@@ -1,0 +1,275 @@
+/* pages/profile/profile.wxss */
+/* 运营商信息页样式 */
+
+.container {
+  min-height: 100vh;
+  padding: var(--spacing-base);
+  background-color: var(--color-bg);
+}
+
+/* ===== 登录区域 ===== */
+.login-section {
+  padding-top: var(--spacing-xl);
+}
+
+.login-header {
+  margin-bottom: var(--spacing-xl);
+  padding: var(--spacing-xl) 0;
+}
+
+.login-emoji {
+  font-size: 100rpx;
+  margin-bottom: var(--spacing-base);
+}
+
+.login-title {
+  font-size: var(--font-size-xxl);
+  font-weight: bold;
+  color: var(--color-text);
+  margin-bottom: var(--spacing-xs);
+}
+
+.login-subtitle {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.login-form {
+  padding: var(--spacing-lg);
+}
+
+/* ===== 表单 ===== */
+.form-group {
+  margin-bottom: var(--spacing-base);
+}
+
+.form-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  display: block;
+  margin-bottom: var(--spacing-xs);
+  font-weight: bold;
+}
+
+.form-input {
+  width: 100%;
+  height: 80rpx;
+  background-color: #f5f6f8;
+  border-radius: var(--radius-sm);
+  padding: 0 var(--spacing-base);
+  font-size: var(--font-size-base);
+  color: var(--color-text);
+}
+
+.form-input-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.form-input-row .form-input {
+  flex: 1;
+}
+
+.location-btn {
+  font-size: var(--font-size-sm);
+  color: var(--color-primary);
+  flex-shrink: 0;
+  padding: var(--spacing-sm);
+}
+
+.form-textarea {
+  width: 100%;
+  min-height: 160rpx;
+  background-color: #f5f6f8;
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-base);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
+/* ===== 个人信息卡片 ===== */
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-base);
+  padding: var(--spacing-lg);
+  background: linear-gradient(135deg, #0f3460, #1a508b);
+  margin-bottom: var(--spacing-lg);
+}
+
+.profile-avatar {
+  width: 100rpx;
+  height: 100rpx;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 3rpx solid rgba(255, 255, 255, 0.3);
+}
+
+.avatar-img {
+  width: 100%;
+  height: 100%;
+}
+
+.avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #e94560, #ff6b81);
+}
+
+.avatar-text {
+  font-size: var(--font-size-xl);
+  color: #ffffff;
+  font-weight: bold;
+}
+
+.profile-info {
+  flex: 1;
+}
+
+.profile-name {
+  font-size: var(--font-size-lg);
+  font-weight: bold;
+  color: #ffffff;
+  display: block;
+  margin-bottom: 4rpx;
+}
+
+.profile-phone {
+  font-size: var(--font-size-xs);
+  color: rgba(255, 255, 255, 0.7);
+  display: block;
+}
+
+.profile-badge {
+  flex-shrink: 0;
+}
+
+.profile-badge .tag {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  padding: 6rpx 20rpx;
+  border-radius: 20rpx;
+  font-size: var(--font-size-xs);
+}
+
+/* ===== 分区标题 ===== */
+.section-title {
+  font-size: var(--font-size-base);
+  font-weight: bold;
+  color: var(--color-text);
+  margin-bottom: var(--spacing-base);
+  margin-top: var(--spacing-xs);
+}
+
+/* ===== 场馆选择器 ===== */
+.venue-selector {
+  padding: var(--spacing-base) var(--spacing-lg);
+}
+
+.venue-current-name {
+  font-size: var(--font-size-base);
+  font-weight: bold;
+  color: var(--color-text);
+}
+
+.venue-current-tip {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-light);
+  margin-top: 4rpx;
+}
+
+.venue-arrow {
+  font-size: var(--font-size-xxl);
+  color: var(--color-text-light);
+}
+
+/* 展开的场馆列表 */
+.venue-picker {
+  background-color: #ffffff;
+  border-radius: var(--radius-base);
+  overflow: hidden;
+  margin-bottom: var(--spacing-base);
+  box-shadow: var(--shadow-sm);
+}
+
+.venue-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-base) var(--spacing-lg);
+  border-bottom: 1rpx solid var(--color-border);
+}
+
+.venue-option:last-child {
+  border-bottom: none;
+}
+
+.venue-selected {
+  background-color: rgba(15, 52, 96, 0.05);
+}
+
+.option-name {
+  font-size: var(--font-size-base);
+  color: var(--color-text);
+}
+
+.option-check {
+  font-size: var(--font-size-lg);
+  color: var(--color-primary);
+  font-weight: bold;
+}
+
+.venue-empty {
+  padding: var(--spacing-lg);
+  text-align: center;
+  color: var(--color-text-light);
+  font-size: var(--font-size-sm);
+}
+
+/* ===== 设置卡片 ===== */
+.settings-card {
+  padding: var(--spacing-base) var(--spacing-lg);
+}
+
+.settings-title {
+  font-size: var(--font-size-base);
+  font-weight: bold;
+  color: var(--color-text);
+  display: block;
+}
+
+.settings-desc {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-light);
+  margin-top: 4rpx;
+}
+
+.settings-arrow {
+  font-size: var(--font-size-xxl);
+  color: var(--color-text-light);
+}
+
+/* 设置表单 */
+.settings-form {
+  padding: var(--spacing-lg);
+}
+
+/* ===== 退出登录 ===== */
+.logout-text {
+  font-size: var(--font-size-base);
+  color: var(--color-danger);
+}
+
+/* ===== 版本信息 ===== */
+.version-info {
+  text-align: center;
+  padding: var(--spacing-xl) 0;
+}
+
+/* ===== 安全区 ===== */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+  height: 40rpx;
+}
