@@ -71,10 +71,6 @@ export default function AdminRoleManage() {
 
   const columns: ColumnsType<PermissionItem> = [
     { title: '角色名称', dataIndex: 'label', key: 'label', width: 120 },
-    { title: '角色标识', dataIndex: 'name', key: 'name', width: 140, render: (name: string) => {
-      const labelMap: Record<string, string> = { super_admin: '超级管理员', admin: '总管理员', ops_admin: '运营管理员', finance_admin: '财务管理员' };
-      return labelMap[name] || name;
-    }},
     {
       title: '权限列表', dataIndex: 'permissions', key: 'permissions',
       render: (permissions: string[]) => (
@@ -84,10 +80,6 @@ export default function AdminRoleManage() {
           ))}
         </>
       ),
-    },
-    {
-      title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 180,
-      render: (v: string) => v ? new Date(v).toLocaleString('zh-CN') : '-',
     },
   ];
 
