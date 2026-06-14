@@ -25,3 +25,9 @@ screenshots-operator.js
 # OpenClaw memory 日志（项目无关）
 memory/
 .help-rules-checklist.md
+
+# 二进制资源（太大不适合 git）
+packages/web/public/avatars/
+packages/web/public/logo.png
+packages/web/public/logo_old.png
+packages/web/public/logo-avatar.png
