@@ -28,7 +28,8 @@ function operatorOnly(req: Request, res: Response, next: Function): void {
  */
 router.post('/races', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
-    const { venueId, name, maxParticipants, startTime, endTime, entryFee } = req.body;
+    const { venueId, name, maxParticipants, startTime, endTime, entryFee, description, venueName } = req.body;
+    const operatorId = req.user?.operatorId || null;
 
     if (!venueId || !name) {
       return res.status(400).json({ code: 400, message: '缺少必填参数（venueId, name）', data: null });
@@ -50,14 +51,17 @@ router.post('/races', authMiddleware, operatorOnly, async (req: Request, res: Re
     const now = new Date().toISOString();
 
     await query(
-      `INSERT INTO races (id, venue_id, name, status, max_participants, entry_fee, start_time, end_time, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      `INSERT INTO races (id, venue_id, name, status, max_participants, entry_fee, start_time, end_time, description, venue_name, operator_id, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
       [
         raceId, venueId, name, 'pending',
         maxParticipants || 20,
         entryFee || 0,
         startTime || now,
         endTime || now,
+        description || null,
+        venueName || null,
+        operatorId || null,
         now, now
       ]
     );

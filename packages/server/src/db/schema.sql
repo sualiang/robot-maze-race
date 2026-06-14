@@ -69,7 +69,11 @@ CREATE TABLE IF NOT EXISTS referees (
   last_checkin_at TEXT,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
+  operator_id TEXT REFERENCES operators(id),
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
 );
+
 CREATE INDEX IF NOT EXISTS idx_referees_user ON referees(user_id);
 CREATE INDEX IF NOT EXISTS idx_referees_venue ON referees(venue_id);
 CREATE INDEX IF NOT EXISTS idx_referees_cert ON referees(cert_status);
@@ -104,7 +108,11 @@ CREATE TABLE IF NOT EXISTS orders (
   paid_at TEXT,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
+  operator_id TEXT REFERENCES operators(id),
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
 );
+
 CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id);
 CREATE INDEX IF NOT EXISTS idx_orders_no ON orders(order_no);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
@@ -384,6 +392,9 @@ CREATE TABLE IF NOT EXISTS races (
   created_at TEXT,
   updated_at TEXT,
   deleted_at TEXT
+  operator_id TEXT REFERENCES operators(id),
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
 );
 
 -- ==================== 比赛记录表 ====================
@@ -397,6 +408,9 @@ CREATE TABLE IF NOT EXISTS race_records (
   started_at TEXT,
   finished_at TEXT,
   created_at TEXT
+  operator_id TEXT REFERENCES operators(id),
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
 );
 
 -- ==================== 比赛签到表 ====================
@@ -406,6 +420,9 @@ CREATE TABLE IF NOT EXISTS race_attendance (
   player_id TEXT,
   check_in_time TEXT,
   status TEXT
+  operator_id TEXT REFERENCES operators(id),
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
 );
 
 -- ==================== 用户票券表 ====================
@@ -417,6 +434,9 @@ CREATE TABLE IF NOT EXISTS user_tickets (
   created_at TEXT,
   used_at TEXT,
   expires_at TEXT
+  operator_id TEXT REFERENCES operators(id),
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
 );
 
 -- ==================== 票券兑换表 ====================
@@ -426,7 +446,8 @@ CREATE TABLE IF NOT EXISTS ticket_redemptions (
   player_id TEXT,
   redeemed_at TEXT,
   reward TEXT,
-  status TEXT
+  status TEXT,
+  operator_id TEXT REFERENCES operators(id)
 );
 
 -- ==================== 后台种子数据 ====================
