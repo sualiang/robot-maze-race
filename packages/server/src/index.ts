@@ -1,0 +1,110 @@
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import http from 'http';
+import { errorHandler, notFoundHandler } from './middleware/errorHandler';
+import { logger, responseTime } from './middleware/logger';
+import { config } from './config';
+import { initSchema } from './config/database';
+import { setupWebSocket } from './ws/handler';
+
+// 路由
+import authRoutes from './routes/auth';
+import operatorRoutes from './routes/operator';
+import userRoutes from './routes/users';
+import venueRoutes from './routes/venues';
+import refereeRoutes from './routes/referees';
+import racePackageRoutes from './routes/race-packages';
+import playerRoutes from './routes/player';
+import adminOperatorRoutes from './routes/admin-operators';
+import adminFinanceRoutes from './routes/admin-finance';
+import adminMarketingRoutes from './routes/admin-marketing';
+import adminSettingsRoutes from './routes/admin-settings';
+import operatorFinanceRoutes from './routes/operator-finance';
+import operatorMarketingRoutes from './routes/operator-marketing';
+import attendanceRoutes from './routes/attendance';
+import adminAttendanceRoutes from './routes/admin-attendance';
+import adminDashboardRoutes from './routes/admin-dashboard';
+import adminRbacRoutes from './routes/admin-rbac';
+import adminBanksRoutes from './routes/admin-banks';
+import adminMapsRoutes from './routes/admin-maps';
+import raceRoutes from './routes/race';
+import clientLogRoutes from './routes/client-log';
+import adminPlayersRouter from './routes/admin-players';
+import operatorPlayersRouter from './routes/operator-players';
+
+const app = express();
+const PORT = config.port || 3000;
+
+// ============================================================
+// 初始化数据库（启动时自动建表）
+// ============================================================
+initSchema();
+
+// ============================================================
+// 基础中间件
+// ============================================================
+app.use(helmet());
+app.use(cors());
+app.use(express.json());
+app.use(logger);
+app.use(responseTime);
+
+// ============================================================
+// 健康检查
+// ============================================================
+app.get('/api/v1/health', (_req, res) => {
+  res.json({
+    code: 0,
+    message: 'ok',
+    data: {
+      status: 'running',
+      version: '1.0.0',
+      env: config.nodeEnv,
+      timestamp: new Date().toISOString(),
+    },
+  });
+});
+
+// ============================================================
+// API 路由挂载
+// ============================================================
+app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/venues', venueRoutes);
+app.use('/api/v1/referees', refereeRoutes);
+app.use('/api/v1/race-packages', racePackageRoutes);
+app.use('/api/v1/packages', racePackageRoutes); // alias for frontend compatibility
+app.use('/api/v1/player', playerRoutes);
+app.use('/api/v1/admin/operators', adminOperatorRoutes);
+app.use('/api/v1/admin/finance', adminFinanceRoutes);
+app.use('/api/v1/admin/marketing', adminMarketingRoutes);
+app.use('/api/v1/admin/settings', adminSettingsRoutes);
+app.use('/api/v1/operator/finance', operatorFinanceRoutes);
+app.use('/api/v1/operator/marketing', operatorMarketingRoutes);
+app.use('/api/v1/operator', operatorRoutes);
+app.use('/api/v1/operator', raceRoutes);
+app.use('/api/v1/attendance', attendanceRoutes);
+app.use('/api/v1/admin/attendance', adminAttendanceRoutes);
+app.use('/api/v1/admin/dashboard', adminDashboardRoutes);
+app.use('/api/v1/admin/rbac', adminRbacRoutes);
+app.use('/api/v1/admin/banks', adminBanksRoutes);
+app.use('/api/v1/admin/maps', adminMapsRoutes);
+
+app.use('/api/v1/admin/players', adminPlayersRouter);
+app.use('/api/v1/operator/players', operatorPlayersRouter);
+
+// 客户端错误日志（无需鉴权）
+app.use('/api/v1', clientLogRoutes);
+
+// ============================================================
+// 404 和全局错误处理
+// ============================================================
+app.use('/api/*', notFoundHandler);
+app.use(errorHandler);
+
+// ============================================================
+// 导出 app（由 server.ts 启动）
+// ============================================================
+
+export default app;
