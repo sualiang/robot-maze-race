@@ -68,15 +68,8 @@ deploy_backend() {
     echo '  当前 commit: ' \$(git rev-parse --short HEAD)
 
     echo '🔧 Step 2: 安装依赖 + 编译后端...'
-    cd $REMOTE_SERVER_DIR
-    # 确保 node_modules 存在
-    if [ ! -d node_modules/.bin ]; then
-      # 首次需要 pnpm install
-      cd $REMOTE_REPO && pnpm install 2>&1 | tail -5
-      cd $REMOTE_SERVER_DIR
-    else
-      echo '  ⚡ node_modules 已存在，跳过 install'
-    fi
+    cd $REMOTE_REPO
+    pnpm install 2>&1 | tail -5
     # 拷贝 schema.sql 到 dist（tsc 不处理 .sql 文件）
     cp src/db/schema.sql dist/db/schema.sql 2>/dev/null || true
     # 用本地 tsc 编译（直接调用 node_modules 的 tsc，绕过 pnpm 构建检查）
