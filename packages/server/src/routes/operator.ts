@@ -55,8 +55,13 @@ router.post('/login', async (req: Request, res: Response) => {
       return res.status(403).json({ code: 403, message: '账号已被禁用', data: null });
     }
 
-    // 简单密码校验（生产环境应使用 bcrypt）
-    if (password !== 'admin123' && password !== 'operator123') {
+    // 使用 bcrypt 验证密码
+    const operator2 = await queryOne<{ password_hash: string }>(
+      'SELECT operator_password_hash as password_hash FROM operators WHERE id = $1',
+      [operator.id]
+    );
+    const bcrypt = require('bcryptjs');
+    if (!operator2 || !operator2.password_hash || !bcrypt.compareSync(password, operator2.password_hash)) {
       return res.status(401).json({ code: 401, message: '手机号或密码错误', data: null });
     }
 
@@ -64,7 +69,7 @@ router.post('/login', async (req: Request, res: Response) => {
     const jwt = require('jsonwebtoken');
     const { config } = require('../config');
     const token = jwt.sign(
-      { userId: operator.id, role: "operator", phone: operator.phone, operatorId: operator.id },
+      { userId: operator.id, role: 'operator', phone: operator.phone, operatorId: operator.id },
       config.jwt.secret || 'robot-race-jwt-secret',
       { expiresIn: '7d' }
     );
@@ -1015,6 +1020,7 @@ router.post('/change-password', authMiddleware, async (req: Request, res: Respon
       userId: operator.id,
       openid: '',
       role: 'operator',
+      operatorId: operator.id,
     };
     const token = jwt.sign(payload, config.jwt.secret, { expiresIn: config.jwt.expiresIn as any });
 
