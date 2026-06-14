@@ -64,7 +64,7 @@ router.post('/login', async (req: Request, res: Response) => {
     const jwt = require('jsonwebtoken');
     const { config } = require('../config');
     const token = jwt.sign(
-      { userId: operator.id, role: 'operator', phone: operator.phone },
+      { userId: operator.id, role: "operator", phone: operator.phone, operatorId: operator.id },
       config.jwt.secret || 'robot-race-jwt-secret',
       { expiresIn: '7d' }
     );

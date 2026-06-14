@@ -1164,7 +1164,7 @@ router.post('/attendance/check-in', authMiddleware, async (req: Request, res: Re
 
     // 确保 referees 表和 venues 表有该记录（防止 FK 约束失败）
     await execute('INSERT OR IGNORE INTO referees (id, user_id, phone, cert_status) VALUES ($1, $2, $3, $4)', [refereeId, 'test-referee-id', phone, 'certified']);
-    await execute('INSERT OR IGNORE INTO venues (id, name, status, open_time, close_time) VALUES ($1, $2, $3, $4, $5)', [finalVenueId, address ? address + '赛场' : '默认赛场', 'open', '09:00', '21:00']);
+// [FIX]     await execute('INSERT OR IGNORE INTO venues (id, name, status, open_time, close_time) VALUES ($1, $2, $3, $4, $5)', [finalVenueId, address ? address + '赛场' : '默认赛场', 'open', '09:00', '21:00']);
 
     // 检查今日是否已签到
     const existing = await queryOne<any>(

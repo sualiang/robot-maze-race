@@ -357,7 +357,7 @@ export default function ScreenDisplay() {
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           gap: 24,
         }}>
-          <img src="/logo.png" alt="铁甲快狗" style={{ width: 200, height: 'auto', maxWidth: '60vw' }} />
+          <img src="/logo.png" alt="铁甲快狗" style={{ width: 300, height: 'auto', maxWidth: '60vw' }} />
           <div style={{ fontSize: 32, fontWeight: 700, color: '#fff' }}>赛场未激活</div>
           <div style={{ fontSize: 18, color: 'rgba(255,255,255,0.5)', letterSpacing: 1 }}>
             等待裁判签到激活…

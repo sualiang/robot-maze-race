@@ -31,7 +31,7 @@ function calcDistance(lat1: number, lng1: number, lat2: number, lng2: number): n
 function getCurrentPosition(): Promise<GeolocationPosition> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) { reject(new Error('浏览器不支持GPS定位')); return; }
-    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 });
+    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: false, timeout: 60000, maximumAge: 30000 });
   });
 }
 

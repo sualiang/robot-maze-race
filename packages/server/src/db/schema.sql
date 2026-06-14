@@ -459,5 +459,5 @@ INSERT OR IGNORE INTO admin_roles (id, name, label, permissions) VALUES
 
 -- admin 用户（first_login = 0，不需要首次改密码）
 INSERT OR IGNORE INTO admin_users (id, username, password, nickname, role_id, first_login) VALUES
-  ('admin-default', 'admin', '$2a$10$uPX5Q6yR0q5R5fl6Pp7k8u3F5x1y2z3A4B5C6D7E8F9G0H1I2J3K4L5M', '超级管理员', 'role-super-admin', 0);
+  ('admin-default', 'admin', '$2b$10$wK8TStP.p630Kkp3nZjHDemm2pf9FkBiJ/uIdHN3TMs/xDRIyGFLC', '超级管理员', 'role-super-admin', 0);
 
