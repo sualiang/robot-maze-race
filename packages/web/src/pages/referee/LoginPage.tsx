@@ -64,8 +64,8 @@ export default function LoginPage() {
         // 清除旧 token 和 user info
         localStorage.removeItem('token');
         localStorage.removeItem('referee_user_info');
-        // 重新跳转登录页
-        navigate('/referee/login', { replace: true });
+        // 全页面跳回登录页（避免 React Router 路由状态混乱）
+        window.location.href = '/referee/login';
       } else {
         message.error(data.message || '密码修改失败');
       }
