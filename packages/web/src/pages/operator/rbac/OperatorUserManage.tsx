@@ -5,7 +5,7 @@ import {
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
-  PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined,
+  PlusOutlined, DeleteOutlined, ReloadOutlined,
   KeyOutlined, SearchOutlined,
 } from '@ant-design/icons';
 import AccountInfoModal from '../../../components/AccountInfoModal';
@@ -38,12 +38,7 @@ export default function OperatorUserManage() {
   const [createLoading, setCreateLoading] = useState(false);
   const [createForm] = Form.useForm();
 
-  // Edit modal
-  const [editOpen, setEditOpen] = useState(false);
-  const [editLoading, setEditLoading] = useState(false);
-  const [editRecord, setEditRecord] = useState<OperatorUserItem | null>(null);
-  const [editForm] = Form.useForm();
-
+  
   // Reset password modal
   const [resetPwdOpen, setResetPwdOpen] = useState(false);
   const [resetPwdLoading, setResetPwdLoading] = useState(false);
@@ -97,43 +92,6 @@ export default function OperatorUserManage() {
       message.error(serverMsg || '创建失败');
     } finally {
       setCreateLoading(false);
-    }
-  };
-
-  const handleEdit = (record: OperatorUserItem) => {
-    setEditRecord(record);
-    editForm.setFieldsValue({
-      nickname: record.nickname,
-      email: record.email,
-      phone: record.phone,
-      role_key: record.role_key,
-      status: record.status === 'active',
-    });
-    setEditOpen(true);
-  };
-
-  const handleEditSave = async () => {
-    if (!editRecord) return;
-    const values = await editForm.validateFields();
-    setEditLoading(true);
-    try {
-      await api.put(`/operator/rbac/users/${editRecord.id}`, {
-        nickname: values.nickname,
-        email: values.email,
-        phone: values.phone,
-        role_key: values.role_key,
-        status: values.status ? 'active' : 'disabled',
-      });
-      message.success('更新成功');
-      setEditOpen(false);
-      setEditRecord(null);
-      fetchList(page, pageSize, search);
-    } catch (err: any) {
-      console.error('[OperatorUser] edit error:', err);
-      const serverMsg = err?.response?.data?.message || err?.data?.message || err?.message || '';
-      message.error(serverMsg || '更新失败');
-    } finally {
-      setEditLoading(false);
     }
   };
 
@@ -353,32 +311,6 @@ export default function OperatorUserManage() {
         role="operator"
         onClose={() => setAccountInfo(null)}
       />
-
-      {/* 编辑成员 Modal */}
-      <Modal
-        title="编辑成员"
-        open={editOpen}
-        onOk={handleEditSave}
-        onCancel={() => { setEditOpen(false); setEditRecord(null); }}
-        confirmLoading={editLoading}
-        destroyOnClose
-        width={520}
-      >
-        <Form form={editForm} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item name="nickname" label="昵称" rules={[{ required: true, message: '请输入昵称' }]}>
-            <Input placeholder="显示昵称" />
-          </Form.Item>
-          <Form.Item name="phone" label="手机号">
-            <Input placeholder="手机号" />
-          </Form.Item>
-          <Form.Item name="role_key" label="角色" rules={[{ required: true, message: '请选择角色' }]}>
-            <Select placeholder="请选择角色" options={roleOptions.map((r) => ({ value: r.key, label: r.name }))} />
-          </Form.Item>
-          <Form.Item name="status" label="状态" valuePropName="checked">
-            <Switch checkedChildren="正常" unCheckedChildren="禁用" />
-          </Form.Item>
-        </Form>
-      </Modal>
 
       {/* 重置密码 Modal */}
       <Modal
