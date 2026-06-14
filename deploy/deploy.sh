@@ -107,11 +107,11 @@ deploy_backend() {
     sudo chown -R ubuntu:ubuntu /opt/robot-maze-race-server
     sudo chmod -R 755 /opt/robot-maze-race-server
 
-    # 复制 shared 模块到生产目录
+    # 复制 shared 模块到生产目录（注意用 -L 解引用 symlink）
     echo '📦 Step 7: 同步 shared 到生产目录...'
     mkdir -p /opt/robot-maze-race-server/node_modules/@robot-race
     rm -rf /opt/robot-maze-race-server/node_modules/@robot-race/shared
-    cp -r $REMOTE_SERVER_DIR/node_modules/@robot-race/shared /opt/robot-maze-race-server/node_modules/@robot-race/
+    cp -rL $REMOTE_SERVER_DIR/node_modules/@robot-race/shared /opt/robot-maze-race-server/node_modules/@robot-race/
 
     echo '🚀 Step 8: 启动后端...'
     pm2 restart robot-maze-race-server --update-env 2>/dev/null || pm2 start /opt/robot-maze-race-server/server.js --name robot-maze-race-server --update-env
