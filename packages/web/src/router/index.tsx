@@ -18,8 +18,6 @@ import OperatorLoginPage from '../pages/operator/login/OperatorLoginPage';
 // 运营商新增页面（小程序的 H5 迁移）
 
 import AdminOperatorDashboard from '../pages/admin/dashboard/OperatorDashboard';
-import OperatorRaces from '../pages/operator/races/OperatorRaces';
-import OperatorRaceDetail from '../pages/operator/race-detail/OperatorRaceDetail';
 import OperatorRbac from '../pages/operator/rbac/OperatorRbac';
 import OperatorProfile from '../pages/operator/profile/OperatorProfile';
 
@@ -61,8 +59,6 @@ export default function AppRouter() {
       {/* 运营商后台 */}
       <Route path="/operator" element={<OperatorLayout />}>
         <Route index element={<Navigate to="venues" replace />} />
-        <Route path="races" element={<OperatorRaces />} />
-        <Route path="races/:id" element={<OperatorRaceDetail />} />
         <Route path="profile" element={<OperatorProfile />} />
         <Route path="venues" element={<VenueList />} />
         <Route path="venues/:id" element={<VenueEdit />} />

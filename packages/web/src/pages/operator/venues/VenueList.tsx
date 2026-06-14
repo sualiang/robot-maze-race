@@ -5,7 +5,6 @@ import { PlusOutlined, EditOutlined, QrcodeOutlined, DownloadOutlined, ReloadOut
 import { VenueStatus } from '@robot-race/shared';
 import api from '../../../utils/api';
 import { CITY_OPTIONS, getDistrictOptions } from '../../../utils/venueData';
-import OperatorRaces from '../races/OperatorRaces';
 
 
 // 省市区数据用Cascader
@@ -424,11 +423,6 @@ export default function VenueList() {
       key: 'venues',
       label: '赛场列表',
       children: <VenueTab />,
-    },
-    {
-      key: 'races',
-      label: '比赛管理',
-      children: <OperatorRaces />,
     },
   ];
 
