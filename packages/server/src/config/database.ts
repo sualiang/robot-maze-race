@@ -202,7 +202,7 @@ export function initSchema(): void {
 
   // 迁移：admin_users 表新增 first_login 字段
   try {
-    db.exec('ALTER TABLE admin_users ADD COLUMN first_login INTEGER DEFAULT 1');
+    db.exec('ALTER TABLE admin_users ADD COLUMN first_login INTEGER DEFAULT 0');
   } catch {
     // ignore — 列已存在
   }
