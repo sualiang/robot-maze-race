@@ -483,8 +483,8 @@ router.post('/login', async (req: Request, res: Response) => {
 
       const firstLogin = referee.first_login == 1;
       const payload = {
-        userId: referee.id,
-        openid: '',
+        userId: referee.user_id || referee.id,
+        openid: referee.user_id ? ('ref_' + referee.user_id) : '',
         role: 'referee',
         firstLogin
       };
