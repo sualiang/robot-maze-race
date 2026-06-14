@@ -210,9 +210,6 @@ export default function OperatorUserManage() {
       title: '操作', key: 'action', width: 240, fixed: 'right',
       render: (_: unknown, record: OperatorUserItem) => (
         <Space size="small" wrap>
-          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
-            编辑
-          </Button>
           <Button
             type="link" size="small" icon={<KeyOutlined />}
             onClick={() => {
