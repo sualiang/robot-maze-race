@@ -3,8 +3,23 @@ set -e
 
 # ========================================
 # 机器狗迷宫竞速赛事 — 服务器部署脚本
-# 用法: bash deploy/deploy.sh <backend|frontend|all>
+# ⚠️ 部署前请先执行: git push origin main 确保与 GitHub 同步
 # ========================================
+
+# ===== 部署前检查清单（每次执行前先停下来想一想）=====
+__preflight_check() {
+  echo "🛩️ 部署前检查清单:"
+  echo "  1. ✅ git push origin main 已经执行了?"
+  echo "  2. 📂 tar 打包前缀: 后端 route 文件在 ./routes/ 下, 不是 ./dist/routes/"
+  echo "  3. 🗄️ 数据库补丁: 新加列/新表需要 ALTER TABLE 或 schema.sql 同步"
+  echo "  4. 📊 数据文件: banks.json / pca-code.json / geojson_data/ 是否遗漏?"
+  echo "  5. 🔗 shared 模块: @robot-race/shared 的 dist 是否已更新?"
+  echo "  6. 🧹 旧文件清理: 之前部署遗留的 .js.map / dist/ 污染要删掉"
+  echo ""
+  if [ -z "$SKIP_PREFLIGHT" ]; then
+    read -p "按回车继续部署，或 Ctrl+C 取消: " dummy
+  fi
+}
 
 SERVER="ubuntu@175.24.200.63"
 SSH_KEY="~/.ssh/robot_server_925.pem"
@@ -18,6 +33,7 @@ if [ -z "$1" ]; then
 fi
 
 build_backend() {
+  __preflight_check
   echo "🔧 编译后端..."
   cd packages/server
   npm run build 2>&1 | tail -3
@@ -55,13 +71,15 @@ deploy_backend() {
     echo '🛑 停后端...'
     pm2 stop robot-maze-race-server 2>/dev/null || true
 
-    echo '🧹 清理旧代码（保留 data/ 和 .env）...'
+    echo '🧹 清理旧代码（保留 data/ robots/.env 文件）...'
     cd $REMOTE_BACKEND
-    sudo rm -rf routes config middleware ws index.js server.js package.json
+    sudo rm -rf routes config middleware ws index.js server.js package.json *.js.map
 
     echo '📦 解压新代码...'
     sudo tar -xzf /tmp/robot-backend-dist.tar.gz -C $REMOTE_BACKEND/
+    # 防止 tar 解压时文件权限被改了
     sudo chown -R ubuntu:ubuntu $REMOTE_BACKEND
+    sudo chmod 755 $REMOTE_BACKEND/routes/*.js 2>/dev/null || true
 
     echo '📄 复制数据文件...'
     sudo cp $DATA_SOURCE/packages/server/src/banks.json $REMOTE_BACKEND/ 2>/dev/null
@@ -69,10 +87,14 @@ deploy_backend() {
     sudo cp -r $DATA_SOURCE/packages/server/src/geojson_data $REMOTE_BACKEND/ 2>/dev/null
     sudo chown ubuntu:ubuntu $REMOTE_BACKEND/banks.json $REMOTE_BACKEND/pca-code.json 2>/dev/null || true
 
-    echo '🔗 复制 shared 模块...'
+    echo '📦 安装依赖...'
+    cd $REMOTE_BACKEND
+    # shared 模块先准备好
     rm -rf $REMOTE_BACKEND/node_modules/@robot-race/shared
     mkdir -p $REMOTE_BACKEND/node_modules/@robot-race
     cp -r $DATA_SOURCE/packages/shared/dist $REMOTE_BACKEND/node_modules/@robot-race/shared/
+    # npm install 补全依赖
+    npm install --omit=dev 2>&1 | tail -3
 
     echo '🚀 启动后端...'
     pm2 start $REMOTE_BACKEND/server.js --name robot-maze-race-server --update-env
