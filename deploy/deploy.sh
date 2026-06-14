@@ -71,9 +71,9 @@ deploy_backend() {
     cd $REMOTE_REPO
     pnpm install 2>&1 | tail -5
     # 拷贝 schema.sql 到 dist（tsc 不处理 .sql 文件）
-    cp src/db/schema.sql dist/db/schema.sql 2>/dev/null || true
-    # 用本地 tsc 编译（直接调用 node_modules 的 tsc，绕过 pnpm 构建检查）
-    ./node_modules/.bin/tsc 2>&1 || { echo '❌ 编译失败'; exit 1; }
+    cd $REMOTE_SERVER_DIR && cp src/db/schema.sql dist/db/schema.sql 2>/dev/null || true
+    # 用 pnpm exec tsc（使用工作区的本地 typescript）
+    pnpm --filter @robot-race/server exec tsc 2>&1 || { echo '❌ 编译失败'; exit 1; }
     echo '  ✅ 编译成功'
 
     echo '📦 Step 3: 准备 shared 模块...'
