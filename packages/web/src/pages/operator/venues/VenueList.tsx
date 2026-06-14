@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card, Table, Button, Space, Tag, Modal, Form, Input, InputNumber, Select, Tabs, message, Popconfirm, QRCode, Cascader } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { PlusOutlined, EditOutlined, QrcodeOutlined, DownloadOutlined, ReloadOutlined, StopOutlined, PlayCircleOutlined, UserSwitchOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, QrcodeOutlined, DownloadOutlined, ReloadOutlined, StopOutlined, PlayCircleOutlined, UserSwitchOutlined, MonitorOutlined } from '@ant-design/icons';
 import { VenueStatus } from '@robot-race/shared';
 import api from '../../../utils/api';
 import { CITY_OPTIONS, getDistrictOptions } from '../../../utils/venueData';
@@ -225,6 +225,44 @@ function VenueTab() {
     setQrModalOpen(true);
   };
 
+  const handleScreenUrl = (record: VenueItem) => {
+    const url = `http://175.24.200.63/screen/display?venueId=${record.id}`;
+    Modal.success({
+      title: '现场大屏网址',
+      content: (
+        <div>
+          <p style={{ marginBottom: 8 }}>赛场「{record.name}」的大屏地址：</p>
+          <div style={{
+            background: '#f5f5f5',
+            padding: '8px 12px',
+            borderRadius: 6,
+            wordBreak: 'break-all',
+            fontSize: 13,
+            marginBottom: 12,
+          }}>{url}</div>
+          <Button
+            type="primary"
+            onClick={() => {
+              navigator.clipboard.writeText(url).then(() => {
+                message.success('链接已复制');
+                Modal.destroyAll();
+              });
+            }}
+          >
+            复制链接
+          </Button>
+          <Button
+            style={{ marginLeft: 8 }}
+            onClick={() => window.open(url, '_blank')}
+          >
+            打开大屏
+          </Button>
+        </div>
+      ),
+      footer: null,
+    });
+  };
+
   const downloadQR = () => {
     const canvas = document.querySelector('.qr-canvas canvas') as HTMLCanvasElement;
     if (canvas && qrVenue) {
@@ -261,6 +299,9 @@ function VenueTab() {
         <Space size="small" wrap>
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
             编辑
+          </Button>
+          <Button type="link" size="small" icon={<MonitorOutlined />} onClick={() => handleScreenUrl(record)}>
+            现场大屏
           </Button>
           <Button type="link" size="small" icon={<UserSwitchOutlined />} onClick={() => handleBindReferee(record)}>
             绑定裁判员
