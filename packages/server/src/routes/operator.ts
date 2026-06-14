@@ -149,7 +149,7 @@ router.get('/rbac/users', authMiddleware, operatorOnly, async (req: Request, res
     const params: any[] = [operatorId];
 
     if (search) {
-      conditions.push(`(au.username LIKE ? OR au.nickname LIKE ?)`);
+      conditions.push(`(au.name LIKE ? OR au.nickname LIKE ?)`);
       params.push(`%${search}%`, `%${search}%`);
     }
 
@@ -164,7 +164,7 @@ router.get('/rbac/users', authMiddleware, operatorOnly, async (req: Request, res
 
     // 分页数据（不返回 password）
     const users = await query<any>(
-      `SELECT au.id, au.username, au.nickname, au.email, au.phone,
+      `SELECT au.id, au.name AS username, au.nickname, au.phone,
               au.role_id as role_key, au.status, au.created_at
        FROM operator_members au
        ${whereClause}
@@ -228,9 +228,9 @@ router.post('/rbac/users', authMiddleware, operatorOnly, async (req: Request, re
     const id = uuidv4();
 
     await query(
-      `INSERT INTO operator_members (id, name, password, nickname, email, phone, role_id, operator_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, phone, hashedPassword, '', '', phone, role_key, operatorId]
+      `INSERT INTO operator_members (id, name, password, nickname, phone, role_id, operator_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [id, phone, hashedPassword, '', phone, role_key, operatorId]
     );
 
     // 查角色名称和权限说明
@@ -314,7 +314,7 @@ router.put('/rbac/users/:id', authMiddleware, operatorOnly, async (req: Request,
     );
 
     const updated = await queryOne<any>(
-      `SELECT au.id, au.username, au.nickname, au.email, au.phone,
+      `SELECT au.id, au.name AS username, au.nickname, au.phone,
               au.role_id as role_key, au.status, au.created_at
        FROM operator_members au WHERE au.id = ?`,
       [id]
@@ -1097,7 +1097,7 @@ router.get('/settings', authMiddleware, async (req: Request, res: Response) => {
 async function initOperatorRoles() {
   try {
     const roles = await query<any>(
-      `SELECT id AS key, label AS name, label, permissions FROM admin_roles WHERE scope = 'operator'  ORDER BY name ASC`
+      `SELECT id AS key, label AS name, label, permissions FROM admin_roles WHERE (scope = 'operator' OR (scope = 'admin' AND name != 'super_admin')) ORDER BY name ASC`
     );
     OPERATOR_ROLES = roles.map((r: any) => ({
       ...r,

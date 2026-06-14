@@ -37,6 +37,10 @@ export default function OperatorLayout() {
     return [];
   });
   const [userInfoLoaded, setUserInfoLoaded] = useState(() => !!localStorage.getItem('operator_user_info'));
+  const rawUserInfo = localStorage.getItem('operator_user_info');
+  const userInfo: any = (() => {
+    try { return JSON.parse(rawUserInfo || '{}'); } catch { return {}; }
+  })();
 
   // 如果 localStorage 没有用户信息但 token 存在，从后端拉取
   const token = localStorage.getItem('token');

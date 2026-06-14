@@ -23,13 +23,8 @@ interface OperatorUserItem {
   created_at: string;
 }
 
-const ROLE_OPTIONS = [
-  { key: 'op_super_admin', name: '总管理员（全部权限）' },
-  { key: 'op_admin', name: '运营' },
-  { key: 'op_finance', name: '财务' },
-];
-
 export default function OperatorUserManage() {
+  const [roleOptions, setRoleOptions] = useState<Array<{ key: string; name: string }>>([]);
   const [list, setList] = useState<OperatorUserItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
@@ -77,6 +72,15 @@ export default function OperatorUserManage() {
   useEffect(() => {
     fetchList(page, pageSize, search);
   }, [fetchList, page, pageSize, search]);
+
+  // 从后端加载角色列表
+  useEffect(() => {
+    api.get('/operator/rbac/roles').then((data: any) => {
+      if (Array.isArray(data)) {
+        setRoleOptions(data.map((r: any) => ({ key: r.key, name: r.label || r.name })));
+      }
+    }).catch(() => {});
+  }, []);
 
   const handleCreate = async () => {
     const values = await createForm.validateFields();
@@ -335,43 +339,12 @@ export default function OperatorUserManage() {
         <Form form={createForm} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item label="说明" style={{ marginBottom: 16 }}>
             <span style={{ color: '#888', fontSize: 13 }}>创建后系统将自动生成随机密码，成员首次登录时可设置用户名和修改密码。</span>
-            <div style={{ marginTop: 8, fontSize: 13, color: '#333', lineHeight: '22px' }}>
-              <div style={{ fontWeight: 600, marginBottom: 4 }}>角色权限说明</div>
-              <div style={{ background: '#fafafa', border: '1px solid #e8e8e8', borderRadius: 6, padding: '8px 12px' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid #e8e8e8' }}>
-                      <th style={{ padding: '6px 8px', textAlign: 'left', color: '#666', fontWeight: 600 }}>角色名称</th>
-                      <th style={{ padding: '6px 8px', textAlign: 'left', color: '#666', fontWeight: 600 }}>角色标识</th>
-                      <th style={{ padding: '6px 8px', textAlign: 'left', color: '#666', fontWeight: 600 }}>权限列表</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                      <td style={{ padding: '6px 8px' }}>总管理员</td>
-                      <td style={{ padding: '6px 8px', color: '#888', fontFamily: 'monospace' }}>op_super_admin</td>
-                      <td style={{ padding: '6px 8px' }}>全部权限</td>
-                    </tr>
-                    <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                      <td style={{ padding: '6px 8px' }}>运营</td>
-                      <td style={{ padding: '6px 8px', color: '#888', fontFamily: 'monospace' }}>op_admin</td>
-                      <td style={{ padding: '6px 8px' }}>赛场管理 · 赛场创建 · 赛场编辑 · 裁判管理 · 裁判创建 · 裁判编辑 · 参赛包管理 · 参赛包创建 · 参赛包编辑 · 营销管理 · 营销配置</td>
-                    </tr>
-                    <tr>
-                      <td style={{ padding: '6px 8px' }}>财务</td>
-                      <td style={{ padding: '6px 8px', color: '#888', fontFamily: 'monospace' }}>op_finance</td>
-                      <td style={{ padding: '6px 8px' }}>财务中心 · 财务提现 · 财务流水</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
           </Form.Item>
           <Form.Item name="phone" label="登录账号" rules={[{ required: true, message: '请输入手机号' }, { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号码' }]}>
             <Input placeholder="请用手机号码注册" />
           </Form.Item>
           <Form.Item name="role_key" label="角色" rules={[{ required: true, message: '请选择角色' }]}>
-            <Select placeholder="请选择角色" options={ROLE_OPTIONS.map((r) => ({ value: r.key, label: r.name }))} />
+            <Select placeholder="请选择角色" options={roleOptions.map((r) => ({ value: r.key, label: r.name }))} />
           </Form.Item>
         </Form>
       </Modal>
@@ -402,7 +375,7 @@ export default function OperatorUserManage() {
             <Input placeholder="手机号" />
           </Form.Item>
           <Form.Item name="role_key" label="角色" rules={[{ required: true, message: '请选择角色' }]}>
-            <Select placeholder="请选择角色" options={ROLE_OPTIONS.map((r) => ({ value: r.key, label: r.name }))} />
+            <Select placeholder="请选择角色" options={roleOptions.map((r) => ({ value: r.key, label: r.name }))} />
           </Form.Item>
           <Form.Item name="status" label="状态" valuePropName="checked">
             <Switch checkedChildren="正常" unCheckedChildren="禁用" />
