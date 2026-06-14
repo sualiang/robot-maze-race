@@ -40,27 +40,29 @@ function convertSql(text: string): string {
  */
 function expandParams(text: string, params: any[]): any[] {
   if (!params || params.length === 0) return [];
-  const maxIdx = Math.max(...params.keys()) + 1;
-  // 找出传入了有效值的最大索引
-  const effectiveMax = params.reduce((max, _, i) => i + 1 > max ? i + 1 : max, 0);
-  // 统计每个 $N 在 SQL 中出现的次数
+  // 如果 SQL 中有 $N 占位符，按 $N 出现次数展开
+  const dollarRegex = /\$(\d+)/g;
+  let hasDollar = false;
   const counts: number[] = [];
-  const regex = /\$(\d+)/g;
   let match;
-  while ((match = regex.exec(text)) !== null) {
+  while ((match = dollarRegex.exec(text)) !== null) {
+    hasDollar = true;
     const idx = parseInt(match[1], 10) - 1;
     counts[idx] = (counts[idx] || 0) + 1;
   }
-  // 按 counts 展开参数
-  const result: any[] = [];
-  for (let i = 0; i < counts.length; i++) {
-    const count = counts[i] || 0;
-    const val = i < params.length ? params[i] : undefined;
-    for (let j = 0; j < count; j++) {
-      result.push(val);
+  if (hasDollar) {
+    const result: any[] = [];
+    for (let i = 0; i < counts.length; i++) {
+      const count = counts[i] || 0;
+      const val = i < params.length ? params[i] : undefined;
+      for (let j = 0; j < count; j++) {
+        result.push(val);
+      }
     }
+    return result;
   }
-  return result;
+  // 没有 $N 占位符（只有 ?），原样返回 params
+  return params;
 }
 
 /**

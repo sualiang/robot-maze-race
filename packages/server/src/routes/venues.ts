@@ -367,7 +367,7 @@ router.get('/:id/referees', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const referees = await query<any>(
-      'SELECT id, user_id, cert_status, phone, id_number, created_at FROM referees WHERE venue_id = $1',
+      'SELECT id, user_id, cert_status, phone, id_number, created_at, name FROM referees WHERE venue_id = $1',
       [id]
     );
     return res.json({ code: 0, message: 'ok', data: referees });
@@ -391,12 +391,16 @@ router.put('/:id/referees', async (req: Request, res: Response) => {
       return res.status(400).json({ code: 400, message: 'referee_ids 必须为数组', data: null });
     }
 
+    // 先查场地 operator_id
+    const venue = await queryOne<{ operator_id: string }>('SELECT operator_id FROM venues WHERE id = $1', [id]);
+    const opId = venue?.operator_id || null;
+
     // 解绑所有已绑定的裁判员
-    await query('UPDATE referees SET venue_id = NULL WHERE venue_id = $1', [id]);
+    await query('UPDATE referees SET venue_id = NULL, operator_id = NULL WHERE venue_id = $1', [id]);
 
     // 绑定新裁判员
     for (const refId of referee_ids) {
-      await query('UPDATE referees SET venue_id = $1 WHERE id = $2', [id, refId]);
+      await query('UPDATE referees SET venue_id = $1, operator_id = $2 WHERE id = $3', [id, opId, refId]);
     }
 
     return res.json({ code: 0, message: '裁判绑定成功', data: null });
