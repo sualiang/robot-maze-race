@@ -84,7 +84,9 @@ deploy_backend() {
 
     echo '📦 Step 4: 安装依赖...'
     cd $REMOTE_SERVER_DIR
-    npm install --omit=dev 2>&1 | tail -3
+    # 生产目录用 npm install --omit=dev，但 lockfile 是 pnpm 锁的
+    # 改用 pnpm install --prod 来 install 生产依赖
+    pnpm install --prod --no-frozen-lockfile 2>&1 | tail -5
 
     echo '📤 Step 5: 部署后端到生产目录...'
     sudo rm -rf /opt/robot-maze-race-server/routes /opt/robot-maze-race-server/db /opt/robot-maze-race-server/middleware /opt/robot-maze-race-server/config /opt/robot-maze-race-server/ws /opt/robot-maze-race-server/index.js /opt/robot-maze-race-server/server.js /opt/robot-maze-race-server/package.json /opt/robot-maze-race-server/*.js.map
