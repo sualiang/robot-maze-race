@@ -283,7 +283,11 @@ CREATE TABLE IF NOT EXISTS operators (
   company_address TEXT DEFAULT '',
   operator_username TEXT DEFAULT '',
   operator_password_hash TEXT DEFAULT '',
+  contact_phone VARCHAR(20),
+  scope VARCHAR(64),
+  role VARCHAR(32) DEFAULT 'admin',
   password_change_required INTEGER DEFAULT 1,
+  first_login INTEGER DEFAULT 1,
   created_by TEXT,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
@@ -319,6 +323,7 @@ CREATE TABLE IF NOT EXISTS admin_users (
   phone TEXT DEFAULT '',
   role_id TEXT NOT NULL REFERENCES admin_roles(id),
   operator_id TEXT REFERENCES operators(id),
+  first_login INTEGER DEFAULT 1,
   status TEXT NOT NULL DEFAULT 'active',
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
@@ -328,9 +333,108 @@ CREATE INDEX IF NOT EXISTS idx_admin_users_role ON admin_users(role_id);
 CREATE INDEX IF NOT EXISTS idx_admin_users_operator ON admin_users(operator_id);
 
 -- ==================== 后台种子数据 ====================
+-- ==================== 客户端日志表 ====================
+CREATE TABLE IF NOT EXISTS client_logs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  level TEXT,
+  message TEXT,
+  source TEXT,
+  detail TEXT,
+  url TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ==================== 运营商成员表 ====================
+CREATE TABLE IF NOT EXISTS operator_members (
+  id TEXT PRIMARY KEY,
+  operator_id TEXT,
+  name TEXT,
+  phone TEXT,
+  password_hash TEXT,
+  role TEXT DEFAULT 'member',
+  status TEXT DEFAULT 'active',
+  first_login INTEGER DEFAULT 1,
+  created_at TEXT,
+  updated_at TEXT
+);
+
+-- ==================== 运营商会话表 ====================
+CREATE TABLE IF NOT EXISTS operator_sessions (
+  id TEXT PRIMARY KEY,
+  operator_id TEXT,
+  member_id TEXT,
+  member_name TEXT,
+  token TEXT,
+  created_at TEXT,
+  expires_at TEXT
+);
+
+-- ==================== 比赛表 ====================
+CREATE TABLE IF NOT EXISTS races (
+  id TEXT PRIMARY KEY,
+  venue_id TEXT,
+  name TEXT,
+  status TEXT DEFAULT 'draft',
+  max_participants INTEGER,
+  entry_fee INTEGER,
+  start_time TEXT,
+  end_time TEXT,
+  created_at TEXT,
+  updated_at TEXT,
+  deleted_at TEXT
+);
+
+-- ==================== 比赛记录表 ====================
+CREATE TABLE IF NOT EXISTS race_records (
+  id TEXT PRIMARY KEY,
+  race_id TEXT,
+  player_id TEXT,
+  score REAL,
+  duration_seconds INTEGER,
+  status TEXT,
+  started_at TEXT,
+  finished_at TEXT,
+  created_at TEXT
+);
+
+-- ==================== 比赛签到表 ====================
+CREATE TABLE IF NOT EXISTS race_attendance (
+  id TEXT PRIMARY KEY,
+  race_id TEXT,
+  player_id TEXT,
+  check_in_time TEXT,
+  status TEXT
+);
+
+-- ==================== 用户票券表 ====================
+CREATE TABLE IF NOT EXISTS user_tickets (
+  id TEXT PRIMARY KEY,
+  player_id TEXT,
+  ticket_type TEXT,
+  status TEXT DEFAULT 'unused',
+  created_at TEXT,
+  used_at TEXT,
+  expires_at TEXT
+);
+
+-- ==================== 票券兑换表 ====================
+CREATE TABLE IF NOT EXISTS ticket_redemptions (
+  id TEXT PRIMARY KEY,
+  ticket_id TEXT,
+  player_id TEXT,
+  redeemed_at TEXT,
+  reward TEXT,
+  status TEXT
+);
+
+-- ==================== 后台种子数据 ====================
 INSERT OR IGNORE INTO admin_roles (id, name, label, permissions) VALUES
   ('role-super-admin', 'super_admin', '超级管理员', '["*"]'),
   ('role-admin', 'admin', '总管理员', '["operators:read","operators:list","dashboard:read","dashboard:list","marketing:read","finance:read","finance:withdraw","finance:history"]'),
   ('role-ops-admin', 'ops_admin', '运营管理员', '["operators:read","operators:create","operators:edit","dashboard:read","dashboard:list"]'),
   ('role-finance-admin', 'finance_admin', '财务管理员', '["finance:read","finance:withdraw","finance:history"]');
+
+-- admin 用户（first_login = 0，不需要首次改密码）
+INSERT OR IGNORE INTO admin_users (id, username, password, nickname, role_id, first_login) VALUES
+  ('admin-default', 'admin', '$2a$10$uPX5Q6yR0q5R5fl6Pp7k8u3F5x1y2z3A4B5C6D7E8F9G0H1I2J3K4L5M', '超级管理员', 'role-super-admin', 0);
 

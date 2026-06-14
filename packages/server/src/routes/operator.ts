@@ -1023,6 +1023,7 @@ router.get('/regions', async (req: Request, res: Response) => {
     const candidates = [
       path.resolve(__dirname, '../../../shared/src/pca-code.json'),
       path.resolve(process.cwd(), 'packages/shared/src/pca-code.json'),
+      path.resolve(process.cwd(), 'pca-code.json'),
     ];
     for (const p of candidates) {
       if (fs.existsSync(p)) {
