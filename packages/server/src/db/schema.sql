@@ -452,11 +452,18 @@ CREATE TABLE IF NOT EXISTS ticket_redemptions (
 );
 
 -- ==================== 后台种子数据 ====================
-INSERT OR IGNORE INTO admin_roles (id, name, label, permissions) VALUES
-  ('role-super-admin', 'super_admin', '超级管理员', '["*"]'),
-  ('role-admin', 'admin', '总管理员', '["operators:read","operators:list","dashboard:read","dashboard:list","marketing:read","finance:read","finance:withdraw","finance:history"]'),
-  ('role-ops-admin', 'ops_admin', '运营管理员', '["operators:read","operators:create","operators:edit","dashboard:read","dashboard:list"]'),
-  ('role-finance-admin', 'finance_admin', '财务管理员', '["finance:read","finance:withdraw","finance:history"]');
+-- 运营商角色（scope='operator'）
+INSERT OR IGNORE INTO admin_roles (id, name, label, permissions, scope) VALUES
+  ('op_super_admin', 'op_super_admin', '总管理员', '["*"]', 'operator'),
+  ('op_admin', 'op_admin', '运营', '["venues:read","venues:create","venues:edit","referees:read","referees:create","referees:edit","packages:read","packages:create","packages:edit","marketing:read","marketing:create","marketing:edit","players:read","dashboard:read"]', 'operator'),
+  ('op_finance', 'op_finance', '财务', '["finance:read","finance:withdraw","finance:history","dashboard:read"]', 'operator');
+
+-- 总部角色（scope='admin'）
+INSERT OR IGNORE INTO admin_roles (id, name, label, permissions, scope) VALUES
+  ('role-super-admin', 'super_admin', '超级管理员', '["*"]', 'admin'),
+  ('role-admin', 'admin', '总管理员', '["operators:read","operators:list","dashboard:read","dashboard:list","marketing:read","finance:read","finance:withdraw","finance:history"]', 'admin'),
+  ('role-ops-admin', 'ops_admin', '运营管理员', '["operators:read","operators:create","operators:edit","dashboard:read","dashboard:list"]', 'admin'),
+  ('role-finance-admin', 'finance_admin', '财务管理员', '["finance:read","finance:withdraw","finance:history"]', 'admin');
 
 -- admin 用户（first_login = 0，不需要首次改密码）
 INSERT OR IGNORE INTO admin_users (id, username, password, nickname, role_id, first_login) VALUES
