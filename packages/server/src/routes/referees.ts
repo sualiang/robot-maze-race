@@ -1099,7 +1099,15 @@ router.get('/attendance/status', authMiddleware, async (req: Request, res: Respo
   try {
     const userId = req.user!.userId;
     const openid = req.user!.openid || '';
-    const phone = openid.replace('mock_openid_', '');
+    // 从 userId 或 openid 中提取手机号
+    let phone = '';
+    if (openid) {
+      phone = openid.replace('mock_openid_', '');
+    } else {
+      // 真实裁判用户：从 referees 表查手机号
+      const ref = await queryOne<{ phone: string }>('SELECT phone FROM referees WHERE id = $1', [userId]);
+      phone = ref?.phone || '';
+    }
     if (!phone) return res.status(401).json({ code: 401, message: '未登录', data: null });
 
     // Mock 模式：和 check-in 用同样的 referee_id 逻辑

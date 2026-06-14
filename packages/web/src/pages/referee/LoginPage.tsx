@@ -83,7 +83,7 @@ export default function LoginPage() {
       <div className="referee-login-box">
         {/* Logo */}
         <div className="referee-login-logo">
-          <img src="/logo-avatar.png" alt="铁甲快狗" style={{ width: 160, height: 160 }} />
+          <div style={{ width: 160, height: 160, borderRadius: 12, background: '#1677ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 60 }}>🐕</div>
         </div>
 
         {/* 品牌标题 — 已集成在 logo 中，文案删掉 */}
