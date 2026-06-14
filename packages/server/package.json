@@ -1,7 +1,7 @@
 {
   "name": "@robot-race/server",
   "version": "1.0.0",
-  "description": "机器狗迷宫竞速赛事 - 后端服务",
+  "description": "\u673a\u5668\u72d7\u8ff7\u5bab\u7ade\u901f\u8d5b\u4e8b - \u540e\u7aef\u670d\u52a1",
   "main": "dist/index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
@@ -22,7 +22,8 @@
     "pg": "^8.11.3",
     "redis": "^4.6.12",
     "uuid": "^9.0.0",
-    "zod": "^3.22.4"
+    "zod": "^3.22.4",
+    "ws": "*"
   },
   "devDependencies": {
     "@types/bcryptjs": "^3.0.0",
@@ -39,7 +40,8 @@
     "supertest": "^7.2.2",
     "ts-jest": "^29.4.11",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^5.3.0"
+    "typescript": "^5.3.0",
+    "@types/ws": "*"
   },
   "keywords": [],
   "author": "",
