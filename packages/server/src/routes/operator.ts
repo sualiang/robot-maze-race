@@ -234,8 +234,8 @@ router.post('/rbac/users', authMiddleware, operatorOnly, async (req: Request, re
     const id = uuidv4();
 
     await query(
-      `INSERT INTO operator_members (id, name, password, nickname, phone, role_id, operator_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO operator_members (id, name, password, nickname, phone, role_id, operator_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
       [id, phone, hashedPassword, '', phone, role_key, operatorId]
     );
 
