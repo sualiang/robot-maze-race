@@ -34,6 +34,36 @@ function convertSql(text: string): string {
 }
 
 /**
+ * 展开参数列表以匹配 convertSql 转换后的 ? 数量。
+ * SQLite 要求传 ? 数量与参数数组完全一致。
+ * 原理：计算 SQL 中 $1, $2 ... 的出现次数，然后按最大引用编号展开参数。
+ */
+function expandParams(text: string, params: any[]): any[] {
+  if (!params || params.length === 0) return [];
+  const maxIdx = Math.max(...params.keys()) + 1;
+  // 找出传入了有效值的最大索引
+  const effectiveMax = params.reduce((max, _, i) => i + 1 > max ? i + 1 : max, 0);
+  // 统计每个 $N 在 SQL 中出现的次数
+  const counts: number[] = [];
+  const regex = /\$(\d+)/g;
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    const idx = parseInt(match[1], 10) - 1;
+    counts[idx] = (counts[idx] || 0) + 1;
+  }
+  // 按 counts 展开参数
+  const result: any[] = [];
+  for (let i = 0; i < counts.length; i++) {
+    const count = counts[i] || 0;
+    const val = i < params.length ? params[i] : undefined;
+    for (let j = 0; j < count; j++) {
+      result.push(val);
+    }
+  }
+  return result;
+}
+
+/**
  * 执行查询，返回多行结果。
  *
  * 兼容原 pg query() 接口：
@@ -44,14 +74,15 @@ function convertSql(text: string): string {
 export async function query<T = any>(text: string, params?: any[]): Promise<T[]> {
   try {
     const sql = convertSql(text);
+    const expandedParams = params ? expandParams(text, params) : undefined;
     const stmt = db.prepare(sql);
     const trimmed = sql.trimStart();
     // 非 SELECT 开头的语句使用 run()，SQLite 不允许 all() 用于 INSERT/UPDATE/DELETE
     if (!/^SELECT\b/i.test(trimmed)) {
-      const info = params ? stmt.run(...params) : stmt.run();
+      const info = expandedParams ? stmt.run(...expandedParams) : stmt.run();
       return [] as T[];
     }
-    const rows = params ? stmt.all(...params) : stmt.all();
+    const rows = expandedParams ? stmt.all(...expandedParams) : stmt.all();
     return (rows || []) as T[];
   } catch (error: any) {
     console.error('[SQLite] query error:', error.message, '\n  SQL:', text.substring(0, 200));
@@ -69,8 +100,9 @@ export async function query<T = any>(text: string, params?: any[]): Promise<T[]>
 export async function queryOne<T = any>(text: string, params?: any[]): Promise<T | null> {
   try {
     const sql = convertSql(text);
+    const expandedParams = params ? expandParams(text, params) : undefined;
     const stmt = db.prepare(sql);
-    const row = params ? stmt.get(...params) : stmt.get();
+    const row = expandedParams ? stmt.get(...expandedParams) : stmt.get();
     return (row as T) ?? null;
   } catch (error: any) {
     console.error('[SQLite] queryOne error:', error.message, '\n  SQL:', text.substring(0, 200));
@@ -85,8 +117,9 @@ export async function queryOne<T = any>(text: string, params?: any[]): Promise<T
 export async function execute(text: string, params?: any[]): Promise<{ changes: number; lastInsertRowid: number | bigint }> {
   try {
     const sql = convertSql(text);
+    const expandedParams = params ? expandParams(text, params) : undefined;
     const stmt = db.prepare(sql);
-    const result = params ? stmt.run(...params) : stmt.run();
+    const result = expandedParams ? stmt.run(...expandedParams) : stmt.run();
     return { changes: result.changes, lastInsertRowid: result.lastInsertRowid };
   } catch (error: any) {
     console.error('[SQLite] execute error:', error.message, '\n  SQL:', text.substring(0, 200));
