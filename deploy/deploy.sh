@@ -73,7 +73,7 @@ deploy_backend() {
     # 拷贝 schema.sql 到 dist（tsc 不处理 .sql 文件）
     cd $REMOTE_SERVER_DIR && cp src/db/schema.sql dist/db/schema.sql 2>/dev/null || true
     # 用本地 tsc 编译（跳过 pnpm 构建检查）
-    node node_modules/.bin/tsc --outDir dist 2>&1 || { echo '❌ 编译失败'; exit 1; }
+    ./node_modules/.bin/tsc 2>&1 || { echo '❌ 编译失败'; exit 1; }
     echo '  ✅ 编译成功'
 
     echo '📦 Step 3: 准备 shared 模块...'
