@@ -319,6 +319,7 @@ CREATE TABLE IF NOT EXISTS admin_roles (
   name TEXT NOT NULL UNIQUE,
   label TEXT NOT NULL,
   permissions TEXT NOT NULL DEFAULT '[]',
+  scope TEXT NOT NULL DEFAULT 'admin',
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
