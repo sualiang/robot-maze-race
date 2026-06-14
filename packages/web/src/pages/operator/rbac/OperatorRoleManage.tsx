@@ -94,7 +94,7 @@ export default function OperatorRoleManage() {
   const columns: ColumnsType<RoleItem> = [
     { title: '角色名称', dataIndex: 'label', key: 'label', width: 120 },
     { title: '角色标识', dataIndex: 'name', key: 'name', width: 160, render: (name: string) => {
-      const labelMap: Record<string, string> = { super_admin: '超级管理员', admin: '总管理员', ops_admin: '运营管理员', finance_admin: '财务管理员' };
+      const labelMap: Record<string, string> = { super_admin: '超级管理员', admin: '总管理员', ops_admin: '运营', finance_admin: '财务' };
       return labelMap[name] || name;
     }},
     {
