@@ -18,6 +18,7 @@ const router = Router();
 /** 参赛包数据库行格式 */
 interface RacePackageRow {
   id: string;
+  operator_id: string;
   name: string;
   description: string | null;
   price_cents: number;
@@ -166,14 +167,16 @@ router.post('/', authMiddleware, async (req: Request, res: Response<ApiResponse<
     const validDays = body.valid_days || 365;
     const sortOrder = body.sort_order || 0;
 
+    const opId = req.user?.operatorId || '00000000-0000-0000-0000-000000000000';
     const row = await queryOne<RacePackageRow>(
-      `INSERT INTO race_packages (id, name, description, price_cents,
+      `INSERT INTO race_packages (id, operator_id, name, description, price_cents,
                race_count, valid_days, status, sort_order)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING id, name, description, price_cents, race_count,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING id, operator_id, name, description, price_cents, race_count,
                  valid_days, status, sort_order, created_at, updated_at`,
       [
         id,
+        opId,
         body.name,
         body.description || null,
         priceCents,

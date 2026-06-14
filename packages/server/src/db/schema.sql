@@ -77,6 +77,7 @@ CREATE INDEX IF NOT EXISTS idx_referees_cert ON referees(cert_status);
 -- ==================== 参赛包表 ====================
 CREATE TABLE IF NOT EXISTS race_packages (
   id TEXT PRIMARY KEY,
+  operator_id TEXT REFERENCES operators(id),
   name VARCHAR(128) NOT NULL,
   description TEXT,
   price_cents INTEGER NOT NULL,
