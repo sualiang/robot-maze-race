@@ -4,7 +4,7 @@ import {
   message, Input, Descriptions, Badge, Form,
 } from 'antd';
 import {
-  CheckOutlined, CloseOutlined, EyeOutlined, ReloadOutlined,
+  CheckOutlined, CloseOutlined, EyeOutlined, KeyOutlined, ReloadOutlined,
   SwapOutlined, SearchOutlined, PlusOutlined, CopyOutlined,
 } from '@ant-design/icons';
 import AccountInfoModal from '../../../components/AccountInfoModal';
@@ -177,6 +177,25 @@ export default function RefereeList() {
     } catch { message.error('删除失败'); }
   };
 
+  const handleResetPassword = async (record: RefereeItem) => {
+    try {
+      const res: any = await api.post(`/referees/${record.id}/reset-password`);
+      Modal.info({
+        title: '密码已重置',
+        content: (
+          <div>
+            <p>裁判 <b>{record.name}</b> 的密码已重置为：</p>
+            <p style={{ fontSize: 20, fontWeight: 'bold', color: '#1890ff', textAlign: 'center', margin: '12px 0' }}>
+              {res.data.init_password}
+            </p>
+            <p style={{ color: '#888' }}>裁判首次登录后需重新设置密码</p>
+          </div>
+        ),
+      });
+      fetchList();
+    } catch { message.error('重置密码失败'); }
+  };
+
   const handleViewDetail = (record: RefereeItem) => {
     setDetailReferee(record);
     setDetailOpen(true);
@@ -228,6 +247,9 @@ export default function RefereeList() {
           )}
           <Button type="link" size="small" icon={<SwapOutlined />} onClick={() => handleBindVenue(record)}>
             绑定赛场
+          </Button>
+          <Button type="link" size="small" icon={<KeyOutlined />} onClick={() => handleResetPassword(record)}>
+            重置密码
           </Button>
           {record.status === 'disabled' ? (
             <Popconfirm title="确认启用该裁判？" onConfirm={() => handleToggleStatus(record.id, 'active')}>

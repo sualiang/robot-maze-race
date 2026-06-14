@@ -1449,4 +1449,42 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response<ApiRespo
   }
 });
 
+/**
+ * POST /api/v1/referees/:id/reset-password
+ * 运营商管理员/运营重置裁判密码
+ */
+router.post('/:id/reset-password', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const bcrypt = require('bcryptjs');
+    const { v4: uuidv4 } = require('uuid');
+    const initPassword = uuidv4().slice(0, 8);
+    const passwordHash = bcrypt.hashSync(initPassword, 10);
+
+    // 先查裁判关联的 user_id
+    const referee = await queryOne<{ user_id: string }>(
+      'SELECT user_id FROM referees WHERE id = $1',
+      [id]
+    );
+    if (!referee) {
+      return res.status(404).json({ code: 404, message: '裁判不存在', data: null });
+    }
+
+    // 更新 users 表密码 + 标记首次登录
+    await query(
+      'UPDATE users SET password = $1, first_login = 1 WHERE id = $2',
+      [passwordHash, referee.user_id]
+    );
+
+    return res.json({
+      code: 0,
+      message: '密码已重置',
+      data: { init_password: initPassword }
+    });
+  } catch (error: any) {
+    console.error('[Referees] reset password error:', error.message);
+    return res.status(500).json({ code: 500, message: '重置密码失败', data: null });
+  }
+});
+
 export default router;
