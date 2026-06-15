@@ -52,6 +52,17 @@ const statusColors: Record<VenueStatus, string> = {
 };
 
 /* ── 赛场管理 Tab ── */
+// 从 localStorage 获取当前用户角色
+const operatorUserInfo = (() => {
+  try {
+    return JSON.parse(localStorage.getItem('operator_user_info') || '{}');
+  } catch { return {}; }
+})();
+const operatorRoleName: string = operatorUserInfo.role_name || '';
+const operatorRoleId: string = operatorUserInfo.role_id || '';
+// 运营商超管（op_super_admin）→ 可删除
+const isOperatorManager = operatorRoleId === 'op_super_admin';
+
 function VenueTab() {
   const [list, setList] = useState<VenueItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -139,6 +150,10 @@ function VenueTab() {
   const handleEdit = (record: VenueItem) => {
     setEditingId(record.id);
     const formValues: any = { ...record };
+    // 后端字段名 max_queue_size 映射为前端 max_capacity
+    if (formValues.max_queue_size !== undefined && formValues.max_capacity === undefined) {
+      formValues.max_capacity = formValues.max_queue_size;
+    }
     if (record.province || record.city || record.district) {
       formValues.province_path = [record.province, record.city, record.district].filter(Boolean);
     }
@@ -318,9 +333,11 @@ function VenueTab() {
               <Button type="link" size="small" icon={<PlayCircleOutlined />} style={{ color: '#52c41a' }}>开启</Button>
             </Popconfirm>
           )}
-          <Popconfirm title="确定删除此赛场？此操作不可恢复" onConfirm={() => handleDelete(record.id)}>
-            <Button type="link" size="small" danger>删除</Button>
-          </Popconfirm>
+          {isOperatorManager && (
+            <Popconfirm title="确定删除此赛场？此操作不可恢复" onConfirm={() => handleDelete(record.id)}>
+              <Button type="link" size="small" danger>删除</Button>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },

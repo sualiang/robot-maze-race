@@ -47,6 +47,17 @@ const certColors: Record<RefereeCertStatus, string> = {
   [RefereeCertStatus.REJECTED]: 'red',
 };
 
+// 从 localStorage 获取当前用户角色
+const operatorUserInfo = (() => {
+  try {
+    return JSON.parse(localStorage.getItem('operator_user_info') || '{}');
+  } catch { return {}; }
+})();
+const operatorRoleName: string = operatorUserInfo.role_name || '';
+const operatorRoleId: string = operatorUserInfo.role_id || '';
+// 运营商超管（op_super_admin）→ 可删除
+const isOperatorManager = operatorRoleId === 'op_super_admin';
+
 export default function RefereeList() {
   const [list, setList] = useState<RefereeItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -180,18 +191,7 @@ export default function RefereeList() {
   const handleResetPassword = async (record: RefereeItem) => {
     try {
       const res: any = await api.post(`/referees/${record.id}/reset-password`);
-      Modal.info({
-        title: '密码已重置',
-        content: (
-          <div>
-            <p>裁判 <b>{record.name}</b> 的密码已重置为：</p>
-            <p style={{ fontSize: 20, fontWeight: 'bold', color: '#1890ff', textAlign: 'center', margin: '12px 0' }}>
-              {res.data.init_password}
-            </p>
-            <p style={{ color: '#888' }}>裁判首次登录后需重新设置密码</p>
-          </div>
-        ),
-      });
+      setAccountInfo({ account: res.phone || record.phone, password: res.init_password });
       fetchList();
     } catch { message.error('重置密码失败'); }
   };
@@ -260,9 +260,11 @@ export default function RefereeList() {
               <Button type="link" size="small" danger>禁用</Button>
             </Popconfirm>
           )}
-          <Popconfirm title="确定删除该裁判？此操作不可恢复！" onConfirm={() => handleDeleteReferee(record.id)}>
-            <Button type="link" size="small" icon={<CloseOutlined />} danger>删除</Button>
-          </Popconfirm>
+          {isOperatorManager && (
+            <Popconfirm title="确定删除该裁判？此操作不可恢复！" onConfirm={() => handleDeleteReferee(record.id)}>
+              <Button type="link" size="small" icon={<CloseOutlined />} danger>删除</Button>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },

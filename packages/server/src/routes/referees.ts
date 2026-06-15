@@ -632,73 +632,10 @@ interface CurrentRacer extends Racer {
   pausedElapsed: number;
 }
 
-// 内存 Mock 数据
-// 默认机器狗头像 (SVG 风格)
-const ROBOT_AVATARS = [
-  '🤖', '🐕', '🐾', '⚡', '🔥',
-  '💎', '🛡️', '⚙️', '🦾', '👾',
-  '🌟', '🌪️', '🗡️', '🚀',
-];
-
-const mockQueue: Racer[] = [
-  { id: 1, name: '铁甲勇士冲冲冲巨无敌旋风小霸王', team: 'A队', queueNumber: 1, avatarUrl: ROBOT_AVATARS[0], remainingRaces: 3 },
-  { id: 2, name: '今天一定要拿到第一名打败全场', team: 'A队', queueNumber: 2, avatarUrl: ROBOT_AVATARS[1], remainingRaces: 3 },
-  { id: 3, name: '全宇宙最厉害迷宫竞速王在此', team: 'B队', queueNumber: 3, avatarUrl: ROBOT_AVATARS[2], remainingRaces: 3 },
-  { id: 4, name: '请大家让一让我是这条街最靓的崽', team: 'B队', queueNumber: 4, avatarUrl: ROBOT_AVATARS[3], remainingRaces: 3 },
-  { id: 5, name: '我家的机器狗跑得比兔子还要快', team: 'C队', queueNumber: 5, avatarUrl: ROBOT_AVATARS[4], remainingRaces: 3 },
-  { id: 6, name: '今天天气真好适合出来跑迷宫转三圈', team: 'C队', queueNumber: 6, avatarUrl: ROBOT_AVATARS[5], remainingRaces: 3 },
-  { id: 7, name: '雷霆', team: 'D队', queueNumber: 7, avatarUrl: ROBOT_AVATARS[6], remainingRaces: 3 },
-  { id: 8, name: '幻影', team: 'D队', queueNumber: 8, avatarUrl: ROBOT_AVATARS[7], remainingRaces: 3 },
-  { id: 9, name: '烈焰', team: 'E队', queueNumber: 9, avatarUrl: ROBOT_AVATARS[8], remainingRaces: 3 },
-  { id: 10, name: '冰锋', team: 'E队', queueNumber: 10, avatarUrl: ROBOT_AVATARS[9], remainingRaces: 3 },
-  { id: 11, name: '暗星', team: 'F队', queueNumber: 11, avatarUrl: ROBOT_AVATARS[10], remainingRaces: 3 },
-  { id: 12, name: '银翼', team: 'F队', queueNumber: 12, avatarUrl: ROBOT_AVATARS[11], remainingRaces: 3 },
-  { id: 13, name: '赤电', team: 'G队', queueNumber: 13, avatarUrl: ROBOT_AVATARS[12], remainingRaces: 3 },
-  { id: 14, name: '玄铁', team: 'G队', queueNumber: 14, avatarUrl: ROBOT_AVATARS[13], remainingRaces: 3 },
-  { id: 15, name: '今天也要加油努力闯关', team: 'H队', queueNumber: 15, avatarUrl: ROBOT_AVATARS[1], remainingRaces: 3 },
-];
-
+let mockQueue: Racer[] = [];
 let mockCurrentRacer: CurrentRacer | null = null;
 const mockResults: { id: number; racerId: number; elapsed: number; status: string }[] = [];
-let mockRacerSeq = 16; // 自增 ID，避免和初始 mock 数据冲突
-
-/**
- * POST /api/v1/referees/match/seed-queue
- * 【测试专用】向排队队列加入指定数量的假玩家
- * @body count - 加入数量，默认 10
- */
-router.post('/match/seed-queue', authMiddleware, async (req: Request, res: Response) => {
-  const count = Math.min(50, Math.max(1, parseInt(req.body?.count, 10) || 10));
-  const now = Date.now();
-  const names = [
-    '闪电突击', '旋风机甲', '铁甲飞龙', '极速猎豹', '暗夜幽灵',
-    '风暴战神', '冰霜巨龙', '烈焰飞鹰', '雷霆战甲', '幻影刺客',
-    '钢铁堡垒', '疾风之刃', '星尘旅者', '深海巨鲨', '天空霸主',
-  ];
-  for (let i = 0; i < count; i++) {
-    const name = names[(mockRacerSeq + i - 15) % names.length] + (mockRacerSeq + i - 15);
-    mockQueue.push({
-      id: mockRacerSeq + i,
-      name,
-      team: '测试队',
-      queueNumber: mockRacerSeq + i,
-      remainingRaces: 3,
-      avatarUrl: ROBOT_AVATARS[(mockRacerSeq + i) % ROBOT_AVATARS.length],
-    });
-  }
-  mockRacerSeq += count;
-
-  // 广播给大屏和裁判端
-  broadcastToScreen({
-    event: 'queue_update',
-    data: {
-      queue: mockQueue.map(q => ({ queue_number: q.queueNumber, nickname: q.name, status: 'waiting' })),
-      currentRacer: mockCurrentRacer ? { nickname: mockCurrentRacer.name, queue_number: mockCurrentRacer.queueNumber } : null,
-    },
-  });
-
-  return res.json({ code: 0, message: `已加入 ${count} 名测试选手`, data: { count, queue: mockQueue } });
-});
+let mockRacerSeq = 1;
 
 /**
  * GET /api/v1/referees/match/queue
@@ -1120,6 +1057,20 @@ router.get('/attendance/status', authMiddleware, async (req: Request, res: Respo
       [refereeId]
     );
 
+    // 查询关联的赛场信息
+    let venueName = '';
+    let venueAddress = '';
+    if (todayCheckin?.venue_id) {
+      const venueRow = await queryOne<{ name: string; address: string }>(
+        'SELECT name, address FROM venues WHERE id = $1',
+        [todayCheckin.venue_id]
+      );
+      if (venueRow) {
+        venueName = venueRow.name;
+        venueAddress = venueRow.address || '';
+      }
+    }
+
     return res.json({
       code: 0,
       message: 'ok',
@@ -1129,7 +1080,8 @@ router.get('/attendance/status', authMiddleware, async (req: Request, res: Respo
         checkedOut: !!todayCheckin?.checkout_at,
         refereeId: refereeId,
         venueId: todayCheckin?.venue_id || '',
-        venueName: '',
+        venueName,
+        venueInfo: { address: venueAddress },
         checkinRecord: todayCheckin || null,
       },
     });
@@ -1199,10 +1151,22 @@ router.post('/attendance/check-in', authMiddleware, async (req: Request, res: Re
     const screenData = getCurrentScreenData();
     broadcastToScreen({ type: 'screen_data', data: screenData });
 
+    // 从数据库获取真实的赛场信息
+    let venueName = finalVenueId;
+    let venueAddress = '';
+    const venueRow = await queryOne<{ name: string; address: string }>(
+      'SELECT name, address FROM venues WHERE id = $1',
+      [finalVenueId]
+    );
+    if (venueRow) {
+      venueName = venueRow.name;
+      venueAddress = venueRow.address || '';
+    }
+
     return res.json({
       code: 0,
       message: '签到成功',
-      data: { id, checkinAt: now, venueInfo: { id: finalVenueId, name: address ? address + '赛场' : '默认赛场', address: address || '', latitude: finalLat, longitude: finalLng } } });
+      data: { id, checkinAt: now, venueInfo: { id: finalVenueId, name: venueName, address: venueAddress, latitude: finalLat, longitude: finalLng } } });
   } catch (error: any) {
     console.error('[Referee] 签到失败:', error.message || error, 'stack:', error.stack ? error.stack.substring(0,200) : 'none');
     return res.status(500).json({ code: 500, message: '签到失败: ' + (error.message || error), data: null });
@@ -1304,19 +1268,8 @@ router.get('/attendance/records', authMiddleware, async (req: Request, res: Resp
   }
 });
 
-/** 获取排行榜数据（有实际成绩时返回，否则返回空数组） */
+/** 获取排行榜数据（从数据库读取） */
 function getLeaderboard() {
-  if (mockResults.length > 0) {
-    // 按用时升序排列（短的在前）
-    const sorted = [...mockResults].sort((a, b) => a.elapsed - b.elapsed);
-    return sorted.map((r, i) => ({
-      rank: i+1,
-      nickname: (r as any).racerName || String(r.racerId || '选手' + r.id),
-      finish_time_ms: r.elapsed,
-      status: 'finished',
-      avatar_url: (r as any).racerAvatar || '🤖',
-    })).slice(0, 10);
-  }
   return [];
 }
 
@@ -1328,6 +1281,27 @@ export function setVenueActive(active: boolean) {
   venueActive = active;
 }
 
+let cachedVenueName = '北京朝阳大悦城赛场';
+let cachedVenueId = 'default_venue_001';
+let cachedVenueStatus = 'active';
+
+try {
+  const fs = require('fs');
+  const path = require('path');
+  const dbPath = process.env.SQLITE_PATH || path.join(process.cwd(), 'data/robot-maze-race.db');
+  if (fs.existsSync(dbPath)) {
+    const Database = require('better-sqlite3');
+    const db = new Database(dbPath, { readonly: true });
+    const row = db.prepare('SELECT id, name, status FROM venues LIMIT 1').get();
+    if (row) {
+      cachedVenueName = row.name || cachedVenueName;
+      cachedVenueId = row.id || cachedVenueId;
+      cachedVenueStatus = row.status || cachedVenueStatus;
+    }
+    db.close();
+  }
+} catch (e) {}
+
 export function getCurrentScreenData() {
   const leaderboard = getLeaderboard();
 
@@ -1335,7 +1309,7 @@ export function getCurrentScreenData() {
 
   return {
     race_status: isActive ? (mockCurrentRacer?.status === 'racing' ? 'racing' : mockCurrentRacer?.status || 'waiting') : 'inactive',
-    venue_status: isActive ? 'active' : 'inactive',
+    venue_status: cachedVenueStatus,
     current_racer: isActive && mockCurrentRacer ? { nickname: mockCurrentRacer.name, queue_number: mockCurrentRacer.queueNumber, avatar_url: mockCurrentRacer.avatarUrl } : null,
     elapsed_ms: !isActive ? 0
       : mockCurrentRacer?.status === 'finished'
@@ -1344,8 +1318,8 @@ export function getCurrentScreenData() {
     start_time: isActive ? (mockCurrentRacer?.startTime || null) : null,
     next_racer: isActive && mockQueue.length > 0 ? { nickname: mockQueue[0].name, queue_number: mockQueue[0].queueNumber } : null,
     queue: isActive ? mockQueue.map(q => ({ queue_number: q.queueNumber, nickname: q.name, status: 'waiting' })) : [],
-    venue_name: '北京朝阳大悦城赛场',
-    venue_id: 'default_venue_001',
+    venue_name: cachedVenueName,
+    venue_id: cachedVenueId,
     leaderboard: isActive ? leaderboard : [],
     last_result: mockCurrentRacer?.status === 'finished' && mockCurrentRacer?.elapsed != null ? {
       racerName: mockCurrentRacer.name,

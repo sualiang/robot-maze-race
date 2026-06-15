@@ -388,27 +388,27 @@ router.post('/rbac/users/:id/reset-password', authMiddleware, operatorOnly, asyn
   try {
     const operatorId = req.user!.operatorId;
     const { id } = req.params;
-    const { password } = req.body;
 
-    if (!password || password.length < 6) {
-      return res.status(400).json({ code: 400, message: '新密码长度不能少于6位', data: null });
-    }
-
-    const existing = await queryOne<{ id: string; operator_id: string }>(
-      'SELECT id, operator_id FROM operator_members WHERE id = ?',
+    const existing = await queryOne<{ id: string; operator_id: string; phone: string; username: string }>(
+      'SELECT id, operator_id, phone, name FROM operator_members WHERE id = ?',
       [id]
     );
     if (!existing || existing.operator_id !== operatorId) {
       return res.status(404).json({ code: 404, message: '成员不存在', data: null });
     }
 
-    const hashed = bcrypt.hashSync(password, 10);
+    const plainPassword = generateSecurePassword();
+    const hashed = bcrypt.hashSync(plainPassword, 10);
     await query(
-      `UPDATE operator_members SET password = ?, updated_at = datetime('now') WHERE id = ?`,
-      [hashed, id]
+      `UPDATE operator_members SET password = ?, password_hash = ?, updated_at = datetime('now') WHERE id = ?`,
+      [hashed, hashed, id]
     );
 
-    return res.json({ code: 0, message: '密码重置成功', data: null });
+    return res.json({
+      code: 0,
+      message: '密码重置成功',
+      data: { account: existing.phone || '', password: plainPassword }
+    });
   } catch (error: any) {
     console.error('[OperatorRBAC] reset password error:', error.message);
     return res.status(500).json({ code: 500, message: '密码重置失败', data: null });

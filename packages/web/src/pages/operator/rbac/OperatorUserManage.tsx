@@ -39,12 +39,6 @@ export default function OperatorUserManage() {
   const [createForm] = Form.useForm();
 
   
-  // Reset password modal
-  const [resetPwdOpen, setResetPwdOpen] = useState(false);
-  const [resetPwdLoading, setResetPwdLoading] = useState(false);
-  const [resetPwdUserId, setResetPwdUserId] = useState<string | null>(null);
-  const [resetPwdForm] = Form.useForm();
-
   const [accountInfo, setAccountInfo] = useState<{ account: string; password: string } | null>(null);
 
   const fetchList = useCallback(async (p: number, ps: number, s: string) => {
@@ -107,22 +101,12 @@ export default function OperatorUserManage() {
     }
   };
 
-  const handleResetPassword = async () => {
-    if (!resetPwdUserId) return;
-    const values = await resetPwdForm.validateFields();
-    setResetPwdLoading(true);
+  const handleResetPassword = async (id: string) => {
     try {
-      await api.post(`/operator/rbac/users/${resetPwdUserId}/reset-password`, {
-        password: values.password,
-      });
-      message.success('密码重置成功');
-      setResetPwdOpen(false);
-      setResetPwdUserId(null);
-      resetPwdForm.resetFields();
+      const res: any = await api.post(`/operator/rbac/users/${id}/reset-password`);
+      setAccountInfo({ account: res.account, password: res.password });
     } catch {
       message.error('密码重置失败');
-    } finally {
-      setResetPwdLoading(false);
     }
   };
 
@@ -170,11 +154,7 @@ export default function OperatorUserManage() {
         <Space size="small" wrap>
           <Button
             type="link" size="small" icon={<KeyOutlined />}
-            onClick={() => {
-              setResetPwdUserId(record.id);
-              resetPwdForm.resetFields();
-              setResetPwdOpen(true);
-            }}
+            onClick={() => handleResetPassword(record.id)}
           >
             重置密码
           </Button>
@@ -206,7 +186,7 @@ export default function OperatorUserManage() {
         </thead>
         <tbody>
           <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-            <td style={{ padding: '6px 8px' }}>总管理员</td>
+            <td style={{ padding: '6px 8px' }}>运营商超管</td>
             <td style={{ padding: '6px 8px', color: '#888', fontFamily: 'monospace' }}>op_super_admin</td>
             <td style={{ padding: '6px 8px' }}>全部权限</td>
           </tr>
@@ -312,37 +292,7 @@ export default function OperatorUserManage() {
         onClose={() => setAccountInfo(null)}
       />
 
-      {/* 重置密码 Modal */}
-      <Modal
-        title="重置密码"
-        open={resetPwdOpen}
-        onOk={handleResetPassword}
-        onCancel={() => { setResetPwdOpen(false); setResetPwdUserId(null); }}
-        confirmLoading={resetPwdLoading}
-        destroyOnClose
-      >
-        <Form form={resetPwdForm} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item name="password" label="新密码" rules={[{ required: true, message: '请输入新密码' }, { min: 6, message: '密码至少6位' }]}>
-            <Input.Password placeholder="输入新密码（至少6位）" />
-          </Form.Item>
-          <Form.Item
-            name="confirm_password"
-            label="确认密码"
-            dependencies={['password']}
-            rules={[
-              { required: true, message: '请确认密码' },
-              ({ getFieldValue }) => ({
-                validator(_, value) {
-                  if (!value || getFieldValue('password') === value) return Promise.resolve();
-                  return Promise.reject(new Error('两次输入的密码不一致'));
-                },
-              }),
-            ]}
-          >
-            <Input.Password placeholder="再次输入新密码" />
-          </Form.Item>
-        </Form>
-      </Modal>
+
     </>
   );
 }

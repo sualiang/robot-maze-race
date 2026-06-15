@@ -103,9 +103,9 @@ export default function AttendancePage() {
         const vi = {
           id: res.venueId || res.checkinRecord.venue_id || 'default_venue_001',
           name: res.venueName || '赛场',
-          address: '',
-          latitude: 0,
-          longitude: 0
+          address: res.venueInfo?.address || '',
+          latitude: res.venueInfo?.latitude || 0,
+          longitude: res.venueInfo?.longitude || 0
         };
         setStatus('checked'); setVenueInfo(vi); setCheckInTime(res.checkinRecord.checkin_at || '');
         const v = { id: vi.id, name: vi.name, address: vi.address, latitude: vi.latitude, longitude: vi.longitude };
@@ -122,7 +122,7 @@ export default function AttendancePage() {
     setActionLoading(true); setStatus('loading');
     try {
       const res: any = await api.post('/referees/attendance/check-in', { latitude: location.latitude, longitude: location.longitude, address: location.address });
-      const vi = res.venueInfo || { id: 'default_venue_001', name: location.address + '赛场', address: location.address, latitude: location.latitude, longitude: location.longitude };
+      const vi = res.venueInfo || { id: 'default_venue_001', name: '默认赛场', address: location.address, latitude: location.latitude, longitude: location.longitude };
       setStatus('checked'); setVenueInfo(vi); setCheckInTime(res.checkinAt || new Date().toISOString());
       const v = { id: vi.id, name: vi.name, address: vi.address, latitude: vi.latitude, longitude: vi.longitude };
       localStorage.setItem('referee_venue', JSON.stringify(v)); startCheckInTimer();
@@ -134,6 +134,14 @@ export default function AttendancePage() {
   };
 
   const checkOut = async () => {
+    const confirm = window.confirm(
+      '⚠️ 确认要签退吗？\n\n' +
+      '比赛时间未结束，签退后赛场将暂停运营，' +
+      '选手将无法继续比赛。如需继续比赛请重新签到。\n\n' +
+      '确定签退？'
+    );
+    if (!confirm) return;
+
     setActionLoading(true);
     try {
       await api.post('/referees/attendance/check-out', { latitude: location?.latitude, longitude: location?.longitude });

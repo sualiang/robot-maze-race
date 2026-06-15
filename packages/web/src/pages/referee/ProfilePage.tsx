@@ -190,19 +190,7 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* 当前赛场信息 */}
-      {venue && (
-        <div className="referee-card" style={{ padding: 20, marginTop: 16 }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ref-text)', marginBottom: 12 }}>📌 当前赛场</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 14, color: 'var(--ref-text-dim)' }}>
-            <div><span style={{ color: 'var(--ref-text)', fontWeight: 500 }}>赛场名称：</span>{venue.name}</div>
-            <div><span style={{ color: 'var(--ref-text)', fontWeight: 500 }}>地址：</span>{venue.address || '未设置'}</div>
-            <div><span style={{ color: 'var(--ref-text)', fontWeight: 500 }}>状态：</span>
-              <span style={{ color: venue.status === '运营中' ? '#27ae60' : '#e74c3c' }}>{venue.status}</span>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* 签到考勤记录 */}
       <div className="referee-card" style={{ padding: 20, marginTop: 16 }}>

@@ -19,6 +19,17 @@ interface PackageItem {
   updated_at: string;
 }
 
+// 从 localStorage 获取当前用户角色
+const operatorUserInfo = (() => {
+  try {
+    return JSON.parse(localStorage.getItem('operator_user_info') || '{}');
+  } catch { return {}; }
+})();
+const operatorRoleName: string = operatorUserInfo.role_name || '';
+const operatorRoleId: string = operatorUserInfo.role_id || '';
+// 运营商超管（op_super_admin）→ 可删除
+const isOperatorManager = operatorRoleId === 'op_super_admin';
+
 export default function PackageList() {
   const [list, setList] = useState<PackageItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -29,7 +40,7 @@ export default function PackageList() {
   const fetchList = useCallback(async () => {
     setLoading(true);
     try {
-      const data: any = await api.get('/packages');
+      const data: any = await api.get('/packages?status=');
       setList(data?.list ?? data ?? []);
     } catch {
       setList([]);
@@ -157,9 +168,11 @@ export default function PackageList() {
               {record.is_active ? '下架' : '上架'}
             </Button>
           </Popconfirm>
-          <Popconfirm title="确定删除？此操作不可恢复" onConfirm={() => handleDelete(record.id)}>
-            <Button type="link" size="small" danger>删除</Button>
-          </Popconfirm>
+          {isOperatorManager && (
+            <Popconfirm title="确定删除？此操作不可恢复" onConfirm={() => handleDelete(record.id)}>
+              <Button type="link" size="small" danger>删除</Button>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },

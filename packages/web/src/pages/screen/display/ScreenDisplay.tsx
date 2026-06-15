@@ -174,10 +174,10 @@ export default function ScreenDisplay() {
       if (timerRef.current) clearInterval(timerRef.current);
       // 断网或者新开一局，重置结束标记让新 race 能正常启动计时
       raceEndedRef.current = false;
-      // 断网自动重连
+      // 断网自动重连（更快重连，减轻短时掉线的感知）
       if (!reconnecting) {
         setReconnecting(true);
-        reconnectTimerRef.current = setTimeout(connect, 3000);
+        reconnectTimerRef.current = setTimeout(connect, 1000);
       }
     };
 
@@ -266,8 +266,8 @@ export default function ScreenDisplay() {
     return () => { cancelled = true; };
   }, []);
 
-  // 使用模拟数据当没有真实连接时（开发模式）
-  const mockData: ScreenData = {
+  // 默认数据（当 WebSocket 返回 undefined 时的回退值）
+  const fallbackData: ScreenData = {
     venue_name: defaultVenueName,
     venue_status: defaultVenueStatus,
     current_racer: null,
@@ -278,8 +278,8 @@ export default function ScreenDisplay() {
     next_racer: null,
   };
 
-  // 合并 data 与 mockData，确保关键字段存在
-  const mergedData = { ...mockData, ...(data || {}) };
+  // 合并 data 与 fallbackData，确保关键字段存在
+  const mergedData = { ...fallbackData, ...(data || {}) };
   const displayData = {
     ...mergedData,
     leaderboard: Array.isArray(mergedData.leaderboard) ? mergedData.leaderboard : [],

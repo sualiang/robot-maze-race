@@ -27,7 +27,7 @@ export default function LoginPage() {
     }
     setLoading(true);
     try {
-      const res: any = await api.post('/auth/login', { phone, password });
+      const res: any = await api.post('/auth/login', { phone: phone, password });
       // 首次登录需改密
       if (res.user?.firstLogin) {
         setTempToken(res.token);
@@ -47,6 +47,7 @@ export default function LoginPage() {
 
   const handleChangePassword = async (values: { currentPassword: string; newPassword: string; confirmPassword: string }) => {
     try {
+      // 裁判首次改密调用
       const resp = await fetch('/api/v1/auth/admin/change-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tempToken}` },

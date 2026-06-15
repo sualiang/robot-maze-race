@@ -338,8 +338,8 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response<ApiResp
     const { id } = req.params;
     const role = req.user!.role;
 
-    if (role !== 'admin') {
-      return res.status(403).json({ code: 403, message: '仅管理员可删除赛场', data: null });
+    if (role !== 'admin' && role !== 'operator') {
+      return res.status(403).json({ code: 403, message: '仅管理员或运营商可删除赛场', data: null });
     }
 
     const result = await queryOne<{ id: string }>(

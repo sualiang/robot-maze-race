@@ -293,7 +293,7 @@ router.post('/operator-member-login', async (req: Request, res: Response) => {
 
     // 查 operator_members 表
     const user = await queryOne<any>(
-      `SELECT m.id, m.password_hash as password, m.nickname, m.phone,
+      `SELECT m.id, m.password as password, m.nickname, m.phone,
               m.role_id, m.status, ar.label as role_name, ar.name as admin_role_name, ar.permissions,
               m.operator_id,
               o.name as operator_name,
@@ -608,7 +608,7 @@ router.post('/admin/change-password', authMiddleware, async (req: Request, res: 
     if (userRole === 'referee') {
       // 裁判改密：通过 referee userId 找到对应的 users 记录
       const referee = await queryOne<{ id: string; user_id: string }>(
-        'SELECT id, user_id FROM referees WHERE id = $1',
+        'SELECT id, user_id FROM referees WHERE user_id = $1',
         [userId]
       );
       if (!referee) {
