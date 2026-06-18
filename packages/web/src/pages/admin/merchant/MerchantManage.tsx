@@ -94,14 +94,7 @@ export default function MerchantManage() {
       title: '地址', dataIndex: 'address', key: 'address', width: 200,
       ellipsis: true,
     },
-    {
-      title: '经纬度', key: 'latlng', width: 160,
-      render: (_: unknown, r: MerchantItem) => (
-        r.latitude != null && r.longitude != null
-          ? `${r.latitude.toFixed(6)}, ${r.longitude.toFixed(6)}`
-          : '-'
-      ),
-    },
+    // 经纬度列已移除（用户不需要手动输入）
     { title: '联系人', dataIndex: 'contact_name', key: 'contact_name', width: 100 },
     { title: '联系人手机', dataIndex: 'contact_phone', key: 'contact_phone', width: 120 },
     {
@@ -174,22 +167,8 @@ export default function MerchantManage() {
             <Input.TextArea rows={2} placeholder="详细地址" maxLength={200} />
           </Form.Item>
 
-          <Space size={16} wrap>
-            <Form.Item name="latitude" label="纬度(Lat)" rules={[{ required: true }]}>
-              <InputNumber
-                style={{ width: 200 }}
-                placeholder="例如: 39.9042"
-                step={0.0001}
-              />
-            </Form.Item>
-            <Form.Item name="longitude" label="经度(Lng)" rules={[{ required: true }]}>
-              <InputNumber
-                style={{ width: 200 }}
-                placeholder="例如: 116.4074"
-                step={0.0001}
-              />
-            </Form.Item>
-          </Space>
+          <input type="hidden" name="latitude" value={0} />
+          <input type="hidden" name="longitude" value={0} />
 
           <Space size={16} wrap>
             <Form.Item name="contactPhone" label="联系人手机" rules={[{ required: true, message: '请输入联系人手机' }]}>
