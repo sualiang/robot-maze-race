@@ -114,8 +114,23 @@ export default function MerchantList() {
         await api.put(`/admin/merchant/${editingId}`, values);
         message.success('商家已更新');
       } else {
-        await api.post('/admin/merchant', values);
-        message.success('商家已创建');
+        const res = await api.post('/admin/merchant', values);
+        const inviteCode = res?.data?.invite_code || '';
+        if (inviteCode) {
+          Modal.info({
+            title: '商家创建成功',
+            content: (
+              <div>
+                <p>商家名称：{values.merchantName}</p>
+                <p>邀请码：<strong style={{ color: '#1890ff', fontSize: 18 }}>{inviteCode}</strong></p>
+                <p style={{ color: '#999', marginTop: 12 }}>请将邀请码提供给商家，商家使用此邀请码注册登录。</p>
+              </div>
+            ),
+            okText: '知道了',
+          });
+        } else {
+          message.success('商家已创建');
+        }
       }
       setModalOpen(false);
       fetchList();

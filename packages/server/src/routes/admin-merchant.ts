@@ -101,9 +101,18 @@ router.post('/', authMiddleware, adminMiddleware, operatorMiddleware, async (req
       ]
     );
 
+    // 自动生成邀请码
+    const inviteId = uuidv4();
+    const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    await execute(
+      `INSERT INTO merchant_invite_codes (id, merchant_id, invite_code, used, created_at)
+       VALUES ($1, $2, $3, 0, datetime('now'))`,
+      [inviteId, id, inviteCode]
+    );
+
     res.json({
       code: 0,
-      data: { id, merchantName }
+      data: { id, merchantName, invite_code: inviteCode }
     });
   } catch (e: any) {
     console.error('[AdminMerchant] create error:', e?.message || e);
