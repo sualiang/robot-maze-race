@@ -1,0 +1,184 @@
+<!-- pages/race/race.wxml - 比赛页 -->
+<view class="page-wrapper">
+
+  <!-- ===== 全局加载状态 ===== -->
+  <view wx:if="{{pageLoading}}" class="page-loading">
+    <view class="spinner"></view>
+  </view>
+
+  <!-- ===== 状态1 — 无活跃比赛（idle）===== -->
+  <block wx:if="{{raceStatus === 'idle'}}">
+    <view class="empty-state">
+      <text class="race-icon">🏁</text>
+      <text class="race-empty-title">还没有参赛记录</text>
+      <text class="race-empty-desc">扫码赛场二维码，开启你的第一场比赛</text>
+      <view class="btn btn-primary btn-lg race-empty-btn" bindtap="onGoCheckin">
+        <text>去扫码参赛</text>
+      </view>
+    </view>
+
+    <!-- 历史参赛记录 -->
+    <view wx:if="{{historyRecords.length > 0}}" class="history-section">
+      <view class="section-header">
+        <text class="section-title">历史参赛记录</text>
+      </view>
+      <view
+        class="history-item card"
+        wx:for="{{historyRecords}}"
+        wx:key="id"
+        data-id="{{item.id}}"
+        bindtap="onTapHistoryRecord"
+      >
+        <view class="history-top">
+          <text class="history-venue">{{item.venueName}}</text>
+          <text class="history-date text-sm text-light">{{item.dateText}}</text>
+        </view>
+        <view class="history-detail">
+          <view class="history-stat">
+            <text class="history-stat-value text-primary">{{item.scoreText}}</text>
+            <text class="history-stat-label">成绩</text>
+          </view>
+          <view class="history-stat">
+            <text class="history-stat-value">{{item.rankText}}</text>
+            <text class="history-stat-label">排名</text>
+          </view>
+          <view wx:if="{{item.timeText}}" class="history-stat">
+            <text class="history-stat-value">{{item.timeText}}</text>
+            <text class="history-stat-label">用时</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 无历史记录占位 -->
+    <view wx:if="{{historyRecords.length === 0 && !historyLoading}}" class="card text-center mt-lg">
+      <text class="text-secondary">暂无参赛记录，快去扫码开赛吧 🏃</text>
+    </view>
+  </block>
+
+  <!-- ===== 状态2 — 排队中（queuing） ===== -->
+  <block wx:elif="{{raceStatus === 'queuing'}}">
+    <view class="queue-section">
+      <!-- 排队号牌 -->
+      <view class="queue-number-card card">
+        <text class="queue-label">您的排队号</text>
+        <text class="queue-number">{{queueInfo.queueNumber}}</text>
+        <view class="queue-meta flex-between">
+          <view class="flex-col queue-meta-item">
+            <text class="queue-meta-label">前方等待</text>
+            <text class="queue-meta-value text-primary">{{queueInfo.aheadCount}}人</text>
+          </view>
+          <view class="flex-col queue-meta-item">
+            <text class="queue-meta-label">预计等待</text>
+            <text class="queue-meta-value text-primary">{{queueInfo.estimatedWait}}min</text>
+          </view>
+          <view class="flex-col queue-meta-item">
+            <text class="queue-meta-label">当前叫号</text>
+            <text class="queue-meta-value text-primary">#{{queueInfo.currentCallNumber}}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 赛场信息 -->
+      <view class="queue-venue card">
+        <view class="flex-row">
+          <text class="queue-venue-icon">📍</text>
+          <view class="flex-col queue-venue-info">
+            <text class="queue-venue-name">{{queueInfo.venueName}}</text>
+            <text class="queue-venue-addr text-sm text-secondary">{{queueInfo.venueAddress}}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 开启叫号提醒按钮 -->
+      <view class="btn btn-outline btn-sm queue-notify-btn" bindtap="onSubscribeNotify">
+        <text>🔔 开启叫号提醒</text>
+      </view>
+
+      <!-- 等待时可看看 -->
+      <view class="queue-browse-section">
+        <view class="section-header">
+          <text class="section-title">等待时可看看</text>
+        </view>
+        <view class="flex-row queue-browse-actions">
+          <view class="queue-browse-item card" bindtap="onGoLeaderboard">
+            <text class="browse-icon">🏆</text>
+            <text class="browse-label">排行榜</text>
+          </view>
+          <view class="queue-browse-item card" bindtap="onGoRules">
+            <text class="browse-icon">📋</text>
+            <text class="browse-label">赛场规则</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </block>
+
+  <!-- ===== 状态3 — 比赛完成（finished） ===== -->
+  <block wx:else>
+    <view class="result-section">
+      <!-- 成绩展示区 -->
+      <view class="result-hero">
+        <text class="result-hero-label">本次成绩</text>
+        <text class="result-hero-score">{{raceResult.scoreText}}</text>
+        <view class="result-rank-row">
+          <text class="result-rank-medal">{{raceResult.medalEmoji}}</text>
+          <text class="result-rank-text">第{{raceResult.rank}}名 击败{{raceResult.beatPercent}}%</text>
+        </view>
+      </view>
+
+      <!-- 成绩详情卡 -->
+      <view class="result-detail-card card">
+        <view class="result-detail-row flex-between">
+          <text class="text-secondary">用时</text>
+          <text class="text-white">{{raceResult.timeText}}</text>
+        </view>
+        <view class="result-detail-row flex-between">
+          <text class="text-secondary">赛道</text>
+          <text class="text-white">{{raceResult.trackName}}</text>
+        </view>
+        <view class="result-detail-row flex-between">
+          <text class="text-secondary">赛场</text>
+          <text class="text-white">{{raceResult.venueName}}</text>
+        </view>
+        <view class="result-detail-row flex-between">
+          <text class="text-secondary">参赛时间</text>
+          <text class="text-white">{{raceResult.dateText}}</text>
+        </view>
+      </view>
+
+      <!-- 剩余参赛次数 -->
+      <view class="result-remain card flex-between">
+        <text class="text-secondary">剩余参赛次数</text>
+        <text class="remain-count text-primary">{{remainCount}} 次</text>
+      </view>
+
+      <!-- 操作按钮 -->
+      <view class="result-actions">
+        <!-- 有次数：再来一局 -->
+        <view wx:if="{{remainCount > 0}}" class="btn btn-primary btn-lg" bindtap="onRaceAgain">
+          <text>再来一局 🔁</text>
+        </view>
+        <!-- 查看排行 -->
+        <view class="btn btn-secondary btn-lg mt-sm" bindtap="onGoLeaderboard">
+          <text>查看排行 🏆</text>
+        </view>
+      </view>
+
+      <!-- 次数用完：购买参赛包 / 邀请好友助力 -->
+      <view wx:if="{{remainCount <= 0}}" class="result-exhausted mt-lg">
+        <view class="divider"></view>
+        <view class="exhausted-card card">
+          <text class="exhausted-title">参赛次数已用完</text>
+          <view class="btn btn-primary" bindtap="onBuyPackage">
+            <text>购买参赛包 💪</text>
+          </view>
+          <view class="btn btn-outline mt-sm" bindtap="onInviteFriend">
+            <text>邀请好友助力 🙌</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </block>
+
+</view>

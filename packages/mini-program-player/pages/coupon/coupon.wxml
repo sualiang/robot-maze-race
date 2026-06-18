@@ -1,0 +1,62 @@
+<view class="page">
+  <!-- 头部标题 -->
+  <view class="page-header">
+    <text class="page-title">我的卡包</text>
+  </view>
+
+  <!-- Tab 切换 -->
+  <view class="coupon-tabs">
+    <view
+      wx:for="{{tabs}}"
+      wx:key="key"
+      class="coupon-tab {{currentTab === item.key ? 'coupon-tab-active' : ''}}"
+      data-key="{{item.key}}"
+      bindtap="onTabChange"
+    >
+      {{item.label}}
+    </view>
+  </view>
+
+  <!-- 卡券列表 -->
+  <view class="coupon-list" wx:if="{{coupons.length > 0}}">
+    <view
+      wx:for="{{coupons}}"
+      wx:key="id"
+      class="coupon-card {{item.status === 'expired' ? 'coupon-expired' : ''}}"
+      data-id="{{item.id}}"
+    >
+      <view class="coupon-left">
+        <text class="coupon-amount">{{item.discountText || item.amount}}</text>
+        <text class="coupon-type">{{item.typeName || item.type}}</text>
+      </view>
+      <view class="coupon-right">
+        <text class="coupon-name">{{item.name || '优惠券'}}</text>
+        <text class="coupon-desc">{{item.description || item.rule || '使用规则详见商家'}}</text>
+        <view class="coupon-bottom-info">
+          <text class="coupon-merchant">{{item.merchantName || item.merchant || ''}}</text>
+          <text class="coupon-date">{{item.validUntil || item.expireDate || ''}}</text>
+        </view>
+        <view class="coupon-actions">
+          <button
+            wx:if="{{item.merchantLat && item.merchantLng && item.status !== 'expired'}}"
+            class="coupon-nav-btn"
+            data-lat="{{item.merchantLat}}"
+            data-lng="{{item.merchantLng}}"
+            data-name="{{item.merchantName || item.merchant || '商家'}}"
+            bindtap="onNavigate"
+          >
+            导航到店
+          </button>
+          <text wx:elif="{{item.status === 'expired'}}" class="coupon-expired-text">已过期</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view wx:else class="empty-state">
+    <text class="empty-icon">🎫</text>
+    <text class="empty-title">暂无卡券</text>
+    <text class="empty-desc">去完成任务赢取更多优惠券吧</text>
+  </view>
+</view>

@@ -1,159 +1,69 @@
-<!-- pages/checkin/checkin.wxml -->
-<!-- 签到排队页：扫码 → 信息填写 → 排队状态 → 比赛/完成 -->
-
-<view class="container">
-  <!-- ===== 页面头部 ===== -->
-  <view class="page-header">
-    <text class="page-title">📋 签到参赛</text>
-    <text class="page-desc">到达赛场所在地后，扫描现场二维码签到排队</text>
+<view class="page">
+  <!-- 赛场信息 -->
+  <view class="venue-header card-elevated">
+    <view class="venue-icon">🏟️</view>
+    <view class="venue-info">
+      <text class="venue-name">{{venue.name || '未知赛场'}}</text>
+      <text class="venue-address">{{venue.address || ''}}</text>
+    </view>
   </view>
 
-  <!-- ========================================== -->
-  <!-- 状态 ① idle — 待签到                         -->
-  <!-- ========================================== -->
-  <view wx:if="{{checkinStatus === 'idle'}}" class="checkin-idle">
-    <view class="scan-card card" bindtap="onScanCode">
-      <view class="scan-icon-wrap">
-        <text class="scan-icon-big">📷</text>
+  <!-- 排队状态 -->
+  <view class="queue-status card-elevated">
+    <view class="queue-header">
+      <text class="queue-label">当前排队情况</text>
+    </view>
+    <view class="queue-body">
+      <view class="queue-stat">
+        <text class="queue-num">{{venue.waitingCount || 0}}</text>
+        <text class="queue-desc">排队人数</text>
       </view>
-      <text class="scan-main-text">点击扫描赛场二维码</text>
-      <text class="scan-hint-text">请到达赛场后扫码签到，需开启摄像头权限</text>
-    </view>
-
-    <view wx:if="{{errorMessage}}" class="error-banner">
-      <text class="error-icon">⚠️</text>
-      <text class="error-text">{{errorMessage}}</text>
-    </view>
-
-    <!-- 重新扫码 -->
-    <view wx:if="{{errorMessage}}" class="retry-btn" bindtap="onScanCode">
-      <text>重新扫码</text>
-    </view>
-  </view>
-
-  <!-- ========================================== -->
-  <!-- 状态 ② checking — 签到校验中                  -->
-  <!-- ========================================== -->
-  <view wx:if="{{checkinStatus === 'checking'}}" class="status-center card">
-    <view class="spinner"></view>
-    <text class="status-title">签到校验中</text>
-    <text class="status-desc">正在验证赛场状态和参赛次数...</text>
-  </view>
-
-  <!-- ========================================== -->
-  <!-- 状态 ③ needFillInfo — 完善个人信息              -->
-  <!-- ========================================== -->
-  <view wx:if="{{needFillInfo}}" class="fill-info card">
-    <text class="fill-title">完善参赛信息</text>
-    <text class="fill-desc">首次参赛需填写个人信息，用于成绩记录和奖励发放</text>
-
-    <!-- 头像 -->
-    <view class="form-item">
-      <text class="form-label">头像</text>
-      <button class="avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
-        <image
-          class="avatar-preview"
-          src="{{userAvatarUrl || '/assets/images/default-avatar.png'}}"
-          mode="aspectFill"
-        />
-      </button>
-    </view>
-
-    <!-- 昵称 -->
-    <view class="form-item">
-      <text class="form-label">昵称</text>
-      <input
-        class="form-input"
-        placeholder="请输入你的昵称"
-        value="{{userNickname}}"
-        bindinput="onNicknameInput"
-        maxlength="20"
-      />
-    </view>
-
-    <!-- 手机号 -->
-    <view class="form-item">
-      <text class="form-label">手机号</text>
-      <input
-        class="form-input"
-        type="number"
-        placeholder="请输入手机号（选填）"
-        value="{{userPhone}}"
-        bindinput="onPhoneInput"
-        maxlength="11"
-      />
-    </view>
-
-    <view class="btn btn-primary form-submit-btn" bindtap="submitProfileAndCheckin">
-      确认并签到
-    </view>
-  </view>
-
-  <!-- ========================================== -->
-  <!-- 状态 ④ queuing — 排队等待中                   -->
-  <!-- ========================================== -->
-  <view wx:if="{{checkinStatus === 'queuing' && queueInfo}}" class="queuing-card card">
-    <text class="queue-section-title">当前排队</text>
-
-    <view class="queue-number-area">
-      <text class="queue-big-num">{{queueInfo.queueNumber}}</text>
-      <text class="queue-label-text">号</text>
-    </view>
-
-    <view class="queue-detail-list">
-      <view class="queue-detail-item">
-        <text class="qdi-label">前方等待</text>
-        <text class="qdi-value">{{queueInfo.position > 0 ? queueInfo.position - 1 : 0}} 人</text>
-      </view>
-      <view class="queue-detail-item">
-        <text class="qdi-label">预计等待</text>
-        <text class="qdi-value">{{queueInfo.waitTimeText}}</text>
-      </view>
-    </view>
-
-    <text class="queue-tip">请留意叫号通知，不要离开赛场区域</text>
-
-    <view class="queue-actions">
-      <view class="btn btn-outline queue-refresh" bindtap="onRefreshQueue">
-        🔄 刷新状态
+      <view class="queue-stat">
+        <text class="queue-num">{{venue.estimatedWait || '-'}}min</text>
+        <text class="queue-desc">预计等待</text>
       </view>
     </view>
   </view>
 
-  <!-- ========================================== -->
-  <!-- 状态 ⑤ racing — 比赛中                        -->
-  <!-- ========================================== -->
-  <view wx:if="{{checkinStatus === 'racing'}}" class="racing-card card">
-    <text class="status-emoji-big">🏁</text>
-    <text class="status-big-title">比赛进行中</text>
-    <text class="status-mid-desc">机器狗正在穿越迷宫，祝你好运！</text>
-    <view class="racing-hint">
-      <text>比赛结果将自动记录到你的参赛记录中</text>
+  <!-- 参赛者信息 -->
+  <view class="info-card card">
+    <view class="info-row">
+      <text class="info-label">参赛编号</text>
+      <text class="info-value">{{playerId}}</text>
+    </view>
+    <view class="divider"></view>
+    <view class="info-row">
+      <text class="info-label">昵称</text>
+      <text class="info-value">{{userInfo.nickname || '未设置'}}</text>
+    </view>
+    <view class="divider"></view>
+    <view class="info-row">
+      <text class="info-label">剩余参赛次数</text>
+      <text class="info-value text-primary">{{userInfo.remainCount || userInfo.raceCount || 0}} 次</text>
     </view>
   </view>
 
-  <!-- ========================================== -->
-  <!-- 状态 ⑥ finished — 已完成                      -->
-  <!-- ========================================== -->
-  <view wx:if="{{checkinStatus === 'finished'}}" class="finished-card card">
-    <text class="status-emoji-big">✅</text>
-    <text class="status-big-title">比赛完成</text>
-    <text class="status-mid-desc">恭喜完成挑战！去看看你的成绩排名吧</text>
+  <!-- 操作按钮 -->
+  <view class="actions">
+    <view class="btn btn-primary btn-lg" bindtap="onConfirmCheckin">
+      ✅ 确认签到并排队
+    </view>
 
-    <view class="finished-actions">
-      <view class="btn btn-primary finished-btn" bindtap="goToLeaderboard">
-        🏆 查看成绩
-      </view>
-      <view class="btn btn-ghost finished-btn" bindtap="onScanCode">
-        🔄 再次参赛
-      </view>
+    <view class="btn btn-ghost cancel-btn" bindtap="onCancel">
+      取消，重新扫码
     </view>
   </view>
 
-  <!-- ========================================== -->
-  <!-- 队列轮询加载指示器                             -->
-  <!-- ========================================== -->
+  <!-- 次数不足提示 -->
+  <view wx:if="{{!hasRemainCount}}" class="no-count-card card">
+    <text class="no-count-text">参赛次数不足，请先购买参赛包</text>
+    <view class="btn btn-outline btn-sm" bindtap="onBuyPackages">
+      去购买参赛包
+    </view>
+  </view>
+
+  <!-- 加载遮罩 -->
   <view wx:if="{{loading}}" class="loading-overlay">
-    <text class="loading-overlay-text">处理中...</text>
+    <view class="spinner"></view>
   </view>
 </view>

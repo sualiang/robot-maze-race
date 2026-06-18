@@ -196,10 +196,10 @@ export function initSchema(): void {
   // 插入默认系统配置（仅在首次运行时生效）
   const defaults: [string, string, string][] = [
     ['help_required_count', '5', '助力所需人数'],
-    ['expand_coupon_valid_days', '15', '膨胀券有效期(天)'],
+
     ['help_valid_days', '7', '助力活动有效期(天)'],
     ['help_initiator_reward_count', '1', '发起者助力完成奖励次数'],
-    ['expand_coupon_helper_gift_count', '1', '助力者获得膨胀券次数'],
+
   ];
   for (const [key, value, desc] of defaults) {
     try {
@@ -280,7 +280,189 @@ export function initSchema(): void {
     // ignore
   }
 
+  // 迁移：help_helpers 表（助力者关系记录表，用于 R6 永久助力限制和记录查询）
+  try {
+    db.exec(`CREATE TABLE IF NOT EXISTS help_helpers (
+      id TEXT PRIMARY KEY,
+      help_id TEXT NOT NULL REFERENCES helps(id),
+      user_id TEXT NOT NULL REFERENCES users(id),
+      device_id VARCHAR(128),
+      helped_at TEXT DEFAULT (datetime('now'))
+    )`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_help_helpers_help ON help_helpers(help_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_help_helpers_user ON help_helpers(user_id)');
+  } catch {
+    // ignore
+  }
+
+  // ============================================
+  // V2.0 迁移：加载 schema_v2.sql
+  // ============================================
+  try {
+    const schemaV2Path = path.join(__dirname, '../db/schema_v2.sql');
+    if (fs.existsSync(schemaV2Path)) {
+      let v2Raw = fs.readFileSync(schemaV2Path, 'utf-8');
+      // 先移除 -- 注释行，避免注释导致整段被过滤
+      v2Raw = v2Raw.replace(/^--.*$/gm, '').trim();
+      v2Raw = v2Raw.replace(/\n\s*\n/g, '\n');
+      const v2Statements = v2Raw.split(';')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+      for (const stmt of v2Statements) {
+        try {
+          db.exec(stmt);
+        } catch (error: any) {
+          if (error.message?.includes('already exists')) {
+            // ignore
+          } else {
+            console.warn('[SQLite][V2] schema warning:', error.message);
+            console.warn('  statement:', stmt.substring(0, 120));
+          }
+        }
+      }
+      console.log('[SQLite] V2 Schema initialized from schema_v2.sql');
+    }
+  } catch {
+    // ignore
+  }
+
+  // V2.0 迁移：users 表新增 level/exp/points 字段
+  try {
+    db.exec('ALTER TABLE users ADD COLUMN level INTEGER NOT NULL DEFAULT 1');
+  } catch { /* ignore — 列已存在 */ }
+  try {
+    db.exec('ALTER TABLE users ADD COLUMN exp INTEGER NOT NULL DEFAULT 0');
+  } catch { /* ignore */ }
+  try {
+    db.exec('ALTER TABLE users ADD COLUMN points INTEGER NOT NULL DEFAULT 0');
+  } catch { /* ignore */ }
+
+  // V2.0 迁移：race_results 表新增 race_type 字段
+  try {
+    db.exec('ALTER TABLE race_results ADD COLUMN race_type INTEGER NOT NULL DEFAULT 1');
+  } catch { /* ignore */ }
+
+  // V2.0 迁移：race_packages 表新增 season_id 字段
+  try {
+    db.exec('ALTER TABLE race_packages ADD COLUMN season_id INTEGER');
+  } catch { /* ignore */ }
+
+  // V2.0 插入默认赛季配置项到 system_config
+  const seasonDefaults: [string, string, string][] = [
+    ['season_level_exp_1', '0', 'Lv1所需经验(青铜勋章)'],
+    ['season_level_exp_2', '200', 'Lv2所需经验(白银勋章)'],
+    ['season_level_exp_3', '500', 'Lv3所需经验(黄金勋章)'],
+    ['season_level_exp_4', '1200', 'Lv4所需经验(铂金勋章)'],
+    ['season_level_exp_5', '2500', 'Lv5所需经验(钻石勋章)'],
+    ['season_score_buy_pkg_39', '100', '39元档购买经验值'],
+    ['season_score_buy_pkg_99', '300', '99元档购买经验值'],
+    ['season_score_buy_pkg_199', '700', '199元档购买经验值'],
+    ['season_exp_per_race', '10', '完成单场比赛经验'],
+    ['season_signin_exp', '5', '商家签到经验'],
+    ['season_points_per_race', '5', '完成单场比赛积分'],
+    ['season_points_rank_1', '100', '日榜第1名积分'],
+    ['season_points_rank_2_5', '50', '日榜2-5名积分'],
+    ['season_points_rank_6_10', '30', '日榜6-10名积分'],
+    ['season_signin_points', '10', '商家签到积分'],
+    ['season_lottery_cost', '100', '单次抽奖所需积分'],
+  ];
+  for (const [key, value, desc] of seasonDefaults) {
+    try {
+      db.prepare(
+        `INSERT OR IGNORE INTO system_config (id, key, value, description) VALUES (?, ?, ?, ?)`
+      ).run(uuidv4(), key, value, desc);
+    } catch {
+      // ignore — 表不存在或已存在
+    }
+  }
+
+  // ============================================
+  // V2.0 商家端迁移：merchants 表新增字段
+  // ============================================
+  try { db.exec('ALTER TABLE merchants ADD COLUMN operator_id TEXT REFERENCES operators(id)'); } catch { /* ignore */ }
+  try { db.exec("ALTER TABLE merchants ADD COLUMN region VARCHAR(64) DEFAULT ''"); } catch { /* ignore */ }
+  try { db.exec("ALTER TABLE merchants ADD COLUMN business_hours VARCHAR(128) DEFAULT ''"); } catch { /* ignore */ }
+  try { db.exec('ALTER TABLE merchants ADD COLUMN description TEXT DEFAULT \'\''); } catch { /* ignore */ }
+  try { db.exec("ALTER TABLE merchants ADD COLUMN qrcode_url VARCHAR(512) DEFAULT ''"); } catch { /* ignore */ }
+  try { db.exec('ALTER TABLE merchants ADD COLUMN audit_status INTEGER NOT NULL DEFAULT 0'); } catch { /* ignore */ }
+  try { db.exec('ALTER TABLE merchants ADD COLUMN audit_remark TEXT DEFAULT \'\''); } catch { /* ignore */ }
+  try { db.exec('ALTER TABLE merchants ADD COLUMN audit_time TEXT'); } catch { /* ignore */ }
+  try { db.exec('ALTER TABLE merchants ADD COLUMN auditor_id TEXT'); } catch { /* ignore */ }
+
+  // V2.0 商家端迁移：merchant_admin 表
+  try {
+    db.exec(`CREATE TABLE IF NOT EXISTS merchant_admin (
+      id TEXT PRIMARY KEY,
+      merchant_id TEXT NOT NULL REFERENCES merchants(id),
+      username VARCHAR(64) NOT NULL UNIQUE,
+      password_hash VARCHAR(256) NOT NULL,
+      phone VARCHAR(20) DEFAULT '',
+      real_name VARCHAR(64) DEFAULT '',
+      status INTEGER NOT NULL DEFAULT 1,
+      last_login_time TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    )`);
+  } catch { /* ignore */ }
+
+  // V2.0 商家端迁移：merchant_coupons 表新增字段
+  try { db.exec('ALTER TABLE merchant_coupons ADD COLUMN audit_status INTEGER NOT NULL DEFAULT 0'); } catch { /* ignore */ }
+  try { db.exec('ALTER TABLE merchant_coupons ADD COLUMN audit_remark TEXT DEFAULT \'\''); } catch { /* ignore */ }
+  try { db.exec('ALTER TABLE merchant_coupons ADD COLUMN audit_time TEXT'); } catch { /* ignore */ }
+  try { db.exec('ALTER TABLE merchant_coupons ADD COLUMN auditor_id TEXT'); } catch { /* ignore */ }
+  try { db.exec('ALTER TABLE merchant_coupons ADD COLUMN version INTEGER DEFAULT 1'); } catch { /* ignore */ }
+  try { db.exec('ALTER TABLE merchant_coupons ADD COLUMN put_channels TEXT DEFAULT \'{}\''); } catch { /* ignore */ }
+  try { db.exec('ALTER TABLE merchant_coupons ADD COLUMN coupon_type INTEGER NOT NULL DEFAULT 1'); } catch { /* ignore */ }
+  try { db.exec('ALTER TABLE merchant_coupons ADD COLUMN discount_percent INTEGER DEFAULT 0'); } catch { /* ignore */ }
+  try { db.exec('ALTER TABLE merchant_coupons ADD COLUMN max_per_user INTEGER NOT NULL DEFAULT 1'); } catch { /* ignore */ }
+  try { db.exec('ALTER TABLE merchant_coupons ADD COLUMN available_start TEXT'); } catch { /* ignore */ }
+  try { db.exec('ALTER TABLE merchant_coupons ADD COLUMN available_end TEXT'); } catch { /* ignore */ }
+
+  // V2.0 商家端迁移：user_coupons 表新增字段
+  try { db.exec('ALTER TABLE user_coupons ADD COLUMN coupon_type INTEGER DEFAULT 1'); } catch { /* ignore */ }
+  try { db.exec('ALTER TABLE user_coupons ADD COLUMN discount_percent INTEGER DEFAULT 0'); } catch { /* ignore */ }
+  try { db.exec('ALTER TABLE user_coupons ADD COLUMN extra_data TEXT DEFAULT \'{}\''); } catch { /* ignore */ }
+  try {
+    db.exec('ALTER TABLE user_coupons ADD COLUMN verify_code VARCHAR(64)');
+  } catch { /* ignore */ }
+
+  // V2.0 商家端迁移：coupon_verify_log 表
+  try {
+    db.exec(`CREATE TABLE IF NOT EXISTS coupon_verify_log (
+      id TEXT PRIMARY KEY,
+      user_coupon_id TEXT NOT NULL REFERENCES user_coupons(id),
+      merchant_id TEXT NOT NULL REFERENCES merchants(id),
+      verifier_id TEXT NOT NULL,
+      verifier_name VARCHAR(64) DEFAULT '',
+      user_id TEXT NOT NULL,
+      coupon_name VARCHAR(256) DEFAULT '',
+      denomination_cents INTEGER DEFAULT 0,
+      verify_type INTEGER NOT NULL DEFAULT 1,
+      verify_time TEXT DEFAULT (datetime('now')),
+      created_at TEXT DEFAULT (datetime('now'))
+    )`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_verify_log_merchant ON coupon_verify_log(merchant_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_verify_log_user ON coupon_verify_log(user_id)');
+  } catch { /* ignore */ }
+
+  // V2.0 商家端迁移：邀请码表
+  try {
+    db.exec(`CREATE TABLE IF NOT EXISTS merchant_invite_codes (
+      id TEXT PRIMARY KEY,
+      code VARCHAR(32) NOT NULL UNIQUE,
+      merchant_id TEXT NOT NULL REFERENCES merchants(id),
+      used INTEGER NOT NULL DEFAULT 0,
+      used_by TEXT,
+      operator_id TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      used_at TEXT
+    )`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_invite_code ON merchant_invite_codes(code)');
+  } catch { /* ignore */ }
+
+  // ============================================
   // 插入默认超级管理员（仅首次运行时生效）
+  // ============================================
   try {
     const existingAdmin = db.prepare("SELECT id FROM admin_users WHERE username = ?").get('admin');
     if (!existingAdmin) {

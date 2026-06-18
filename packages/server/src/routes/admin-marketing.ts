@@ -39,25 +39,6 @@ const defaultConfigs: Record<string, string> = {
   'mkt_help_reward_count_min': '1',
   'mkt_help_reward_count_max': '50',
   'mkt_help_reward_count_default': '1',
-  // 膨胀券 · 好友助力赠送
-  'mkt_help_coupon_default_enabled': 'true',
-  'mkt_help_coupon_bonus_count_min': '1',
-  'mkt_help_coupon_bonus_count_max': '20',
-  'mkt_help_coupon_bonus_count_default': '2',
-  'mkt_help_coupon_valid_days_min': '1',
-  'mkt_help_coupon_valid_days_max': '90',
-  'mkt_help_coupon_valid_days_default': '15',
-  // 膨胀券 · 持续充值赠送
-  'mkt_recharge_coupon_default_enabled': 'true',
-  'mkt_recharge_coupon_bonus_count_min': '1',
-  'mkt_recharge_coupon_bonus_count_max': '30',
-  'mkt_recharge_coupon_bonus_count_default': '3',
-  'mkt_recharge_coupon_valid_days_min': '1',
-  'mkt_recharge_coupon_valid_days_max': '90',
-  'mkt_recharge_coupon_valid_days_default': '30',
-  'mkt_recharge_coupon_trigger_races_min': '1',
-  'mkt_recharge_coupon_trigger_races_max': '50',
-  'mkt_recharge_coupon_trigger_races_default': '3',
 };
 
 // ============================================================
@@ -132,11 +113,6 @@ router.get('/operators', authMiddleware, checkPermission('marketing:read'), asyn
       let help_enabled = true;
       let help_required_count = 3;
       let help_reward_count = 1;
-      let help_coupon_enabled = true;
-      let help_coupon_bonus_count = 2;
-      let recharge_coupon_enabled = true;
-      let recharge_coupon_bonus_count = 3;
-      let recharge_coupon_trigger_races = 3;
       let updated_at = new Date().toISOString();
 
       if (venues.length > 0) {
@@ -144,7 +120,7 @@ router.get('/operators', authMiddleware, checkPermission('marketing:read'), asyn
         const placeholders = venueIds.map((_: any, i: number) => `$${i + 1}`).join(',');
         const mcRows = await query<{ key: string; value: string; updated_at: string }>(
           `SELECT key, value, updated_at FROM marketing_config
-           WHERE venue_id IN (${placeholders}) AND key IN ('help_enabled', 'help_required_count', 'help_reward_count', 'help_coupon_enabled', 'help_coupon_bonus_count', 'recharge_coupon_enabled', 'recharge_coupon_bonus_count', 'recharge_coupon_trigger_races')`,
+           WHERE venue_id IN (${placeholders}) AND key IN ('help_enabled', 'help_required_count', 'help_reward_count')`,
           venueIds
         );
 
@@ -152,11 +128,6 @@ router.get('/operators', authMiddleware, checkPermission('marketing:read'), asyn
           if (mc.key === 'help_enabled') help_enabled = mc.value === 'true';
           if (mc.key === 'help_required_count') help_required_count = parseInt(mc.value, 10) || 3;
           if (mc.key === 'help_reward_count') help_reward_count = parseInt(mc.value, 10) || 1;
-          if (mc.key === 'help_coupon_enabled') help_coupon_enabled = mc.value === 'true';
-          if (mc.key === 'help_coupon_bonus_count') help_coupon_bonus_count = parseInt(mc.value, 10) || 2;
-          if (mc.key === 'recharge_coupon_enabled') recharge_coupon_enabled = mc.value === 'true';
-          if (mc.key === 'recharge_coupon_bonus_count') recharge_coupon_bonus_count = parseInt(mc.value, 10) || 3;
-          if (mc.key === 'recharge_coupon_trigger_races') recharge_coupon_trigger_races = parseInt(mc.value, 10) || 3;
           if (mc.updated_at) updated_at = mc.updated_at;
         }
       }
@@ -167,11 +138,6 @@ router.get('/operators', authMiddleware, checkPermission('marketing:read'), asyn
         help_enabled,
         help_required_count,
         help_reward_count,
-        help_coupon_enabled,
-        help_coupon_bonus_count,
-        recharge_coupon_enabled,
-        recharge_coupon_bonus_count,
-        recharge_coupon_trigger_races,
         updated_at,
       });
     }

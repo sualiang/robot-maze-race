@@ -1,0 +1,140 @@
+/* 任务中心 */
+
+.page-header {
+  text-align: center;
+  padding: var(--space-base) 0;
+}
+.page-title {
+  font-size: var(--font-xl);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+/* Tab 切换 */
+.task-tabs {
+  display: flex;
+  background: var(--color-bg-card);
+  border-radius: var(--radius-lg);
+  padding: 6rpx;
+  margin-bottom: var(--space-base);
+}
+.task-tab {
+  flex: 1;
+  text-align: center;
+  padding: 16rpx 0;
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-base);
+}
+.task-tab-active {
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+/* 倒计时 */
+.countdown-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  margin-bottom: var(--space-base);
+}
+.countdown-icon {
+  font-size: 28rpx;
+}
+.countdown-text {
+  font-size: var(--font-sm);
+  color: var(--color-info);
+  font-weight: 600;
+}
+
+/* 任务列表 */
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xl);
+}
+.task-item {
+  display: flex;
+  align-items: stretch;
+  padding: var(--space-base);
+}
+.task-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+.task-name {
+  font-size: var(--font-base);
+  font-weight: 700;
+  color: var(--color-text);
+}
+.task-condition {
+  font-size: var(--font-xs);
+  color: var(--color-text-secondary);
+}
+.task-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.task-progress-text {
+  font-size: var(--font-xs);
+  color: var(--color-text-light);
+  white-space: nowrap;
+}
+
+/* 进度条覆盖 */
+.progress-bar.max {
+  flex: 1;
+}
+
+/* 奖励预览 */
+.task-reward-preview {
+  display: flex;
+  gap: var(--space-sm);
+}
+.reward-exp {
+  font-size: var(--font-xs);
+  color: var(--color-primary);
+  background: rgba(233, 69, 96, 0.1);
+  padding: 2rpx 12rpx;
+  border-radius: 20rpx;
+}
+.reward-points {
+  font-size: var(--font-xs);
+  color: var(--color-warning);
+  background: rgba(250, 173, 20, 0.1);
+  padding: 2rpx 12rpx;
+  border-radius: 20rpx;
+}
+
+/* 任务操作 */
+.task-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: var(--space-base);
+  min-width: 120rpx;
+}
+.claim-btn {
+  font-size: 22rpx;
+  height: 56rpx;
+  padding: 0 24rpx;
+}
+.claim-done {}
+.claim-done-text {
+  font-size: var(--font-sm);
+  color: var(--color-success);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.claim-pending {}
+.claim-pending-text {
+  font-size: var(--font-sm);
+  color: var(--color-text-light);
+}

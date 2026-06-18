@@ -1,4 +1,5 @@
 {
+  "navigationBarTitleText": "确认签到",
   "usingComponents": {},
-  "navigationBarTitleText": "签到参赛"
+  "enablePullDownRefresh": false
 }

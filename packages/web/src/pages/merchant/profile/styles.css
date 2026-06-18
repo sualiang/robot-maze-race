@@ -1,0 +1,234 @@
+/* ==================== 商家端"我的"页面 ==================== */
+
+.mch-profile-page {
+  padding: 14px;
+  padding-bottom: 84px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+/* 商家信息区 */
+.mch-profile-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  margin-bottom: 20px;
+  backdrop-filter: blur(12px);
+}
+
+.mch-profile-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.mch-profile-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.mch-profile-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: #e8e8f0;
+  margin-bottom: 4px;
+}
+
+.mch-profile-details {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.45);
+  line-height: 1.6;
+}
+
+/* 统计数据卡片 */
+.mch-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.mch-stat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  backdrop-filter: blur(12px);
+}
+
+.mch-stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.mch-stat-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.mch-stat-today {
+  color: #00d4ff;
+}
+
+.mch-stat-month {
+  color: #f59e0b;
+}
+
+.mch-stat-total {
+  color: #10b981;
+}
+
+/* 签到人数 */
+.mch-checkin-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  margin-bottom: 20px;
+  backdrop-filter: blur(12px);
+}
+
+.mch-checkin-label {
+  font-size: 15px;
+  color: #e8e8f0;
+}
+
+.mch-checkin-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #8b5cf6;
+}
+
+/* 操作列表 */
+.mch-action-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.mch-action-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  backdrop-filter: blur(12px);
+}
+
+.mch-action-item:active {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.mch-action-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mch-action-icon {
+  font-size: 20px;
+}
+
+.mch-action-label {
+  font-size: 15px;
+  color: #e8e8f0;
+}
+
+.mch-action-arrow {
+  color: rgba(255, 255, 255, 0.25);
+  font-size: 16px;
+}
+
+/* 退出登录按钮 */
+.mch-logout-btn {
+  width: 100%;
+  padding: 16px;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.06);
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 2px;
+}
+
+.mch-logout-btn:active {
+  background: rgba(239, 68, 68, 0.1);
+  transform: scale(0.98);
+}
+
+/* 修改密码弹窗 */
+.mch-pwd-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 24px;
+}
+
+.mch-pwd-modal-content {
+  width: 100%;
+  max-width: 380px;
+  background: rgba(20, 25, 50, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 24px 20px;
+  backdrop-filter: blur(20px);
+}
+
+.mch-pwd-modal-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #e8e8f0;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.mch-pwd-modal-btn {
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 8px;
+}
+
+.mch-pwd-modal-btn:active {
+  transform: scale(0.97);
+}

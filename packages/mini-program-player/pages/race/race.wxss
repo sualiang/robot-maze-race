@@ -1,0 +1,298 @@
+/* pages/race/race.wxss - 比赛页样式 */
+
+/* ===== 通用 ===== */
+.page-wrapper {
+  min-height: 100vh;
+  padding: var(--space-base);
+  padding-bottom: calc(var(--space-xl) + env(safe-area-inset-bottom));
+}
+
+.page-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: var(--space-lg) 0 var(--space-sm) 0;
+}
+
+.section-title {
+  font-size: var(--font-lg);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+/* ===== 状态1 — idle（无活跃比赛） ===== */
+.race-icon {
+  font-size: 88rpx;
+  margin-bottom: var(--space-base);
+}
+
+.race-empty-title {
+  font-size: var(--font-xxl);
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: var(--space-sm);
+}
+
+.race-empty-desc {
+  font-size: var(--font-sm);
+  color: var(--color-text-light);
+  margin-bottom: var(--space-lg);
+  text-align: center;
+}
+
+.race-empty-btn {
+  width: 360rpx;
+}
+
+/* 历史记录 */
+.history-section {
+  margin-top: var(--space-lg);
+}
+
+.history-item {
+  cursor: pointer;
+}
+
+.history-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-sm);
+}
+
+.history-venue {
+  font-size: var(--font-base);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.history-date {
+  font-size: var(--font-xs);
+}
+
+.history-detail {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+}
+
+.history-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+.history-stat-value {
+  font-size: var(--font-lg);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.history-stat-label {
+  font-size: var(--font-xs);
+  color: var(--color-text-light);
+  margin-top: 4rpx;
+}
+
+/* ===== 状态2 — queuing（排队中） ===== */
+.queue-number-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-xl) var(--space-base);
+  background: linear-gradient(135deg, var(--color-bg-card), var(--color-bg-elevated));
+  border: 1rpx solid var(--color-border);
+}
+
+.queue-label {
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-sm);
+}
+
+.queue-number {
+  font-size: var(--font-giant);
+  font-weight: 800;
+  color: var(--color-primary);
+  line-height: 1.2;
+  text-shadow: 0 0 30rpx rgba(233, 69, 96, 0.4);
+  margin-bottom: var(--space-lg);
+}
+
+.queue-meta {
+  width: 100%;
+}
+
+.queue-meta-item {
+  align-items: center;
+}
+
+.queue-meta-label {
+  font-size: var(--font-xs);
+  color: var(--color-text-light);
+  margin-bottom: 4rpx;
+}
+
+.queue-meta-value {
+  font-size: var(--font-xl);
+  font-weight: 700;
+}
+
+/* 赛场信息 */
+.queue-venue {
+  margin-top: var(--space-sm);
+}
+
+.queue-venue-icon {
+  font-size: 36rpx;
+  margin-right: var(--space-sm);
+}
+
+.queue-venue-info {
+  flex: 1;
+}
+
+.queue-venue-name {
+  font-size: var(--font-base);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.queue-venue-addr {
+  margin-top: 4rpx;
+}
+
+/* 叫号提醒按钮 */
+.queue-notify-btn {
+  width: 320rpx;
+  margin: var(--space-base) auto 0;
+}
+
+/* 等待时可看看 */
+.queue-browse-section {
+  margin-top: var(--space-lg);
+}
+
+.queue-browse-actions {
+  gap: var(--space-base);
+  margin-top: var(--space-sm);
+}
+
+.queue-browse-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg) var(--space-sm);
+  cursor: pointer;
+  min-height: 140rpx;
+}
+
+.browse-icon {
+  font-size: 48rpx;
+  margin-bottom: var(--space-xs);
+}
+
+.browse-label {
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+}
+
+/* ===== 状态3 — finished（比赛完成） ===== */
+.result-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-xl) 0;
+  background: linear-gradient(180deg, rgba(233, 69, 96, 0.15) 0%, transparent 100%);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-lg);
+}
+
+.result-hero-label {
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-sm);
+}
+
+.result-hero-score {
+  font-size: 120rpx;
+  font-weight: 800;
+  color: var(--color-primary);
+  line-height: 1.2;
+  text-shadow: 0 0 40rpx rgba(233, 69, 96, 0.4);
+}
+
+.result-rank-row {
+  display: flex;
+  align-items: center;
+  margin-top: var(--space-sm);
+}
+
+.result-rank-medal {
+  font-size: 40rpx;
+  margin-right: var(--space-xs);
+}
+
+.result-rank-text {
+  font-size: var(--font-lg);
+  font-weight: 600;
+  color: var(--color-warning);
+}
+
+/* 成绩详情卡 */
+.result-detail-card {
+  margin-bottom: var(--space-base);
+}
+
+.result-detail-row {
+  padding: var(--space-sm) 0;
+}
+
+.result-detail-row + .result-detail-row {
+  border-top: 1rpx solid var(--color-border);
+}
+
+/* 剩余参赛次数 */
+.result-remain {
+  flex-direction: row;
+}
+
+.remain-count {
+  font-size: var(--font-xxl);
+  font-weight: 800;
+}
+
+/* 操作按钮 */
+.result-actions {
+  margin-top: var(--space-lg);
+}
+
+/* 次数用完 */
+.result-exhausted {
+  margin-top: var(--space-lg);
+}
+
+.exhausted-card {
+  text-align: center;
+}
+
+.exhausted-title {
+  font-size: var(--font-base);
+  color: var(--color-text-light);
+  margin-bottom: var(--space-lg);
+  display: block;
+}
+
+.exhausted-card .btn {
+  width: 100%;
+}

@@ -1,11 +1,12 @@
 <!-- pages/packages/packages.wxml -->
-<!-- 参赛包购买页：列表展示、价格对比、购买按钮 -->
+<!-- 参赛包购买页：展示剩余次数、参赛包列表、购买流程 -->
 
-<view class="container">
-  <!-- ===== 页面头部 ===== -->
-  <view class="page-header">
-    <text class="page-title">🏷️ 参赛包</text>
-    <text class="page-desc">购买参赛包获取参赛次数，次数可用于签到参与竞速</text>
+<view class="page">
+
+  <!-- ===== 顶部提示条 ===== -->
+  <view wx:if="{{!loading}}" class="top-banner">
+    <text class="banner-icon">📢</text>
+    <text class="banner-text">当前剩余 <text class="banner-count">{{remainCount}}</text> 次，需要补充参赛次数</text>
   </view>
 
   <!-- ===== 参赛包列表 ===== -->
@@ -16,72 +17,63 @@
       class="package-card card"
     >
       <!-- 标签 -->
-      <view wx:if="{{item.isHot}}" class="pkg-tag tag-hot">🔥 热门</view>
-      <view wx:elif="{{item.isLimited}}" class="pkg-tag tag-limited">⏳ 限时特惠</view>
+      <view wx:if="{{item.tag}}" class="pkg-tag tag-{{item.tagType || 'hot'}}">{{item.tag}}</view>
 
-      <!-- 主内容 -->
-      <view class="pkg-header">
-        <text class="pkg-name">{{item.name}}</text>
-        <view wx:if="{{item.originalPrice > item.salePrice}}" class="pkg-discount-tag">
-          省 ¥{{item.savedText}}
+      <!-- 卡片主内容 -->
+      <view class="pkg-body">
+        <view class="pkg-name-area">
+          <text class="pkg-name">{{item.name}}</text>
+          <text wx:if="{{item.description}}" class="pkg-desc">{{item.description}}</text>
         </view>
-      </view>
 
-      <text wx:if="{{item.description}}" class="pkg-desc">{{item.description}}</text>
-
-      <!-- 核心参数 -->
-      <view class="pkg-features">
-        <view class="feature-item">
-          <text class="feature-icon">🏁</text>
-          <text class="feature-text">{{item.raceCount}} 次参赛</text>
+        <!-- 次数展示（大号） -->
+        <view class="pkg-count-area">
+          <text class="pkg-count-number">{{item.raceCount}}</text>
+          <text class="pkg-count-unit">次参赛</text>
         </view>
-        <view class="feature-item">
-          <text class="feature-icon">📅</text>
-          <text class="feature-text">{{item.validDays}} 天有效期</text>
+
+        <!-- 有效期 -->
+        <view class="pkg-meta">
+          <text class="pkg-meta-icon">📅</text>
+          <text class="pkg-meta-text">有效期 {{item.validDays}} 天</text>
         </view>
       </view>
 
       <!-- 价格 & 购买 -->
-      <view class="pkg-bottom">
+      <view class="pkg-footer">
         <view class="pkg-price-area">
-          <view class="pkg-current-price">
-            <text class="price-symbol">¥</text>
-            <text class="price-number">{{item.salePriceText}}</text>
-          </view>
-          <text wx:if="{{item.originalPrice > item.salePrice}}" class="pkg-original-price">
-            ¥{{item.originalPriceText}}
-          </text>
+          <text class="price-symbol">¥</text>
+          <text class="price-number">{{item.salePriceText}}</text>
+          <text wx:if="{{item.originalPrice > item.salePrice}}" class="price-original">¥{{item.originalPriceText}}</text>
         </view>
-        <view
+        <button
           class="btn btn-primary buy-btn"
           data-id="{{item.id}}"
           data-name="{{item.name}}"
-          data-saleprice="{{item.salePrice}}"
+          data-price="{{item.salePrice}}"
+          data-count="{{item.raceCount}}"
           bindtap="onBuyPackage"
-        >
-          立即购买
-        </view>
+        >立即购买</button>
       </view>
     </view>
   </view>
 
   <!-- ===== 空状态 ===== -->
   <view wx:if="{{!loading && empty}}" class="empty-state">
-    <text class="empty-emoji">📦</text>
+    <text class="empty-icon">📦</text>
     <text class="empty-title">暂无可购买的参赛包</text>
     <text class="empty-desc">赛事运营团队正在准备新的参赛包，请稍后再来</text>
   </view>
 
   <!-- ===== 加载中 ===== -->
-  <view wx:if="{{loading}}" class="loading-state">
-    <text class="loading-text">加载中...</text>
+  <view wx:if="{{loading}}" class="loading-container">
+    <view class="spinner"></view>
   </view>
 
-  <!-- ===== 底部说明 ===== -->
-  <view wx:if="{{!loading && !empty}}" class="page-tips">
-    <text class="tips-title">💡 温馨提示</text>
-    <text class="tips-item">• 参赛次数在有效期内可累计使用</text>
-    <text class="tips-item">• 购买后自动扣减次数，请注意有效期</text>
-    <text class="tips-item">• 你也可以邀请好友助力获取免费次数</text>
+  <!-- ===== 底部兜底：邀请助力 ===== -->
+  <view wx:if="{{!loading && !empty}}" class="invite-footer" bindtap="onInviteFriend">
+    <text class="invite-icon">🎁</text>
+    <text class="invite-text">不想付费？邀请好友助力免费拿 →</text>
   </view>
+
 </view>

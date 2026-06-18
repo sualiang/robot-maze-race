@@ -1,0 +1,48 @@
+<view class="page">
+
+  <!-- 头像 -->
+  <view class="section">
+    <view class="field-row" bindtap="onAvatarTap">
+      <text class="field-label">头像</text>
+      <view class="field-value-row">
+        <image class="avatar-preview" src="{{avatar || '/assets/images/default-avatar.png'}}" mode="aspectFill" />
+        <text class="arrow-icon">›</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 昵称 -->
+  <view class="section">
+    <view class="field-row">
+      <text class="field-label">昵称</text>
+      <input class="field-input" type="text" value="{{nickname}}" placeholder="请输入昵称" maxlength="12" bindinput="onNicknameInput" />
+    </view>
+  </view>
+
+  <!-- 性别 -->
+  <view class="section">
+    <picker mode="selector" range="{{genderOptions}}" bindchange="onGenderChange">
+      <view class="field-row">
+        <text class="field-label">性别</text>
+        <view class="field-value-row">
+          <text class="field-value">{{genderOptions[genderIndex]}}</text>
+          <text class="arrow-icon">›</text>
+        </view>
+      </view>
+    </picker>
+  </view>
+
+  <!-- 手机号 -->
+  <view class="section">
+    <view class="field-row">
+      <text class="field-label">手机号</text>
+      <input class="field-input" type="text" value="{{phone}}" placeholder="请输入手机号" maxlength="11" disabled="{{phoneDisabled}}" bindinput="onPhoneInput" />
+    </view>
+  </view>
+
+  <!-- 保存按钮 -->
+  <view class="save-section">
+    <view class="btn btn-primary save-btn" bindtap="onSave">保存</view>
+  </view>
+
+</view>

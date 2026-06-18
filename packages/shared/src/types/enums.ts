@@ -61,13 +61,6 @@ export enum PaymentStatus {
   REFUNDED = 'refunded',
 }
 
-/** 膨胀券状态 */
-export enum CouponStatus {
-  ACTIVE = 'active',
-  USED = 'used',
-  EXPIRED = 'expired',
-}
-
 // ==================== 通用类型 ====================
 
 export interface PaginationParams {

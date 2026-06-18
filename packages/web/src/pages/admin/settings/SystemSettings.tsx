@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import {
   Card, Form, InputNumber, Button, Switch, message, Divider,
-  Space, Spin, Tabs, Result,
+  Space, Spin, Tabs, Result, Row, Col, Typography,
 } from 'antd';
 import {
-  SaveOutlined, SettingOutlined, PercentageOutlined,
+  SaveOutlined, SettingOutlined, PercentageOutlined, TrophyOutlined,
 } from '@ant-design/icons';
 import api from '../../../utils/api';
 import ProfitConfig from './ProfitConfig';
+
+const { Text } = Typography;
 
 export default function SystemSettings() {
   const adminUser = JSON.parse(localStorage.getItem('admin_user') || '{}');
@@ -45,7 +47,6 @@ export default function SystemSettings() {
           default_timeout_seconds: 300,
           checkin_enabled: true,
           help_enabled: true,
-          coupon_enabled: true,
           gps_check_enabled: true,
           gps_check_radius: 500,
           auto_assign_venue: true,
@@ -117,9 +118,6 @@ export default function SystemSettings() {
             <Form.Item name="help_enabled" label="助力功能" valuePropName="checked">
               <Switch />
             </Form.Item>
-            <Form.Item name="coupon_enabled" label="膨胀券功能" valuePropName="checked">
-              <Switch />
-            </Form.Item>
             <Form.Item name="auto_assign_venue" label="自动分配赛场" valuePropName="checked"
               tooltip="启用后系统根据GPS自动将裁判分配到最近赛场">
               <Switch />
@@ -145,6 +143,113 @@ export default function SystemSettings() {
             tooltip="开启后仅管理员可访问，用户端显示维护提示">
             <Switch />
           </Form.Item>
+
+          {/* 赛季配置 */}
+          <Divider >
+            <Space><TrophyOutlined /> 赛季配置</Space>
+          </Divider>
+          <div style={{ paddingLeft: 8 }}>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+              配置赛季相关的经验、积分等参数。
+            </Text>
+
+            <Text strong style={{ display: 'block', marginBottom: 8 }}>等级经验阈值</Text>
+            <Row gutter={16}>
+              <Col span={8}>
+                <Form.Item name="season_exp_lv1" label="Lv1">
+                  <InputNumber min={0} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item name="season_exp_lv2" label="Lv2">
+                  <InputNumber min={0} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item name="season_exp_lv3" label="Lv3">
+                  <InputNumber min={0} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+            </Row>
+            <Row gutter={16}>
+              <Col span={8}>
+                <Form.Item name="season_exp_lv4" label="Lv4">
+                  <InputNumber min={0} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item name="season_exp_lv5" label="Lv5">
+                  <InputNumber min={0} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Text strong style={{ display: 'block', marginBottom: 8, marginTop: 16 }}>购包经验</Text>
+            <Row gutter={16}>
+              <Col span={8}>
+                <Form.Item name="season_pack_exp_39" label="39元档">
+                  <InputNumber min={0} style={{ width: '100%' }} addonAfter="经验" />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item name="season_pack_exp_99" label="99元档">
+                  <InputNumber min={0} style={{ width: '100%' }} addonAfter="经验" />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item name="season_pack_exp_199" label="199元档">
+                  <InputNumber min={0} style={{ width: '100%' }} addonAfter="经验" />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Text strong style={{ display: 'block', marginBottom: 8, marginTop: 16 }}>比赛与签到经验</Text>
+            <Row gutter={16}>
+              <Col span={8}>
+                <Form.Item name="season_race_exp" label="单场比赛经验">
+                  <InputNumber min={0} style={{ width: '100%' }} addonAfter="经验" />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item name="season_checkin_exp" label="商家签到经验">
+                  <InputNumber min={0} style={{ width: '100%' }} addonAfter="经验" />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Text strong style={{ display: 'block', marginBottom: 8, marginTop: 16 }}>比赛积分</Text>
+            <Row gutter={16}>
+              <Col span={8}>
+                <Form.Item name="season_race_points" label="单场积分">
+                  <InputNumber min={0} style={{ width: '100%' }} addonAfter="积分" />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item name="season_checkin_points" label="商家签到积分">
+                  <InputNumber min={0} style={{ width: '100%' }} addonAfter="积分" />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Text strong style={{ display: 'block', marginBottom: 8, marginTop: 16 }}>日榜积分</Text>
+            <Row gutter={16}>
+              <Col span={8}>
+                <Form.Item name="season_daily_rank_1" label="第1名">
+                  <InputNumber min={0} style={{ width: '100%' }} addonAfter="积分" />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item name="season_daily_rank_2_5" label="第2-5名">
+                  <InputNumber min={0} style={{ width: '100%' }} addonAfter="积分" />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item name="season_daily_rank_6_10" label="第6-10名">
+                  <InputNumber min={0} style={{ width: '100%' }} addonAfter="积分" />
+                </Form.Item>
+              </Col>
+            </Row>
+          </div>
 
           <Form.Item>
             <Button type="primary" size="large" icon={<SaveOutlined />} onClick={handleSave} loading={saving}>

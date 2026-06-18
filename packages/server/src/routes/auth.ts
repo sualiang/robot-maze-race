@@ -506,6 +506,48 @@ router.post('/login', async (req: Request, res: Response) => {
       });
     }
 
+    // ===== 玩家登录（users 表） =====
+    const playerUser = await queryOne<{
+      id: string;
+      phone: string;
+      nickname: string;
+      password: string;
+      role: string;
+      race_count: number;
+      avatar_url: string;
+      first_login: number;
+    }>(
+      `SELECT id, phone, nickname, password, role, race_count, avatar_url, first_login FROM users WHERE phone = $1 AND role = 'player'`,
+      [phone]
+    );
+
+    if (playerUser) {
+      // 开发阶段：玩家手机号登录免密
+      // 无论前端传什么密码都放行，密码列仅作预留
+
+      const payload = {
+        userId: playerUser.id,
+        openid: 'plr_' + playerUser.id,
+        role: 'player' as const,
+        firstLogin: playerUser.first_login === 1
+      };
+      const token = jwt.sign(payload, config.jwt.secret, { expiresIn: config.jwt.expiresIn as any });
+      return res.json({
+        code: 0,
+        message: '登录成功',
+        data: {
+          token,
+          user: {
+            id: playerUser.id,
+            nickname: playerUser.nickname || '玩家',
+            avatarUrl: playerUser.avatar_url || '',
+            role: 'player',
+            raceCount: playerUser.race_count || 0
+          }
+        }
+      });
+    }
+
     // ===== 原有 Mock 登录（回退/未注册手机号） =====
     const userId = 'ref_' + Date.now();
     const userRole = role || 'referee';
@@ -882,6 +924,73 @@ router.post('/member/change-password', authMiddleware, async (req: Request, res:
   } catch (error: any) {
     console.error('[Auth] member change-password error:', error.message);
     return res.status(500).json({ code: 500, message: '密码修改失败', data: null });
+  }
+});
+
+/**
+ * POST /api/v1/auth/register
+ * 玩家快速注册（手机号+密码）
+ */
+router.post('/register', async (req: Request, res: Response) => {
+  const { phone, password, nickname } = req.body;
+
+  if (!phone || phone.length < 11) {
+    return res.status(400).json({ code: 400, message: '请填写正确的手机号', data: null });
+  }
+
+  try {
+    // 检查是否已注册
+    const existing = await queryOne<{ id: string }>(
+      `SELECT id FROM users WHERE phone = $1`,
+      [phone]
+    );
+
+    if (existing) {
+      return res.status(400).json({ code: 400, message: '该手机号已注册，请直接登录', data: null });
+    }
+
+    const userId = uuidv4();
+    const pwd = password || 'admin123';
+    const hash = bcrypt.hashSync(pwd, 10);
+    const displayName = nickname || '玩家_' + phone.slice(-4);
+
+    await query(
+      `INSERT INTO users (id, openid, phone, nickname, password, role, race_count, avatar_url, first_login, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, 'player', 3, '', 0, datetime('now'), datetime('now'))`,
+      [userId, 'plr_' + phone, phone, displayName, hash]
+    );
+
+    const user: User = {
+      id: userId,
+      openid: 'plr_' + phone,
+      phone: phone,
+      nickname: displayName,
+      role: 'player' as UserRole,
+      avatar_url: '',
+      race_count: 3,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const token = generateToken(user);
+
+    return res.json({
+      code: 0,
+      message: '注册成功',
+      data: {
+        token,
+        user: {
+          id: userId,
+          nickname: displayName,
+          avatarUrl: '',
+          role: 'player',
+          raceCount: 3,
+        },
+      },
+    });
+  } catch (error: any) {
+    console.error('[Auth] register error:', error.message);
+    return res.status(500).json({ code: 500, message: '注册失败', data: null });
   }
 });
 

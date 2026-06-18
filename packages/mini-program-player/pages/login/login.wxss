@@ -1,0 +1,203 @@
+/* ===== 登录页 - 深色主题 ===== */
+
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 40rpx;
+  box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 背景光晕 */
+.login-container::before {
+  content: '';
+  position: absolute;
+  top: -200rpx;
+  right: -200rpx;
+  width: 600rpx;
+  height: 600rpx;
+  background: radial-gradient(circle, rgba(233, 69, 96, 0.08) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.login-container::after {
+  content: '';
+  position: absolute;
+  bottom: -300rpx;
+  left: -200rpx;
+  width: 500rpx;
+  height: 500rpx;
+  background: radial-gradient(circle, rgba(83, 52, 131, 0.06) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* ===== 登录卡片容器 ===== */
+.login-box {
+  width: 100%;
+  max-width: 580rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  z-index: 1;
+}
+
+/* ===== Logo 区域 ===== */
+.logo-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: var(--space-xl);
+}
+
+.logo-emoji {
+  font-size: 80rpx;
+  width: 140rpx;
+  height: 140rpx;
+  line-height: 140rpx;
+  text-align: center;
+  background: var(--color-bg-card);
+  border: 2rpx solid var(--color-border);
+  border-radius: var(--radius-xl);
+  margin-bottom: var(--space-base);
+  box-shadow: var(--shadow-glow);
+}
+
+.app-name {
+  font-size: var(--font-xxl);
+  font-weight: 700;
+  color: var(--color-text);
+  letter-spacing: 2rpx;
+}
+
+.app-subtitle {
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+  margin-top: var(--space-xs);
+}
+
+/* ===== 表单区域 ===== */
+.form-area {
+  width: 100%;
+}
+
+/* ===== 输入框组 ===== */
+.input-group {
+  display: flex;
+  align-items: center;
+  height: 96rpx;
+  background: var(--color-bg-input);
+  border: 2rpx solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 0 var(--space-base);
+  margin-bottom: var(--space-base);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.input-group-focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2rpx rgba(233, 69, 96, 0.15);
+}
+
+.input-icon {
+  font-size: 32rpx;
+  margin-right: var(--space-sm);
+  flex-shrink: 0;
+}
+
+.input-field {
+  flex: 1;
+  height: 100%;
+  font-size: var(--font-lg);
+  color: var(--color-text);
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 0;
+}
+
+.input-field:focus {
+  outline: none;
+  border: none;
+}
+
+.input-placeholder {
+  color: var(--color-text-light);
+  font-size: var(--font-lg);
+}
+
+.input-clear {
+  font-size: 28rpx;
+  color: var(--color-text-light);
+  padding: 10rpx;
+  flex-shrink: 0;
+}
+
+.input-toggle-pwd {
+  font-size: 28rpx;
+  color: var(--color-text-light);
+  padding: 10rpx;
+  flex-shrink: 0;
+}
+
+/* ===== 登录按钮 ===== */
+.login-btn {
+  width: 100%;
+  height: 96rpx;
+  line-height: 96rpx;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+  color: #fff;
+  border-radius: var(--radius-xl);
+  font-size: var(--font-xl);
+  font-weight: 600;
+  letter-spacing: 8rpx;
+  border: none;
+  margin-top: var(--space-lg);
+  box-shadow: var(--shadow-glow);
+  transition: opacity 0.2s, transform 0.15s;
+}
+
+.login-btn:active {
+  transform: scale(0.97);
+  opacity: 0.9;
+}
+
+.login-btn-disabled,
+.login-btn[disabled] {
+  background: linear-gradient(135deg, rgba(233, 69, 96, 0.35) 0%, rgba(199, 58, 82, 0.35) 100%);
+  box-shadow: none;
+  transform: none;
+  opacity: 1;
+}
+
+/* ===== 注册链接 ===== */
+.register-area {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: var(--space-xl);
+  padding-bottom: 20rpx;
+}
+
+.register-text {
+  font-size: var(--font-base);
+  color: var(--color-text-secondary);
+}
+
+.register-link {
+  font-size: var(--font-base);
+  color: var(--color-primary);
+  margin-left: 6rpx;
+  font-weight: 500;
+  padding: 4rpx 8rpx;
+}
+
+/* ===== 辅助类 ===== */
+.hidden {
+  display: none;
+}

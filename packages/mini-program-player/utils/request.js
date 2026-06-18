@@ -1,25 +1,37 @@
 // 玩家端 - API请求封装
-const BASE_URL = 'http://192.168.43.10:3000/api/v1';
+const BASE_URL = 'http://175.24.200.63/api/v1';
+
+var loadingCount = 0;
+
+function hideLoadingSafe() {
+  loadingCount--;
+  if (loadingCount <= 0) {
+    loadingCount = 0;
+    wx.hideLoading({});
+  }
+}
 
 function request(url, options) {
   const { method = 'GET', data, header = {}, showLoading = true } = options || {};
 
   if (showLoading) {
+    loadingCount++;
     wx.showLoading({ title: '加载中...', mask: true });
   }
 
-  return new Promise((resolve, reject) => {
+  return new Promise(function (resolve, reject) {
     const token = wx.getStorageSync('player_token');
 
     wx.request({
       url: BASE_URL + url,
       method: method,
       data: data,
+      enableHttp2: true,
       header: Object.assign({
         'Content-Type': 'application/json'
       }, token ? { Authorization: 'Bearer ' + token } : {}, header),
       success(res) {
-        wx.hideLoading({});
+        if (showLoading) hideLoadingSafe();
         var body = res.data;
         if (res.statusCode === 200 && body && body.code === 0) {
           resolve(body.data);
@@ -35,7 +47,7 @@ function request(url, options) {
         }
       },
       fail(err) {
-        wx.hideLoading({});
+        if (showLoading) hideLoadingSafe();
         wx.showToast({ title: '网络异常，请重试', icon: 'none' });
         reject(err);
       }

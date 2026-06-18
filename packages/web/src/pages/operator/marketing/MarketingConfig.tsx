@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
 import {
   Card, Form, Switch, InputNumber, Button, Space,
-  Divider, message, Spin, Alert, Descriptions, Typography,
+  Divider, message, Spin, Alert, Typography, Descriptions,
 } from 'antd';
 import {
-  SaveOutlined, GiftOutlined, ThunderboltOutlined, SettingOutlined,
-  TeamOutlined, ReloadOutlined,
+  SaveOutlined, GiftOutlined, SettingOutlined, TrophyOutlined,
 } from '@ant-design/icons';
 import api from '../../../utils/api';
 
@@ -22,9 +21,23 @@ export default function MarketingConfig() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // 赛季奖励参数（只读，来自总部配置）
+  const [seasonConfig, setSeasonConfig] = useState<Record<string, any> | null>(null);
+  const [seasonConfigLoading, setSeasonConfigLoading] = useState(true);
+
   // 总部范围
   const [ranges, setRanges] = useState<Record<string, Range>>({});
   const [rangeLoading, setRangeLoading] = useState(true);
+
+  // 读取赛季奖励参数（只读）
+  useEffect(() => {
+    api.get('/operator/marketing/season-rewards')
+      .then((data: any) => {
+        if (data) setSeasonConfig(data);
+      })
+      .catch(() => {})
+      .finally(() => setSeasonConfigLoading(false));
+  }, []);
 
   // 读取总部范围
   useEffect(() => {
@@ -41,31 +54,6 @@ export default function MarketingConfig() {
               min: data.help_reward_count_min || 1,
               max: data.help_reward_count_max || 50,
               default: data.help_reward_count_default || 1,
-            },
-            help_coupon_bonus_count: {
-              min: data.help_coupon_bonus_count_min || 1,
-              max: data.help_coupon_bonus_count_max || 20,
-              default: data.help_coupon_bonus_count_default || 2,
-            },
-            help_coupon_valid_days: {
-              min: data.help_coupon_valid_days_min || 1,
-              max: data.help_coupon_valid_days_max || 90,
-              default: data.help_coupon_valid_days_default || 15,
-            },
-            recharge_coupon_bonus_count: {
-              min: data.recharge_coupon_bonus_count_min || 1,
-              max: data.recharge_coupon_bonus_count_max || 30,
-              default: data.recharge_coupon_bonus_count_default || 3,
-            },
-            recharge_coupon_valid_days: {
-              min: data.recharge_coupon_valid_days_min || 1,
-              max: data.recharge_coupon_valid_days_max || 90,
-              default: data.recharge_coupon_valid_days_default || 30,
-            },
-            recharge_coupon_trigger_races: {
-              min: data.recharge_coupon_trigger_races_min || 1,
-              max: data.recharge_coupon_trigger_races_max || 50,
-              default: data.recharge_coupon_trigger_races_default || 3,
             },
           });
         }
@@ -84,13 +72,6 @@ export default function MarketingConfig() {
         help_enabled: true,
         help_required_count: ranges.help_required_count?.default ?? 3,
         help_reward_count: ranges.help_reward_count?.default ?? 1,
-        help_coupon_enabled: true,
-        help_coupon_bonus_count: ranges.help_coupon_bonus_count?.default ?? 2,
-        help_coupon_valid_days: ranges.help_coupon_valid_days?.default ?? 15,
-        recharge_coupon_enabled: true,
-        recharge_coupon_bonus_count: ranges.recharge_coupon_bonus_count?.default ?? 3,
-        recharge_coupon_valid_days: ranges.recharge_coupon_valid_days?.default ?? 30,
-        recharge_coupon_trigger_races: ranges.recharge_coupon_trigger_races?.default ?? 3,
       };
     }
 
@@ -106,13 +87,6 @@ export default function MarketingConfig() {
           if (config.help_enabled !== undefined) fields.help_enabled = config.help_enabled === 'true';
           if (config.help_required_count !== undefined) fields.help_required_count = Number(config.help_required_count);
           if (config.help_reward_count !== undefined) fields.help_reward_count = Number(config.help_reward_count);
-          if (config.help_coupon_enabled !== undefined) fields.help_coupon_enabled = config.help_coupon_enabled === 'true';
-          if (config.help_coupon_bonus_count !== undefined) fields.help_coupon_bonus_count = Number(config.help_coupon_bonus_count);
-          if (config.help_coupon_valid_days !== undefined) fields.help_coupon_valid_days = Number(config.help_coupon_valid_days);
-          if (config.recharge_coupon_enabled !== undefined) fields.recharge_coupon_enabled = config.recharge_coupon_enabled === 'true';
-          if (config.recharge_coupon_bonus_count !== undefined) fields.recharge_coupon_bonus_count = Number(config.recharge_coupon_bonus_count);
-          if (config.recharge_coupon_valid_days !== undefined) fields.recharge_coupon_valid_days = Number(config.recharge_coupon_valid_days);
-          if (config.recharge_coupon_trigger_races !== undefined) fields.recharge_coupon_trigger_races = Number(config.recharge_coupon_trigger_races);
         }
         form.setFieldsValue(fields);
       })
@@ -129,11 +103,6 @@ export default function MarketingConfig() {
     const checks: { key: string; val: number; range: Range; label: string }[] = [
       { key: 'help_required_count', val: values.help_required_count, range: ranges.help_required_count, label: '所需助力人数' },
       { key: 'help_reward_count', val: values.help_reward_count, range: ranges.help_reward_count, label: '发起者奖励次数' },
-      { key: 'help_coupon_bonus_count', val: values.help_coupon_bonus_count, range: ranges.help_coupon_bonus_count, label: '好友助力赠送次数' },
-      { key: 'help_coupon_valid_days', val: values.help_coupon_valid_days, range: ranges.help_coupon_valid_days, label: '助力券有效期' },
-      { key: 'recharge_coupon_bonus_count', val: values.recharge_coupon_bonus_count, range: ranges.recharge_coupon_bonus_count, label: '持续充值赠送次数' },
-      { key: 'recharge_coupon_valid_days', val: values.recharge_coupon_valid_days, range: ranges.recharge_coupon_valid_days, label: '充值券有效期' },
-      { key: 'recharge_coupon_trigger_races', val: values.recharge_coupon_trigger_races, range: ranges.recharge_coupon_trigger_races, label: '触发参赛次数' },
     ];
     for (const c of checks) {
       if (c.range && (c.val < c.range.min || c.val > c.range.max)) {
@@ -148,13 +117,6 @@ export default function MarketingConfig() {
         { key: 'help_enabled', value: String(values.help_enabled) },
         { key: 'help_required_count', value: String(values.help_required_count) },
         { key: 'help_reward_count', value: String(values.help_reward_count) },
-        { key: 'help_coupon_enabled', value: String(values.help_coupon_enabled) },
-        { key: 'help_coupon_bonus_count', value: String(values.help_coupon_bonus_count) },
-        { key: 'help_coupon_valid_days', value: String(values.help_coupon_valid_days) },
-        { key: 'recharge_coupon_enabled', value: String(values.recharge_coupon_enabled) },
-        { key: 'recharge_coupon_bonus_count', value: String(values.recharge_coupon_bonus_count) },
-        { key: 'recharge_coupon_valid_days', value: String(values.recharge_coupon_valid_days) },
-        { key: 'recharge_coupon_trigger_races', value: String(values.recharge_coupon_trigger_races) },
       ];
       // 不传 venue_id，保存为运营商全局配置
       await api.post('/operator/marketing/batch', { configs });
@@ -166,7 +128,7 @@ export default function MarketingConfig() {
     }
   };
 
-  if (rangeLoading) {
+  if (rangeLoading || seasonConfigLoading) {
     return <Card><div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" /></div></Card>;
   }
 
@@ -189,6 +151,28 @@ export default function MarketingConfig() {
       />
 
       <Form form={form} layout="vertical" style={{ maxWidth: 720 }}>
+
+          {/* 赛季奖励参数卡片（只读） */}
+          {seasonConfig && (
+            <Card
+              size="small"
+              title={<Space><TrophyOutlined /> 赛季奖励参数（只读 · 总部配置）</Space>}
+              style={{ marginBottom: 24, background: '#fafafa' }}
+            >
+              <Descriptions column={3} size="small" bordered>
+                <Descriptions.Item label="单场比赛经验">{seasonConfig.season_race_exp ?? '-'}</Descriptions.Item>
+                <Descriptions.Item label="商家签到经验">{seasonConfig.season_checkin_exp ?? '-'}</Descriptions.Item>
+                <Descriptions.Item label="单场积分">{seasonConfig.season_race_points ?? '-'}</Descriptions.Item>
+                <Descriptions.Item label="商家签到积分">{seasonConfig.season_checkin_points ?? '-'}</Descriptions.Item>
+                <Descriptions.Item label="日榜第1名积分">{seasonConfig.season_daily_rank_1 ?? '-'}</Descriptions.Item>
+                <Descriptions.Item label="日榜第2-5名积分">{seasonConfig.season_daily_rank_2_5 ?? '-'}</Descriptions.Item>
+                <Descriptions.Item label="日榜第6-10名积分">{seasonConfig.season_daily_rank_6_10 ?? '-'}</Descriptions.Item>
+                <Descriptions.Item label="39元档购包经验">{seasonConfig.season_pack_exp_39 ?? '-'}</Descriptions.Item>
+                <Descriptions.Item label="99元档购包经验">{seasonConfig.season_pack_exp_99 ?? '-'}</Descriptions.Item>
+                <Descriptions.Item label="199元档购包经验">{seasonConfig.season_pack_exp_199 ?? '-'}</Descriptions.Item>
+              </Descriptions>
+            </Card>
+          )}
         <Spin spinning={loading}>
 
           {/* 好友助力活动 */}
@@ -229,104 +213,6 @@ export default function MarketingConfig() {
               />
             </Form.Item>
           </Space>
-
-          {/* 膨胀券 — 好友助力赠送 */}
-          <Divider >
-            <Space><TeamOutlined /> 膨胀券 · 好友助力赠送</Space>
-            <Text type="secondary" style={{ fontSize: 12 }}>玩家助力后获得的膨胀券</Text>
-          </Divider>
-
-          <Form.Item name="help_coupon_enabled" label="开启好友助力赠送膨胀券" valuePropName="checked">
-            <Switch />
-          </Form.Item>
-
-          <Space size={24} wrap>
-            <Form.Item
-              name="help_coupon_bonus_count"
-              label="赠送参赛次数"
-              rules={[{ required: true }]}
-              tooltip={`总部范围: ${ranges.help_coupon_bonus_count?.min ?? 1}~${ranges.help_coupon_bonus_count?.max ?? 20}次`}
-            >
-              <InputNumber
-                min={ranges.help_coupon_bonus_count?.min ?? 1}
-                max={ranges.help_coupon_bonus_count?.max ?? 20}
-                style={{ width: 180 }}
-                addonAfter="次"
-              />
-            </Form.Item>
-            <Form.Item
-              name="help_coupon_valid_days"
-              label="有效期"
-              rules={[{ required: true }]}
-              tooltip={`总部范围: ${ranges.help_coupon_valid_days?.min ?? 1}~${ranges.help_coupon_valid_days?.max ?? 90}天`}
-            >
-              <InputNumber
-                min={ranges.help_coupon_valid_days?.min ?? 1}
-                max={ranges.help_coupon_valid_days?.max ?? 90}
-                style={{ width: 160 }}
-                addonAfter="天"
-              />
-            </Form.Item>
-          </Space>
-
-          {/* 膨胀券 — 持续充值赠送 */}
-          <Divider >
-            <Space><ReloadOutlined /> 膨胀券 · 持续充值赠送</Space>
-            <Text type="secondary" style={{ fontSize: 12 }}>玩家累计参赛一定次数后自动获得</Text>
-          </Divider>
-
-          <Form.Item name="recharge_coupon_enabled" label="开启持续充值赠送膨胀券" valuePropName="checked">
-            <Switch />
-          </Form.Item>
-
-          <Space size={24} wrap>
-            <Form.Item
-              name="recharge_coupon_bonus_count"
-              label="赠送参赛次数"
-              rules={[{ required: true }]}
-              tooltip={`总部范围: ${ranges.recharge_coupon_bonus_count?.min ?? 1}~${ranges.recharge_coupon_bonus_count?.max ?? 30}次`}
-            >
-              <InputNumber
-                min={ranges.recharge_coupon_bonus_count?.min ?? 1}
-                max={ranges.recharge_coupon_bonus_count?.max ?? 30}
-                style={{ width: 180 }}
-                addonAfter="次"
-              />
-            </Form.Item>
-            <Form.Item
-              name="recharge_coupon_valid_days"
-              label="有效期"
-              rules={[{ required: true }]}
-              tooltip={`总部范围: ${ranges.recharge_coupon_valid_days?.min ?? 1}~${ranges.recharge_coupon_valid_days?.max ?? 90}天`}
-            >
-              <InputNumber
-                min={ranges.recharge_coupon_valid_days?.min ?? 1}
-                max={ranges.recharge_coupon_valid_days?.max ?? 90}
-                style={{ width: 160 }}
-                addonAfter="天"
-              />
-            </Form.Item>
-            <Form.Item
-              name="recharge_coupon_trigger_races"
-              label="触发参赛次数"
-              rules={[{ required: true }]}
-              tooltip={`总部范围: ${ranges.recharge_coupon_trigger_races?.min ?? 1}~${ranges.recharge_coupon_trigger_races?.max ?? 50}次`}
-            >
-              <InputNumber
-                min={ranges.recharge_coupon_trigger_races?.min ?? 1}
-                max={ranges.recharge_coupon_trigger_races?.max ?? 50}
-                style={{ width: 180 }}
-                addonAfter="次"
-              />
-            </Form.Item>
-          </Space>
-
-          <Descriptions size="small" bordered style={{ marginBottom: 24, marginTop: 16 }}>
-            <Descriptions.Item label="券类型说明">
-              好友助力赠送券：玩家通过邀请好友助力后获得的膨胀券，购买参赛包时可额外增加参赛次数。
-              持续充值赠送券：玩家累计参赛达到触发次数后系统自动赠送，购买参赛包时可额外增加参赛次数。
-            </Descriptions.Item>
-          </Descriptions>
 
         </Spin>
 

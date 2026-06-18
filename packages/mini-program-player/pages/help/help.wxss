@@ -1,297 +1,310 @@
-/* pages/help/help.wxss */
-/* 好友助力裂变页样式 */
+/* pages/help/help.wxss - 发起者助力管理页 */
 
-/* ===== 加载/错误状态 ===== */
-.loading-state, .error-state {
+/* ===== 加载/空状态 ===== */
+.loading-state, .empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 400rpx;
+  min-height: 500rpx;
+  padding: var(--space-xl);
 }
 
 .loading-text {
-  font-size: var(--font-size-base);
+  font-size: var(--font-base);
   color: var(--color-text-light);
 }
 
-.error-emoji {
+.empty-emoji {
   font-size: 80rpx;
-  margin-bottom: var(--spacing-base);
+  margin-bottom: var(--space-base);
 }
 
-.error-title {
-  font-size: var(--font-size-lg);
-  color: var(--color-text);
+.empty-title {
+  font-size: var(--font-xl);
   font-weight: bold;
-  margin-bottom: var(--spacing-xs);
+  color: var(--color-text);
+  margin-bottom: var(--space-xs);
 }
 
-.error-desc {
-  font-size: var(--font-size-sm);
+.empty-desc {
+  font-size: var(--font-sm);
   color: var(--color-text-light);
-  margin-bottom: var(--spacing-base);
+  margin-bottom: var(--space-lg);
 }
 
-.retry-btn {
-  width: 300rpx;
+.btn-create-help {
+  width: 400rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  text-align: center;
+  background: linear-gradient(135deg, #e94560, #ff6b81);
+  color: #ffffff;
+  font-size: var(--font-lg);
+  font-weight: 600;
+  border-radius: 44rpx;
+  border: none;
 }
 
-/* ===== Hero 头部 ===== */
-.help-hero {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: var(--spacing-xl);
-  background: linear-gradient(135deg, #533483, #e94560);
-  border-radius: var(--radius-lg);
-  margin-bottom: var(--spacing-base);
+.btn-create-help::after {
+  border: none;
 }
 
-.hero-icon {
-  font-size: 64rpx;
-  margin-bottom: var(--spacing-sm);
+/* ===== 进度卡片 ===== */
+.progress-card {
+  padding: var(--space-lg);
+  margin-bottom: var(--space-base);
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
 }
 
-.hero-title {
-  font-size: var(--font-size-xl);
-  font-weight: 900;
-  color: #fff;
-  margin-bottom: var(--spacing-xs);
-}
-
-.hero-sub {
-  font-size: var(--font-size-sm);
-  color: rgba(255,255,255,0.75);
-}
-
-/* ===== 目标卡片 ===== */
-.target-card {
-  padding: var(--spacing-lg);
-  margin-bottom: var(--spacing-base);
-}
-
-.target-header {
+.progress-card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--spacing-sm);
+  margin-bottom: var(--space-sm);
 }
 
-.target-label {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-light);
+.progress-card-title {
+  font-size: var(--font-base);
+  font-weight: 600;
+  color: var(--color-text);
 }
 
-.target-badge {
-  font-size: var(--font-size-xs);
-  color: var(--color-primary);
-  background: rgba(233,69,96,0.1);
+.progress-card-badge {
+  font-size: 22rpx;
   padding: 4rpx 16rpx;
   border-radius: 12rpx;
 }
 
-.target-pkg {
-  font-size: var(--font-size-xl);
-  font-weight: bold;
-  color: var(--color-text);
-  display: block;
-  margin-bottom: var(--spacing-lg);
+.progress-card-badge.active {
+  color: #e94560;
+  background: rgba(233,69,96,0.15);
 }
 
-/* 进度条 */
-.progress-section {
-  margin-bottom: var(--spacing-sm);
+.progress-card-badge.completed {
+  color: #07c160;
+  background: rgba(7,193,96,0.15);
+}
+
+.progress-card-badge.expired {
+  color: var(--color-text-light);
+  background: rgba(255,255,255,0.08);
+}
+
+.progress-number-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  margin-bottom: var(--space-base);
+}
+
+.progress-number-current {
+  font-size: 80rpx;
+  font-weight: 900;
+  color: #e94560;
+}
+
+.progress-number-sep {
+  font-size: 40rpx;
+  color: var(--color-text-light);
+  margin: 0 var(--space-xs);
+}
+
+.progress-number-target {
+  font-size: 40rpx;
+  font-weight: 600;
+  color: var(--color-text-secondary);
 }
 
 .progress-bar-bg {
   width: 100%;
-  height: 12rpx;
-  background: var(--color-bg-secondary);
-  border-radius: 6rpx;
+  height: 16rpx;
+  background: rgba(255,255,255,0.08);
+  border-radius: 8rpx;
   overflow: hidden;
-  margin-bottom: var(--spacing-sm);
+  margin-bottom: var(--space-sm);
 }
 
 .progress-bar-fill {
   height: 100%;
   background: linear-gradient(90deg, #e94560, #ff6b81);
-  border-radius: 6rpx;
-  transition: width 0.3s ease;
+  border-radius: 8rpx;
+  transition: width 0.4s ease;
 }
 
-.progress-text-row {
-  display: flex;
-  justify-content: space-between;
-}
-
-.progress-current {
-  font-size: var(--font-size-xs);
-  color: var(--color-primary);
-  font-weight: bold;
-}
-
-.progress-target {
-  font-size: var(--font-size-xs);
+.progress-tip {
+  font-size: var(--font-xs);
   color: var(--color-text-light);
+  text-align: center;
+  display: block;
 }
 
-/* ===== 助力者列表 ===== */
-.helpers-section {
-  padding: var(--spacing-lg);
-  margin-bottom: var(--spacing-base);
+/* ===== 已助力好友头像组 ===== */
+.helpers-card {
+  padding: var(--space-lg);
+  margin-bottom: var(--space-base);
 }
 
 .section-title {
-  font-size: var(--font-size-base);
+  font-size: var(--font-base);
   font-weight: 600;
   color: var(--color-text);
   display: block;
-  margin-bottom: var(--spacing-base);
+  margin-bottom: var(--space-base);
 }
 
-.helpers-grid {
+.helpers-avatar-row {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--spacing-base);
+  gap: var(--space-sm);
 }
 
-.helper-item {
+.avatar-wrapper {
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 120rpx;
 }
 
 .helper-avatar {
   width: 80rpx;
   height: 80rpx;
   border-radius: 50%;
-  margin-bottom: var(--spacing-xs);
-  background: var(--color-bg-secondary);
+  flex-shrink: 0;
 }
 
-.helper-name {
-  font-size: var(--font-size-xs);
-  color: var(--color-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 100%;
+.helper-avatar-placeholder {
+  background: #e94560;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.helper-time {
-  font-size: 18rpx;
+.placeholder-text {
+  font-size: 28rpx;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.helper-avatar-empty {
+  background: rgba(255,255,255,0.08);
+  border: 2rpx dashed rgba(255,255,255,0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.empty-text {
+  font-size: 32rpx;
   color: var(--color-text-light);
 }
 
-/* ===== 分享卡片区 ===== */
-.share-card-section {
-  padding: var(--spacing-lg);
-  margin-bottom: var(--spacing-base);
+/* ===== 奖励卡片 ===== */
+.reward-card {
+  padding: var(--space-lg);
+  margin-bottom: var(--space-base);
 }
 
-.share-tip {
-  font-size: var(--font-size-xs);
+.reward-text {
+  font-size: var(--font-base);
+  color: var(--color-text-secondary);
+}
+
+.reward-highlight {
+  color: #e94560;
+  font-weight: bold;
+  font-size: var(--font-lg);
+}
+
+/* ===== 分享按钮 ===== */
+.action-section {
+  padding: 0 var(--space-base);
+  margin-bottom: var(--space-base);
+}
+
+.btn-share {
+  width: 100%;
+  height: 100rpx;
+  line-height: 100rpx;
+  text-align: center;
+  background: linear-gradient(135deg, #e94560, #ff6b81);
+  color: #ffffff;
+  font-size: var(--font-lg);
+  font-weight: 600;
+  border-radius: 50rpx;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-share::after {
+  border: none;
+}
+
+.btn-share-icon {
+  font-size: 36rpx;
+  margin-right: var(--space-xs);
+}
+
+.btn-share-text {
+  font-size: var(--font-lg);
+  font-weight: 600;
+}
+
+/* ===== 海报区 ===== */
+.poster-section {
+  padding: var(--space-lg);
+  margin-bottom: var(--space-base);
+}
+
+.poster-tip {
+  font-size: var(--font-xs);
   color: var(--color-text-light);
   display: block;
-  margin-bottom: var(--spacing-base);
+  margin-bottom: var(--space-base);
 }
 
 .share-canvas {
   width: 100%;
-  max-width: 600rpx;
-  margin: 0 auto;
+  height: 400px;
   border-radius: var(--radius-sm);
   overflow: hidden;
-  background: var(--color-bg-secondary);
+  background: #1a1a2e;
 }
 
-.share-btns {
-  display: flex;
-  gap: var(--spacing-base);
-  margin-top: var(--spacing-lg);
-}
-
-.share-action-btn {
-  flex: 1;
-  height: 80rpx;
-  font-size: var(--font-size-base);
-  border-radius: var(--radius-base);
-}
-
-.share-action-btn::after {
-  border: none;
-}
-
-/* ===== 助力按钮 ===== */
-.action-section {
-  margin-bottom: var(--spacing-lg);
-}
-
-.help-action-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: var(--spacing-xl);
-  background: linear-gradient(135deg, #1a1a2e, #16213e);
-  border: 2rpx dashed rgba(233,69,96,0.3);
-}
-
-.help-title {
-  font-size: var(--font-size-xl);
-  font-weight: bold;
-  color: var(--color-text);
-  margin-bottom: var(--spacing-sm);
-}
-
-.help-desc {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-  text-align: center;
-  margin-bottom: var(--spacing-lg);
-  padding: 0 var(--spacing-base);
-}
-
-.help-btn {
-  width: 500rpx;
+.btn-poster-save {
+  width: 100%;
   height: 88rpx;
-  font-size: var(--font-size-lg);
-}
-
-/* ===== 已完成/已助力/已过期 ===== */
-.help-done-card, .help-expired-card {
+  line-height: 88rpx;
+  text-align: center;
+  background: rgba(233,69,96,0.1);
+  color: #e94560;
+  font-size: var(--font-base);
+  font-weight: 600;
+  border-radius: 44rpx;
+  border: 2rpx solid rgba(233,69,96,0.3);
+  margin-top: var(--space-base);
   display: flex;
-  flex-direction: column;
   align-items: center;
-  padding: var(--spacing-xl);
+  justify-content: center;
 }
 
-.done-icon {
-  font-size: 80rpx;
-  margin-bottom: var(--spacing-base);
+.btn-poster-save-icon {
+  font-size: 32rpx;
+  margin-right: var(--space-xs);
 }
 
-.done-title {
-  font-size: var(--font-size-lg);
-  font-weight: bold;
-  color: var(--color-text);
-  margin-bottom: var(--spacing-xs);
+.btn-poster-save-text {
+  font-size: var(--font-base);
 }
 
-.done-desc {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
+/* ===== 底部提示 ===== */
+.footer-tip {
   text-align: center;
+  padding: var(--space-lg) var(--space-base) 60rpx;
 }
 
-/* ===== 有效期 ===== */
-.expiry-tip {
-  text-align: center;
-  padding: var(--spacing-lg);
-}
-
-.expiry-tip text {
-  font-size: var(--font-size-xs);
+.footer-tip text {
+  font-size: var(--font-xs);
   color: var(--color-text-light);
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Empty } from 'antd';
-import { TrophyOutlined, ClockCircleOutlined, UserOutlined, WifiOutlined, WifiOutlined as WifiOfflined } from '@ant-design/icons';
+import { Empty, Tag } from 'antd';
+import { TrophyOutlined, ClockCircleOutlined, UserOutlined, WifiOutlined, WifiOutlined as WifiOfflined, MoneyCollectOutlined } from '@ant-design/icons';
 import api from '../../../utils/api';
 
 interface LeaderboardEntry {
@@ -40,6 +40,8 @@ export default function ScreenDisplay() {
   const [forfeitMessage, setForfeitMessage] = useState('');
   const [forfeitName, setForfeitName] = useState('');
   const [forfeitHint, setForfeitHint] = useState('');
+  const [prizePool, setPrizePool] = useState(0);
+  const [seasonName, setSeasonName] = useState('');
   const wsRef = useRef<WebSocket | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -53,6 +55,7 @@ export default function ScreenDisplay() {
   const raceEndedRef = useRef(false);
   const MAX_TIMEOUT_SEC = 180;
   const timeoutMsRef = useRef(0);
+  const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const connect = useCallback(() => {
     // 直接连后端 WebSocket，跳过 Vite proxy 避免 EPIPE 崩溃
@@ -65,6 +68,13 @@ export default function ScreenDisplay() {
       ws.send(JSON.stringify({ type: 'subscribe', channel: 'screen' }));
       // 请求一次当前数据（防止签到后打开大屏没有初始数据）
       ws.send(JSON.stringify({ type: 'get_screen_data' }));
+      // 心跳保活：每 15 秒发一次 ping，防止 nginx/防火墙断开空闲连接
+      if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+      heartbeatRef.current = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'ping' }));
+        }
+      }, 15000);
     };
 
     ws.onmessage = (event) => {
@@ -193,6 +203,7 @@ export default function ScreenDisplay() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+      if (heartbeatRef.current) clearInterval(heartbeatRef.current);
       wsRef.current?.close();
     };
   }, [connect]);
@@ -226,6 +237,20 @@ export default function ScreenDisplay() {
     if (!ms) return '--:--.--';
     return formatTime(ms);
   };
+
+  // 获取赛季信息和奖池
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      api.get('/seasons/current').catch(() => null),
+      api.get('/seasons/prize-pool').catch(() => null),
+    ]).then(([season, pool]: [any, any]) => {
+      if (cancelled) return;
+      if (season?.name) setSeasonName(season.name);
+      if (pool?.amount != null) setPrizePool(pool.amount);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   // 默认场地数据（API 获取失败时的回退值）
   const defaultVenueName = '机器狗迷宫赛场';
@@ -405,10 +430,19 @@ export default function ScreenDisplay() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <img src="/logo.png" alt="logo" style={{ height: 50, width: 'auto' }} />
           <h1 style={{ fontSize: 32, margin: 0, lineHeight: 1.4, fontWeight: 700, background: 'linear-gradient(90deg, #ff6b35, #ff9a3c)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            — 闯关竞速赛
+            闯关竞速赛
           </h1>
           <span style={{ fontSize: 18, color: '#aaa' }}>|</span>
           <span style={{ fontSize: 20, fontWeight: 500 }}>{displayData.venue_name}</span>
+          {seasonName && (
+            <Tag color="gold" style={{ fontSize: 16, padding: '2px 12px', borderRadius: 6, fontWeight: 600 }}>
+              {seasonName}
+            </Tag>
+          )}
+          <span style={{ fontSize: 18, color: '#aaa' }}>|</span>
+          <span style={{ fontSize: 18, fontWeight: 500, color: '#ffd700' }}>
+            <MoneyCollectOutlined /> 奖池: ¥{prizePool.toLocaleString()}
+          </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{

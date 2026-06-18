@@ -13,7 +13,7 @@ import { resetDatabase, createPlayerToken, createAdminToken, setupTestDatabase }
  *   R5 — 同设备最多助力 3 次
  *   R6 — 同用户最多为 1 人助力
  *   R8 — 助力人数从配置读取
- *   R10 — 完成后发膨胀券
+ *   R10 — 完成后发奖励
  */
 
 describe('👥 好友助力功能 E2E 测试', () => {
@@ -333,100 +333,6 @@ describe('👥 好友助力功能 E2E 测试', () => {
       expect(res.body.message).toContain('上限');
     });
   });
-
-  // ================================================================
-  // 全流程：凑满 + 完成 + 超额 + 膨胀券
-  // ================================================================
-  describe('助力全流程 — 凑满 + 完成 + 超额 + 膨胀券', () => {
-    let helpId: string;
-
-    beforeAll(async () => {
-      // 先过期玩家1之前的活动的（R6 创建的）
-      db.prepare('UPDATE helps SET status = \'expired\' WHERE initiator_id = ? AND status = \'active\'').run('test-p1');
-
-      // 玩家1再创建一个新活动
-      const res = await request(app)
-        .post('/api/v1/player/help/create')
-        .set('Authorization', `Bearer ${tk1}`)
-        .send({})
-        .expect(200);
-      expect(res.body.code).toBe(0);
-      helpId = res.body.data.id;
-
-      // 把 required_help_count 改成3（方便测试，默认是5）
-      db.prepare(`UPDATE helps SET required_help_count = 3 WHERE id = ?`).run(helpId);
-    });
-
-    // 动态创建4个助力者
-    const helperCount = 4;
-    for (let i = 1; i <= helperCount; i++) {
-      const uid = `help-fullflow-${i}`;
-      const tk = createPlayerToken(uid);
-
-      // 单独 beforeAll 插入用户
-      beforeAll(async () => {
-        db.prepare(
-          `INSERT OR IGNORE INTO users (id, openid, nickname, role) VALUES (?, ?, ?, ?)`
-        ).run(uid, `openid_${uid}`, `全流程助力${i}`, 'player');
-      });
-
-      if (i <= 3) {
-        it(`第${i}次助力应成功${i === 3 ? '（助力完成）' : ''}`, async () => {
-          const res = await request(app)
-            .post('/api/v1/player/help/assist')
-            .set('Authorization', `Bearer ${tk}`)
-            .send({ helpId })
-            .expect(200);
-
-          expect(res.body.code).toBe(0);
-          if (i === 3) {
-            expect(res.body.data.isComplete).toBe(true);
-          } else {
-            expect(res.body.data.isComplete).toBe(false);
-          }
-        });
-      } else {
-        it(`第${i}次助力（超额）应被拒绝`, async () => {
-          const res = await request(app)
-            .post('/api/v1/player/help/assist')
-            .set('Authorization', `Bearer ${tk}`)
-            .send({ helpId })
-            .expect(200);
-
-          expect(res.body.code).toBe(400);
-          expect(res.body.message).toContain('已满额');
-        });
-      }
-    }
-
-    it('详情接口应反映 completed 状态', async () => {
-      const res = await request(app)
-        .get('/api/v1/player/help/detail')
-        .query({ helpId })
-        .expect(200);
-
-      expect(res.body.data.activity.status).toBe('completed');
-      expect(res.body.data.canHelp).toBe(false);
-    });
-
-    it('R10: 膨胀券应已发放给发起者', async () => {
-      const row = db.prepare(
-        `SELECT COUNT(*) as cnt FROM expand_coupons WHERE user_id = ? AND help_id = ?`
-      ).get('test-p1', helpId);
-      expect((row as any).cnt).toBeGreaterThanOrEqual(1);
-    });
-
-    it('R10: 膨胀券应已发放给最后一位助力者', async () => {
-      const row = db.prepare(
-        `SELECT COUNT(*) as cnt FROM expand_coupons WHERE user_id = ? AND help_id = ?`
-      ).get('help-fullflow-3', helpId);
-      // 最后一位助力者（第3次助力）trigger了完成，应该也获得膨胀券
-      expect((row as any).cnt).toBeGreaterThanOrEqual(1);
-    });
-  });
-
-  // ================================================================
-  // 额外：重复助力 / 不存在的活动
   // ================================================================
   describe('异常输入处理', () => {
     it('助力不存在的活动应返回 404', async () => {

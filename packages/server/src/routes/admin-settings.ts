@@ -50,7 +50,6 @@ const defaultSettings: Record<string, string> = {
   'cfg_default_timeout_seconds': '300',
   'cfg_checkin_enabled': 'true',
   'cfg_help_enabled': 'true',
-  'cfg_coupon_enabled': 'true',
   'cfg_gps_check_enabled': 'true',
   'cfg_gps_check_radius': '500',
   'cfg_auto_assign_venue': 'true',
@@ -59,9 +58,7 @@ const defaultSettings: Record<string, string> = {
   'cfg_max_race_per_day': '50',
   'cfg_help_required_count': '5',
   'cfg_help_valid_days': '7',
-  'cfg_expand_coupon_valid_days': '15',
   'cfg_help_initiator_reward_count': '1',
-  'cfg_expand_coupon_helper_gift_count': '1',
 };
 
 /**

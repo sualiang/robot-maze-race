@@ -8,7 +8,8 @@ App({
     userInfo: null,
     token: null,
     isLoggedIn: false,
-    systemInfo: null
+    systemInfo: null,
+    scanData: null  // 存储扫码结果，用于跨页面传递
   },
 
   onLaunch: function () {

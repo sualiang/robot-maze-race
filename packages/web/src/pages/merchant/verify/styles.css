@@ -1,0 +1,430 @@
+/* ==================== 商家端核销页面 ==================== */
+
+.mch-verify-page {
+  padding: 14px;
+  padding-bottom: 84px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+/* Tab 切换 */
+.mch-verify-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 20px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.mch-verify-tab {
+  flex: 1;
+  padding: 12px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.45);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.mch-verify-tab:active {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.mch-verify-tab.mch-tab-active {
+  color: #00d4ff;
+  background: rgba(0, 212, 255, 0.08);
+}
+
+/* 扫码区域 */
+.mch-scan-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.mch-scan-button {
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 8px 32px rgba(99, 102, 241, 0.3);
+  transition: all 0.2s;
+}
+
+.mch-scan-button:active {
+  transform: scale(0.95);
+}
+
+.mch-scan-icon {
+  font-size: 48px;
+}
+
+.mch-scan-hint {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.35);
+  text-align: center;
+}
+
+/* 手动核销区域 */
+.mch-manual-area {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mch-manual-input {
+  width: 100%;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  font-size: 18px;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+  color: #e8e8f0;
+  text-align: center;
+  letter-spacing: 4px;
+  font-family: 'SF Mono', Menlo, Monaco, monospace;
+}
+
+.mch-manual-input:focus {
+  border-color: #00d4ff;
+  box-shadow: 0 0 12px rgba(0, 212, 255, 0.1);
+}
+
+.mch-manual-input::placeholder {
+  letter-spacing: 0;
+  font-family: inherit;
+}
+
+.mch-verify-confirm-btn {
+  width: 100%;
+  padding: 16px;
+  border: none;
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #059669, #10b981);
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 2px;
+  box-shadow: 0 3px 16px rgba(16, 185, 129, 0.25);
+}
+
+.mch-verify-confirm-btn:active {
+  transform: scale(0.97);
+}
+
+.mch-verify-confirm-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* 核销结果弹窗 */
+.mch-result-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 24px;
+}
+
+.mch-result-card {
+  width: 100%;
+  max-width: 360px;
+  background: rgba(20, 25, 50, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 32px 24px;
+  text-align: center;
+  backdrop-filter: blur(20px);
+}
+
+.mch-result-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.mch-result-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #e8e8f0;
+  margin-bottom: 16px;
+}
+
+.mch-result-body {
+  text-align: left;
+  margin-bottom: 20px;
+}
+
+.mch-result-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  font-size: 14px;
+}
+
+.mch-result-label {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.mch-result-value {
+  color: #e8e8f0;
+  font-weight: 500;
+}
+
+.mch-result-error {
+  color: #ef4444;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.mch-result-btn {
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.mch-result-btn:active {
+  transform: scale(0.97);
+}
+
+/* 最近核销记录 */
+.mch-recent-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #e8e8f0;
+  margin: 20px 0 12px;
+}
+
+.mch-recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mch-recent-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+}
+
+.mch-recent-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mch-recent-coupon {
+  font-size: 14px;
+  font-weight: 500;
+  color: #e8e8f0;
+}
+
+.mch-recent-user {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.mch-recent-right {
+  text-align: right;
+}
+
+.mch-recent-value {
+  font-size: 15px;
+  font-weight: 600;
+  color: #10b981;
+}
+
+.mch-recent-time {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+/* 查看全部链接 */
+.mch-verify-view-all {
+  display: block;
+  text-align: center;
+  padding: 14px;
+  font-size: 14px;
+  color: #00d4ff;
+  text-decoration: none;
+  margin-top: 8px;
+}
+
+/* ==================== 核销记录列表页 ==================== */
+
+.mch-log-page {
+  padding: 14px;
+  padding-bottom: 84px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.mch-log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.mch-log-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #e8e8f0;
+}
+
+.mch-log-search {
+  width: 100%;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+  color: #e8e8f0;
+  transition: border-color 0.2s;
+  margin-bottom: 16px;
+}
+
+.mch-log-search:focus {
+  border-color: #00d4ff;
+}
+
+.mch-log-search::placeholder {
+  color: rgba(255, 255, 255, 0.2);
+}
+
+.mch-log-date-filter {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.mch-log-date-input {
+  flex: 1;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  font-size: 13px;
+  outline: none;
+  color: #e8e8f0;
+  box-sizing: border-box;
+}
+
+.mch-log-date-input:focus {
+  border-color: #00d4ff;
+}
+
+.mch-log-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 14px;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+}
+
+.mch-log-item-left {
+  flex: 1;
+}
+
+.mch-log-item-coupon {
+  font-size: 15px;
+  font-weight: 600;
+  color: #e8e8f0;
+  margin-bottom: 4px;
+}
+
+.mch-log-item-user {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-bottom: 2px;
+}
+
+.mch-log-item-meta {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.mch-log-item-right {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.mch-log-item-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #10b981;
+  margin-bottom: 4px;
+}
+
+.mch-log-item-method {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  display: inline-block;
+}
+
+.mch-log-method-scan {
+  color: #00d4ff;
+  background: rgba(0, 212, 255, 0.1);
+  border: 1px solid rgba(0, 212, 255, 0.15);
+}
+
+.mch-log-method-manual {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.15);
+}
+
+.mch-log-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 48px 0;
+  color: rgba(255, 255, 255, 0.25);
+  font-size: 14px;
+}

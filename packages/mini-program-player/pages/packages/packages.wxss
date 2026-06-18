@@ -1,37 +1,47 @@
 /* pages/packages/packages.wxss */
-/* 参赛包购买页样式 */
+/* 参赛包购买页样式 - 深色主题 #0f0f23 / 主色 #e94560 */
 
-/* ===== 页面头部 ===== */
-.page-header {
-  margin-bottom: var(--spacing-lg);
+/* ===== 顶部提示条 ===== */
+.top-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-base);
+  margin-bottom: var(--space-lg);
+  background: linear-gradient(135deg, rgba(233, 69, 96, 0.2), rgba(233, 69, 96, 0.08));
+  border-radius: var(--radius-base);
+  border: 1rpx solid rgba(233, 69, 96, 0.25);
 }
 
-.page-title {
-  font-size: var(--font-size-xl);
-  font-weight: bold;
-  color: var(--color-text-white);
-  display: block;
-  margin-bottom: var(--spacing-xs);
+.banner-icon {
+  font-size: var(--font-lg);
+  flex-shrink: 0;
 }
 
-.page-desc {
-  font-size: var(--font-size-sm);
-  color: rgba(255,255,255,0.55);
+.banner-text {
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
   line-height: 1.5;
+}
+
+.banner-count {
+  font-size: var(--font-lg);
+  font-weight: 700;
+  color: var(--color-primary);
 }
 
 /* ===== 参赛包列表 ===== */
 .package-list {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-base);
+  gap: var(--space-base);
 }
 
 .package-card {
   position: relative;
   display: flex;
   flex-direction: column;
-  padding: var(--spacing-lg);
+  padding: var(--space-lg);
   overflow: hidden;
 }
 
@@ -40,10 +50,11 @@
   position: absolute;
   top: 0;
   right: 0;
-  font-size: var(--font-size-xs);
+  font-size: var(--font-xs);
   padding: 6rpx 20rpx;
   border-radius: 0 var(--radius-base) 0 var(--radius-base);
-  font-weight: bold;
+  font-weight: 700;
+  z-index: 1;
 }
 
 .tag-hot {
@@ -51,98 +62,102 @@
   color: #fff;
 }
 
-.tag-limited {
-  background: linear-gradient(135deg, #ff9800, #ffc107);
+.tag-recommend {
+  background: linear-gradient(135deg, #533483, #7c5fbf);
   color: #fff;
 }
 
-/* 头部 */
-.pkg-header {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  margin-bottom: var(--spacing-xs);
+/* 卡片主体 */
+.pkg-body {
+  margin-bottom: var(--space-base);
+}
+
+.pkg-name-area {
+  margin-bottom: var(--space-base);
 }
 
 .pkg-name {
-  font-size: var(--font-size-xl);
-  font-weight: bold;
+  font-size: var(--font-xl);
+  font-weight: 700;
   color: var(--color-text);
-}
-
-.pkg-discount-tag {
-  font-size: var(--font-size-xs);
-  color: #fff;
-  background-color: var(--color-primary);
-  padding: 2rpx 12rpx;
-  border-radius: 6rpx;
+  display: block;
+  margin-bottom: var(--space-xs);
 }
 
 .pkg-desc {
-  font-size: var(--font-size-sm);
+  font-size: var(--font-xs);
   color: var(--color-text-secondary);
-  margin-bottom: var(--spacing-base);
+  display: block;
   line-height: 1.5;
 }
 
-/* 参数特征 */
-.pkg-features {
-  display: flex;
-  gap: var(--spacing-lg);
-  padding: var(--spacing-sm) var(--spacing-base);
-  background-color: var(--color-bg-secondary);
-  border-radius: var(--radius-sm);
-  margin-bottom: var(--spacing-base);
-}
-
-.feature-item {
-  display: flex;
-  align-items: center;
-  gap: 6rpx;
-}
-
-.feature-icon {
-  font-size: var(--font-size-lg);
-}
-
-.feature-text {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-light);
-}
-
-/* 底部价格与购买 */
-.pkg-bottom {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.pkg-price-area {
+/* 次数展示 */
+.pkg-count-area {
   display: flex;
   align-items: baseline;
-  gap: var(--spacing-sm);
+  gap: var(--space-xs);
+  margin-bottom: var(--space-sm);
 }
 
-.pkg-current-price {
-  display: flex;
-  align-items: baseline;
-}
-
-.price-symbol {
-  font-size: var(--font-size-sm);
-  color: var(--color-primary);
-  font-weight: bold;
-}
-
-.price-number {
-  font-size: 56rpx;
+.pkg-count-number {
+  font-size: 64rpx;
   font-weight: 900;
   color: var(--color-primary);
   line-height: 1;
 }
 
-.pkg-original-price {
-  font-size: var(--font-size-xs);
+.pkg-count-unit {
+  font-size: var(--font-base);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+/* 有效期 */
+.pkg-meta {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+}
+
+.pkg-meta-icon {
+  font-size: var(--font-sm);
+}
+
+.pkg-meta-text {
+  font-size: var(--font-xs);
+  color: var(--color-text-light);
+}
+
+/* 底部：价格 + 按钮 */
+.pkg-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: var(--space-base);
+  border-top: 1rpx solid var(--color-border);
+}
+
+.pkg-price-area {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+}
+
+.price-symbol {
+  font-size: var(--font-sm);
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.price-number {
+  font-size: 52rpx;
+  font-weight: 900;
+  color: var(--color-primary);
+  line-height: 1;
+}
+
+.price-original {
+  font-size: var(--font-xs);
   color: var(--color-text-light);
   text-decoration: line-through;
 }
@@ -150,70 +165,48 @@
 .buy-btn {
   width: 200rpx;
   height: 72rpx;
-  font-size: var(--font-size-base);
+  font-size: var(--font-base);
   border-radius: 36rpx;
 }
 
-/* ===== 底部提示 ===== */
-.page-tips {
-  margin-top: var(--spacing-xl);
-  padding: var(--spacing-base) var(--spacing-lg);
-  background: rgba(255,255,255,0.06);
+.buy-btn::after {
+  border: none;
+}
+
+/* ===== 底部邀请助力区 ===== */
+.invite-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  margin-top: var(--space-xl);
+  margin-bottom: var(--space-lg);
+  padding: var(--space-base) var(--space-lg);
+  background: rgba(83, 52, 131, 0.15);
   border-radius: var(--radius-base);
-  border: 1rpx solid rgba(255,255,255,0.08);
+  border: 1rpx solid rgba(83, 52, 131, 0.3);
 }
 
-.tips-title {
-  font-size: var(--font-size-sm);
-  font-weight: bold;
-  color: rgba(255,255,255,0.7);
-  display: block;
-  margin-bottom: var(--spacing-sm);
+.invite-icon {
+  font-size: var(--font-lg);
 }
 
-.tips-item {
-  font-size: var(--font-size-xs);
-  color: rgba(255,255,255,0.45);
-  display: block;
-  line-height: 1.8;
+.invite-text {
+  font-size: var(--font-sm);
+  color: var(--color-accent-light);
+  font-weight: 500;
 }
 
-/* ===== 空状态 ===== */
-.empty-state {
-  padding: var(--spacing-xl) var(--spacing-base);
-}
-
-.empty-emoji {
-  font-size: 80rpx;
-  display: block;
-  text-align: center;
-  margin-bottom: var(--spacing-base);
-}
-
-.empty-title {
-  font-size: var(--font-size-base);
-  color: var(--color-text);
-  display: block;
-  text-align: center;
-  margin-bottom: var(--spacing-xs);
-}
-
-.empty-desc {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-light);
-  display: block;
-  text-align: center;
+.invite-footer:active {
+  opacity: 0.7;
 }
 
 /* ===== 加载中 ===== */
-.loading-state {
+.loading-container {
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 200rpx 0;
 }
 
-.loading-text {
-  font-size: var(--font-size-base);
-  color: var(--color-text-light);
-}
+

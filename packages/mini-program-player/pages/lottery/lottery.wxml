@@ -1,0 +1,56 @@
+<view class="page">
+  <!-- 头部：积分余额 -->
+  <view class="points-header card-elevated">
+    <text class="points-label">当前积分</text>
+    <text class="points-balance">{{pointsBalance || 0}}</text>
+  </view>
+
+  <!-- 抽奖区域 -->
+  <view class="lottery-section card-elevated">
+    <text class="lottery-title">🎰 积分抽奖</text>
+
+    <view class="lottery-actions">
+      <!-- 单抽 -->
+      <view class="btn btn-primary btn-sm lottery-btn" bindtap="onDrawSingle">
+        <text>单抽 ({{singleCost || 100}}积分)</text>
+      </view>
+
+      <!-- 连抽 -->
+      <view class="lottery-multi-row">
+        <text class="lottery-multi-label">连抽次数：</text>
+        <picker mode="selector" range="{{drawCountOptions}}" value="{{drawCount}}" bindchange="onDrawCountChange">
+          <view class="lottery-picker">
+            <text>{{drawCountOptions[drawCount]}}</text>
+            <text class="picker-arrow">▼</text>
+          </view>
+        </picker>
+        <view class="btn btn-primary btn-sm lottery-btn" bindtap="onDrawMulti">
+          <text>连抽 ({{multiCost || 500}}积分)</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 抽奖结果弹窗 -->
+  <view wx:if="{{showDrawResult}}" class="draw-result-overlay" bindtap="onCloseResult">
+    <view class="draw-result-card" catchtap="">
+      <text class="draw-result-title">🎉 恭喜获得</text>
+      <text class="draw-result-item">{{drawResultText || '谢谢参与'}}</text>
+      <view class="btn btn-primary btn-sm" bindtap="onCloseResult">知道了</view>
+    </view>
+  </view>
+
+  <!-- 中奖记录 -->
+  <view class="history-section">
+    <text class="history-title">中奖记录</text>
+    <view wx:if="{{historyRecords.length > 0}}" class="history-list">
+      <view wx:for="{{historyRecords}}" wx:key="id" class="history-item">
+        <text class="history-prize">{{item.prizeName || item.name || '奖品'}}</text>
+        <text class="history-date">{{item.date || item.createdAt || ''}}</text>
+      </view>
+    </view>
+    <view wx:else class="empty-state">
+      <text class="empty-desc">暂无中奖记录</text>
+    </view>
+  </view>
+</view>

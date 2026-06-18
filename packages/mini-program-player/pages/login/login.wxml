@@ -1,0 +1,65 @@
+<view class="login-container">
+  <view class="login-box">
+    <!-- Logo + 应用名 -->
+    <view class="logo-area">
+      <text class="logo-emoji">🦾</text>
+      <text class="app-name">铁甲快狗·迷宫竞速</text>
+      <text class="app-subtitle">手机号登录</text>
+    </view>
+
+    <!-- 登录表单 -->
+    <view class="form-area">
+      <!-- 手机号 -->
+      <view class="input-group {{focusPhone ? 'input-group-focus' : ''}}">
+        <text class="input-icon">📱</text>
+        <input
+          class="input-field"
+          type="number"
+          maxlength="11"
+          placeholder="请输入手机号"
+          placeholder-class="input-placeholder"
+          value="{{phone}}"
+          bindinput="onPhoneInput"
+          bindfocus="onPhoneFocus"
+          bindblur="onPhoneBlur"
+          data-field="phone"
+        />
+        <text class="input-clear {{phone ? '' : 'hidden'}}" bindtap="clearPhone">✕</text>
+      </view>
+
+      <!-- 密码 -->
+      <view class="input-group {{focusPwd ? 'input-group-focus' : ''}}">
+        <text class="input-icon">🔒</text>
+        <input
+          class="input-field"
+          type="text"
+          password="{{!showPwd}}"
+          placeholder="请输入密码"
+          placeholder-class="input-placeholder"
+          value="{{password}}"
+          bindinput="onPwdInput"
+          bindfocus="onPwdFocus"
+          bindblur="onPwdBlur"
+          data-field="password"
+        />
+        <text class="input-toggle-pwd" bindtap="togglePwd">{{showPwd ? '🙈' : '👁️'}}</text>
+      </view>
+
+      <!-- 登录按钮 -->
+      <button
+        class="login-btn {{canSubmit ? '' : 'login-btn-disabled'}}"
+        loading="{{loading}}"
+        disabled="{{!canSubmit}}"
+        bindtap="doLogin"
+      >
+        {{loading ? '登录中...' : '登 录'}}
+      </button>
+
+      <!-- 注册链接 -->
+      <view class="register-area">
+        <text class="register-text">新用户？</text>
+        <text class="register-link" bindtap="doRegister">快速注册</text>
+      </view>
+    </view>
+  </view>
+</view>

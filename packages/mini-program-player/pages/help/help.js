@@ -1,69 +1,80 @@
-// pages/help/help.js - 好友助力裂变页
+// pages/help/help.js - 发起者的助力管理页
 var request = require('../../utils/request');
 
 Page({
   data: {
     activity: null,
-    helpId: '',
     loading: true,
-    isInitiator: false,
-    isHelper: false,
-    canHelp: true,
-    canvasWidth: 600,
-    canvasHeight: 800,
-    shareCardReady: false
+    emptySlots: [],
+    canvasWidth: 300,
+    canvasHeight: 450,
+    canvasReady: false
   },
 
-  onLoad: function (options) {
-    if (options && options.id) {
-      this.setData({ helpId: options.id });
-      this.loadHelpDetail(options.id);
-    } else {
-      this.createHelpActivity();
-    }
-  },
-
-  loadHelpDetail: function (id) {
+  onLoad: function () {
     var that = this;
     that.setData({ loading: true });
-    request.get('/player/help/detail', { helpId: id }).then(function (data) {
-      var activity = data.activity;
-      if (activity && activity.helpers && activity.helpers.length > 0) {
-        activity.firstHelperName = activity.helpers[0].helperNickname || '用户';
+    request.get('/player/me/help-status').then(function (data) {
+      if (data && data.activity) {
+        var activity = data.activity;
+        activity.progressPercent = that.calcProgress(activity.currentHelpCount, activity.requiredHelpCount);
+        var helpers = activity.helpers || [];
+        var emptyCount = activity.requiredHelpCount - helpers.length;
+        if (emptyCount < 0) emptyCount = 0;
+        var emptySlots = [];
+        for (var i = 0; i < emptyCount; i++) {
+          emptySlots.push({ index: i });
+        }
+        that.setData({
+          activity: activity,
+          emptySlots: emptySlots,
+          loading: false
+        });
+        // 延迟生成海报 canvas
+        setTimeout(function () {
+          that.generatePoster();
+        }, 800);
       } else {
-        activity.firstHelperName = '发起者';
-      }
-      if (activity) {
-        activity.progressPercent = Math.round(activity.currentHelpCount / activity.requiredHelpCount * 100);
-      }
-      that.setData({
-        activity: activity,
-        isInitiator: data.isInitiator,
-        isHelper: data.isHelper,
-        canHelp: data.canHelp,
-        loading: false
-      });
-      if (data.isInitiator) {
-        setTimeout(function () { that.generateShareCard(); }, 500);
+        that.setData({ loading: false });
       }
     }).catch(function (err) {
-      console.error('获取助力详情失败', err);
+      console.error('获取助力状态失败', err);
       that.setData({ loading: false });
       wx.showToast({ title: (err && err.message) || '获取数据失败', icon: 'none' });
     });
   },
 
+  calcProgress: function (current, required) {
+    if (!required || required <= 0) return 0;
+    var pct = Math.round(current / required * 100);
+    if (pct > 100) pct = 100;
+    return pct;
+  },
+
   createHelpActivity: function () {
     var that = this;
     that.setData({ loading: true });
-    request.post('/player/help/create', { targetPackageId: '' }).then(function (activity) {
-      that.setData({
-        activity: activity,
-        helpId: activity.id,
-        isInitiator: true,
-        loading: false
-      });
-      setTimeout(function () { that.generateShareCard(); }, 500);
+    request.post('/player/help/create', {}).then(function (activity) {
+      if (activity) {
+        activity.progressPercent = that.calcProgress(activity.currentHelpCount, activity.requiredHelpCount);
+        var helpers = activity.helpers || [];
+        var emptyCount = activity.requiredHelpCount - helpers.length;
+        if (emptyCount < 0) emptyCount = 0;
+        var emptySlots = [];
+        for (var i = 0; i < emptyCount; i++) {
+          emptySlots.push({ index: i });
+        }
+        that.setData({
+          activity: activity,
+          emptySlots: emptySlots,
+          loading: false
+        });
+        setTimeout(function () {
+          that.generatePoster();
+        }, 800);
+      } else {
+        that.setData({ loading: false });
+      }
     }).catch(function (err) {
       console.error('创建助力失败', err);
       that.setData({ loading: false });
@@ -71,60 +82,21 @@ Page({
     });
   },
 
-  onDoHelp: function () {
-    var that = this;
-    var app = getApp();
-
-    // 获取设备ID用于防刷校验
-    var deviceId = '';
-    try {
-      var sysInfo = wx.getSystemInfoSync();
-      deviceId = sysInfo.deviceId || '';
-    } catch (e) {
-      deviceId = '';
-    }
-
-    if (!app.globalData.isLoggedIn) {
-      wx.showModal({
-        title: '请先登录',
-        content: '登录后可以为好友助力',
-        confirmText: '去登录',
-        success: function (res) {
-          if (res.confirm) {
-            app.wxLogin().then(function () { that.onDoHelp(); });
-          }
-        }
-      });
-      return;
-    }
-    wx.showLoading({ title: '助力中...' });
-    request.post('/player/help/action', {
-      helpId: that.data.helpId,
-      helperDeviceId: deviceId
-    }).then(function () {
-      wx.hideLoading();
-      wx.showToast({ title: '助力成功！', icon: 'success' });
-      that.loadHelpDetail(that.data.helpId);
-    }).catch(function (err) {
-      wx.hideLoading();
-      wx.showToast({ title: (err && err.message) || '助力失败', icon: 'none' });
-    });
-  },
-
-  generateShareCard: function () {
+  // 生成分享海报
+  generatePoster: function () {
     var that = this;
     var activity = that.data.activity;
-    var helpId = that.data.helpId;
-    if (!activity || !helpId) return;
+    if (!activity) return;
 
     var app = getApp();
     var user = app.globalData.userInfo;
-    if (!user) return;
+    if (!user || !user.avatarUrl) return;
 
     var ctx = wx.createCanvasContext('shareCanvas', that);
     var W = that.data.canvasWidth;
     var H = that.data.canvasHeight;
 
+    // 背景渐变
     var gradient = ctx.createLinearGradient(0, 0, 0, H);
     gradient.addColorStop(0, '#1a1a2e');
     gradient.addColorStop(0.5, '#16213e');
@@ -132,80 +104,82 @@ Page({
     ctx.setFillStyle(gradient);
     ctx.fillRect(0, 0, W, H);
 
-    ctx.setFillStyle('rgba(233,69,96,0.15)');
+    // 装饰发光圆
+    ctx.setFillStyle('rgba(233,69,96,0.12)');
     ctx.beginPath();
-    ctx.arc(W / 2, 80, 160, 0, 2 * Math.PI);
+    ctx.arc(W / 2, 50, 100, 0, 2 * Math.PI);
     ctx.fill();
 
+    // 标题
     ctx.setFillStyle('#ffffff');
-    ctx.setFontSize(40);
+    ctx.setFontSize(22);
     ctx.setTextAlign('center');
-    ctx.fillText('机器狗迷宫竞速', W / 2, 140);
-    ctx.setFontSize(28);
-    ctx.setFillStyle('rgba(255,255,255,0.7)');
-    ctx.fillText('好友助力 · 免费获取参赛次数', W / 2, 185);
+    ctx.fillText('机器狗迷宫竞速', W / 2, 60);
+    ctx.setFontSize(14);
+    ctx.setFillStyle('rgba(255,255,255,0.6)');
+    ctx.fillText('好友助力·免费参赛', W / 2, 85);
 
-    var avatarY = 250;
+    // 用户头像（圆形裁剪）
+    var avatarX = W / 2 - 28;
+    var avatarY = 115;
     ctx.save();
     ctx.beginPath();
-    ctx.arc(W / 2, avatarY, 50, 0, 2 * Math.PI);
+    ctx.arc(W / 2, avatarY + 28, 28, 0, 2 * Math.PI);
     ctx.closePath();
     ctx.clip();
-
-    that.drawAvatarImage(ctx, user.avatarUrl, W / 2 - 50, avatarY - 50, 100, 100, function () {
+    that._drawAvatarImage(ctx, user.avatarUrl, avatarX, avatarY, 56, 56, function () {
       ctx.restore();
       ctx.draw();
     });
 
+    // 用户昵称
+    ctx.setFillStyle('#ffffff');
+    ctx.setFontSize(18);
+    ctx.setTextAlign('center');
+    ctx.fillText(user.nickname || '我', W / 2, 185);
+
+    // 进度框
+    var boxY = 210;
+    ctx.setFillStyle('rgba(255,255,255,0.06)');
+    ctx.fillRect(30, boxY, W - 60, 90);
+    ctx.setStrokeStyle('rgba(255,255,255,0.1)');
+    ctx.setLineWidth(1);
+    ctx.strokeRect(30, boxY, W - 60, 90);
+
+    ctx.setFillStyle('#e94560');
+    ctx.setFontSize(16);
+    ctx.fillText('助力进度', W / 2, boxY + 28);
     ctx.setFillStyle('#ffffff');
     ctx.setFontSize(32);
-    ctx.setTextAlign('center');
-    ctx.fillText(user.nickname, W / 2, 340);
-    ctx.setFontSize(24);
-    ctx.setFillStyle('rgba(255,255,255,0.6)');
-    ctx.fillText('邀请你一起参加机器狗迷宫竞速', W / 2, 375);
+    ctx.fillText(activity.currentHelpCount + ' / ' + activity.requiredHelpCount, W / 2, boxY + 68);
+    ctx.setFontSize(12);
+    ctx.setFillStyle('rgba(255,255,255,0.4)');
+    ctx.fillText('还差 ' + (activity.requiredHelpCount - activity.currentHelpCount) + ' 人', W / 2, boxY + 85);
 
-    var progressBoxY = 420;
-    ctx.setFillStyle('rgba(255,255,255,0.08)');
-    ctx.fillRect(60, progressBoxY, W - 120, 160);
-    ctx.setStrokeStyle('rgba(255,255,255,0.15)');
-    ctx.setLineWidth(1);
-    ctx.strokeRect(60, progressBoxY, W - 120, 160);
-
+    // 底部提示
     ctx.setFillStyle('#e94560');
-    ctx.setFontSize(28);
-    ctx.fillText('助力进度', W / 2, progressBoxY + 40);
-    ctx.setFillStyle('#ffffff');
-    ctx.setFontSize(56);
-    ctx.fillText(activity.currentHelpCount + ' / ' + activity.requiredHelpCount, W / 2, progressBoxY + 105);
-    ctx.setFontSize(22);
-    ctx.setFillStyle('rgba(255,255,255,0.5)');
-    ctx.fillText('还差 ' + (activity.requiredHelpCount - activity.currentHelpCount) + ' 人助力即可获得免费次数', W / 2, progressBoxY + 140);
-
+    ctx.setFontSize(16);
+    ctx.fillText('长按小程序码为我助力', W / 2, 340);
     ctx.setFillStyle('#e94560');
-    ctx.setFontSize(28);
-    ctx.fillText('长按识别小程序码', W / 2, 640);
-    ctx.fillText('为我助力', W / 2, 680);
+    ctx.setFontSize(16);
+    ctx.fillText('扫码加入', W / 2, 365);
 
-    ctx.setFillStyle('rgba(255,255,255,0.1)');
-    ctx.fillRect(W / 2 - 75, 710, 150, 150);
-    ctx.setFillStyle('rgba(255,255,255,0.3)');
-    ctx.setFontSize(22);
-    ctx.fillText('小程序码', W / 2, 795);
+    // 小程序码占位
+    ctx.setFillStyle('rgba(255,255,255,0.06)');
+    ctx.fillRect(W / 2 - 40, 390, 80, 80);
+    ctx.setFillStyle('rgba(255,255,255,0.2)');
+    ctx.setFontSize(12);
+    ctx.fillText('小程序码', W / 2, 435);
 
     ctx.draw(false, function () {
-      that.setData({ shareCardReady: true });
+      that.setData({ canvasReady: true });
     });
   },
 
-  drawAvatarImage: function (ctx, url, x, y, w, h, callback) {
+  _drawAvatarImage: function (ctx, url, x, y, w, h, callback) {
     if (!url) {
       ctx.setFillStyle('#e94560');
       ctx.fillRect(x, y, w, h);
-      ctx.setFillStyle('#ffffff');
-      ctx.setFontSize(36);
-      ctx.setTextAlign('center');
-      ctx.fillText('👤', x + w / 2, y + h / 2 + 12);
       callback();
       return;
     }
@@ -243,38 +217,40 @@ Page({
                   if (modalRes.confirm) wx.openSetting();
                 }
               });
+            } else {
+              wx.showToast({ title: '保存失败', icon: 'none' });
             }
           }
         });
       },
-      fail: function () {
+      fail: function (err) {
+        console.error('生成海报失败', err);
         wx.showToast({ title: '生成图片失败', icon: 'none' });
       }
-    }, that);
+    });
   },
 
   onViewHelper: function (e) {
-    var helpername = e.currentTarget.dataset.helpername;
-    wx.showToast({ title: helpername || '好友', icon: 'none' });
+    var helperName = e.currentTarget.dataset.helpername || '好友';
+    wx.showToast({ title: helperName, icon: 'none' });
+  },
+
+  onShareTap: function () {
+    // 用户点击分享按钮，由 open-type="share" 处理
   },
 
   onShareAppMessage: function () {
+    var that = this;
+    var activity = that.data.activity;
+    var helpId = activity ? activity.helpId || activity.id : '';
     var app = getApp();
-    var name = '好友';
+    var nickname = '好友';
     if (app.globalData.userInfo && app.globalData.userInfo.nickname) {
-      name = app.globalData.userInfo.nickname;
+      nickname = app.globalData.userInfo.nickname;
     }
     return {
-      title: name + '邀请你助力机器狗迷宫竞速！',
-      path: '/pages/help/help?id=' + this.data.helpId,
-      imageUrl: ''
-    };
-  },
-
-  onShareTimeline: function () {
-    return {
-      title: '帮我助力！一起玩机器狗迷宫竞速',
-      query: 'id=' + this.data.helpId,
+      title: nickname + '邀请你助力机器狗迷宫竞速！',
+      path: '/pages/help/assist/assist?help_id=' + helpId + '&inviter=' + encodeURIComponent(nickname),
       imageUrl: ''
     };
   }

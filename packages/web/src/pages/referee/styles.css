@@ -24,7 +24,9 @@
   position: relative;
   padding-bottom: 72px;
   width: 100%;
+  max-width: 480px;
   box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 /* =======================================================================
@@ -761,8 +763,8 @@
 
 .referee-login-glow-1 {
   position: absolute;
-  width: 400px;
-  height: 400px;
+  width: min(400px, 80vw);
+  height: min(400px, 80vw);
   border-radius: 50%;
   background: radial-gradient(circle, rgba(0, 212, 255, 0.06), transparent 70%);
   top: -100px;
@@ -772,8 +774,8 @@
 
 .referee-login-glow-2 {
   position: absolute;
-  width: 500px;
-  height: 500px;
+  width: min(500px, 90vw);
+  height: min(500px, 90vw);
   border-radius: 50%;
   background: radial-gradient(circle, rgba(124, 58, 237, 0.05), transparent 70%);
   bottom: -150px;

@@ -1,454 +1,234 @@
-/* pages/profile/profile.wxss */
-/* 个人中心样式 */
+/* 个人中心 V2.0 */
 
-/* ===== 未登录 ===== */
-.not-login {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: var(--spacing-xl);
-  margin-top: var(--spacing-xl);
-}
-
-.default-avatar {
-  width: 160rpx;
-  height: 160rpx;
-  border-radius: 50%;
-  margin-bottom: var(--spacing-base);
-  background: var(--color-bg-secondary);
-}
-
-.login-prompt {
-  font-size: var(--font-size-base);
-  color: var(--color-text-secondary);
-  margin-bottom: var(--spacing-lg);
-}
-
-.login-btn {
-  width: 400rpx;
-}
-
-/* ===== 个人资料头部 ===== */
+/* ===== 用户信息 ===== */
 .profile-header {
-  margin-bottom: var(--spacing-base);
+  margin-bottom: var(--space-base);
 }
-
-.profile-top {
+.profile-user-row {
   display: flex;
   align-items: center;
-  gap: var(--spacing-base);
 }
-
 .profile-avatar {
-  width: 120rpx;
-  height: 120rpx;
-  border-radius: 50%;
-  border: 3rpx solid var(--color-primary);
+  width: 100rpx;
+  height: 100rpx;
+  border-radius: var(--radius-round);
+  background: var(--color-bg-input);
   flex-shrink: 0;
 }
-
-.profile-info {
-  flex: 1;
+.profile-user-text {
+  margin-left: var(--space-base);
   display: flex;
   flex-direction: column;
+  gap: 6rpx;
 }
-
+.profile-nickname-row {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
 .profile-nickname {
-  font-size: var(--font-size-xl);
-  font-weight: bold;
+  font-size: var(--font-xl);
+  font-weight: 700;
   color: var(--color-text);
 }
-
+.profile-gender {
+  font-size: 30rpx;
+  font-weight: 700;
+}
+.profile-gender.male { color: #64b5f6; }
+.profile-gender.female { color: #f48fb1; }
 .profile-phone {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-light);
-  margin-top: 4rpx;
-}
-
-.edit-btn {
-  font-size: 36rpx;
-  padding: var(--spacing-sm);
-}
-
-/* ===== 数据面板 ===== */
-.stats-row {
-  display: flex;
-  gap: var(--spacing-sm);
-  margin-bottom: var(--spacing-lg);
-}
-
-.stats-col {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: var(--spacing-base) var(--spacing-sm);
-}
-
-.stats-num {
-  font-size: var(--font-size-xl);
-  font-weight: 900;
-  color: var(--color-primary);
-}
-
-.stats-label {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-light);
-  margin-top: 4rpx;
-}
-
-/* ===== 内容 Tab ===== */
-.content-tabs {
-  display: flex;
-  border-bottom: 1rpx solid var(--color-border);
-  margin-bottom: var(--spacing-base);
-}
-
-.ctab-item {
-  flex: 1;
-  text-align: center;
-  padding: var(--spacing-base) 0;
-  font-size: var(--font-size-base);
+  font-size: var(--font-sm);
   color: var(--color-text-secondary);
-  position: relative;
-  transition: color 0.2s;
 }
 
-.ctab-active {
-  color: var(--color-primary);
-  font-weight: 600;
-}
-
-.ctab-line {
-  position: absolute;
-  bottom: -1rpx;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 48rpx;
-  height: 4rpx;
-  background: var(--color-primary);
-  border-radius: 2rpx;
-}
-
-/* ===== 参赛记录 ===== */
-.tab-content {
-  min-height: 300rpx;
-}
-
-.record-list {
+/* ===== 等级勋章 ===== */
+.medal-section {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
-}
-
-.record-item {
-  padding: var(--spacing-base) var(--spacing-lg);
-}
-
-.record-row {
-  display: flex;
-  justify-content: space-between;
   align-items: center;
+  padding: var(--space-lg) var(--space-base);
+  margin-bottom: var(--space-base);
+  border: 2rpx solid #ffd700;
+  box-shadow: 0 0 20rpx rgba(255, 215, 0, 0.15);
+  border-radius: var(--radius-lg);
 }
-
-.record-left {
-  display: flex;
-  flex-direction: column;
-}
-
-.record-arena {
-  font-size: var(--font-size-base);
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-.record-date {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-light);
-  margin-top: 4rpx;
-}
-
-.record-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-}
-
-.record-score {
-  font-size: var(--font-size-lg);
-  font-weight: 900;
-  color: var(--color-primary);
-}
-
-.record-rank {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-light);
-  margin-top: 4rpx;
-}
-
-/* ===== 助力记录 ===== */
-.help-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-}
-
-.help-item {
-  padding: var(--spacing-base) var(--spacing-lg);
-}
-
-.help-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.help-left {
-  display: flex;
-  flex-direction: column;
-}
-
-.help-pkg-name {
-  font-size: var(--font-size-base);
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-.help-progress {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-light);
-  margin-top: 4rpx;
-}
-
-.help-right {
+.medal-icon-wrapper {
+  width: 100rpx;
+  height: 100rpx;
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
-}
-
-.help-status-tag {
-  font-size: var(--font-size-xs);
-  padding: 4rpx 16rpx;
-  border-radius: 12rpx;
-}
-
-.tag-active { background: rgba(233,69,96,0.1); color: var(--color-primary); }
-.tag-done { background: rgba(82,196,26,0.1); color: var(--color-success); }
-.tag-expired { background: rgba(153,153,153,0.1); color: var(--color-text-light); }
-
-.help-arrow {
-  font-size: 40rpx;
-  color: var(--color-text-light);
-}
-
-/* ===== 优惠券 ===== */
-.coupon-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-}
-
-.coupon-item {
-  display: flex;
-  padding: var(--spacing-lg);
-  border-left: 6rpx solid var(--color-primary);
-}
-
-.coupon-item.coupon-disabled {
-  border-left-color: var(--color-border);
-  opacity: 0.6;
-}
-
-.coupon-left {
-  display: flex;
-  flex-direction: column;
   justify-content: center;
-  align-items: center;
-  min-width: 140rpx;
-  border-right: 2rpx dashed var(--color-border);
-  padding-right: var(--spacing-base);
-  margin-right: var(--spacing-base);
+  margin-bottom: var(--space-sm);
 }
-
-.coupon-value {
-  font-size: var(--font-size-xxl);
-  font-weight: 900;
-  color: var(--color-primary);
-}
-
-.coupon-name {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-secondary);
-  margin-top: 4rpx;
-}
-
-.coupon-right {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.coupon-condition {
-  font-size: var(--font-size-sm);
-  color: var(--color-text);
-}
-
-.coupon-valid {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-light);
-  margin-top: 4rpx;
-}
-
-.coupon-status-tag {
-  margin-top: var(--spacing-xs);
-}
-
-.tag-available {
-  font-size: var(--font-size-xs);
-  color: var(--color-success);
-  background: rgba(82,196,26,0.08);
-  padding: 2rpx 12rpx;
-  border-radius: 8rpx;
-}
-
-.tag-used, .tag-expired {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-light);
-}
-
-/* ===== 空状态 ===== */
-.empty-tab {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 100rpx 0;
-}
-
-.empty-icon {
+.medal-icon {
   font-size: 80rpx;
-  margin-bottom: var(--spacing-base);
+}
+.medal-name {
+  font-size: var(--font-xl);
+  font-weight: 700;
+  color: #ffd700;
+  text-shadow: 0 0 10rpx rgba(255, 215, 0, 0.3);
 }
 
-.empty-text {
-  font-size: var(--font-size-base);
-  color: var(--color-text-secondary);
-  margin-bottom: var(--spacing-xs);
+/* ===== 经验进度条 ===== */
+.exp-section {
+  margin-bottom: var(--space-base);
 }
-
-.empty-hint {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-light);
-}
-
-.loading-tab {
+.exp-header {
   display: flex;
-  justify-content: center;
-  padding: 100rpx 0;
-  font-size: var(--font-size-base);
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-sm);
+}
+.exp-label {
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+}
+.exp-value {
+  font-size: var(--font-sm);
+  color: var(--color-text);
+  font-weight: 600;
+}
+.progress-bar {
+  height: 14rpx;
+  background: var(--color-bg-input);
+  border-radius: 7rpx;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #e94560, #ff6b81, #ffd700);
+  border-radius: 7rpx;
+  transition: width 0.3s;
+}
+.exp-percent-text {
+  font-size: var(--font-xs);
   color: var(--color-text-light);
+  text-align: center;
+  margin-top: var(--space-xs);
+}
+
+/* ===== 战斗力 + 排名 + 积分 ===== */
+.combat-section {
+  margin-bottom: var(--space-base);
+}
+.combat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+}
+.combat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+.combat-number {
+  font-size: var(--font-huge);
+  font-weight: 900;
+  color: var(--color-primary);
+  line-height: 1.1;
+}
+.combat-rank {
+  font-size: var(--font-xxl);
+}
+.combat-points {
+  font-size: var(--font-xxl);
+  color: var(--color-warning);
+}
+.combat-label {
+  font-size: var(--font-xs);
+  color: var(--color-text-light);
+  margin-top: 4rpx;
+}
+.combat-divider {
+  width: 1rpx;
+  height: 48rpx;
+  background: var(--color-border);
+}
+
+/* ===== 三行核心数据 ===== */
+.core-stats {
+  margin-bottom: var(--space-base);
+}
+.core-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-sm) 0;
+}
+.core-stat-row + .core-stat-row {
+  border-top: 1rpx solid var(--color-border);
+}
+.core-stat-label {
+  font-size: var(--font-base);
+  color: var(--color-text-secondary);
+}
+.core-stat-value {
+  font-size: var(--font-lg);
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+/* ===== 赛季未开启 ===== */
+.season-closed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-xl) var(--space-base);
+  margin-bottom: var(--space-base);
+}
+.season-closed-icon {
+  font-size: 80rpx;
+  margin-bottom: var(--space-base);
+}
+.season-closed-text {
+  font-size: var(--font-xl);
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: var(--space-sm);
+}
+.season-closed-desc {
+  font-size: var(--font-sm);
+  color: var(--color-text-light);
+}
+
+/* ===== 菜单列表 ===== */
+.menu-section {
+  margin-bottom: var(--space-base);
+  padding: 0;
+}
+.menu-item {
+  display: flex;
+  align-items: center;
+  padding: var(--space-base);
+}
+.menu-icon {
+  font-size: 36rpx;
+  margin-right: var(--space-base);
+}
+.menu-label {
+  flex: 1;
+  font-size: var(--font-base);
+  color: var(--color-text);
+}
+.menu-arrow {
+  font-size: var(--font-xl);
+  color: var(--color-text-light);
+}
+.menu-divider {
+  height: 1rpx;
+  background: var(--color-border);
+  margin: 0 var(--space-base);
 }
 
 /* ===== 退出登录 ===== */
 .logout-section {
-  margin-top: var(--spacing-xl);
-  padding-bottom: var(--spacing-xl);
+  margin-top: var(--space-xl);
+  padding-bottom: calc(var(--space-xl) + env(safe-area-inset-bottom));
 }
-
 .logout-btn {
-  width: 100%;
   color: var(--color-text-light);
   border: 1rpx solid var(--color-border);
-  border-radius: var(--radius-base);
-}
-
-/* ===== 编辑弹窗 ===== */
-.modal-mask {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.6);
-  display: flex;
-  align-items: flex-end;
-  z-index: 1000;
-}
-
-.modal-content {
-  width: 100%;
-  background: #fff;
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  padding: var(--spacing-xl) var(--spacing-lg);
-  animation: slideUp 0.25s ease;
-}
-
-@keyframes slideUp {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
-}
-
-.modal-title {
-  font-size: var(--font-size-lg);
-  font-weight: bold;
-  color: var(--color-text);
-  display: block;
-  text-align: center;
-  margin-bottom: var(--spacing-lg);
-}
-
-.form-row {
-  display: flex;
-  align-items: center;
-  margin-bottom: var(--spacing-lg);
-}
-
-.form-label {
-  width: 120rpx;
-  font-size: var(--font-size-base);
-  color: var(--color-text-secondary);
-  flex-shrink: 0;
-}
-
-.form-input {
-  flex: 1;
-  height: 80rpx;
-  background: var(--color-bg-secondary);
-  border-radius: var(--radius-sm);
-  padding: 0 var(--spacing-base);
-  font-size: var(--font-size-base);
-  color: var(--color-text);
-}
-
-.avatar-pick-btn {
-  width: 100rpx;
-  height: 100rpx;
-  padding: 0;
-  border: none;
-  background: transparent;
-}
-
-.avatar-pick-btn::after {
-  border: none;
-}
-
-.avatar-preview {
-  width: 100rpx;
-  height: 100rpx;
-  border-radius: 50%;
-  border: 2rpx solid var(--color-border);
-}
-
-.modal-btns {
-  display: flex;
-  gap: var(--spacing-base);
-  margin-top: var(--spacing-base);
-}
-
-.modal-cancel {
-  flex: 1;
-  color: var(--color-text-secondary);
-  background: var(--color-bg-secondary);
-  border-radius: var(--radius-base);
-}
-
-.modal-save {
-  flex: 2;
 }

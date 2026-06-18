@@ -1,0 +1,22 @@
+<view class="login-container">
+  <view class="login-card">
+    <view class="logo-area">
+      <image class="logo" src="/assets/images/banner.png" mode="aspectFit"></image>
+      <text class="app-name">机器狗迷宫竞速</text>
+    </view>
+
+    <view class="form-area">
+      <view class="input-group">
+        <text class="input-label">手机号</text>
+        <input class="input-field" type="number" maxlength="11" placeholder="请输入手机号" value="{{phone}}" bindinput="onPhoneInput" />
+      </view>
+
+      <button class="login-btn" loading="{{loading}}" disabled="{{!canSubmit}}" bindtap="doLogin">登 录</button>
+
+      <view class="register-hint">
+        <text>新用户？</text>
+        <text class="register-link" bindtap="doRegister">快速注册</text>
+      </view>
+    </view>
+  </view>
+</view>

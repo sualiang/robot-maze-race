@@ -107,10 +107,8 @@ CREATE TABLE IF NOT EXISTS orders (
   payment_method VARCHAR(20),
   paid_at TEXT,
   created_at TEXT DEFAULT (datetime('now')),
-  updated_at TEXT DEFAULT (datetime('now'))
-  operator_id TEXT REFERENCES operators(id),
-  created_at TEXT DEFAULT (datetime('now')),
-  updated_at TEXT DEFAULT (datetime('now'))
+  updated_at TEXT DEFAULT (datetime('now')),
+  operator_id TEXT REFERENCES operators(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id);
@@ -193,22 +191,7 @@ CREATE INDEX IF NOT EXISTS idx_helps_initiator ON helps(initiator_id);
 CREATE INDEX IF NOT EXISTS idx_helps_helper ON helps(helper_id);
 CREATE INDEX IF NOT EXISTS idx_helps_status ON helps(status);
 
--- ==================== 膨胀券表 ====================
-CREATE TABLE IF NOT EXISTS expand_coupons (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL REFERENCES users(id),
-  help_id TEXT REFERENCES helps(id),
-  bonus_count INTEGER NOT NULL DEFAULT 1,
-  status VARCHAR(20) NOT NULL DEFAULT 'active',
-  used_order_id TEXT REFERENCES orders(id),
-  valid_from TEXT DEFAULT (datetime('now')),
-  valid_until TEXT NOT NULL,
-  used_at TEXT,
-  created_at TEXT DEFAULT (datetime('now'))
-);
-CREATE INDEX IF NOT EXISTS idx_coupons_user ON expand_coupons(user_id);
-CREATE INDEX IF NOT EXISTS idx_coupons_status ON expand_coupons(status);
-CREATE INDEX IF NOT EXISTS idx_coupons_valid ON expand_coupons(valid_until);
+
 
 -- ==================== 考勤记录表 ====================
 CREATE TABLE IF NOT EXISTS attendance (

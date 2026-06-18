@@ -1,285 +1,250 @@
 /* pages/index/index.wxss */
-/* 赛事首页样式 */
+/* 首页样式 — 深色主题，扫码主入口 */
 
-/* ===== Hero Banner ===== */
-.hero-banner {
-  position: relative;
-  width: 100%;
-  height: 420rpx;
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  margin-bottom: var(--spacing-base);
+/* ===== 页面容器 ===== */
+.container {
+  padding: 0 24rpx 24rpx;
+  min-height: 100vh;
+  background: #0f0f23;
+  box-sizing: border-box;
 }
 
-.hero-bg {
+/* ===== 1. Hero Banner ===== */
+.hero-banner {
+  position: relative;
+  margin: 24rpx 0;
+  border-radius: 20rpx;
+  overflow: hidden;
+  box-shadow: 0 0 20rpx rgba(233,69,96,0.15);
+}
+
+.hero-img {
   width: 100%;
-  height: 100%;
+  display: block;
 }
 
 .hero-overlay {
   position: absolute;
-  inset: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
   display: flex;
-  flex-direction: column;
-  align-items: center;
   justify-content: center;
-  background: linear-gradient(180deg, rgba(26,26,46,0.2) 0%, rgba(26,26,46,0.75) 100%);
-  padding: var(--spacing-lg);
+  align-items: center;
+  padding: 6rpx 0 14rpx;
+  background: linear-gradient(transparent, rgba(0,0,0,0.5));
 }
 
-.hero-tag {
-  font-size: var(--font-size-xs);
-  color: rgba(255,255,255,0.85);
-  background: rgba(233,69,96,0.4);
-  padding: 6rpx 24rpx;
-  border-radius: 20rpx;
-  margin-bottom: var(--spacing-sm);
-  backdrop-filter: blur(4rpx);
+.hero-scan-btn {
+  background: rgba(233,69,96,0.88);
+  border: 1px solid rgba(233,69,96,0.4);
+  border-radius: 36rpx;
+  padding: 6rpx 36rpx;
+  box-shadow: 0 0 14rpx rgba(233,69,96,0.25);
 }
 
-.hero-title {
-  font-size: 52rpx;
-  font-weight: 900;
+.hero-scan-text {
+  font-size: 26rpx;
+  font-weight: 700;
   color: #fff;
-  margin-bottom: var(--spacing-xs);
-  text-shadow: 0 2rpx 8rpx rgba(0,0,0,0.3);
   letter-spacing: 4rpx;
 }
 
-.hero-subtitle {
-  font-size: var(--font-size-base);
-  color: rgba(255,255,255,0.8);
-}
-
-/* ===== 统计数据 ===== */
-.stats-row {
-  margin-bottom: var(--spacing-base);
-}
-
-.stats-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  padding: var(--spacing-lg) var(--spacing-sm);
-}
-
-.stat-item {
+/* ===== 赛季信息标签（从接口读取） ===== */
+.season-tag {
   display: flex;
   flex-direction: column;
   align-items: center;
-  flex: 1;
-}
-
-.stat-value {
-  font-size: var(--font-size-xl);
-  font-weight: bold;
-  color: var(--color-primary);
-  margin-bottom: 4rpx;
-}
-
-.stat-label {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-secondary);
-}
-
-.stat-divider {
-  width: 1rpx;
-  height: 50rpx;
-  background-color: var(--color-border);
-}
-
-.arena-status {
-  display: flex;
-  align-items: center;
   gap: 8rpx;
-  font-size: var(--font-size-lg);
-  font-weight: bold;
+  padding: 16rpx 24rpx;
+  margin: 16rpx 0 0;
+  background: rgba(83, 52, 131, 0.15);
+  border-radius: 12rpx;
+  border: 1rpx solid rgba(83, 52, 131, 0.3);
 }
-
-.status-dot {
-  width: 14rpx;
-  height: 14rpx;
-  border-radius: 50%;
+.season-name {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #a78bfa;
 }
-
-.status-open {
-  color: var(--color-success);
+.level-badge {
+  background: linear-gradient(135deg, #e94560, #ff6b81);
+  padding: 2rpx 16rpx;
+  border-radius: 20rpx;
 }
-.status-open .status-dot {
-  background-color: var(--color-success);
-  box-shadow: 0 0 8rpx var(--color-success);
-}
-
-.status-closed {
-  color: var(--color-danger);
-}
-.status-closed .status-dot {
-  background-color: var(--color-danger);
-}
-
-/* 我的参赛次数 */
-.race-count-card {
-  margin-top: var(--spacing-sm);
-  padding: var(--spacing-base) var(--spacing-lg);
-  background: linear-gradient(135deg, #e94560, #533483);
-}
-
-.race-count-label {
-  font-size: var(--font-size-base);
-  color: rgba(255,255,255,0.9);
-  font-weight: bold;
-}
-
-.race-count-tip {
-  font-size: var(--font-size-xs);
-  color: rgba(255,255,255,0.65);
-  margin-top: 4rpx;
-}
-
-.race-count-value {
-  font-size: 64rpx;
-  font-weight: 900;
+.level-badge-text {
+  font-size: 22rpx;
+  font-weight: 700;
   color: #fff;
-  text-shadow: 0 2rpx 8rpx rgba(0,0,0,0.2);
+}
+.level-exp-bar {
+  width: 160rpx;
+  height: 6rpx;
+  background: rgba(255,255,255,0.15);
+  border-radius: 3rpx;
+  overflow: hidden;
+}
+.level-exp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #e94560, #ffd700);
+  border-radius: 3rpx;
 }
 
-/* ===== 公告 ===== */
-.notice-bar {
+/* ===== 2. 剩余参赛次数卡（主视觉） ===== */
+.remain-card {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
+  border-radius: 16rpx;
+  padding: 28rpx 0;
+  margin: 28rpx 0;
+  border: 1rpx solid rgba(233,69,96,0.15);
+}
+
+.remain-body {
   display: flex;
   align-items: center;
-  padding: var(--spacing-sm) var(--spacing-base);
-  margin-bottom: var(--spacing-lg);
+  gap: 12rpx;
 }
 
-.notice-icon {
-  font-size: var(--font-size-lg);
-  margin-right: var(--spacing-sm);
-  flex-shrink: 0;
+.remain-label {
+  font-size: 30rpx;
+  color: #c0c0d0;
+  font-weight: 500;
 }
 
-.notice-swiper {
-  flex: 1;
-  height: 40rpx;
+.remain-count {
+  font-size: 56rpx;
+  font-weight: 900;
+  color: #e94560;
+  line-height: 1;
+  text-shadow: 0 0 12rpx rgba(233,69,96,0.3);
 }
 
-.notice-text {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-  line-height: 40rpx;
+.remain-unit {
+  font-size: 30rpx;
+  color: #a0a0b0;
+  display: flex;
+  align-items: center;
+}
+
+/* ===== 3. 推荐参赛包 ===== */
+.packages-section {
+  margin: 56rpx 0 28rpx;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10rpx;
+}
+
+.section-title {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #e0e0e0;
+}
+
+.section-more {
+  font-size: 22rpx;
+  color: #e94560;
+}
+
+.packages-scroll {
+  height: 176rpx;
+  white-space: nowrap;
+  overflow-x: scroll;
+}
+
+.package-item {
+  display: inline-block;
+  width: 240rpx;
+  margin-right: 16rpx;
+  vertical-align: top;
+}
+
+.package-card {
+  background: #1a1a2e;
+  border-radius: 14rpx;
+  padding: 16rpx;
+  height: 156rpx;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.pkg-name {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #e0e0e0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* ===== 分区标题 ===== */
-.section-title {
-  font-size: var(--font-size-lg);
-  font-weight: bold;
-  color: var(--color-text-white);
-  margin-bottom: var(--spacing-base);
-  padding-left: var(--spacing-sm);
-  border-left: 6rpx solid var(--color-primary);
-}
-
-/* ===== 快捷入口 ===== */
-.action-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--spacing-sm);
-  margin-bottom: var(--spacing-lg);
-}
-
-.action-item {
+.pkg-bottom {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: var(--spacing-lg) var(--spacing-sm);
-  transition: transform 0.15s;
+  align-items: baseline;
+  gap: 8rpx;
 }
 
-.action-item:active {
-  transform: scale(0.96);
+.pkg-price {
+  font-size: 30rpx;
+  font-weight: 800;
+  color: #e94560;
 }
 
-.action-icon-wrap {
-  width: 88rpx;
-  height: 88rpx;
-  border-radius: 50%;
+.pkg-times {
+  font-size: 24rpx;
+  color: #888;
+}
+
+.pkg-tag {
+  font-size: 20rpx;
+  padding: 2rpx 10rpx;
+  border-radius: 10rpx;
+  align-self: flex-start;
+}
+
+.tag-hot {
+  background: rgba(233,69,96,0.2);
+  color: #e94560;
+}
+
+.tag-rec {
+  background: rgba(76,175,80,0.2);
+  color: #4caf50;
+}
+
+/* ===== 4. 次数不足（轻量提示） ===== */
+.no-count-card {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: var(--spacing-sm);
-}
-
-.icon-race { background: linear-gradient(135deg, #e94560, #ff6b81); }
-.icon-package { background: linear-gradient(135deg, #ff9800, #ffc107); }
-.icon-rank { background: linear-gradient(135deg, #4caf50, #8bc34a); }
-.icon-help { background: linear-gradient(135deg, #2196f3, #64b5f6); }
-
-.action-emoji {
-  font-size: 40rpx;
-}
-
-.action-name {
-  font-size: var(--font-size-base);
-  font-weight: bold;
-  color: var(--color-text);
-  margin-bottom: 4rpx;
-}
-
-.action-desc {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-light);
-}
-
-/* ===== 赛事亮点 ===== */
-.intro-list {
-  margin-bottom: var(--spacing-lg);
-}
-
-.intro-card {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--spacing-base);
-}
-
-.intro-icon {
-  font-size: 44rpx;
-  flex-shrink: 0;
-  width: 72rpx;
-  height: 72rpx;
-  border-radius: var(--radius-sm);
-  background: var(--color-bg-secondary);
-  display: flex;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
+  gap: 8rpx;
+  background: rgba(233,69,96,0.06);
+  border: 1rpx solid rgba(233,69,96,0.15);
+  border-radius: 12rpx;
+  padding: 14rpx 0;
+  margin: 28rpx 0;
 }
 
-.intro-content {
-  flex: 1;
+.no-count-icon {
+  font-size: 22rpx;
 }
 
-.intro-title {
-  font-size: var(--font-size-base);
-  font-weight: bold;
-  color: var(--color-text);
-  display: block;
-  margin-bottom: 4rpx;
+.no-count-title {
+  font-size: 22rpx;
+  font-weight: 600;
+  color: #e94560;
 }
 
-.intro-desc {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-  line-height: 1.5;
+.no-count-desc {
+  font-size: 20rpx;
+  color: #6b7280;
 }
 
-/* ===== 底部 ===== */
-.page-footer {
-  text-align: center;
-  padding: var(--spacing-xl) 0;
-}
 
-.footer-text {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-light);
-}

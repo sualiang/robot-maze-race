@@ -1,0 +1,129 @@
+/* 我的卡包 */
+
+.page-header {
+  text-align: center;
+  padding: var(--space-base) 0;
+}
+
+.page-title {
+  font-size: var(--font-xl);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+/* Tab 切换 */
+.coupon-tabs {
+  display: flex;
+  background: var(--color-bg-card);
+  border-radius: var(--radius-lg);
+  padding: 6rpx;
+  margin-bottom: var(--space-base);
+}
+.coupon-tab {
+  flex: 1;
+  text-align: center;
+  padding: 16rpx 0;
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-base);
+}
+.coupon-tab-active {
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+/* 卡券列表 */
+.coupon-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+/* 卡券卡片 */
+.coupon-card {
+  display: flex;
+  background: var(--color-bg-card);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border-left: 6rpx solid var(--color-primary);
+}
+.coupon-card.coupon-expired {
+  opacity: 0.5;
+  border-left-color: var(--color-text-light);
+  pointer-events: none;
+}
+
+.coupon-left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-base);
+  min-width: 160rpx;
+  border-right: 1rpx dashed var(--color-border);
+}
+.coupon-amount {
+  font-size: var(--font-huge);
+  font-weight: 900;
+  color: var(--color-primary);
+  line-height: 1;
+}
+.coupon-type {
+  font-size: var(--font-xs);
+  color: var(--color-text-light);
+  margin-top: 4rpx;
+}
+
+.coupon-right {
+  flex: 1;
+  padding: var(--space-base);
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+.coupon-name {
+  font-size: var(--font-base);
+  font-weight: 700;
+  color: var(--color-text);
+}
+.coupon-desc {
+  font-size: var(--font-xs);
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+.coupon-bottom-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.coupon-merchant {
+  font-size: var(--font-xs);
+  color: var(--color-info);
+}
+.coupon-date {
+  font-size: var(--font-xs);
+  color: var(--color-text-light);
+}
+.coupon-actions {
+  margin-top: 4rpx;
+}
+
+.coupon-nav-btn {
+  display: inline-block;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-light));
+  color: #fff;
+  font-size: 22rpx;
+  padding: 8rpx 24rpx;
+  border-radius: 30rpx;
+  border: none;
+  line-height: 1.6;
+}
+.coupon-nav-btn:active {
+  opacity: 0.8;
+}
+
+.coupon-expired-text {
+  font-size: var(--font-sm);
+  color: var(--color-text-light);
+}

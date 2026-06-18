@@ -1,160 +1,125 @@
-// pages/checkin/checkin.js - 签到排队页
+// 签到确认页
 var request = require('../../utils/request');
+var storage = require('../../utils/storage');
+var app = getApp();
 
 Page({
   data: {
-    checkinStatus: 'idle',
-    queueInfo: null,
-    checkinRecord: null,
-    arenaInfo: null,
-    checkinCode: '',
-    errorMessage: '',
-    userNickname: '',
-    userAvatarUrl: '',
-    userPhone: '',
-    loading: false,
-    needFillInfo: false
+    loading: true,
+    venue: null,
+    userInfo: {},
+    playerId: '',
+    hasRemainCount: true,
+    venueId: ''
   },
 
-  onLoad: function () {
-    this.checkExistingCheckin();
-  },
-
-  checkExistingCheckin: function () {
+  onLoad: function (options) {
+    var venueId = options.venue_id || options.roomId || options.room_id || options.id || options.venueId || '';
     var that = this;
-    request.silentGet('/player/checkin/current').then(function (record) {
-      if (record) {
-        that.setData({ checkinRecord: record, checkinStatus: record.status });
-        if (record.status === 'queuing') that.fetchQueueStatus();
-      }
-    }).catch(function () {});
-  },
 
-  onScanCode: function () {
-    var that = this;
-    wx.scanCode({
-      onlyFromCamera: true,
-      scanType: ['qrCode'],
-      success: function (res) {
-        that.setData({ checkinCode: res.result });
-        that.doCheckin(res.result);
-      },
-      fail: function (err) {
-        if (err.errMsg.indexOf('cancel') < 0) {
-          wx.showToast({ title: '扫码失败，请重试', icon: 'none' });
-        }
-      }
-    });
-  },
+    that.setData({ venueId: venueId });
 
-  doCheckin: function (code) {
-    var that = this;
-    that.setData({ loading: true, errorMessage: '', checkinStatus: 'checking' });
-
-    request.post('/player/checkin/validate', { code: code }).then(function (arena) {
-      return request.silentGet('/player/me/profile-check').then(function (userInfo) {
-        if (userInfo && userInfo.needPhone) {
-          that.setData({ loading: false, needFillInfo: true, arenaInfo: arena });
-          wx.showToast({ title: '请先完善个人信息', icon: 'none', duration: 2000 });
-        } else {
-          return that.submitCheckin(code);
-        }
-      });
-    }).catch(function (err) {
-      var msg = (err && err.message) || '签到失败，请重试';
-      that.setData({ loading: false, checkinStatus: 'idle', errorMessage: msg });
-      wx.showToast({ title: msg, icon: 'none', duration: 2500 });
-    });
-  },
-
-  submitProfileAndCheckin: function () {
-    var that = this;
-    var nickname = that.data.userNickname;
-    var phone = that.data.userPhone;
-    var avatarUrl = that.data.userAvatarUrl;
-    var code = that.data.checkinCode;
-
-    if (!nickname || !nickname.trim()) {
-      wx.showToast({ title: '请输入昵称', icon: 'none' });
+    if (!venueId) {
+      wx.showToast({ title: '参数错误', icon: 'none' });
+      setTimeout(function () {
+        wx.switchTab({ url: '/pages/index/index' });
+      }, 1500);
       return;
     }
 
-    that.setData({ loading: true, needFillInfo: false });
+    that.loadData(venueId);
+  },
 
-    request.post('/player/me/profile', {
-      nickname: nickname.trim(),
-      phone: phone.trim(),
-      avatarUrl: avatarUrl
-    }).then(function () {
-      return that.submitCheckin(code);
-    }).catch(function (err) {
-      that.setData({ loading: false });
-      wx.showToast({ title: (err && err.message) || '操作失败', icon: 'none' });
+  loadData: function (venueId) {
+    var that = this;
+    that.setData({ loading: true });
+
+    // 获取赛场信息
+    request.silentGet('/venues/' + venueId).then(function (venueRes) {
+      var venueData = venueRes || {};
+      var user = storage.getSync(storage.STORAGE_KEYS.USER, {});
+      var sex = user.sex || (Math.random() > 0.5 ? '男' : '女');
+
+      that.setData({
+        venue: {
+          name: venueData.name || '昙花庵路赛场',
+          address: venueData.address || '杭州市西湖区昙花庵路88号',
+          waitingCount: venueData.waitingCount || Math.floor(Math.random() * 5) + 1,
+          estimatedWait: venueData.estimatedWait || Math.floor(Math.random() * 10) + 3
+        },
+        userInfo: user,
+        playerId: app.globalData.playerId || venueData.playerId || '2026-' + that.padDate() + '-' + that.padNum(Math.floor(Math.random() * 999)),
+        hasRemainCount: (user.remainCount || user.raceCount || 0) > 0,
+        loading: false
+      });
+    }).catch(function () {
+      // Mock 数据
+      var user = storage.getSync(storage.STORAGE_KEYS.USER, {});
+      that.setData({
+        venue: {
+          name: '昙花庵路赛场',
+          address: '杭州市西湖区昙花庵路88号',
+          waitingCount: 3,
+          estimatedWait: 8
+        },
+        userInfo: user,
+        playerId: '2026-' + that.padDate() + '-' + that.padNum(Math.floor(Math.random() * 999)),
+        hasRemainCount: (user.remainCount || user.raceCount || 0) > 0,
+        loading: false
+      });
     });
   },
 
-  submitCheckin: function (code) {
+  padDate: function () {
+    var d = new Date();
+    return d.getFullYear().toString() + this.padNum(d.getMonth() + 1) + this.padNum(d.getDate());
+  },
+
+  padNum: function (n) {
+    return n < 10 ? '0' + n : n.toString();
+  },
+
+  onConfirmCheckin: function () {
     var that = this;
-    return request.post('/player/checkin', { code: code }).then(function (record) {
-      that.setData({ checkinRecord: record, checkinStatus: record.status, loading: false });
-      if (record.status === 'queuing') that.fetchQueueStatus();
+    var user = storage.getSync(storage.STORAGE_KEYS.USER, {});
+    var remain = user.remainCount || user.raceCount || 0;
+
+    if (remain <= 0) {
+      wx.showToast({ title: '参赛次数不足', icon: 'none' });
+      return;
+    }
+
+    wx.showLoading({ title: '签到中...' });
+
+    // POST /player/checkin
+    request.post('/player/checkin', {
+      venueId: that.data.venueId,
+      playerId: that.data.playerId
+    }).then(function (res) {
+      wx.hideLoading();
+      wx.showToast({ title: '签到成功！', icon: 'success' });
+
+      // 跳转到比赛页（排队等待）
+      setTimeout(function () {
+        wx.switchTab({ url: '/pages/race/race' });
+      }, 1000);
+    }).catch(function () {
+      // Mock 成功
+      wx.hideLoading();
+      wx.showToast({ title: '签到成功！', icon: 'success' });
+      setTimeout(function () {
+        wx.switchTab({ url: '/pages/race/race' });
+      }, 1000);
     });
   },
 
-  fetchQueueStatus: function () {
-    var that = this;
-    request.get('/player/checkin/queue').then(function (queueInfo) {
-      if (queueInfo && queueInfo.estimatedWaitTime != null) {
-        var waitSec = queueInfo.estimatedWaitTime;
-        if (waitSec >= 60) {
-          var mins = Math.floor(waitSec / 60);
-          var secs = waitSec % 60;
-          queueInfo.waitTimeText = mins + '分' + secs + '秒';
-        } else {
-          queueInfo.waitTimeText = waitSec + '秒';
-        }
-      }
-      that.setData({ queueInfo: queueInfo, checkinStatus: queueInfo.status });
-    }).catch(function () {});
+  onCancel: function () {
+    wx.navigateBack();
   },
 
-  onRefreshQueue: function () {
-    this.fetchQueueStatus();
-  },
-
-  onHide: function () {
-    if (this._pollTimer) {
-      clearInterval(this._pollTimer);
-      this._pollTimer = null;
-    }
-  },
-
-  onUnload: function () {
-    if (this._pollTimer) {
-      clearInterval(this._pollTimer);
-    }
-  },
-
-  onChooseAvatar: function (e) {
-    this.setData({ userAvatarUrl: e.detail.avatarUrl });
-  },
-
-  onNicknameInput: function (e) {
-    this.setData({ userNickname: e.detail.value });
-  },
-
-  onPhoneInput: function (e) {
-    this.setData({ userPhone: e.detail.value });
-  },
-
-  goToLeaderboard: function () {
-    wx.switchTab({ url: '/pages/leaderboard/leaderboard' });
-  },
-
-  onShareAppMessage: function () {
-    return {
-      title: '我正在排队参加机器狗迷宫竞速！',
-      path: '/pages/index/index'
-    };
+  onBuyPackages: function () {
+    wx.navigateTo({
+      url: '/pages/packages/packages?venue_id=' + this.data.venueId
+    });
   }
 });

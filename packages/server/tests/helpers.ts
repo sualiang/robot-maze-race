@@ -67,7 +67,6 @@ export function resetDatabase(db?: any): void {
   const d = db || require('../src/config/database').default;
   const tables = [
     'marketing_config',
-    'expand_coupons',
     'attendance',
     'helps',
     'race_results',
@@ -106,21 +105,6 @@ export function resetDatabase(db?: any): void {
     initiated_at TEXT DEFAULT (datetime('now')),
     helped_at TEXT,
     expires_at TEXT,
-    created_at TEXT DEFAULT (datetime('now'))
-  )`);
-
-  // 重建 expand_coupons 表
-  try { d.exec(`DROP TABLE IF EXISTS expand_coupons`); } catch {}
-  d.exec(`CREATE TABLE IF NOT EXISTS expand_coupons (
-    id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL REFERENCES users(id),
-    help_id TEXT REFERENCES helps(id),
-    amount_cents INTEGER NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'active',
-    used_order_id TEXT REFERENCES orders(id),
-    valid_from TEXT DEFAULT (datetime('now')),
-    valid_until TEXT NOT NULL,
-    used_at TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   )`);
 
