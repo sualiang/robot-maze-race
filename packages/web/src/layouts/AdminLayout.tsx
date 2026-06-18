@@ -4,7 +4,7 @@ import { Layout, Menu, Result, Modal, Form, Input, Button, Space, message } from
 import {
   TeamOutlined, GiftOutlined, DollarOutlined, SettingOutlined,
   DashboardOutlined, SafetyCertificateOutlined, UserOutlined,
-  LogoutOutlined, UserSwitchOutlined,
+  LogoutOutlined, UserSwitchOutlined, ShoppingOutlined,
 } from '@ant-design/icons';
 
 const { Header, Sider, Content } = Layout;
@@ -45,7 +45,7 @@ const ALL_MENU_ITEMS = [
   { key: '/admin/dashboard', icon: <DashboardOutlined />, label: '运营商数据看板', permission: 'dashboard:read' },
   { key: '/admin/marketing', icon: <GiftOutlined />, label: '营销配置', permission: 'marketing:read' },
   { key: '/admin/finance', icon: <DollarOutlined />, label: '财务中心', permission: 'finance:read' },
-  { key: '/admin/merchant', icon: <ShopOutlined />, label: '商家管理', permission: 'merchant:read' },
+  { key: '/admin/merchant', icon: <ShoppingOutlined />, label: '商家管理', permission: 'merchant:read' },
   { key: '/admin/rbac', icon: <SafetyCertificateOutlined />, label: '角色和成员管理', superAdminOnly: true },
   { key: '/admin/settings', icon: <SettingOutlined />, label: '系统设置', superAdminOnly: true },
   { key: '/admin/profile', icon: <UserOutlined />, label: '个人中心' },

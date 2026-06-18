@@ -3,7 +3,7 @@ import { Layout, Menu, Modal, Form, Input, Button, Space, message } from 'antd';
 import { LogoutOutlined } from '@ant-design/icons';
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { HomeOutlined, TeamOutlined, ShopOutlined, GiftOutlined, DollarOutlined, UserOutlined, SafetyCertificateOutlined, UserSwitchOutlined } from '@ant-design/icons';
+import { HomeOutlined, TeamOutlined, ShopOutlined, GiftOutlined, DollarOutlined, UserOutlined, SafetyCertificateOutlined, UserSwitchOutlined, ShoppingOutlined } from '@ant-design/icons';
 import api from '../utils/api';
 
 const { Header, Sider, Content } = Layout;
@@ -15,7 +15,7 @@ const allMenuItems: { key: string; icon: React.ReactNode; label: string; perms?:
   { key: '/operator/marketing', icon: <GiftOutlined />, label: '营销管理', perms: ['marketing:read'] },
   { key: '/operator/finance', icon: <DollarOutlined />, label: '财务中心', perms: ['finance:read'] },
   { key: '/operator/rbac', icon: <SafetyCertificateOutlined />, label: '角色与成员管理', perms: ['rbac:read'] },
-  { key: '/operator/merchant', icon: <ShopOutlined />, label: '商家管理', perms: ['merchant:read'] },
+  { key: '/operator/merchant', icon: <ShoppingOutlined />, label: '商家管理', perms: ['merchant:read'] },
   { key: '/operator/players', icon: <UserSwitchOutlined />, label: '玩家管理', perms: ['players:read'] },
 
   { key: '/operator/profile', icon: <UserOutlined />, label: '个人中心' },
