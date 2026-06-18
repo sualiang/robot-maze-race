@@ -170,6 +170,25 @@
   animation: referee-pulse 1.2s ease-in-out infinite;
 }
 
+.merchant-login-tabs {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+.merchant-login-tab {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--mch-text-dim);
+  cursor: pointer;
+  padding-bottom: 6px;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+}
+.merchant-login-tab.active {
+  color: var(--mch-accent);
+  border-bottom-color: var(--mch-accent);
+}
 .merchant-login-hint {
   text-align: center;
   font-size: 12px;
