@@ -32,7 +32,7 @@ function operatorMiddleware(req: Request, res: Response, next: Function): void {
  * GET /api/v1/admin/merchant/list
  * 商家列表
  */
-router.get('/list', authMiddleware, adminMiddleware, operatorMiddleware, async (req: Request, res: Response) => {
+router.get('/', authMiddleware, adminMiddleware, operatorMiddleware, async (req: Request, res: Response) => {
   try {
     const page = Math.max(parseInt(req.query.page as string, 10) || 1, 1);
     const pageSize = Math.min(Math.max(parseInt(req.query.pageSize as string, 10) || 20, 1), 100);
