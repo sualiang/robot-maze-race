@@ -78,7 +78,7 @@ router.get('/', authMiddleware, adminMiddleware, operatorMiddleware, async (req:
  * 创建商家
  */
 router.post('/', authMiddleware, adminMiddleware, operatorMiddleware, async (req: Request, res: Response) => {
-  const { merchantName, merchantAddress, longitude, latitude, contactPhone, logoUrl } = req.body;
+  const { merchantName, merchantAddress, longitude, latitude, contactPhone, logoUrl, accountPhone, accountPassword } = req.body;
 
   if (!merchantName) {
     res.json({ code: 400, message: '商家名称不能为空', data: null });
@@ -86,12 +86,12 @@ router.post('/', authMiddleware, adminMiddleware, operatorMiddleware, async (req
   }
 
   try {
-    const id = uuidv4();
+    const merchantId = uuidv4();
     await execute(
       `INSERT INTO merchants (id, merchant_name, merchant_address, longitude, latitude, contact_phone, logo_url, status, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 1, datetime('now'), datetime('now'))`,
       [
-        id,
+        merchantId,
         merchantName,
         merchantAddress || '',
         longitude !== undefined ? parseFloat(longitude) : 0,
@@ -101,18 +101,30 @@ router.post('/', authMiddleware, adminMiddleware, operatorMiddleware, async (req
       ]
     );
 
-    // 自动生成邀请码
-    const inviteId = uuidv4();
-    const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-    await execute(
-      `INSERT INTO merchant_invite_codes (id, merchant_id, invite_code, used, created_at)
-       VALUES ($1, $2, $3, 0, datetime('now'))`,
-      [inviteId, id, inviteCode]
-    );
+    // 同时创建商家管理员账号（直接创建，不需要邀请码）
+    let adminId = '';
+    let adminPhone = accountPhone || contactPhone || '';
+    let adminPassword = accountPassword || '123456';
+    if (adminPhone) {
+      adminId = uuidv4();
+      const crypto = require('crypto');
+      const passwordHash = crypto.createHash('sha256').update(adminPassword).digest('hex');
+      await execute(
+        `INSERT INTO merchant_admin (id, merchant_id, username, password_hash, phone, real_name, status, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, '', 1, datetime('now'), datetime('now'))`,
+        [adminId, merchantId, adminPhone, passwordHash, adminPhone]
+      );
+    }
 
     res.json({
       code: 0,
-      data: { id, merchantName, invite_code: inviteCode }
+      data: {
+        id: merchantId,
+        merchantName,
+        adminPhone,
+        adminPassword,
+        adminCreated: !!adminId,
+      }
     });
   } catch (e: any) {
     console.error('[AdminMerchant] create error:', e?.message || e);

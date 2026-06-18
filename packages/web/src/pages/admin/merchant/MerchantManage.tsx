@@ -65,8 +65,28 @@ export default function MerchantManage() {
         await api.put(`/admin/merchant/${editingId}`, values);
         message.success('商家信息已更新');
       } else {
-        await api.post('/admin/merchant', values);
-        message.success('商家已创建');
+        const res = await api.post('/admin/merchant', values);
+        const d = res?.data;
+        if (d?.adminCreated) {
+          Modal.info({
+            title: '商家创建成功',
+            content: (
+              <div>
+                <p>商家名称：<strong>{values.merchantName}</strong></p>
+                <div style={{ background: '#f5f5f5', borderRadius: 8, padding: 16, marginTop: 12 }}>
+                  <p>登录地址：<br/><code style={{ wordBreak: 'break-all', fontSize: 12, color: '#1890ff' }}>http://175.24.200.63/merchant/login</code></p>
+                  <p style={{ marginTop: 12 }}>账号：<strong style={{ color: '#1890ff', fontSize: 16 }}>{d.adminPhone}</strong></p>
+                  <p style={{ marginTop: 8 }}>初始密码：<strong style={{ color: '#f5222d', fontSize: 16 }}>{d.adminPassword}</strong></p>
+                </div>
+                <p style={{ color: '#999', marginTop: 12, fontSize: 13 }}>请将以上信息提供给商家，商家首次登录后请及时修改密码。</p>
+              </div>
+            ),
+            okText: '知道了',
+            width: 480,
+          });
+        } else {
+          message.success('商家已创建');
+        }
       }
       setModalOpen(false);
       fetchList();
@@ -175,6 +195,20 @@ export default function MerchantManage() {
               <Input placeholder="手机号码" style={{ width: 200 }} />
             </Form.Item>
           </Space>
+
+          {!editingId && (
+            <>
+              <div style={{ marginBottom: 8, fontSize: 13, color: '#999' }}>以下为商家登录账号信息（创建后不可修改）</div>
+              <Space size={16} wrap>
+                <Form.Item name="accountPhone" label="登录手机号" rules={[{ required: true, message: '请输入登录手机号' }]}>
+                  <Input placeholder="商家登录用的手机号" maxLength={11} style={{ width: 220 }} />
+                </Form.Item>
+                <Form.Item name="accountPassword" label="初始密码" rules={[{ required: true, message: '请输入初始密码' }]}>
+                  <Input.Password placeholder="至少6位" minLength={6} style={{ width: 220 }} />
+                </Form.Item>
+              </Space>
+            </>
+          )}
 
 
         </Form>
