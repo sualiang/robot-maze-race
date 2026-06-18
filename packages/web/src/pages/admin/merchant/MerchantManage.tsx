@@ -176,9 +176,7 @@ export default function MerchantManage() {
             </Form.Item>
           </Space>
 
-          <Form.Item name="logoUrl" label="Logo URL">
-            <Input placeholder="Logo图片地址（选填）" />
-          </Form.Item>
+
         </Form>
       </Modal>
     </>
