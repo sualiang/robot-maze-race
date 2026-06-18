@@ -34,7 +34,7 @@ export default function MerchantManage() {
   const fetchList = useCallback(async () => {
     setLoading(true);
     try {
-      const data: any = await api.get('/admin/merchant/list');
+      const data: any = await api.get('/admin/merchant');
       setList(data?.list ?? []);
     } catch {
       setList([]);
@@ -62,10 +62,10 @@ export default function MerchantManage() {
     setSaving(true);
     try {
       if (editingId) {
-        await api.put(`/admin/merchant/merchant/${editingId}`, values);
+        await api.put(`/admin/merchant/${editingId}`, values);
         message.success('商家信息已更新');
       } else {
-        await api.post('/admin/merchant/merchant', values);
+        await api.post('/admin/merchant', values);
         message.success('商家已创建');
       }
       setModalOpen(false);
@@ -80,7 +80,7 @@ export default function MerchantManage() {
   const handleToggleStatus = async (record: MerchantItem) => {
     const newStatus = record.status === 'enabled' ? 'disabled' : 'enabled';
     try {
-      await api.put(`/admin/merchant/merchant/${record.id}`, { status: newStatus === 'enabled' ? 1 : 0 });
+      await api.put(`/admin/merchant/${record.id}`, { status: newStatus === 'enabled' ? 1 : 0 });
       message.success(newStatus === 'enabled' ? '已启用' : '已禁用');
       fetchList();
     } catch {

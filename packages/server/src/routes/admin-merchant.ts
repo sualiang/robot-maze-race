@@ -32,7 +32,7 @@ function operatorMiddleware(req: Request, res: Response, next: Function): void {
  * GET /api/v1/admin/merchant/list
  * 商家列表
  */
-router.get('/merchant/list', authMiddleware, adminMiddleware, operatorMiddleware, async (req: Request, res: Response) => {
+router.get('/list', authMiddleware, adminMiddleware, operatorMiddleware, async (req: Request, res: Response) => {
   try {
     const page = Math.max(parseInt(req.query.page as string, 10) || 1, 1);
     const pageSize = Math.min(Math.max(parseInt(req.query.pageSize as string, 10) || 20, 1), 100);
@@ -74,10 +74,10 @@ router.get('/merchant/list', authMiddleware, adminMiddleware, operatorMiddleware
 });
 
 /**
- * POST /api/v1/admin/merchant/merchant
+ * POST /api/v1/admin/merchant
  * 创建商家
  */
-router.post('/merchant', authMiddleware, adminMiddleware, operatorMiddleware, async (req: Request, res: Response) => {
+router.post('/', authMiddleware, adminMiddleware, operatorMiddleware, async (req: Request, res: Response) => {
   const { merchantName, merchantAddress, longitude, latitude, contactPhone, logoUrl } = req.body;
 
   if (!merchantName) {
@@ -112,10 +112,10 @@ router.post('/merchant', authMiddleware, adminMiddleware, operatorMiddleware, as
 });
 
 /**
- * PUT /api/v1/admin/merchant/merchant/:id
+ * PUT /api/v1/admin/merchant/:id
  * 编辑商家（含坐标）
  */
-router.put('/merchant/:id', authMiddleware, adminMiddleware, operatorMiddleware, async (req: Request, res: Response) => {
+router.put('/:id', authMiddleware, adminMiddleware, operatorMiddleware, async (req: Request, res: Response) => {
   const { id } = req.params;
   const { merchantName, merchantAddress, longitude, latitude, contactPhone, logoUrl, status } = req.body;
 

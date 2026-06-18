@@ -70,7 +70,7 @@ export default function MerchantList() {
       if (activeTab === 'pending') {
         data = await api.get('/operator/merchant/pending');
       } else {
-        data = await api.get('/admin/merchant/list');
+        data = await api.get('/admin/merchant');
       }
       setList(data?.list ?? data ?? []);
     } catch {
@@ -111,10 +111,10 @@ export default function MerchantList() {
     setSaving(true);
     try {
       if (editingId) {
-        await api.put(`/admin/merchant/merchant/${editingId}`, values);
+        await api.put(`/admin/merchant/${editingId}`, values);
         message.success('商家已更新');
       } else {
-        await api.post('/admin/merchant/merchant', values);
+        await api.post('/admin/merchant', values);
         message.success('商家已创建');
       }
       setModalOpen(false);
