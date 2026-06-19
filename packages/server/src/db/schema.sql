@@ -437,7 +437,7 @@ CREATE TABLE IF NOT EXISTS ticket_redemptions (
 -- ==================== 后台种子数据 ====================
 -- 运营商角色（scope='operator'）
 INSERT OR IGNORE INTO admin_roles (id, name, label, permissions, scope) VALUES
-  ('op_super_admin', 'op_super_admin', '总管理员', '["*"]', 'operator'),
+  ('op_super_admin', 'op_super_admin', '运营商超管', '["*"]', 'operator'),
   ('op_admin', 'op_admin', '运营', '["venues:read","venues:create","venues:edit","referees:read","referees:create","referees:edit","packages:read","packages:create","packages:edit","marketing:read","marketing:create","marketing:edit","players:read","dashboard:read"]', 'operator'),
   ('op_finance', 'op_finance', '财务', '["finance:read","finance:withdraw","finance:history","dashboard:read"]', 'operator');
 

@@ -457,7 +457,7 @@ router.post('/login', async (req: Request, res: Response) => {
             username: operator.operator_username,
             nickname: operator.name,
             phone: operator.phone || operator.operator_username,
-            role_name: '总管理员',
+            role_name: '运营商超管',
             role: 'operator',
             permissions: ['*'],
             passwordChangeRequired,
@@ -904,7 +904,7 @@ router.post('/member/change-password', authMiddleware, async (req: Request, res:
           username: op.operator_username,
           nickname: op.name,
           phone: op.phone || op.operator_username,
-          role_name: '总管理员',
+          role_name: '运营商超管',
           role: 'operator',
           permissions: ['*'],
         };
