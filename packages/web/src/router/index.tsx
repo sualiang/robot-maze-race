@@ -111,7 +111,7 @@ export default function AppRouter() {
         <Route path="season" element={<AdminSeasonList />} />
         <Route path="prize" element={<PrizeList />} />
         <Route path="task" element={<TaskList />} />
-        <Route path="merchant" element={<MerchantManage />} />
+        <Route path="operators/:id/merchants" element={<MerchantManage />} />
       </Route>
 
       {/* 裁判端（移动端 H5） */}

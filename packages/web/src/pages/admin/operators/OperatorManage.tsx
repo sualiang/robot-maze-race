@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Card, Table, Button, Space, Modal, Form, Input,
   message, Popconfirm, Drawer, Descriptions, Badge, Select, Typography, Cascader,
@@ -8,7 +9,7 @@ const { Text } = Typography;
 import type { ColumnsType } from 'antd/es/table';
 import {
   PlusOutlined, EditOutlined, EyeOutlined, ReloadOutlined,
-  StopOutlined, CheckCircleOutlined, DeleteOutlined,
+  StopOutlined, CheckCircleOutlined, DeleteOutlined, ShopOutlined,
 } from '@ant-design/icons';
 import AccountInfoModal from '../../../components/AccountInfoModal';
 import api from '../../../utils/api';
@@ -43,6 +44,7 @@ interface RegionOption {
 }
 
 export default function OperatorManage() {
+  const navigate = useNavigate();
   const [list, setList] = useState<OperatorItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -289,6 +291,9 @@ export default function OperatorManage() {
           </Button>
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
             编辑
+          </Button>
+          <Button type="link" size="small" icon={<ShopOutlined />} onClick={() => navigate(`/admin/operators/${record.id}/merchants`)}>
+            商家
           </Button>
           {canOperate && (
             <Popconfirm

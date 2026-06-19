@@ -5,21 +5,27 @@ import {
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
-  PlusOutlined, EditOutlined, ReloadOutlined,
+  PlusOutlined, EditOutlined, ReloadOutlined, KeyOutlined,
 } from '@ant-design/icons';
 import api from '../../../utils/api';
+import AccountInfoModal from '../../../components/AccountInfoModal';
 
 interface MerchantItem {
   id: string;
-  name: string;
-  address: string;
-  latitude: number;
+  merchantName: string;
+  name?: string;
+  merchantAddress: string;
+  address?: string;
   longitude: number;
-  contact_name: string;
-  contact_phone: string;
-  logo_url: string;
-  status: 'enabled' | 'disabled';
-  audit_status: number; // 0=待审核, 1=已通过, 2=已驳回
+  latitude: number;
+  contactName: string;
+  contactPhone: string;
+  contact_phone?: string;
+  contact_name?: string;
+  logoUrl: string;
+  logo_url?: string;
+  status: number;
+  audit_status: number;
   reject_reason: string;
   created_at: string;
 }
@@ -46,13 +52,8 @@ export default function MerchantList() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
-  // 审核相关（商家入驻）
-  const [auditModalOpen, setAuditModalOpen] = useState(false);
-  const [auditMerchant, setAuditMerchant] = useState<MerchantItem | null>(null);
-  const [auditResult, setAuditResult] = useState<'approved' | 'rejected'>('approved');
-  const [auditReason, setAuditReason] = useState('');
-  const [auditing, setAuditing] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
+  const [accountInfo, setAccountInfo] = useState<{ account: string; password: string } | null>(null);
 
   // 优惠券审核
   const [couponList, setCouponList] = useState<CouponItem[]>([]);
@@ -66,19 +67,14 @@ export default function MerchantList() {
   const fetchList = useCallback(async () => {
     setLoading(true);
     try {
-      let data: any;
-      if (activeTab === 'pending') {
-        data = await api.get('/operator/merchant/pending');
-      } else {
-        data = await api.get('/admin/merchant');
-      }
+      const data: any = await api.get('/admin/merchant');
       setList(data?.list ?? data ?? []);
     } catch {
       setList([]);
     } finally {
       setLoading(false);
     }
-  }, [activeTab]);
+  }, []);
 
   useEffect(() => { fetchList(); }, [fetchList]);
 
@@ -106,36 +102,91 @@ export default function MerchantList() {
     setModalOpen(true);
   };
 
+  const handleToggleStatus = async (record: MerchantItem) => {
+    const newStatus = record.status === 1 ? 0 : 1;
+    const actionText = newStatus === 1 ? '启用' : '禁用';
+    Modal.confirm({
+      title: `${actionText}商家`,
+      content: `确定${actionText}商家「${record.merchantName}」吗？`,
+      onOk: () => {
+        api.patch(`/admin/merchant/${record.id}/status`, { status: newStatus })
+          .then(() => {
+            message.success(`商家已${actionText}`);
+            setList(prev => prev.map(item =>
+              item.id === record.id ? { ...item, status: newStatus } : item
+            ));
+          })
+          .catch(() => {
+            message.error('操作失败');
+          });
+      },
+    });
+  };
+
+  const handleDelete = async (record: MerchantItem) => {
+    Modal.confirm({
+      title: '确认删除',
+      content: `确定永久删除商家「${record.merchantName}」吗？此操作不可恢复，将同时删除关联的账号、优惠券等数据。`,
+      okType: 'danger',
+      onOk: () => {
+        api.delete(`/admin/merchant/${record.id}`)
+          .then(() => {
+            message.success('商家已删除');
+            setList(prev => prev.filter(item => item.id !== record.id));
+          })
+          .catch(() => {
+            message.error('删除失败');
+          });
+      },
+    });
+  };
+
+  const handleResetPassword = (record: MerchantItem) => {
+    Modal.confirm({
+      title: '确认重置密码',
+      content: `确定重置商家「${record.merchantName}」的管理员密码吗？重置后商家需使用新密码登录。`,
+      onOk: () => {
+        api.post(`/admin/merchant/${record.id}/reset-password`)
+          .then((res: any) => {
+            Modal.success({
+              title: '密码已重置',
+              content: (
+                <div>
+                  <p>商家：<strong>{record.merchantName}</strong></p>
+                  <div style={{ background: '#f5f5f5', borderRadius: 8, padding: 16, marginTop: 12 }}>
+                    <p>新密码：<strong style={{ color: '#f5222d', fontSize: 16 }}>{res.initPassword}</strong></p>
+                  </div>
+                  <p style={{ color: '#999', marginTop: 12, fontSize: 13 }}>请将新密码提供给商家。</p>
+                </div>
+              ),
+              okText: '知道了',
+              width: 400,
+            });
+          })
+          .catch(() => {
+            message.error('重置密码失败');
+          });
+      },
+    });
+  };
+
   const handleSave = async () => {
-    const values = await form.validateFields();
+
+    let values: any;
+    try {
+      values = await form.validateFields();
+    } catch {
+      message.error('表单验证失败，请检查填写内容');
+      return;
+    }
     setSaving(true);
     try {
       if (editingId) {
         await api.put(`/admin/merchant/${editingId}`, values);
         message.success('商家已更新');
       } else {
-        const res = await api.post('/admin/merchant', values);
-        const d = res?.data;
-        if (d?.adminCreated) {
-          Modal.info({
-            title: '商家创建成功',
-            content: (
-              <div>
-                <p>商家名称：<strong>{values.merchantName}</strong></p>
-                <div style={{ background: '#f5f5f5', borderRadius: 8, padding: 16, marginTop: 12 }}>
-                  <p>登录地址：<br/><code style={{ wordBreak: 'break-all', fontSize: 12, color: '#1890ff' }}>http://175.24.200.63/merchant/login</code></p>
-                  <p style={{ marginTop: 12 }}>账号：<strong style={{ color: '#1890ff', fontSize: 16 }}>{d.adminPhone}</strong></p>
-                  <p style={{ marginTop: 8 }}>初始密码：<strong style={{ color: '#f5222d', fontSize: 16 }}>{d.adminPassword}</strong></p>
-                </div>
-                <p style={{ color: '#999', marginTop: 12, fontSize: 13 }}>请将以上信息提供给商家，商家首次登录后请及时修改密码。</p>
-              </div>
-            ),
-            okText: '知道了',
-            width: 480,
-          });
-        } else {
-          message.success('商家已创建');
-        }
+        const d = await api.post('/admin/merchant', values);
+        setAccountInfo({ account: values.accountPhone, password: d?.adminPassword || '' });
       }
       setModalOpen(false);
       fetchList();
@@ -146,36 +197,7 @@ export default function MerchantList() {
     }
   };
 
-  // 商家入驻审核
-  const openAuditModal = (record: MerchantItem) => {
-    setAuditMerchant(record);
-    setAuditResult('approved');
-    setAuditReason('');
-    setAuditModalOpen(true);
-  };
-
-  const handleAudit = async () => {
-    if (!auditMerchant) return;
-    if (auditResult === 'rejected' && !auditReason.trim()) {
-      message.error('驳回原因必填');
-      return;
-    }
-    setAuditing(true);
-    try {
-      await api.post('/operator/merchant/audit', {
-        merchantId: auditMerchant.id,
-        auditStatus: auditResult === 'approved' ? 1 : 2,
-        auditRemark: auditResult === 'rejected' ? auditReason.trim() : '',
-      });
-      message.success(auditResult === 'approved' ? '已通过审核' : '已驳回');
-      setAuditModalOpen(false);
-      fetchList();
-    } catch {
-      message.error('审核操作失败');
-    } finally {
-      setAuditing(false);
-    }
-  };
+  // 商家入驻审核（已废弃——商家创建后即生效，无需审核）
 
   // 优惠券审核
   const openCouponAudit = (coupon: CouponItem) => {
@@ -232,19 +254,30 @@ export default function MerchantList() {
     return null;
   };
 
+  // 获取当前用户信息，判断权限
+  const userInfoStr = localStorage.getItem('operator_user_info') || '{}';
+  const userInfo = JSON.parse(userInfoStr);
+  const permissions = userInfo?.permissions || [];
+  const role = userInfo?.role || '';
+  const roleId = userInfo?.role_id || '';
+  console.log('[MerchantList] userInfo:', userInfo);
+  console.log('[MerchantList] permissions:', permissions, 'isArray:', Array.isArray(permissions));
+  console.log('[MerchantList] canDelete:', permissions.includes('*') || roleId === 'role-admin');
+  // 超级管理员（*权限）和运营商管理员（role-admin）有删除权限
+  const canDelete = permissions.includes('*') || roleId === 'role-admin' || role === 'operator';
+
   const merchantColumns: ColumnsType<MerchantItem> = [
-    { title: '商家名称', dataIndex: 'name', key: 'name', width: 160 },
+    { title: '商家名称', dataIndex: 'merchantName', key: 'merchantName', width: 160 },
     {
-      title: '地址', dataIndex: 'address', key: 'address', width: 200,
+      title: '地址', dataIndex: 'merchantAddress', key: 'merchantAddress', width: 200,
       ellipsis: true,
     },
-    // 经纬度列已移除（用户不需要手动输入）
-    { title: '联系人', dataIndex: 'contact_name', key: 'contact_name', width: 100 },
-    { title: '联系人手机', dataIndex: 'contact_phone', key: 'contact_phone', width: 120 },
+    { title: '联系人', dataIndex: 'contactName', key: 'contactName', width: 100 },
+    { title: '联系手机', dataIndex: 'contactPhone', key: 'contactPhone', width: 120 },
     {
       title: '状态', dataIndex: 'status', key: 'status', width: 80,
-      render: (s: string) => (
-        <Badge status={s === 'enabled' ? 'success' : 'error'} text={s === 'enabled' ? '启用' : '禁用'} />
+      render: (s: number) => (
+        <Badge status={s === 1 ? 'success' : 'error'} text={s === 1 ? '启用' : '禁用'} />
       ),
     },
     {
@@ -252,15 +285,21 @@ export default function MerchantList() {
       render: (_: unknown, record: MerchantItem) => renderAuditStatus(record),
     },
     {
-      title: '操作', key: 'action', width: 180, fixed: 'right',
+      title: '操作', key: 'action', width: 360, fixed: 'right',
       render: (_: unknown, record: MerchantItem) => (
         <Space size="small" wrap>
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
             编辑
           </Button>
-          {record.audit_status === 0 && (
-            <Button type="link" size="small" onClick={() => openAuditModal(record)}>
-              审核
+          <Button type="link" size="small" onClick={() => handleToggleStatus(record)}>
+            {record.status === 1 ? '禁用' : '启用'}
+          </Button>
+          <Button type="link" size="small" icon={<KeyOutlined />} onClick={() => handleResetPassword(record)}>
+            重置密码
+          </Button>
+          {canDelete && (
+            <Button type="link" size="small" danger onClick={() => handleDelete(record)}>
+              删除
             </Button>
           )}
         </Space>
@@ -318,7 +357,6 @@ export default function MerchantList() {
           }}
           items={[
             { key: 'all', label: '全部商家' },
-            { key: 'pending', label: '待审核商家' },
             { key: 'coupon', label: '优惠券审核' },
           ]}
           style={{ marginBottom: 16 }}
@@ -356,11 +394,21 @@ export default function MerchantList() {
         confirmLoading={saving}
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
+
+          {!editingId && (
+            <>
+              <div style={{ marginBottom: 8, fontSize: 13, color: '#999' }}>商家登录账号（创建后不可修改），初始密码由系统自动生成</div>
+              <Form.Item name="accountPhone" label="登录账号" rules={[{ required: true, message: '请输入登录手机号' }]}>
+                <Input placeholder="商家登录用的手机号" maxLength={11} style={{ width: 280 }} />
+              </Form.Item>
+            </>
+          )}
+
           <Form.Item name="merchantName" label="商家名称" rules={[{ required: true, message: '请输入商家名称' }]}>
             <Input placeholder="商家名称" maxLength={50} />
           </Form.Item>
 
-          <Form.Item name="merchantAddress" label="地址" rules={[{ required: true, message: '请输入地址' }]}>
+          <Form.Item name="merchantAddress" label="地址">
             <Input.TextArea rows={2} placeholder="详细地址" maxLength={200} />
           </Form.Item>
 
@@ -368,91 +416,18 @@ export default function MerchantList() {
           <input type="hidden" name="longitude" value={0} />
 
           <Space size={16} wrap>
-            <Form.Item name="contactPhone" label="联系人手机" rules={[{ required: true, message: '请输入联系人手机' }]}>
-              <Input placeholder="手机号码" style={{ width: 200 }} />
+            <Form.Item name="contactName" label="联系人">
+              <Input placeholder="联系人姓名" style={{ width: 200 }} />
+            </Form.Item>
+            <Form.Item name="contactPhone" label="联系手机">
+              <Input placeholder="联系手机号码" style={{ width: 200 }} />
             </Form.Item>
           </Space>
-
-          {!editingId && (
-            <>
-              <div style={{ marginBottom: 8, fontSize: 13, color: '#999' }}>以下为商家登录账号信息（创建后不可修改）</div>
-              <Space size={16} wrap>
-                <Form.Item name="accountPhone" label="登录手机号" rules={[{ required: true, message: '请输入登录手机号' }]}>
-                  <Input placeholder="商家登录用的手机号" maxLength={11} style={{ width: 220 }} />
-                </Form.Item>
-                <Form.Item name="accountPassword" label="初始密码" rules={[{ required: true, message: '请输入初始密码' }]}>
-                  <Input.Password placeholder="至少6位" minLength={6} style={{ width: 220 }} />
-                </Form.Item>
-              </Space>
-            </>
-          )}
-
 
         </Form>
       </Modal>
 
-      {/* 商家入驻审核弹窗 */}
-      <Modal
-        title="商家审核"
-        open={auditModalOpen}
-        onCancel={() => setAuditModalOpen(false)}
-        footer={null}
-        width={500}
-        destroyOnClose
-      >
-        {auditMerchant && (
-          <>
-            <div style={{ marginBottom: 16, padding: '12px 16px', background: '#fafafa', borderRadius: 8 }}>
-              <p><strong>商家名称：</strong>{auditMerchant.name}</p>
-              <p><strong>地址：</strong>{auditMerchant.address}</p>
-              <p><strong>联系人：</strong>{auditMerchant.contact_name} / {auditMerchant.contact_phone}</p>
-              <p><strong>创建时间：</strong>{auditMerchant.created_at}</p>
-            </div>
 
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>审核结果</label>
-              <Space>
-                <Button
-                  type={auditResult === 'approved' ? 'primary' : 'default'}
-                  onClick={() => setAuditResult('approved')}
-                >
-                  通过
-                </Button>
-                <Button
-                  type={auditResult === 'rejected' ? 'primary' : 'default'}
-                  danger
-                  onClick={() => setAuditResult('rejected')}
-                >
-                  驳回
-                </Button>
-              </Space>
-            </div>
-
-            {auditResult === 'rejected' && (
-              <Form.Item
-                label="驳回原因"
-                required
-                validateStatus={!auditReason.trim() ? 'error' : undefined}
-                help={!auditReason.trim() ? '驳回原因必填' : undefined}
-              >
-                <Input.TextArea
-                  rows={3}
-                  placeholder="请输入驳回原因"
-                  value={auditReason}
-                  onChange={(e) => setAuditReason(e.target.value)}
-                />
-              </Form.Item>
-            )}
-
-            <Space style={{ marginTop: 24, width: '100%', justifyContent: 'flex-end' }}>
-              <Button onClick={() => setAuditModalOpen(false)}>取消</Button>
-              <Button type="primary" loading={auditing} onClick={handleAudit}>
-                确认审核
-              </Button>
-            </Space>
-          </>
-        )}
-      </Modal>
 
       {/* 优惠券审核弹窗 */}
       <Modal
@@ -518,6 +493,14 @@ export default function MerchantList() {
           </>
         )}
       </Modal>
+      <AccountInfoModal
+        open={!!accountInfo}
+        account={accountInfo?.account || ''}
+        password={accountInfo?.password || ''}
+        role="merchant"
+        loginUrl="http://175.24.200.63/merchant/login"
+        onClose={() => setAccountInfo(null)}
+      />
     </>
   );
 }

@@ -112,7 +112,7 @@ export default function OperatorRoleManage() {
   return (
     <Card title="角色权限说明">
       <Paragraph type="secondary" style={{ marginBottom: 16 }}>
-        以下为运营商后台预定义的三种角色，角色不可编辑或删除。
+        以下为运营商后台预定义的角色，角色不可编辑或删除。
       </Paragraph>
       <Table
         columns={columns}

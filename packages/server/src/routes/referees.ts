@@ -8,7 +8,6 @@ import {
   ApiResponse,
   PaginatedResult,
   Referee,
-  RefereeCertStatus,
   CreateRefereeParams,
   UpdateRefereeParams,
 } from '@robot-race/shared';
@@ -82,9 +81,9 @@ router.post('/create-by-operator', authMiddleware, async (req: Request, res: Res
 
     const refereeId = uuidv4();
     await execute(
-      `INSERT INTO referees (id, user_id, phone, cert_status, venue_id, name, operator_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [refereeId, userId, phone, 'approved', venue_id || null, name, req.user?.operatorId || null]
+      `INSERT INTO referees (id, user_id, phone, venue_id, name, operator_id)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [refereeId, userId, phone, venue_id || null, name, req.user?.operatorId || null]
     );
 
     return res.json({
@@ -96,7 +95,6 @@ router.post('/create-by-operator', authMiddleware, async (req: Request, res: Res
         name,
         phone,
         venue_id: venue_id || null,
-        cert_status: 'approved',
         init_password: initPassword,
       },
     });
@@ -126,7 +124,6 @@ interface RefereeWithUser extends Referee {
 router.get('/', authMiddleware, async (req: Request, res: Response<ApiResponse<PaginatedResult<RefereeWithUser>>>) => {
   try {
     const {
-      cert_status,
       venue_id,
       page: pageStr = '1',
       pageSize: pageSizeStr = '20',
@@ -139,12 +136,6 @@ router.get('/', authMiddleware, async (req: Request, res: Response<ApiResponse<P
     const conditions: string[] = [];
     const params: any[] = [];
     let paramIdx = 1;
-
-    if (cert_status && (cert_status as string) !== '') {
-      conditions.push(`r.cert_status = $${paramIdx}`);
-      params.push(cert_status);
-      paramIdx++;
-    }
 
     if (venue_id && (venue_id as string) !== '') {
       conditions.push(`r.venue_id = $${paramIdx}`);
@@ -192,7 +183,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response<ApiResponse<P
     const total = parseInt(countResult?.count || '0', 10);
 
     const list = await query<RefereeWithUser>(
-      `SELECT r.id, r.user_id, r.venue_id, r.cert_status, r.status,
+      `SELECT r.id, r.user_id, r.venue_id, r.status,
               r.name,
               r.phone, r.id_number, r.cert_image, r.gps_lat, r.gps_lng,
               r.last_checkin_at, r.created_at, r.updated_at,
@@ -230,7 +221,7 @@ router.get('/my', authMiddleware, async (req: Request, res: Response<ApiResponse
     const userId = req.user!.userId;
 
     const referee = await queryOne<RefereeWithUser>(
-      `SELECT r.id, r.user_id, r.venue_id, r.cert_status, r.status,
+      `SELECT r.id, r.user_id, r.venue_id, r.status,
               r.name,
               r.phone, r.id_number, r.cert_image, r.gps_lat, r.gps_lng,
               r.last_checkin_at, r.created_at, r.updated_at,
@@ -268,7 +259,7 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response<ApiRespons
     const { id } = req.params;
 
     const referee = await queryOne<RefereeWithUser>(
-      `SELECT r.id, r.user_id, r.venue_id, r.cert_status, r.status,
+      `SELECT r.id, r.user_id, r.venue_id, r.status,
               r.name,
               r.phone, r.id_number, r.cert_image, r.gps_lat, r.gps_lng,
               r.last_checkin_at, r.created_at, r.updated_at,
@@ -320,42 +311,15 @@ router.post('/apply', authMiddleware, async (req: Request, res: Response<ApiResp
     }
 
     // 检查是否已存在裁判申请
-    const existingReferee = await queryOne<{ id: string; cert_status: string }>(
-      'SELECT id, cert_status FROM referees WHERE user_id = $1',
+    const existingReferee = await queryOne<{ id: string }>(
+      'SELECT id FROM referees WHERE user_id = $1',
       [userId]
     );
 
     if (existingReferee) {
-      // 如果被拒绝，允许重新提交
-      if (existingReferee.cert_status === RefereeCertStatus.REJECTED) {
-        const referee = await queryOne<Referee>(
-          `UPDATE referees
-           SET venue_id = $1, cert_status = $2, phone = $3,
-               id_number = $4, cert_image = $5,
-               id_card_front = $6, id_card_back = $7,
-               updated_at = $8
-           WHERE user_id = $9
-           RETURNING id, user_id, venue_id, cert_status,
-                     phone, id_number, cert_image, id_card_front, id_card_back,
-                     gps_lat, gps_lng, last_checkin_at, created_at, updated_at`,
-          [
-            body.venue_id,
-            RefereeCertStatus.PENDING,
-            body.phone || null,
-            body.id_number || null,
-            body.cert_image_url || null,
-            body.id_card_front || null,
-            body.id_card_back || null,
-            new Date().toISOString(),
-            userId,
-          ]
-        );
-        return res.json({ code: 0, message: '已重新提交认证申请', data: referee! });
-      }
-
       return res.status(400).json({
         code: 400,
-        message: `您已有裁判记录，当前状态: ${existingReferee.cert_status}`,
+        message: '您已是裁判，无需重复申请',
         data: null as any,
       });
     }
@@ -372,17 +336,16 @@ router.post('/apply', authMiddleware, async (req: Request, res: Response<ApiResp
     // 创建裁判记录
     const id = uuidv4();
     const referee = await queryOne<Referee>(
-      `INSERT INTO referees (id, user_id, venue_id, cert_status, phone, id_number,
+      `INSERT INTO referees (id, user_id, venue_id, phone, id_number,
                cert_image, id_card_front, id_card_back)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       RETURNING id, user_id, venue_id, cert_status,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id, user_id, venue_id,
                  phone, id_number, cert_image, id_card_front, id_card_back,
                  gps_lat, gps_lng, last_checkin_at, created_at, updated_at`,
       [
         id,
         userId,
         body.venue_id,
-        RefereeCertStatus.PENDING,
         body.phone || null,
         body.id_number || null,
         body.cert_image_url || null,
@@ -398,89 +361,7 @@ router.post('/apply', authMiddleware, async (req: Request, res: Response<ApiResp
   }
 });
 
-/**
- * PUT /api/v1/referees/:id/approve
- * 审核裁判 — 通过/拒绝（admin/operator 专用）
- * @param id - 裁判记录 UUID
- * @header Authorization: Bearer <token>
- * @body status - approved | rejected
- * @body reason - 拒绝原因（rejected 时建议填写）
- * @returns 更新后的 Referee
- */
-router.put('/:id/approve', authMiddleware, async (req: Request, res: Response<ApiResponse<Referee>>) => {
-  try {
-    const { id } = req.params;
-    const { cert_status, reason } = req.body;
-    const role = req.user!.role;
-
-    // 仅 admin 和 operator 可以审核
-    if (role !== 'admin' && role !== 'operator') {
-      return res.status(403).json({ code: 403, message: '仅管理员或运营人员可审核', data: null as any });
-    }
-
-    if (!cert_status || ![RefereeCertStatus.APPROVED, RefereeCertStatus.REJECTED].includes(cert_status)) {
-      return res.status(400).json({
-        code: 400,
-        message: '请提供有效的审核状态: approved 或 rejected',
-        data: null as any,
-      });
-    }
-
-    // 检查裁判记录是否存在
-    const existing = await queryOne<{ id: string; cert_status: string; venue_id: string }>(
-      'SELECT id, cert_status, venue_id FROM referees WHERE id = $1',
-      [id]
-    );
-    if (!existing) {
-      return res.status(404).json({ code: 404, message: '裁判记录不存在', data: null as any });
-    }
-
-    if (existing.cert_status !== RefereeCertStatus.PENDING) {
-      return res.status(400).json({
-        code: 400,
-        message: `该申请已处理，当前状态: ${existing.cert_status}`,
-        data: null as any,
-      });
-    }
-
-    // operator 只能审核自己管理的赛场下的裁判
-    if (role === 'operator') {
-      const venue = await queryOne<{ id: string }>(
-        'SELECT id FROM venues WHERE id = $1 AND operator_id = $2',
-        [existing.venue_id, req.user!.userId]
-      );
-      if (!venue) {
-        return res.status(403).json({
-          code: 403,
-          message: '您无权审核该赛场下的裁判',
-          data: null as any,
-        });
-      }
-    }
-
-    // 更新认证状态
-    const now = new Date().toISOString();
-    const referee = await queryOne<Referee>(
-      `UPDATE referees
-       SET cert_status = $1, updated_at = $2
-       WHERE id = $3
-       RETURNING id, user_id, venue_id, cert_status,
-                 phone, id_number, cert_image, id_card_front, id_card_back,
-                 gps_lat, gps_lng, last_checkin_at, created_at, updated_at`,
-      [cert_status, now, id]
-    );
-
-    // 如果审核通过，可选地更新用户角色（保守策略：不自动更改）
-    const message = cert_status === RefereeCertStatus.APPROVED
-      ? '裁判审核已通过'
-      : `裁判审核已拒绝${reason ? ': ' + reason : ''}`;
-
-    return res.json({ code: 0, message, data: referee! });
-  } catch (error: any) {
-    console.error('[Referees] approve error:', error.message);
-    return res.status(500).json({ code: 500, message: '审核操作失败', data: null as any });
-  }
-});
+// 裁判审核路由已移除（cert_status 不再使用）
 
 /**
  * PUT /api/v1/referees/:id/bind-venue
@@ -517,7 +398,7 @@ router.put('/:id/bind-venue', authMiddleware, async (req: Request, res: Response
       `UPDATE referees
        SET venue_id = $1, updated_at = $2
        WHERE id = $3
-       RETURNING id, user_id, venue_id, cert_status,
+       RETURNING id, user_id, venue_id,
                  phone, id_number, cert_image, id_card_front, id_card_back,
                  gps_lat, gps_lng, last_checkin_at, created_at, updated_at`,
       [venue_id, new Date().toISOString(), id]
@@ -1331,49 +1212,7 @@ export function getCurrentScreenData() {
   };
 }
 
-/**
- * PATCH /api/v1/referees/:id/cert
- * 审核裁判认证（approve/reject）
- * @param id - 裁判 ID
- * @body cert_status - approved | rejected
- */
-router.patch('/:id/cert', authMiddleware, async (req: Request, res: Response<ApiResponse<null>>) => {
-  try {
-    const { id } = req.params;
-    const { cert_status } = req.body;
-    const role = req.user!.role;
-
-    if (role !== 'admin' && role !== 'operator') {
-      return res.status(403).json({ code: 403, message: '仅管理员或运营商可审核认证', data: null });
-    }
-
-    if (!cert_status || !['approved', 'rejected'].includes(cert_status)) {
-      return res.status(400).json({ code: 400, message: '状态值无效，请使用 approved 或 rejected', data: null });
-    }
-
-    const existing = await queryOne<{ id: string }>(
-      'SELECT id FROM referees WHERE id = $1',
-      [id]
-    );
-    if (!existing) {
-      return res.status(404).json({ code: 404, message: '裁判不存在', data: null });
-    }
-
-    await query(
-      `UPDATE referees SET cert_status = $1, updated_at = $2 WHERE id = $3`,
-      [cert_status, new Date().toISOString(), id]
-    );
-
-    return res.json({
-      code: 0,
-      message: cert_status === 'approved' ? '裁判已认证' : '裁判认证已拒绝',
-      data: null,
-    });
-  } catch (error: any) {
-    console.error('[Referees] cert update error:', error.message);
-    return res.status(500).json({ code: 500, message: '认证操作失败', data: null });
-  }
-});
+// 裁判认证审核路由已移除（cert_status 不再使用）
 
 /**
  * PATCH /api/v1/referees/:id

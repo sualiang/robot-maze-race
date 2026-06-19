@@ -203,6 +203,7 @@ router.post('/login', async (req: Request, res: Response) => {
       message: '登录成功',
       data: {
         token,
+        firstLogin: admin.first_login === 1,
         admin: {
           id: admin.id,
           username: admin.username,
@@ -257,7 +258,7 @@ router.post('/change-password', merchantAuthMiddleware, async (req: Request, res
 
     const newHash = hashPassword(newPassword);
     await execute(
-      `UPDATE merchant_admin SET password_hash = $1, updated_at = datetime('now') WHERE id = $2`,
+      `UPDATE merchant_admin SET password_hash = $1, first_login = 0, updated_at = datetime('now') WHERE id = $2`,
       [newHash, adminId]
     );
 

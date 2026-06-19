@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+
 import merchantApi from '../../../utils/merchant-api';
 import './styles.css';
 
@@ -9,6 +10,10 @@ export default function MerchantLoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [firstLoginOpen, setFirstLoginOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPwd, setChangingPwd] = useState(false);
 
   const handleLogin = async () => {
     setError('');
@@ -36,12 +41,47 @@ export default function MerchantLoginPage() {
       const res = json.data;
       localStorage.setItem('merchant_token', res.token);
       localStorage.setItem('merchant_user', JSON.stringify(res.admin || {}));
-      navigate('/merchant/coupon', { replace: true });
+      if (res.firstLogin) {
+        setFirstLoginOpen(true);
+      } else {
+        navigate('/merchant/coupon', { replace: true });
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '网络错误';
       setError(msg);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!newPassword || newPassword.length < 6) {
+      alert('新密码长度不能少于6位');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      alert('两次密码输入不一致');
+      return;
+    }
+    setChangingPwd(true);
+    try {
+      const resp = await fetch('/api/v1/merchant/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('merchant_token') },
+        body: JSON.stringify({ oldPassword: password, newPassword }),
+      });
+      const json = await resp.json();
+      if (json.code !== 0) {
+        alert(json.message || '修改密码失败');
+        return;
+      }
+      setFirstLoginOpen(false);
+      alert('密码修改成功');
+      navigate('/merchant/coupon', { replace: true });
+    } catch {
+      alert('网络错误，请重试');
+    } finally {
+      setChangingPwd(false);
     }
   };
 
@@ -109,6 +149,42 @@ export default function MerchantLoginPage() {
           </div>
         </div>
       </div>
+
+      {/* 首次登录修改密码弹窗 */}
+      {firstLoginOpen && (
+        <div className="merchant-pwd-overlay">
+          <div className="merchant-pwd-modal">
+            <div className="merchant-pwd-title">首次登录，请修改密码</div>
+            <div className="merchant-pwd-field">
+              <label className="merchant-login-label">新密码</label>
+              <input
+                className="merchant-login-input"
+                type="password"
+                placeholder="至少6位"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+            </div>
+            <div className="merchant-pwd-field">
+              <label className="merchant-login-label">确认密码</label>
+              <input
+                className="merchant-login-input"
+                type="password"
+                placeholder="再次输入新密码"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+            </div>
+            <button
+              className="merchant-login-btn"
+              onClick={handleChangePassword}
+              disabled={changingPwd || !newPassword || !confirmPassword}
+            >
+              {changingPwd ? '修改中...' : '确认修改'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

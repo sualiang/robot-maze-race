@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { query, queryOne, execute } from '../config/database';
+import { query, queryOne, execute, generateSecurePassword } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 
 const router = Router();
@@ -56,9 +56,10 @@ router.get('/', authMiddleware, adminMiddleware, operatorMiddleware, async (req:
           merchantAddress: m.merchant_address || '',
           longitude: m.longitude || 0,
           latitude: m.latitude || 0,
+          contactName: m.contact_name || '',
           contactPhone: m.contact_phone || '',
           logoUrl: m.logo_url || '',
-          status: m.status || 1,
+          status: m.status != null ? m.status : 1,
           createdAt: m.created_at,
           updatedAt: m.updated_at,
         })),
@@ -78,7 +79,7 @@ router.get('/', authMiddleware, adminMiddleware, operatorMiddleware, async (req:
  * 创建商家
  */
 router.post('/', authMiddleware, adminMiddleware, operatorMiddleware, async (req: Request, res: Response) => {
-  const { merchantName, merchantAddress, longitude, latitude, contactPhone, logoUrl, accountPhone, accountPassword } = req.body;
+  const { merchantName, merchantAddress, longitude, latitude, contactName, contactPhone, logoUrl, accountPhone } = req.body;
 
   if (!merchantName) {
     res.json({ code: 400, message: '商家名称不能为空', data: null });
@@ -88,23 +89,28 @@ router.post('/', authMiddleware, adminMiddleware, operatorMiddleware, async (req
   try {
     const merchantId = uuidv4();
     await execute(
-      `INSERT INTO merchants (id, merchant_name, merchant_address, longitude, latitude, contact_phone, logo_url, status, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 1, datetime('now'), datetime('now'))`,
+      `INSERT INTO merchants (id, merchant_name, merchant_address, longitude, latitude, contact_name, contact_phone, logo_url, status, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, datetime('now'), datetime('now'))`,
       [
         merchantId,
         merchantName,
         merchantAddress || '',
         longitude !== undefined ? parseFloat(longitude) : 0,
         latitude !== undefined ? parseFloat(latitude) : 0,
+        contactName || '',
         contactPhone || '',
         logoUrl || '',
       ]
     );
 
+    // 生成随机密码
+    const adminPassword = generateSecurePassword();
+    console.log('[AdminMerchant] creating merchant:', { merchantName, merchantAddress, accountPhone, contactPhone });
+
     // 同时创建商家管理员账号（直接创建，不需要邀请码）
     let adminId = '';
     let adminPhone = accountPhone || contactPhone || '';
-    let adminPassword = accountPassword || '123456';
+    console.log('[AdminMerchant] adminPhone:', adminPhone);
     if (adminPhone) {
       adminId = uuidv4();
       const crypto = require('crypto');
@@ -116,6 +122,7 @@ router.post('/', authMiddleware, adminMiddleware, operatorMiddleware, async (req
       );
     }
 
+    const loginUrl = process.env.WEB_URL || 'http://175.24.200.63/merchant';
     res.json({
       code: 0,
       data: {
@@ -123,6 +130,7 @@ router.post('/', authMiddleware, adminMiddleware, operatorMiddleware, async (req
         merchantName,
         adminPhone,
         adminPassword,
+        loginUrl,
         adminCreated: !!adminId,
       }
     });
@@ -138,7 +146,7 @@ router.post('/', authMiddleware, adminMiddleware, operatorMiddleware, async (req
  */
 router.put('/:id', authMiddleware, adminMiddleware, operatorMiddleware, async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { merchantName, merchantAddress, longitude, latitude, contactPhone, logoUrl, status } = req.body;
+  const { merchantName, merchantAddress, longitude, latitude, contactName, contactPhone, logoUrl, status } = req.body;
 
   try {
     const existing = await queryOne<{ id: string }>('SELECT id FROM merchants WHERE id = $1', [id]);
@@ -155,6 +163,7 @@ router.put('/:id', authMiddleware, adminMiddleware, operatorMiddleware, async (r
     if (merchantAddress !== undefined) { updates.push(`merchant_address = $${idx++}`); params.push(merchantAddress); }
     if (longitude !== undefined) { updates.push(`longitude = $${idx++}`); params.push(parseFloat(longitude)); }
     if (latitude !== undefined) { updates.push(`latitude = $${idx++}`); params.push(parseFloat(latitude)); }
+    if (contactName !== undefined) { updates.push(`contact_name = $${idx++}`); params.push(contactName); }
     if (contactPhone !== undefined) { updates.push(`contact_phone = $${idx++}`); params.push(contactPhone); }
     if (logoUrl !== undefined) { updates.push(`logo_url = $${idx++}`); params.push(logoUrl); }
     if (status !== undefined) { updates.push(`status = $${idx++}`); params.push(status); }
@@ -254,6 +263,113 @@ router.post('/coupon/:id/force-offline', authMiddleware, adminMiddleware, async 
   } catch (e: any) {
     console.error('[AdminMerchant] force offline error:', e?.message || e);
     res.json({ code: 500, message: '操作失败', data: null });
+  }
+});
+
+// ============================================================
+// 删除商家（仅 super_admin）
+// ============================================================
+router.delete('/:id', authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const permissions = req.user?.permissions || [];
+    const role = req.user?.role || '';
+    if (!permissions.includes('*') && role !== 'admin') {
+      res.status(403).json({ code: 403, message: '您没有删除商家的权限', data: null });
+      return;
+    }
+
+    const existing = await queryOne<any>('SELECT id FROM merchants WHERE id = $1', [id]);
+    if (!existing) {
+      res.json({ code: 404, message: '商家不存在', data: null });
+      return;
+    }
+
+    // 删除关联数据
+    await execute('DELETE FROM merchant_admin WHERE merchant_id = $1', [id]);
+    await execute('DELETE FROM merchant_coupons WHERE merchant_id = $1', [id]);
+    await execute('DELETE FROM merchants WHERE id = $1', [id]);
+
+    res.json({ code: 0, message: '商家已删除' });
+  } catch (e: any) {
+    console.error('[AdminMerchant] delete error:', e?.message || e);
+    res.json({ code: 500, message: '删除失败', data: null });
+  }
+});
+
+// ============================================================
+// 启用/禁用商家
+// ============================================================
+router.patch('/:id/status', authMiddleware, adminMiddleware, operatorMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body; // 1=启用, 0=禁用
+
+    if (status !== 0 && status !== 1) {
+      res.json({ code: 400, message: '状态值无效', data: null });
+      return;
+    }
+
+    const existing = await queryOne<any>('SELECT id FROM merchants WHERE id = $1', [id]);
+    if (!existing) {
+      res.json({ code: 404, message: '商家不存在', data: null });
+      return;
+    }
+
+    await execute('UPDATE merchants SET status = $1, updated_at = datetime(\'now\') WHERE id = $2', [status, id]);
+
+    res.json({ code: 0, message: status === 1 ? '商家已启用' : '商家已禁用' });
+  } catch (e: any) {
+    console.error('[AdminMerchant] toggle status error:', e?.message || e);
+    res.json({ code: 500, message: '操作失败', data: null });
+  }
+});
+
+/**
+ * POST /api/v1/admin/merchant/:id/reset-password
+ * 运营商超管/运营重置商家管理员密码
+ */
+router.post('/:id/reset-password', operatorMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // 查商家是否存在
+    const merchant = await queryOne<{ id: string }>('SELECT id FROM merchants WHERE id = $1', [id]);
+    if (!merchant) {
+      res.json({ code: 404, message: '商家不存在', data: null });
+      return;
+    }
+
+    // 查商家管理员账号
+    const admin = await queryOne<{ id: string }>(
+      'SELECT id FROM merchant_admin WHERE merchant_id = $1 LIMIT 1',
+      [id]
+    );
+    if (!admin) {
+      res.json({ code: 404, message: '商家管理员账号不存在', data: null });
+      return;
+    }
+
+    // 生成新密码
+    const { generateSecurePassword } = require('./utils');
+    const newPassword = generateSecurePassword();
+    const { hashPassword } = require('../config/database');
+    const passwordHash = hashPassword(newPassword);
+
+    // 更新密码 + 标记首次登录
+    await execute(
+      `UPDATE merchant_admin SET password_hash = $1, first_login = 1, updated_at = datetime('now') WHERE id = $2`,
+      [passwordHash, admin.id]
+    );
+
+    res.json({
+      code: 0,
+      message: '密码已重置',
+      data: { initPassword: newPassword },
+    });
+  } catch (e: any) {
+    console.error('[AdminMerchant] reset password error:', e?.message || e);
+    res.json({ code: 500, message: '重置密码失败', data: null });
   }
 });
 

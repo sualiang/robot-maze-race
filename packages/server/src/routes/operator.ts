@@ -65,11 +65,29 @@ router.post('/login', async (req: Request, res: Response) => {
       return res.status(401).json({ code: 401, message: '手机号或密码错误', data: null });
     }
 
-    // 生成简单 token（生产环境应使用 JWT）
+    // 获取角色权限 — 先从 operator_members 查，没有则从 operators.role 推算
+    let permissions: string[] = ['*'];
+    let roleName = '';
+    const member = await queryOne<{ role: string }>(
+      'SELECT role FROM operator_members WHERE operator_id = $1 LIMIT 1',
+      [operator.id]
+    );
+    if (member && member.role) {
+      const roleRec = await queryOne<{ permissions: string; role_name: string }>(
+        'SELECT permissions, role_name FROM admin_roles WHERE name = $1',
+        [member.role]
+      );
+      if (roleRec) {
+        permissions = JSON.parse(roleRec.permissions);
+        roleName = roleRec.role_name;
+      }
+    }
+
+    // 生成 JWT
     const jwt = require('jsonwebtoken');
     const { config } = require('../config');
     const token = jwt.sign(
-      { userId: operator.id, role: 'operator', phone: operator.phone, operatorId: operator.id },
+      { userId: operator.id, role: 'operator', phone: operator.phone, operatorId: operator.id, permissions },
       config.jwt.secret || 'robot-race-jwt-secret',
       { expiresIn: '7d' }
     );
@@ -92,6 +110,9 @@ router.post('/login', async (req: Request, res: Response) => {
           phone: operator.phone,
           venueId: venue?.id || null,
           venueName: venue?.name || null,
+          permissions,
+          role_name: roleName,
+          role_id: member?.role || '',
         },
       },
     });
@@ -154,7 +175,7 @@ router.get('/rbac/users', authMiddleware, operatorOnly, async (req: Request, res
     const params: any[] = [operatorId];
 
     if (search) {
-      conditions.push(`(au.name LIKE ? OR au.nickname LIKE ?)`);
+      conditions.push(`(au.name LIKE ?)`);
       params.push(`%${search}%`, `%${search}%`);
     }
 
@@ -169,10 +190,10 @@ router.get('/rbac/users', authMiddleware, operatorOnly, async (req: Request, res
 
     // 分页数据（不返回 password）
     const users = await query<any>(
-      `SELECT au.id, au.name AS username, au.nickname, au.phone,
-              au.role_id as role_key, COALESCE(arr.label, '') as role_name, au.status, au.created_at
+      `SELECT au.id, au.name AS username, au.name AS nickname, au.phone,
+              au.role as role_key, COALESCE(arr.label, '') as role_name, au.status, au.created_at
        FROM operator_members au
-       LEFT JOIN admin_roles arr ON au.role_id = arr.id
+       LEFT JOIN admin_roles arr ON au.role = arr.name
        ${whereClause}
        ORDER BY au.created_at ASC
        LIMIT ? OFFSET ?`,
@@ -234,9 +255,9 @@ router.post('/rbac/users', authMiddleware, operatorOnly, async (req: Request, re
     const id = uuidv4();
 
     await query(
-      `INSERT INTO operator_members (id, name, password, nickname, phone, role_id, operator_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
-      [id, phone, hashedPassword, '', phone, role_key, operatorId]
+      `INSERT INTO operator_members (id, name, password_hash, phone, role, operator_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
+      [id, phone, hashedPassword, phone, role_key, operatorId]
     );
 
     // 查角色名称和权限说明
@@ -276,7 +297,7 @@ router.put('/rbac/users/:id', authMiddleware, operatorOnly, async (req: Request,
   try {
     const operatorId = req.user!.operatorId;
     const { id } = req.params;
-    const { nickname, email, phone, role_key, status, password } = req.body;
+    const { phone, role_key, status } = req.body;
 
     // 只能编辑自己运营商下的成员
     const existing = await queryOne<{ id: string; operator_id: string }>(
@@ -298,16 +319,9 @@ router.put('/rbac/users/:id', authMiddleware, operatorOnly, async (req: Request,
     const sets: string[] = [];
     const params: any[] = [];
 
-    if (nickname !== undefined) { sets.push('nickname = ?'); params.push(nickname); }
-    if (email !== undefined) { sets.push('email = ?'); params.push(email); }
     if (phone !== undefined) { sets.push('phone = ?'); params.push(phone); }
-    if (role_key !== undefined) { sets.push('role_id = ?'); params.push(role_key); }
+    if (role_key !== undefined) { sets.push('role = ?'); params.push(role_key); }
     if (status !== undefined) { sets.push('status = ?'); params.push(status); }
-    if (password) {
-      const hashed = bcrypt.hashSync(password, 10);
-      sets.push('password = ?');
-      params.push(hashed);
-    }
 
     if (sets.length === 0) {
       return res.status(400).json({ code: 400, message: '没有要更新的字段', data: null });
@@ -322,10 +336,10 @@ router.put('/rbac/users/:id', authMiddleware, operatorOnly, async (req: Request,
     );
 
     const updated = await queryOne<any>(
-      `SELECT au.id, au.name AS username, au.nickname, au.phone,
-              au.role_id as role_key, COALESCE(arr.label, '') as role_name, au.status, au.created_at
+      `SELECT au.id, au.name AS username, au.name AS nickname, au.phone,
+              au.role as role_key, COALESCE(arr.label, '') as role_name, au.status, au.created_at
        FROM operator_members au
-       LEFT JOIN admin_roles arr ON au.role_id = arr.id
+       LEFT JOIN admin_roles arr ON au.role = arr.name
        WHERE au.id = ?`,
       [id]
     );
@@ -353,7 +367,7 @@ router.delete('/rbac/users/:id', authMiddleware, operatorOnly, async (req: Reque
     const { id } = req.params;
 
     const existing = await queryOne<{ id: string; operator_id: string; role_id: string }>(
-      'SELECT id, operator_id, role_id FROM operator_members WHERE id = ?',
+      'SELECT id, operator_id, role FROM operator_members WHERE id = ?' as any,
       [id]
     );
     if (!existing || existing.operator_id !== operatorId) {
@@ -361,9 +375,9 @@ router.delete('/rbac/users/:id', authMiddleware, operatorOnly, async (req: Reque
     }
 
     // 不允许删除最后一个总管理员
-    if (existing.role_id === 'op_super_admin') {
+    if ((existing as any).role === 'op_super_admin') {
       const adminCount = await queryOne<{ count: number }>(
-        'SELECT COUNT(*) as count FROM operator_members WHERE role_id = ? AND operator_id = ?',
+        'SELECT COUNT(*) as count FROM operator_members WHERE role = ? AND operator_id = ?',
         ['op_super_admin', operatorId]
       );
       if (adminCount && adminCount.count <= 1) {
@@ -400,8 +414,8 @@ router.post('/rbac/users/:id/reset-password', authMiddleware, operatorOnly, asyn
     const plainPassword = generateSecurePassword();
     const hashed = bcrypt.hashSync(plainPassword, 10);
     await query(
-      `UPDATE operator_members SET password = ?, password_hash = ?, updated_at = datetime('now') WHERE id = ?`,
-      [hashed, hashed, id]
+      `UPDATE operator_members SET password_hash = ?, updated_at = datetime('now') WHERE id = ?`,
+      [hashed, id]
     );
 
     return res.json({

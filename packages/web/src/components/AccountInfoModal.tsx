@@ -24,7 +24,7 @@ export default function AccountInfoModal({ open, account, password, loginUrl: cu
   const defaultPath = rolePaths[role || ''] || '/admin/login';
   const loginUrl = customLoginUrl || `${host}${defaultPath}`;
 
-  const roleLabel: Record<string, string> = { operator: '运营商', referee: '裁判', player: '玩家', admin: '总部管理员' };
+  const roleLabel: Record<string, string> = { operator: '运营商', referee: '裁判', player: '玩家', admin: '总部管理员', merchant: '商家' };
   const roleText = role ? roleLabel[role] || '' : '';
 
   const textToCopy = `${roleText}端：\n登录账号：${account}\n初始密码：${password}\n登录地址：${loginUrl}\n首次登录请设置用户名和修改密码`;

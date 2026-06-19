@@ -388,6 +388,7 @@ export function initSchema(): void {
   try { db.exec('ALTER TABLE merchants ADD COLUMN audit_remark TEXT DEFAULT \'\''); } catch { /* ignore */ }
   try { db.exec('ALTER TABLE merchants ADD COLUMN audit_time TEXT'); } catch { /* ignore */ }
   try { db.exec('ALTER TABLE merchants ADD COLUMN auditor_id TEXT'); } catch { /* ignore */ }
+  try { db.exec("ALTER TABLE merchants ADD COLUMN contact_name VARCHAR(64) DEFAULT ''"); } catch { /* ignore */ }
 
   // V2.0 商家端迁移：merchant_admin 表
   try {
@@ -479,16 +480,18 @@ export function initSchema(): void {
 }
 
 // 生成符合密码规则的随机密码：至少8位，含大写、小写字母和数字
-function generateSecurePassword(length: number = 10): string {
+function generateSecurePassword(length: number = 8): string {
   const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
   const lower = 'abcdefghjkmnpqrstuvwxyz';
   const digits = '23456789';
-  const all = upper + lower + digits;
+  const symbols = '!@#$%^&*';
+  const all = upper + lower + digits + symbols;
 
   // 确保每种字符至少出现一次
   let pw = upper[Math.floor(Math.random() * upper.length)] +
            lower[Math.floor(Math.random() * lower.length)] +
-           digits[Math.floor(Math.random() * digits.length)];
+           digits[Math.floor(Math.random() * digits.length)] +
+           symbols[Math.floor(Math.random() * symbols.length)];
 
   // 补足剩余长度
   for (let i = pw.length; i < length; i++) {
@@ -496,7 +499,8 @@ function generateSecurePassword(length: number = 10): string {
   }
 
   // 打乱顺序
-  return pw.split('').sort(() => Math.random() - 0.5).join('');
+  pw = pw.split('').sort(() => Math.random() - 0.5).join('');
+  return pw;
 }
 
 export { generateSecurePassword };

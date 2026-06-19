@@ -9,7 +9,7 @@ import {
 } from '@ant-design/icons';
 import AccountInfoModal from '../../../components/AccountInfoModal';
 import type { ColumnsType } from 'antd/es/table';
-import { RefereeCertStatus } from '@robot-race/shared';
+
 import api from '../../../utils/api';
 
 interface RefereeItem {
@@ -20,7 +20,6 @@ interface RefereeItem {
   avatar_url: string;
   venue_name: string;
   venue_id: string;
-  cert_status: RefereeCertStatus;
   status?: string;
   cert_image_url?: string;
   check_in_at?: string;
@@ -35,18 +34,6 @@ interface VenueOption {
   name: string;
 }
 
-const certLabels: Record<RefereeCertStatus, string> = {
-  [RefereeCertStatus.PENDING]: '待审核',
-  [RefereeCertStatus.APPROVED]: '已认证',
-  [RefereeCertStatus.REJECTED]: '已拒绝',
-};
-
-const certColors: Record<RefereeCertStatus, string> = {
-  [RefereeCertStatus.PENDING]: 'orange',
-  [RefereeCertStatus.APPROVED]: 'green',
-  [RefereeCertStatus.REJECTED]: 'red',
-};
-
 // 从 localStorage 获取当前用户角色
 const operatorUserInfo = (() => {
   try {
@@ -55,8 +42,9 @@ const operatorUserInfo = (() => {
 })();
 const operatorRoleName: string = operatorUserInfo.role_name || '';
 const operatorRoleId: string = operatorUserInfo.role_id || '';
-// 运营商超管（op_super_admin）→ 可删除
-const isOperatorManager = operatorRoleId === 'op_super_admin';
+const operatorPermissions: string[] = operatorUserInfo.permissions || [];
+// 运营商超管（op_super_admin）或拥有 '*' 权限 → 可删除
+const isOperatorManager = operatorRoleId === 'op_super_admin' || operatorPermissions.includes('*');
 
 export default function RefereeList() {
   const [list, setList] = useState<RefereeItem[]>([]);
@@ -129,30 +117,6 @@ export default function RefereeList() {
     }
   };
 
-  const handleApprove = async (id: string) => {
-    try {
-      await api.patch(`/referees/${id}/cert`, { cert_status: RefereeCertStatus.APPROVED });
-      message.success('已认证该裁判');
-      fetchList();
-    } catch { message.error('操作失败'); }
-  };
-
-  const handleReject = (id: string) => {
-    Modal.confirm({
-      title: '拒绝认证',
-      content: (
-        <Input.TextArea id="reject-reason" rows={2} placeholder="请输入拒绝原因（选填）" />
-      ),
-      onOk: async () => {
-        try {
-          await api.patch(`/referees/${id}/cert`, { cert_status: RefereeCertStatus.REJECTED });
-          message.success('已拒绝');
-          fetchList();
-        } catch { message.error('操作失败'); }
-      },
-    });
-  };
-
   const handleBindVenue = (record: RefereeItem) => {
     setBindTarget(record);
     setBindVenueId(record.venue_id || '');
@@ -209,10 +173,6 @@ export default function RefereeList() {
       render: (v: string) => v || <Tag color="default">未绑定</Tag>,
     },
     {
-      title: '认证状态', dataIndex: 'cert_status', key: 'cert_status', width: 100,
-      render: (s: RefereeCertStatus) => <Tag color={certColors[s]}>{certLabels[s]}</Tag>,
-    },
-    {
       title: '今日考勤', key: 'attendance', width: 120,
       render: (_: unknown, r: RefereeItem) => {
         if (r.check_in_at && !r.check_out_at) {
@@ -235,16 +195,6 @@ export default function RefereeList() {
           <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => handleViewDetail(record)}>
             详情
           </Button>
-          {record.cert_status === RefereeCertStatus.PENDING && (
-            <>
-              <Popconfirm title="确认认证该裁判？" onConfirm={() => handleApprove(record.id)}>
-                <Button type="link" size="small" icon={<CheckOutlined />} style={{ color: '#52c41a' }}>认证</Button>
-              </Popconfirm>
-              <Button type="link" size="small" icon={<CloseOutlined />} danger onClick={() => handleReject(record.id)}>
-                拒绝
-              </Button>
-            </>
-          )}
           <Button type="link" size="small" icon={<SwapOutlined />} onClick={() => handleBindVenue(record)}>
             绑定赛场
           </Button>
@@ -285,21 +235,7 @@ export default function RefereeList() {
               style={{ width: 200 }}
               allowClear
             />
-            <Select
-              placeholder="认证状态筛选"
-              allowClear
-              style={{ width: 140 }}
-              options={[
-                { value: RefereeCertStatus.PENDING, label: '待审核' },
-                { value: RefereeCertStatus.APPROVED, label: '已认证' },
-                { value: RefereeCertStatus.REJECTED, label: '已拒绝' },
-              ]}
-              onChange={(val) => {
-                if (val === undefined) {
-                  // TODO: reset filter - currently just re-fetches all
-                }
-              }}
-            />
+
             <Button type="primary" icon={<PlusOutlined />} onClick={() => { setCreateOpen(true); setCreatedResult(null); }}>
               新建裁判
             </Button>
@@ -383,11 +319,6 @@ export default function RefereeList() {
             <Descriptions.Item label="手机号">{detailReferee.phone}</Descriptions.Item>
             <Descriptions.Item label="绑定赛场" span={2}>
               {detailReferee.venue_name || '未绑定'}
-            </Descriptions.Item>
-            <Descriptions.Item label="认证状态">
-              <Tag color={certColors[detailReferee.cert_status]}>
-                {certLabels[detailReferee.cert_status]}
-              </Tag>
             </Descriptions.Item>
             <Descriptions.Item label="总工时(h)">{detailReferee.total_hours ?? 0}</Descriptions.Item>
             <Descriptions.Item label="签到时间" span={2}>

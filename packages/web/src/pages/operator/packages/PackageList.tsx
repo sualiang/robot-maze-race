@@ -27,8 +27,9 @@ const operatorUserInfo = (() => {
 })();
 const operatorRoleName: string = operatorUserInfo.role_name || '';
 const operatorRoleId: string = operatorUserInfo.role_id || '';
-// 运营商超管（op_super_admin）→ 可删除
-const isOperatorManager = operatorRoleId === 'op_super_admin';
+const operatorPermissions: string[] = operatorUserInfo.permissions || [];
+// 运营商超管（op_super_admin）或拥有 '*' 权限 → 可删除
+const isOperatorManager = operatorRoleId === 'op_super_admin' || operatorPermissions.includes('*');
 
 export default function PackageList() {
   const [list, setList] = useState<PackageItem[]>([]);

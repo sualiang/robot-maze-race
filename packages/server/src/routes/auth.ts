@@ -239,6 +239,18 @@ router.post('/admin-login', async (req: Request, res: Response) => {
       permissions = ['*'];
     }
 
+    // 如果有运营商角色，查 operators 表获取 operatorId
+    let operatorId: string | undefined;
+    if (['op_super_admin', 'op_admin', 'op_finance'].includes(user.role_id)) {
+      const opUser = await queryOne<{ id: string }>(
+        'SELECT id FROM operators WHERE operator_username = $1',
+        [user.username]
+      );
+      if (opUser) {
+        operatorId = opUser.id;
+      }
+    }
+
     // 生成 JWT（包含 admin 权限信息）
     const payload: AuthPayload & { admin_role_id?: string; admin_role_name?: string; permissions?: string[] } = {
       userId: user.id,
@@ -247,6 +259,7 @@ router.post('/admin-login', async (req: Request, res: Response) => {
       admin_role_id: user.role_id,
       admin_role_name: user.admin_role_name,
       permissions,
+      ...(operatorId ? { operatorId } : {}),
     };
 
     const token = jwt.sign(payload, config.jwt.secret, { expiresIn: config.jwt.expiresIn as any });
@@ -293,13 +306,13 @@ router.post('/operator-member-login', async (req: Request, res: Response) => {
 
     // 查 operator_members 表
     const user = await queryOne<any>(
-      `SELECT m.id, m.password as password, m.nickname, m.phone,
-              m.role_id, m.status, ar.label as role_name, ar.name as admin_role_name, ar.permissions,
+      `SELECT m.id, m.password_hash as password, m.name as nickname, m.phone,
+              m.role, m.status, ar.label as role_name, ar.name as admin_role_name, ar.permissions,
               m.operator_id,
               o.name as operator_name,
               m.first_login
        FROM operator_members m
-       LEFT JOIN admin_roles ar ON ar.id = m.role_id
+       LEFT JOIN admin_roles ar ON ar.name = m.role
        LEFT JOIN operators o ON o.id = m.operator_id
        WHERE m.phone = $1`,
       [phone]
@@ -898,9 +911,9 @@ router.post('/member/change-password', authMiddleware, async (req: Request, res:
       }
     } else {
       const m = await queryOne<any>(
-        `SELECT m.id, m.operator_id, m.phone, m.nickname, m.status, ar.label as role_name, ar.permissions
+        `SELECT m.id, m.operator_id, m.phone, m.name as nickname, m.status, ar.label as role_name, ar.permissions
          FROM operator_members m
-         LEFT JOIN admin_roles ar ON ar.id = m.role_id
+         LEFT JOIN admin_roles ar ON ar.name = m.role
          WHERE m.id = $1`,
         [userId]
       );
