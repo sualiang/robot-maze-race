@@ -75,10 +75,7 @@ export default function MerchantList() {
   const [offlineReason, setOfflineReason] = useState('');
   const [offlineAuditing, setOfflineAuditing] = useState(false);
 
-  // 已驳回列表
-  const [rejectedList, setRejectedList] = useState<any[]>([]);
-  const [rejectedLoading, setRejectedLoading] = useState(false);
-  const [rejectedUnreadCount, setRejectedUnreadCount] = useState(0);
+
 
   // 优惠券子 Tab
   const [couponSubTab, setCouponSubTab] = useState('pending');
@@ -121,29 +118,7 @@ export default function MerchantList() {
     }
   }, []);
 
-  const fetchRejectedList = useCallback(async () => {
-    setRejectedLoading(true);
-    try {
-      const data: any = await api.get('/operator/merchant/coupon/rejected');
-      setRejectedList(data?.list ?? []);
-      setRejectedUnreadCount(data?.unreadCount ?? 0);
-    } catch {
-      setRejectedList([]);
-      setRejectedUnreadCount(0);
-    } finally {
-      setRejectedLoading(false);
-    }
-  }, []);
 
-  const markRejectedRead = async (couponId: string) => {
-    try {
-      await api.post('/operator/merchant/coupon/rejected/read', { couponId });
-      setRejectedList(prev => prev.map(r => r.id === couponId ? { ...r, opRead: 1 } : r));
-      setRejectedUnreadCount(prev => Math.max(0, prev - 1));
-    } catch {
-      message.error('标记已读失败');
-    }
-  };
 
   const handleAdd = () => {
     setEditingId(null);
@@ -434,7 +409,6 @@ export default function MerchantList() {
               else if (activeTab === 'coupon') {
                 if (couponSubTab === 'pending') fetchCouponList();
                 else if (couponSubTab === 'offline') fetchOfflineList();
-                else fetchRejectedList();
               }
             }}>刷新</Button>
             <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增商家</Button>
@@ -463,7 +437,6 @@ export default function MerchantList() {
                   items={[
                     { key: 'pending', label: '待审核' },
                     { key: 'offline', label: '待下架审核' },
-                    { key: 'rejected', label: `已驳回${rejectedUnreadCount > 0 ? ` (${rejectedUnreadCount})` : ''}` },
                   ]}
                 />
               ),
@@ -499,86 +472,7 @@ export default function MerchantList() {
             scroll={{ x: 1000 }}
             pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t: number) => `共 ${t} 条` }}
           />
-        ) : (
-          <div style={{ padding: '8px 0' }}>
-            {rejectedLoading ? (
-              <div style={{ textAlign: 'center', padding: 40, color: '#999' }}>加载中...</div>
-            ) : rejectedList.length === 0 ? (
-              <Empty description="暂无已驳回记录" />
-            ) : (
-              <>
-                {rejectedList.map((r: any) => (
-                  <div key={r.id} style={{
-                    border: '1px solid #f0f0f0',
-                    borderRadius: 10,
-                    padding: '16px 20px',
-                    marginBottom: 12,
-                    background: r.opRead === 0 ? '#fffbe6' : '#fff',
-                    position: 'relative',
-                  }}>
-                    {/* 未读标记 */}
-                    {r.opRead === 0 && (
-                      <span style={{
-                        position: 'absolute', top: 12, right: 12,
-                        background: '#ff4d4f', color: '#fff',
-                        borderRadius: 10, padding: '1px 8px',
-                        fontSize: 11, lineHeight: '18px',
-                      }}>未读</span>
-                    )}
-                    
-                    {/* 第一行：名称 + 商家 */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                      <strong style={{ fontSize: 15 }}>{r.name}</strong>
-                      <span style={{ color: '#666', fontSize: 13 }}>{r.merchantName}</span>
-                    </div>
-
-                    {/* 第二行：面值 + 审核状态 */}
-                    <div style={{ display: 'flex', gap: 24, marginBottom: 8, fontSize: 13 }}>
-                      <span>面值：<b>¥{(r.denominationCents / 100).toFixed(2)}</b></span>
-                      <span>类型：{r.rejectType === 'offline' ? <Tag color="purple" style={{ margin: 0 }}>下架申请</Tag> : <Tag color="blue" style={{ margin: 0 }}>新券审核</Tag>}</span>
-                      {renderCouponStatus(r.auditStatus)}
-                    </div>
-
-                    {/* 驳回理由 */}
-                    <div style={{
-                      marginTop: 8,
-                      padding: '10px 14px',
-                      background: '#fff2f0',
-                      border: '1px solid #ffccc7',
-                      borderRadius: 6,
-                      fontSize: 13,
-                      lineHeight: 1.6,
-                    }}>
-                      <span style={{ color: '#cf1322', fontWeight: 500, marginRight: 6 }}>⚠ 驳回理由：</span>
-                      {r.auditRemark || '无驳回理由'}
-                    </div>
-
-                    {/* 底部操作 */}
-                    <div style={{ marginTop: 12, textAlign: 'right' }}>
-                      {r.opRead === 0 ? (
-                        <Button
-                          type="primary"
-                          size="small"
-                          ghost
-                          icon={<CheckCircleOutlined />}
-                          onClick={() => markRejectedRead(r.id)}
-                        >
-                          确认已读
-                        </Button>
-                      ) : (
-                        <span style={{ color: '#999', fontSize: 13 }}>✓ 已读</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                {/* 分页 */}
-                <div style={{ textAlign: 'center', marginTop: 16 }}>
-                  <span style={{ color: '#999', fontSize: 13 }}>共 {rejectedList.length} 条</span>
-                </div>
-              </>
-            )}
-          </div>
-        )}
+        ) : null}
       </Card>
 
       {/* 商家编辑弹窗 */}
