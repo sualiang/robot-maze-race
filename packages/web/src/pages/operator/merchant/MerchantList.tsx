@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Card, Table, Button, Space, Modal, Form, Input,
-  message, Badge, Tabs, Tag, Tooltip,
+  message, Badge, Tabs, Tag, Tooltip, Popover, Empty,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
   PlusOutlined, EditOutlined, ReloadOutlined, KeyOutlined,
+  CheckCircleOutlined, ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import api from '../../../utils/api';
 import AccountInfoModal from '../../../components/AccountInfoModal';
@@ -73,6 +74,11 @@ export default function MerchantList() {
   const [offlineReason, setOfflineReason] = useState('');
   const [offlineAuditing, setOfflineAuditing] = useState(false);
 
+  // 已驳回列表
+  const [rejectedList, setRejectedList] = useState<any[]>([]);
+  const [rejectedLoading, setRejectedLoading] = useState(false);
+  const [rejectedUnreadCount, setRejectedUnreadCount] = useState(0);
+
   // 优惠券子 Tab
   const [couponSubTab, setCouponSubTab] = useState('pending');
 
@@ -113,6 +119,30 @@ export default function MerchantList() {
       setOfflineLoading(false);
     }
   }, []);
+
+  const fetchRejectedList = useCallback(async () => {
+    setRejectedLoading(true);
+    try {
+      const data: any = await api.get('/operator/merchant/coupon/rejected');
+      setRejectedList(data?.list ?? []);
+      setRejectedUnreadCount(data?.unreadCount ?? 0);
+    } catch {
+      setRejectedList([]);
+      setRejectedUnreadCount(0);
+    } finally {
+      setRejectedLoading(false);
+    }
+  }, []);
+
+  const markRejectedRead = async (couponId: string) => {
+    try {
+      await api.post('/operator/merchant/coupon/rejected/read', { couponId });
+      setRejectedList(prev => prev.map(r => r.id === couponId ? { ...r, opRead: 1 } : r));
+      setRejectedUnreadCount(prev => Math.max(0, prev - 1));
+    } catch {
+      message.error('标记已读失败');
+    }
+  };
 
   const handleAdd = () => {
     setEditingId(null);
@@ -401,7 +431,8 @@ export default function MerchantList() {
               if (activeTab === 'all') fetchList();
               else if (activeTab === 'coupon') {
                 if (couponSubTab === 'pending') fetchCouponList();
-                else fetchOfflineList();
+                else if (couponSubTab === 'offline') fetchOfflineList();
+                else fetchRejectedList();
               }
             }}>刷新</Button>
             <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增商家</Button>
@@ -424,11 +455,13 @@ export default function MerchantList() {
                   onChange={(key) => {
                     setCouponSubTab(key);
                     if (key === 'pending') fetchCouponList();
-                    else fetchOfflineList();
+                    else if (key === 'offline') fetchOfflineList();
+                    else fetchRejectedList();
                   }}
                   items={[
                     { key: 'pending', label: '待审核' },
                     { key: 'offline', label: '待下架审核' },
+                    { key: 'rejected', label: `已驳回${rejectedUnreadCount > 0 ? ` (${rejectedUnreadCount})` : ''}` },
                   ]}
                 />
               ),
@@ -455,13 +488,57 @@ export default function MerchantList() {
             scroll={{ x: 1000 }}
             pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t: number) => `共 ${t} 条` }}
           />
-        ) : (
+        ) : couponSubTab === 'offline' ? (
           <Table
             columns={couponColumns}
             dataSource={offlineList}
             rowKey="id"
             loading={offlineLoading}
             scroll={{ x: 1000 }}
+            pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t: number) => `共 ${t} 条` }}
+          />
+        ) : (
+          <Table
+            columns={[
+              { title: '优惠券名称', dataIndex: 'name', key: 'name', width: 140 },
+              { title: '商家名称', dataIndex: 'merchantName', key: 'merchantName', width: 130 },
+              {
+                title: '面值', dataIndex: 'denominationCents', key: 'denominationCents', width: 80,
+                render: (v: number) => `¥${(v / 100).toFixed(2)}`,
+              },
+              {
+                title: '驳回理由', key: 'auditRemark', width: 300,
+                render: (_: unknown, r: any) => r.auditRemark || '无',
+              },
+              {
+                title: '审核状态', key: 'auditStatus', width: 90,
+                render: (_: unknown, r: any) => renderCouponStatus(r.auditStatus),
+              },
+              {
+                title: '操作', key: 'action', width: 120,
+                render: (_: unknown, r: any) => (
+                  <Space size="small" wrap>
+                    {r.opRead === 0 ? (
+                      <Button
+                        type="link"
+                        size="small"
+                        icon={<CheckCircleOutlined />}
+                        onClick={() => markRejectedRead(r.id)}
+                      >
+                        确认已读
+                      </Button>
+                    ) : (
+                      <span style={{ color: '#999' }}>已读</span>
+                    )}
+                  </Space>
+                ),
+              },
+            ]}
+            dataSource={rejectedList}
+            rowKey="id"
+            loading={rejectedLoading}
+            scroll={{ x: 960 }}
+            locale={{ emptyText: <Empty description="暂无已驳回记录" /> }}
             pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t: number) => `共 ${t} 条` }}
           />
         )}

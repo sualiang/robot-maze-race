@@ -388,15 +388,17 @@ router.post('/merchant/coupon/audit', authMiddleware, operatorOnly, async (req: 
       return;
     }
 
+    const isRejected = auditStatus === 3;
     await execute(
       `UPDATE merchant_coupons SET
         audit_status = $1,
         audit_remark = $2,
         audit_time = datetime('now'),
         auditor_id = $3,
+        op_read = $4,
         updated_at = datetime('now')
-       WHERE id = $4`,
-      [auditStatus, auditRemark || '', operatorId, couponId]
+       WHERE id = $5`,
+      [auditStatus, auditRemark || '', operatorId, isRejected ? 0 : 1, couponId] // 驳回未读，通过已读
     );
 
     res.json({
@@ -513,7 +515,7 @@ router.post('/merchant/coupon/offline-audit', authMiddleware, operatorOnly, asyn
     }
 
     if (approved) {
-      // 同意下架：status=0(下架), audit_status=2(已通过,无后续流程)
+      // 同意下架：status=0(下架), audit_status=2(已通过)
       await execute(
         `UPDATE merchant_coupons SET
           status = 0,
@@ -521,19 +523,21 @@ router.post('/merchant/coupon/offline-audit', authMiddleware, operatorOnly, asyn
           audit_remark = $1,
           audit_time = datetime('now'),
           auditor_id = $2,
+          op_read = 0,
           updated_at = datetime('now')
          WHERE id = $3`,
         [auditRemark || '运营商同意下架', operatorId, couponId]
       );
     } else {
-      // 驳回：回到已上架状态
+      // 驳回下架申请：audit_status=3(已驳回), 回到已上架状态
       await execute(
         `UPDATE merchant_coupons SET
-          audit_status = 2,
+          audit_status = 3,
           status = 1,
           audit_remark = $1,
           audit_time = datetime('now'),
           auditor_id = $2,
+          op_read = 0,
           updated_at = datetime('now')
          WHERE id = $3`,
         [auditRemark || '下架申请被驳回', operatorId, couponId]
@@ -546,6 +550,107 @@ router.post('/merchant/coupon/offline-audit', authMiddleware, operatorOnly, asyn
     });
   } catch (e: any) {
     console.error('[OperatorMerchant] offline audit error:', e?.message || e);
+    res.json({ code: 500, message: '操作失败', data: null });
+  }
+});
+
+// ============================================================
+// 已驳回列表 + 标记已读
+// ============================================================
+
+/**
+ * GET /api/v1/operator/merchant/coupon/rejected
+ * 已驳回优惠券列表（audit_status=3），含未读标记
+ */
+router.get('/merchant/coupon/rejected', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
+  try {
+    const operatorId = req.user!.operatorId;
+    const page = Math.max(parseInt(req.query.page as string, 10) || 1, 1);
+    const pageSize = Math.min(Math.max(parseInt(req.query.pageSize as string, 10) || 20, 1), 100);
+    const offset = (page - 1) * pageSize;
+
+    const countRow = await queryOne<{ total: number }>(
+      `SELECT COUNT(*) as total FROM merchant_coupons mc
+       LEFT JOIN merchants m ON mc.merchant_id = m.id
+       WHERE mc.audit_status = 3 AND m.operator_id = $1`,
+      [operatorId]
+    );
+
+    const countRowUnread = await queryOne<{ total: number }>(
+      `SELECT COUNT(*) as total FROM merchant_coupons mc
+       LEFT JOIN merchants m ON mc.merchant_id = m.id
+       WHERE mc.audit_status = 3 AND m.operator_id = $1 AND mc.op_read = 0`,
+      [operatorId]
+    );
+
+    const coupons = await query<any>(
+      `SELECT mc.*, m.merchant_name
+       FROM merchant_coupons mc
+       LEFT JOIN merchants m ON mc.merchant_id = m.id
+       WHERE mc.audit_status = 3 AND m.operator_id = $1
+       ORDER BY mc.updated_at DESC LIMIT $2 OFFSET $3`,
+      [operatorId, pageSize, offset]
+    );
+
+    res.json({
+      code: 0,
+      data: {
+        list: (coupons || []).map((c: any) => ({
+          id: c.id,
+          merchantId: c.merchant_id,
+          merchantName: c.merchant_name || '',
+          name: c.name,
+          description: c.description || '',
+          denominationCents: c.denomination_cents,
+          minConsumeCents: c.min_consume_cents || 0,
+          totalCount: c.total_count,
+          remainCount: c.remain_count,
+          couponType: c.coupon_type,
+          discountPercent: c.discount_percent || 0,
+          maxPerUser: c.max_per_user || 1,
+          status: c.status,
+          auditStatus: c.audit_status,
+          auditRemark: c.audit_remark || '',
+          opRead: c.op_read || 0,
+          version: c.version || 1,
+          validStart: c.valid_start ? new Date(c.valid_start).getTime() : null,
+          validEnd: c.valid_end ? new Date(c.valid_end).getTime() : null,
+          createdAt: new Date(c.created_at).getTime(),
+        })),
+        total: countRow?.total || 0,
+        unreadCount: countRowUnread?.total || 0,
+        page,
+        pageSize,
+      },
+    });
+  } catch (e: any) {
+    console.error('[OperatorMerchant] rejected list error:', e?.message || e);
+    res.json({ code: 500, message: '查询失败', data: null });
+  }
+});
+
+/**
+ * POST /api/v1/operator/merchant/coupon/rejected/read
+ * 标记已驳回优惠券为已读
+ */
+router.post('/merchant/coupon/rejected/read', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
+  try {
+    const operatorId = req.user!.operatorId;
+    const { couponId } = req.body;
+
+    if (!couponId) {
+      res.json({ code: 400, message: '优惠券ID不能为空', data: null });
+      return;
+    }
+
+    await execute(
+      `UPDATE merchant_coupons SET op_read = 1 WHERE id = $1`,
+      [couponId]
+    );
+
+    res.json({ code: 0, message: '已标记已读' });
+  } catch (e: any) {
+    console.error('[OperatorMerchant] rejected read error:', e?.message || e);
     res.json({ code: 500, message: '操作失败', data: null });
   }
 });
