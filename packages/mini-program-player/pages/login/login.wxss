@@ -55,14 +55,9 @@
   margin-bottom: var(--space-xl);
 }
 
-.logo-emoji {
-  font-size: 80rpx;
-  width: 140rpx;
-  height: 140rpx;
-  line-height: 140rpx;
-  text-align: center;
-  background: var(--color-bg-card);
-  border: 2rpx solid var(--color-border);
+.logo-image {
+  width: 240rpx;
+  height: 240rpx;
   border-radius: var(--radius-xl);
   margin-bottom: var(--space-base);
   box-shadow: var(--shadow-glow);
