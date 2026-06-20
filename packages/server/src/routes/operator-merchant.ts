@@ -10,7 +10,10 @@ const router = Router();
 // 运营商商家管理相关中间件
 // ============================================================
 function operatorOnly(req: Request, res: Response, next: Function): void {
-  if (req.user?.role !== 'operator' && req.user?.role !== 'admin') {
+  const role = req.user?.role;
+  console.log('[operatorOnly] role:', role, 'operatorId:', req.user?.operatorId);
+  if (role !== 'operator' && role !== 'admin') {
+    console.log('[operatorOnly] BLOCKED - role:', role);
     res.status(403).json({ code: 403, message: '仅运营商可操作', data: null });
     return;
   }
