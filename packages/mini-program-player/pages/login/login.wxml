@@ -3,7 +3,7 @@
     <!-- Logo + 应用名 -->
     <view class="logo-area">
       <image class="logo-image" src="/assets/images/logo-avatar.png" mode="aspectFit" />
-      <text class="app-name">铁甲快狗·迷宫竞速</text>
+      <text class="app-name">迷宫竞速</text>
       <text class="app-subtitle">手机号登录</text>
     </view>
 
