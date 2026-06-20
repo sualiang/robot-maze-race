@@ -299,7 +299,7 @@ export default function MerchantList() {
   const handleOfflineAudit = async (couponId: string, approved: boolean) => {
     setOfflineAuditing(true);
     try {
-      await api.post('/operator/merchant/coupon/offline-audit', {
+      const res = await api.post('/operator/merchant/coupon/offline-audit', {
         couponId,
         approved,
         auditRemark: approved ? '' : offlineReason.trim(),
@@ -307,8 +307,8 @@ export default function MerchantList() {
       message.success(approved ? '已下架' : '已驳回下架申请');
       setOfflineAuditOpen(false);
       // 从列表中移除已处理的券
-      setOfflineList(prev => prev.filter(c => c.id !== couponId));
-      setCouponList(prev => prev.filter((c: any) => c.id !== couponId));
+      setOfflineList(prev => (prev || []).filter(c => String(c.id) !== String(couponId)));
+      setCouponList(prev => (prev || []).filter((c: any) => String(c.id) !== String(couponId)));
     } catch {
       message.error('操作失败');
     } finally {
