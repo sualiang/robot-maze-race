@@ -217,7 +217,7 @@ export default function MerchantList() {
     try {
       await api.post('/operator/merchant/coupon/audit', {
         couponId: auditCoupon.id,
-        auditStatus: couponAuditResult === 'approved' ? 1 : 2,
+        auditStatus: couponAuditResult === 'approved' ? 2 : 3, // 2=已通过, 3=已驳回
         auditRemark: couponAuditResult === 'rejected' ? couponAuditReason.trim() : '',
       });
       message.success(couponAuditResult === 'approved' ? '优惠券已通过' : '优惠券已驳回');
@@ -247,10 +247,13 @@ export default function MerchantList() {
     return null;
   };
 
+  // audit_status 枚举：0=草稿, 1=待审核, 2=已通过, 3=已驳回, 4=待下架审核
   const renderCouponStatus = (status: number) => {
-    if (status === 0) return <Tag color="warning">待审核</Tag>;
-    if (status === 1) return <Tag color="success">已通过</Tag>;
-    if (status === 2) return <Tag color="error">已驳回</Tag>;
+    if (status === 0) return <Tag color="default">草稿</Tag>;
+    if (status === 1) return <Tag color="warning">待审核</Tag>;
+    if (status === 2) return <Tag color="success">已通过</Tag>;
+    if (status === 3) return <Tag color="error">已驳回</Tag>;
+    if (status === 4) return <Tag color="purple">待下架审核</Tag>;
     return null;
   };
 
@@ -328,7 +331,7 @@ export default function MerchantList() {
       title: '操作', key: 'action', width: 160, fixed: 'right',
       render: (_: unknown, record: CouponItem) => (
         <Space size="small" wrap>
-          {record.auditStatus === 0 && (
+          {record.auditStatus === 1 && (
             <Button type="link" size="small" onClick={() => openCouponAudit(record)}>
               审核
             </Button>

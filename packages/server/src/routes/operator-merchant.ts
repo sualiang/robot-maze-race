@@ -274,7 +274,7 @@ router.get('/merchant/coupon/pending', authMiddleware, operatorOnly, async (req:
     const page = Math.max(parseInt(req.query.page as string, 10) || 1, 1);
     const pageSize = Math.min(Math.max(parseInt(req.query.pageSize as string, 10) || 20, 1), 100);
     const offset = (page - 1) * pageSize;
-    const auditStatus = req.query.auditStatus as string || '0';
+    const auditStatus = req.query.auditStatus as string || '1'; // 默认查待审核(1)
 
     const conditions: string[] = ['mc.audit_status = ?', 'm.operator_id = ?'];
     const params: any[] = [parseInt(auditStatus, 10), operatorId];
@@ -352,8 +352,9 @@ router.post('/merchant/coupon/audit', authMiddleware, operatorOnly, async (req: 
       return;
     }
 
-    if (auditStatus !== 1 && auditStatus !== 2) {
-      res.json({ code: 400, message: '审核状态无效，只能为通过(1)或驳回(2)', data: null });
+    // audit_status 新枚举：2=已通过, 3=已驳回
+    if (auditStatus !== 2 && auditStatus !== 3) {
+      res.json({ code: 400, message: '审核状态无效，只能为通过(2)或驳回(3)', data: null });
       return;
     }
 
@@ -376,12 +377,13 @@ router.post('/merchant/coupon/audit', authMiddleware, operatorOnly, async (req: 
       return;
     }
 
-    if (coupon.audit_status === 1) {
+    // 新枚举：1=待审核, 2=已通过, 3=已驳回
+    if (coupon.audit_status === 2) {
       res.json({ code: 400, message: '该优惠券已审核通过', data: null });
       return;
     }
 
-    if (coupon.audit_status === 2 && auditStatus === 2) {
+    if (coupon.audit_status === 3 && auditStatus === 3) {
       res.json({ code: 400, message: '该优惠券已被驳回', data: null });
       return;
     }
@@ -399,7 +401,7 @@ router.post('/merchant/coupon/audit', authMiddleware, operatorOnly, async (req: 
 
     res.json({
       code: 0,
-      message: auditStatus === 1 ? '审核通过' : '已驳回',
+      message: auditStatus === 2 ? '审核通过' : '已驳回',
     });
   } catch (e: any) {
     console.error('[OperatorMerchant] coupon audit error:', e?.message || e);
