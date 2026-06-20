@@ -1,18 +1,28 @@
-// pages/index/index.js - 首页（Tab1：扫码主入口）
+// pages/index/index.js - 首页（V2重构版）
+// 模块1: 顶部导航栏 | 模块2: 主视觉Banner | 模块3: 参赛状态&福利总览卡
+// 模块4: 今日专属福利条 | 模块5: 参赛包推荐区 | 模块6: 赛季竞技入口卡片
 var request = require('../../utils/request');
 
 Page({
   data: {
+    // 通用状态
     loaded: false,
+    // 模块1: 导航栏
+    venueName: '',  // 上次扫码赛场名, 从微信缓存取
+    couponCount: 0,
+    // 模块2: Banner
     remainCount: 0,
+    // 模块3: 参赛状态&福利
+    couponValue: 0,
+    // 模块4: 福利条
+    promoText: '🔥 今日专属：买任意参赛包，额外赠15元奶茶无门槛券',
+    // 模块5: 参赛包
     packages: [],
     packagesLoaded: false,
-    lastRace: null,
-    recommendList: [],
-    showPackageSection: false,
+    // 模块6: 赛季竞技
     seasonName: '',
-    levelName: '',
-    expPercent: 0
+    seasonEndDays: 0,
+    userRank: 0
   },
 
   /* ======== 生命周期 ======== */
@@ -21,123 +31,106 @@ Page({
   },
 
   onShow: function () {
-    // 每次显示刷新数据（次数可能变化）
     this.loadAllData();
   },
 
   onPullDownRefresh: function () {
-    this.loadAllData();
+    this.loadAllData().then(function () {
+      wx.stopPullDownRefresh();
+    });
   },
 
   /* ======== 数据加载 ======== */
   loadAllData: function () {
-    this.fetchUserInfo();
-    this.fetchPackages();
+    var that = this;
+
+    // 读本地存储的赛场名（扫码入场时存储）
+    // 占位 — 赛场名称此前保留为将来扩展
+
+    // 并行拉取所有数据
+    that.fetchUserProfile();
+    that.fetchCoupons();
+    that.fetchPackages();
+    that.fetchSeasonUserInfo();
+    that.fetchSeasonConfig();
+
+    return Promise.resolve();
   },
 
   /**
-   * 获取用户信息和剩余次数
-   * 模拟 /player/me/info 响应
+   * 获取用户信息 /api/v1/player/me/profile
    */
-  fetchUserInfo: function () {
+  fetchUserProfile: function () {
     var that = this;
     var app = getApp();
 
-    // 未登录 — 用默认值显示扫码入口即可
     if (!app.globalData.isLoggedIn) {
       that.setData({
         remainCount: 0,
-        lastRace: {
-          id: 'mock_01',
-          venueName: '未来科技城·初级赛道',
-          score: '00:32.45',
-          rankText: '5',
-          dateText: '2026-06-16 15:20'
-        },
         loaded: true
       });
-      wx.stopPullDownRefresh();
       return;
     }
 
-    // 获取赛季信息（首页顶部展示赛季名称 + 等级标签）
-    request.silentGet('/season/user/info').then(function (seasonData) {
-      if (seasonData) {
-        var medal = seasonData.medal || {};
-        var currentExp = medal.currentExp || 0;
-        var nextLevelExp = medal.nextLevelExp || 100;
-        var expPercent = nextLevelExp > 0 ? Math.min(100, Math.round((currentExp / nextLevelExp) * 100)) : 0;
-        that.setData({
-          seasonName: seasonData.seasonName || seasonData.season_name || '',
-          levelName: medal.name || '',
-          expPercent: expPercent
-        });
-      }
-    }).catch(function () {
-      // 赛季接口未就绪，静默跳过
-    });
-
-    // 先尝试 /player/me/profile-check 获取剩余次数，同时拉取 race-records
-    request.silentGet('/player/me/profile-check').then(function (data) {
+    request.silentGet('/player/me/profile').then(function (data) {
       var remain = (typeof data.race_count !== 'undefined') ? data.race_count :
-                   (data.raceCount || data.ticketCount || 0);
-      var hasPack = that.data.packages && that.data.packages.length > 0;
-      that.setData({ remainCount: remain, showPackageSection: hasPack });
+                   (data.raceCount || data.remainCount || 0);
+      that.setData({ remainCount: remain });
     }).catch(function () {
-      // fallback
-    });
-
-    request.silentGet('/player/me/race-records', { limit: 1 }).then(function (data) {
-      var list = [];
-      if (Array.isArray(data)) list = data;
-      else if (data && Array.isArray(data.list)) list = data.list;
-      else if (data && Array.isArray(data.data)) list = data.data;
-      else if (data && data.code === 0 && Array.isArray(data.data)) list = data.data;
-      var last = null;
-      if (list.length > 0) {
-        var r = list[0];
-        last = {
-          id: r.id || '',
-          venueName: r.venueName || r.venue_name || '未来科技城·初级赛道',
-          score: r.score || r.time || '00:32.45',
-          rankText: r.rankText || (r.rank || r.ranking || '5'),
-          rankClass: (r.rank || r.ranking) <= 3 ? 'rank-green' : 'rank-yellow',
-          timeText: r.timeText || (r.time ? r.time + 's' : '--'),
-          dateText: formatRaceDate(r.date || r.createdAt)
-        };
-      } else {
-        // Mock: 展示一条演示数据
-        last = {
-          id: 'mock_01',
-          venueName: '未来科技城·初级赛道',
-          score: '00:32.45',
-          rankText: '5',
-          rankClass: 'rank-yellow',
-          dateText: '2026-06-16 15:20'
-        };
-      }
-      that.setData({ lastRace: last, loaded: true });
-      wx.stopPullDownRefresh();
-    }).catch(function () {
-      // Mock fallback
-      that.setData({
-        lastRace: {
-          id: 'mock_01',
-          venueName: '未来科技城·初级赛道',
-          score: '00:32.45',
-          rankText: '5',
-          rankClass: 'rank-yellow',
-          dateText: '2026-06-16 15:20'
-        },
-        loaded: true
+      // fallback: 尝试旧的 profile-check 接口
+      request.silentGet('/player/me/profile-check').then(function (data) {
+        var remain = (typeof data.race_count !== 'undefined') ? data.race_count :
+                     (data.raceCount || data.ticketCount || 0);
+        that.setData({ remainCount: remain });
+      }).catch(function () {
+        // 静默失败，使用默认值
       });
-      wx.stopPullDownRefresh();
     });
   },
 
   /**
-   * 获取推荐参赛包
-   * 模拟 /player/packages 响应
+   * 获取卡包信息 /api/v1/player/coupons
+   */
+  fetchCoupons: function () {
+    var that = this;
+    var app = getApp();
+
+    if (!app.globalData.isLoggedIn) {
+      that.setData({ couponCount: 0, couponValue: 0 });
+      return;
+    }
+
+    request.silentGet('/player/coupons', { status: 0 }).then(function (data) {
+      var list = [];
+      var totalValue = 0;
+
+      if (Array.isArray(data)) {
+        list = data;
+      } else if (data && Array.isArray(data.list)) {
+        list = data.list;
+      } else if (data && data.data && Array.isArray(data.data.list)) {
+        list = data.data.list;
+      }
+
+      // 计算券数量和总价值
+      for (var i = 0; i < list.length; i++) {
+        var c = list[i];
+        if (c.value) totalValue += Number(c.value);
+        else if (c.amount) totalValue += Number(c.amount);
+        else if (c.denomination) totalValue += Number(c.denomination);
+      }
+
+      that.setData({
+        couponCount: list.length,
+        couponValue: totalValue
+      });
+    }).catch(function () {
+      // 静默失败
+    });
+  },
+
+  /**
+   * 获取参赛包列表 /api/v1/player/packages
    */
   fetchPackages: function () {
     var that = this;
@@ -153,46 +146,108 @@ Page({
       }
 
       var mapped = rawList.map(function (p) {
+        // 解析权益行
+        var benefits = [];
+        if (p.benefits && Array.isArray(p.benefits)) {
+          benefits = p.benefits;
+        } else if (p.description) {
+          // 从描述中提取权益点
+          var lines = p.description.split('\n');
+          for (var i = 0; i < lines.length; i++) {
+            var line = lines[i].replace(/^[\d\.]+[\.\s]*/, '').trim();
+            if (line) benefits.push(line);
+          }
+        }
+        // 至少保证有2行
+        while (benefits.length < 2) {
+          benefits.push('含参赛资格');
+        }
+
         return {
           id: p.id || p._id,
           name: p.name,
-          description: p.description || '',
-          salePriceText: p.salePrice ? (p.salePrice / 100).toFixed(0) : (p.price ? Number(p.price) + '' : '0'),
-          originalPriceText: p.originalPrice ? (p.originalPrice / 100).toFixed(0) : '',
+          salePriceFen: p.price || 0,
+          salePriceText: ((p.price || 0) / 100).toFixed(2).replace(/\.?0+$/, ''),
+          originalPrice: p.originalPrice || 0,
+          originalPriceText: p.originalPrice ? (p.originalPrice / 100).toFixed(2).replace(/\.?0+$/, '') : '',
           isHot: p.isHot || false,
           isRecommend: p.isRecommend || false,
-          times: p.race_count || (p.description ? (p.description.match(/^(\d+)/) || [0])[0] : 0) || 0,
-          tag: p.isHot ? '🔥 热门' : (p.isRecommend ? '💎 推荐' : ''),
-          tagType: p.isHot ? 'hot' : (p.isRecommend ? 'recommend' : '')
+          times: p.race_count || 0,
+          tag: p.tag || (p.isHot ? '🔥 热门' : (p.isRecommend ? '💎 推荐' : '')),
+          benefits: benefits.slice(0, 2)
         };
       });
 
       that.setData({
         packages: mapped,
-        recommendList: mapped.slice(0, 5),
-        showPackageSection: mapped.length > 0,
         packagesLoaded: true
       });
-    }).catch(function (err) {
+    }).catch(function () {
       that.setData({
         packages: [],
-        packagesLoaded: true,
-        showPackageSection: false
+        packagesLoaded: true
       });
+    });
+  },
+
+  /**
+   * 获取赛季用户信息 /api/v1/season/user/info
+   */
+  fetchSeasonUserInfo: function () {
+    var that = this;
+    var app = getApp();
+
+    if (!app.globalData.isLoggedIn) return;
+
+    request.silentGet('/season/user/info').then(function (data) {
+      var rank = data.rank || data.ranking || 0;
+      that.setData({
+        seasonName: data.seasonName || data.season_name || '',
+        userRank: rank
+      });
+    }).catch(function () {
+      // 静默失败
+    });
+  },
+
+  /**
+   * 获取赛季配置 /api/v1/season/config
+   */
+  fetchSeasonConfig: function () {
+    var that = this;
+
+    request.silentGet('/season/config').then(function (data) {
+      if (data && (data.cycleEnd || data.endDate)) {
+        var endStr = data.cycleEnd || data.endDate;
+        var endTime = new Date(endStr).getTime();
+        var now = Date.now();
+        var daysLeft = Math.max(0, Math.ceil((endTime - now) / (1000 * 60 * 60 * 24)));
+        that.setData({ seasonEndDays: daysLeft });
+      }
+    }).catch(function () {
+      // 静默失败
     });
   },
 
   /* ======== 事件处理 ======== */
 
   /**
-   * 扫码参赛 — 调用 wx.scanCode
+   * 扫码参赛
    */
-  onScanCode: function () {
+  onScan: function () {
     var that = this;
 
-    // 未登录提示
     if (!that.isLoggedIn()) {
       that.promptLogin();
+      return;
+    }
+
+    if (that.data.remainCount <= 0) {
+      wx.showToast({
+        title: '参赛次数不足，请先购买参赛包',
+        icon: 'none',
+        duration: 2000
+      });
       return;
     }
 
@@ -202,7 +257,6 @@ Page({
       success: function (res) {
         var result = res.result;
         if (result) {
-          // 解析扫码结果：预期格式 "maze://race?roomId=xxx" 或直接传 roomId
           var roomId = that.parseScanResult(result);
           if (roomId) {
             wx.navigateTo({
@@ -217,23 +271,146 @@ Page({
         }
       },
       fail: function () {
-        // 用户取消扫码或失败，不处理
+        // 用户取消扫码，不做处理
+      }
+    });
+  },
+
+  /**
+   * 跳转卡包页
+   */
+  onGoCoupon: function () {
+    wx.navigateTo({
+      url: '/pages/coupon/coupon'
+    });
+  },
+
+  /**
+   * 跳转卡包页（福利总览区域点击）
+   */
+  onGoCouponFromBenefits: function () {
+    wx.navigateTo({
+      url: '/pages/coupon/coupon'
+    });
+  },
+
+  /**
+   * 滚动到参赛包区域
+   */
+  onScrollToPackages: function () {
+    // 使用页面滚动到参赛包推荐区域
+    var query = wx.createSelectorQuery();
+    query.select('#packages-section').boundingClientRect(function (rect) {
+      if (rect && rect.top > 0) {
+        wx.pageScrollTo({
+          scrollTop: rect.top - 20,
+          duration: 300
+        });
+      }
+    }).exec();
+  },
+
+  /**
+   * 立即购买参赛包
+   */
+  onBuyPackage: function (e) {
+    var that = this;
+    var id = e.currentTarget.dataset.id;
+    var index = e.currentTarget.dataset.index;
+
+    if (!that.isLoggedIn()) {
+      that.promptLogin();
+      return;
+    }
+
+    var pkg = that.data.packages[index];
+    if (!pkg) return;
+
+    // 调起微信支付下单
+    wx.showLoading({ title: '下单中...', mask: true });
+
+    request.post('/player/orders', {
+      packageId: id,
+      channel: 'wx_mini'
+    }).then(function (orderData) {
+      wx.hideLoading();
+
+      var payParams = orderData.payParams || orderData.payment || orderData;
+      if (payParams && payParams.package) {
+        // 微信支付调起
+        wx.requestPayment({
+          timeStamp: payParams.timeStamp || payParams.timestamp || '',
+          nonceStr: payParams.nonceStr || '',
+          package: payParams.package || '',
+          signType: payParams.signType || 'MD5',
+          paySign: payParams.paySign || payParams.sign || '',
+          success: function () {
+            wx.showToast({ title: '购买成功', icon: 'success' });
+            that.loadAllData();
+          },
+          fail: function (err) {
+            if (err.errMsg.indexOf('cancel') === -1) {
+              wx.showToast({ title: '支付失败', icon: 'none' });
+            }
+          }
+        });
+      } else {
+        wx.showToast({ title: '下单成功', icon: 'success' });
+        that.loadAllData();
+      }
+    }).catch(function (err) {
+      wx.hideLoading();
+      wx.showToast({ title: '下单失败，请重试', icon: 'none' });
+    });
+  },
+
+  /**
+   * 查看全部参赛包
+   */
+  onViewAllPackages: function () {
+    wx.navigateTo({
+      url: '/pages/packages/packages'
+    });
+  },
+
+  /**
+   * 跳转排行榜页
+   */
+  onGoLeaderboard: function () {
+    wx.navigateTo({
+      url: '/pages/leaderboard/leaderboard'
+    });
+  },
+
+  /* ======== 工具方法 ======== */
+
+  isLoggedIn: function () {
+    var app = getApp();
+    return !!app.globalData.isLoggedIn;
+  },
+
+  promptLogin: function () {
+    wx.showModal({
+      title: '提示',
+      content: '请先登录后再操作',
+      cancelText: '稍后',
+      success: function (res) {
+        if (res.confirm) {
+          wx.navigateTo({
+            url: '/pages/login/login'
+          });
+        }
       }
     });
   },
 
   /**
    * 解析扫码结果，提取 roomId
-   * 支持格式：
-   *   - maze://race?roomId=xxx
-   *   - https://xxx/race?roomId=xxx
-   *   - 纯 roomId 字符串
    */
   parseScanResult: function (text) {
     if (!text || typeof text !== 'string') return null;
 
     try {
-      // URL 格式
       if (text.indexOf('://') !== -1) {
         var parts = text.split('?');
         if (parts.length > 1) {
@@ -248,123 +425,17 @@ Page({
         return null;
       }
 
-      // JSON 格式
       if (text.charAt(0) === '{' || text.charAt(0) === '[') {
         var obj = JSON.parse(text);
         return obj.roomId || obj.room_id || obj.id || null;
       }
 
-      // 纯 ID 格式（24位 hex 或 UUID）
       if (/^[a-f0-9]{24}$/i.test(text) || /^[a-f0-9-]{36}$/i.test(text)) {
         return text;
       }
 
-    } catch (e) {
-      // 解析失败
-    }
+    } catch (e) {}
 
     return null;
-  },
-
-  /**
-   * 好友助力
-   */
-  onTapAssist: function () {
-    if (!this.isLoggedIn()) {
-      this.promptLogin();
-      return;
-    }
-    wx.navigateTo({
-      url: '/pages/help/help'
-    });
-  },
-
-  /**
-   * 点击单个参赛包
-   */
-  onTapPackage: function (e) {
-    var id = e.currentTarget.dataset.id;
-    wx.navigateTo({
-      url: '/pages/packages/packages?id=' + encodeURIComponent(id)
-    });
-  },
-
-  /**
-   * 点击参赛包
-   */
-  onPackageTap: function (e) {
-    var id = e.currentTarget.dataset.id;
-    if (id) {
-      wx.navigateTo({
-        url: '/pages/packages/packages?id=' + encodeURIComponent(id)
-      });
-    }
-  },
-
-  /**
-   * 查看上次参赛记录
-   */
-  onViewRecord: function (e) {
-    var id = e.currentTarget.dataset.id;
-    if (id) {
-      wx.navigateTo({
-        url: '/pages/race/race?recordId=' + encodeURIComponent(id)
-      });
-    }
-  },
-
-  /**
-   * 查看全部参赛包
-   */
-  onViewAllPackages: function () {
-    wx.navigateTo({
-      url: '/pages/packages/packages'
-    });
-  },
-
-  /* ======== 工具方法 ======== */
-
-  isLoggedIn: function () {
-    var app = getApp();
-    return !!app.globalData.isLoggedIn;
-  },
-
-  promptLogin: function () {
-    var that = this;
-    wx.showModal({
-      title: '提示',
-      content: '请先登录后再参赛',
-      cancelText: '稍后',
-      success: function (res) {
-        if (res.confirm) {
-          wx.navigateTo({
-            url: '/pages/login/login'
-          });
-        }
-      }
-    });
   }
 });
-
-/* ======== 工具函数 ======== */
-
-/**
- * 格式化参赛日期
- */
-function formatRaceDate(dateInput) {
-  if (!dateInput) return '';
-  try {
-    var d = typeof dateInput === 'number' ? new Date(dateInput)
-      : typeof dateInput === 'string' ? new Date(dateInput)
-      : dateInput;
-    if (isNaN(d.getTime())) return '';
-    var month = d.getMonth() + 1;
-    var day = d.getDate();
-    var hours = d.getHours();
-    var min = d.getMinutes();
-    return (month < 10 ? '0' : '') + month + '/' + (day < 10 ? '0' : '') + day
-      + ' ' + (hours < 10 ? '0' : '') + hours + ':' + (min < 10 ? '0' : '') + min;
-  } catch (e) {
-    return '';
-  }
-}

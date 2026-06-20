@@ -1,71 +1,139 @@
-<!-- pages/index/index.wxml -->
-<!-- 首页：品牌 + 扫码 + 参赛状态 + 参赛包 + 上次记录 -->
-
+<!-- pages/index/index.wxml - 首页 V2重构版 -->
+<!-- 模块1: 顶部导航栏 | 模块2: 主视觉Banner | 模块3: 参赛状态&福利总览卡 -->
+<!-- 模块4: 今日专属福利条 | 模块5: 参赛包推荐区 | 模块6: 赛季竞技入口卡片 -->
 <view class="container">
 
-  <!-- ===== 1. 全宽 Banner ===== -->
-  <view class="hero-banner" bindtap="onScanCode">
-    <image class="hero-img" src="/assets/images/hero-banner.png" mode="widthFix"/>
-    <view class="hero-overlay">
-      <view class="hero-scan-btn">
-        <text class="hero-scan-text">扫码参赛</text>
+  <!-- ============================================================ -->
+  <!-- 模块1: 顶部导航栏（已精简） -->
+
+  <!-- ============================================================ -->
+  <!-- 模块2: 主视觉Banner -->
+  <!-- ============================================================ -->
+  <view class="hero-banner-image">
+    <image class="hero-banner-img" src="/assets/images/home-banner.png" mode="widthFix" />
+    <view class="hero-btn-wrap">
+      <view class="hero-btn {{remainCount <= 0 ? 'hero-btn-disabled' : ''}}" bindtap="onScan" style="background-color: #FF3B5C; opacity: 1;">
+        <text class="hero-btn-text">扫码参赛</text>
       </view>
     </view>
+
   </view>
 
-  <!-- ===== 赛季信息 + 等级标签（条件显示） ===== -->
-  <view wx:if="{{seasonName}}" class="season-tag">
-    <text class="season-name">{{seasonName}}</text>
-    <view wx:if="{{levelName}}" class="level-badge">
-      <text class="level-badge-text">{{levelName}}</text>
+  <!-- ============================================================ -->
+  <!-- 模块3: 参赛状态&福利总览卡 -->
+  <!-- ============================================================ -->
+  <view class="status-card">
+    <view class="status-card-body">
+      <!-- 左侧: 剩余参赛次数 -->
+      <view class="status-left">
+        <text class="status-label">剩余参赛次数</text>
+        <view class="status-number-wrap">
+          <text class="status-number-red">{{remainCount}}</text>
+          <text class="status-unit">次</text>
+        </view>
+      </view>
+
+      <!-- 分割线 -->
+      <view class="status-divider"></view>
+
+      <!-- 右侧: 我的福利 -->
+      <view class="status-right" bindtap="onGoCouponFromBenefits">
+        <text class="status-label">我的福利</text>
+        <view class="status-number-wrap">
+          <text class="status-number-gold">¥{{couponValue}}</text>
+          <text class="status-arrow">›</text>
+        </view>
+        <text class="status-subtext">含餐饮/游乐/兑换券</text>
+      </view>
     </view>
-    <view wx:if="{{expPercent > 0}}" class="level-exp-bar">
-      <view class="level-exp-fill" style="width: {{expPercent}}%"></view>
+
+    <!-- 底部提示条 -->
+    <view class="status-tip">
+      <text class="status-tip-text">购买参赛包，立得等额商场券+参赛资格</text>
     </view>
   </view>
 
-  <!-- ===== 2. 剩余参赛次数（居中） ===== -->
-  <view class="remain-card">
-    <view class="remain-body">
-      <text class="remain-label">剩余参赛次数</text>
-      <text class="remain-count">{{remainCount}}</text>
-      <text class="remain-unit">次</text>
-    </view>
+  <!-- ============================================================ -->
+  <!-- 模块4: 今日专属福利条 -->
+  <!-- ============================================================ -->
+  <view class="promo-bar" bindtap="onScrollToPackages">
+    <text class="promo-text">{{promoText}}</text>
   </view>
 
-  <!-- ===== 3. 次数不足（仅剩余次数为0时显示，位于参赛包推荐之前） ===== -->
-  <view wx:if="{{remainCount === 0}}" class="no-count-card" bindtap="goToPackages">
-    <text class="no-count-icon">⚡</text>
-    <text class="no-count-title">次数不足</text>
-    <text class="no-count-desc">购买参赛包获取参赛机会</text>
-  </view>
-
-  <!-- ===== 4. 参赛包推荐 ===== -->
-  <view wx:if="{{showPackageSection}}" class="packages-section">
+  <!-- ============================================================ -->
+  <!-- 模块5: 参赛包推荐区 -->
+  <!-- ============================================================ -->
+  <view id="packages-section" class="packages-section">
     <view class="section-header">
-      <text class="section-title">参赛包推荐</text>
-      <text class="section-more" bindtap="goToPackages">查看全部 ›</text>
+      <text class="section-title">选择参赛包</text>
+      <view class="section-more" bindtap="onViewAllPackages">
+        <text class="section-more-text">查看全部</text>
+        <text class="section-more-arrow">›</text>
+      </view>
     </view>
-    <scroll-view class="packages-scroll" scroll-x enhanced show-scrollbar="{{false}}" enable-flex>
+
+    <scroll-view
+      class="packages-scroll"
+      scroll-x
+      enhanced
+      show-scrollbar="{{false}}"
+      enable-flex
+    >
       <view
-        wx:for="{{recommendList}}"
+        wx:for="{{packages}}"
         wx:key="id"
         class="package-item"
         data-id="{{item.id}}"
-        bindtap="onPackageTap"
+        data-index="{{index}}"
       >
         <view class="package-card">
-          <text class="pkg-name">{{item.name}}</text>
-          <view class="pkg-bottom">
-            <text class="pkg-price">{{item.salePriceText}}元</text>
-            <text wx:if="{{item.times > 0}}" class="pkg-times">{{item.times}}次</text>
+          <!-- 标签 -->
+          <view wx:if="{{item.tag}}" class="pkg-tag">
+            <text class="pkg-tag-text">{{item.tag}}</text>
           </view>
-          <text wx:if="{{item.tag}}" class="pkg-tag tag-{{item.tagType}}">{{item.tag}}</text>
+
+          <!-- 名称 -->
+          <text class="pkg-name">{{item.name}}</text>
+
+          <!-- 价格 + 次数 -->
+          <view class="pkg-price-row">
+            <text class="pkg-price">¥{{item.salePriceText}}</text>
+            <text wx:if="{{item.originalPriceText}}" class="pkg-original-price">¥{{item.originalPriceText}}</text>
+            <text class="pkg-times">{{item.times}}次</text>
+          </view>
+
+          <!-- 权益行 -->
+          <view wx:for="{{item.benefits}}" wx:for-item="benefit" wx:key="index" class="pkg-benefit-row">
+            <image class="pkg-benefit-icon" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E" mode="aspectFit" />
+            <text class="pkg-benefit-text">{{benefit}}</text>
+          </view>
+
+          <!-- 立即购买按钮 -->
+          <view class="pkg-buy-btn" data-id="{{item.id}}" data-index="{{index}}" bindtap="onBuyPackage">
+            <text class="pkg-buy-btn-text">立即购买</text>
+          </view>
         </view>
       </view>
     </scroll-view>
+
+    <!-- 无参赛包时的占位 -->
+    <view wx:if="{{packagesLoaded && packages.length === 0}}" class="packages-empty">
+      <text class="packages-empty-text">暂无参赛包，敬请期待</text>
+    </view>
   </view>
 
-
+  <!-- ============================================================ -->
+  <!-- 模块6: 赛季竞技入口卡片 -->
+  <!-- ============================================================ -->
+  <view class="season-card" bindtap="onGoLeaderboard">
+    <view class="season-card-left">
+      <text class="season-card-title">本赛季商圈挑战赛</text>
+      <text class="season-card-subtitle">距决赛还有{{seasonEndDays || 0}}天 · 前20名赢机器狗大奖</text>
+    </view>
+    <view class="season-card-right">
+      <text class="season-card-rank">我的排名 第{{userRank || 0}}名</text>
+      <text class="season-card-arrow">›</text>
+    </view>
+  </view>
 
 </view>

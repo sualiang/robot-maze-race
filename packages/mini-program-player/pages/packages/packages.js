@@ -73,8 +73,17 @@ Page({
       for (var i = 0; i < items.length; i++) {
         var item = items[i];
         // 格式化价格：分 → 元
-        item.salePriceText = (item.salePrice / 100).toFixed(0);
-        item.originalPriceText = (item.originalPrice / 100).toFixed(0);
+        item.salePrice = item.price || 0;
+        item.salePriceText = (item.price / 100).toFixed(2).replace(/\.?0+$/, '');
+        item.originalPriceText = (item.originalPrice / 100).toFixed(2).replace(/\.?0+$/, '');
+        // 格式化礼券价格
+        if (item.coupons && item.coupons.length > 0) {
+          for (var j = 0; j < item.coupons.length; j++) {
+            var c = item.coupons[j];
+            c.couponValueText = (c.denominationCents / 100).toFixed(0);
+          }
+          item.totalRewardValueText = (item.totalRewardValue / 100).toFixed(0);
+        }
         // 标签
         if (item.isHot) {
           item.tag = '🔥 热门';

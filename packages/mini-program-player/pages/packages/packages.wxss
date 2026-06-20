@@ -101,7 +101,7 @@
 
 .pkg-count-number {
   font-size: 64rpx;
-  font-weight: 900;
+  font-weight: 400;
   color: var(--color-primary);
   line-height: 1;
 }
@@ -109,7 +109,7 @@
 .pkg-count-unit {
   font-size: var(--font-base);
   color: var(--color-primary);
-  font-weight: 600;
+  font-weight: 400;
 }
 
 /* 有效期 */
