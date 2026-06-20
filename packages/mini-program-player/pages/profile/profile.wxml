@@ -1,132 +1,94 @@
 <view class="page">
 
-  <!-- ===== 1. 用户信息头部（点击进入编辑页） ===== -->
-  <view class="profile-header card-elevated" bindtap="onEditProfile">
-    <view class="profile-user-row">
-      <image class="profile-avatar" src="{{userInfo.avatar || '/assets/images/default-avatar.png'}}" mode="aspectFill" />
-      <view class="profile-user-text">
-        <view class="profile-nickname-row">
-          <text class="profile-nickname">{{userInfo.nickname || '未设置昵称'}}</text>
-          <text wx:if="{{userInfo.gender === 'male'}}" class="profile-gender male">♂</text>
-          <text wx:elif="{{userInfo.gender === 'female'}}" class="profile-gender female">♀</text>
-        </view>
-        <text class="profile-phone">{{userInfo.phone || ''}}</text>
-      </view>
+  <!-- ========== 模块1: 用户信息栏 ========== -->
+  <view class="user-card" bindtap="onEditProfile">
+    <image class="user-avatar" src="{{userInfo.avatar || userInfo.avatarUrl || userInfo.avatar_url || '/assets/images/default-avatar.png'}}" mode="aspectFill" />
+    <view class="user-info">
+      <text class="user-nickname">{{userInfo.nickname || '未设置昵称'}}</text>
+      <text class="user-phone">{{userInfo.phone || ''}}</text>
     </view>
   </view>
 
-  <!-- ===== 2. 赛季相关区域（接口返回 403 时隐藏） ===== -->
-  <view wx:if="{{!seasonClosed}}">
-
-    <!-- 等级勋章 -->
-    <view class="medal-section card-elevated">
-      <view class="medal-icon-wrapper">
-        <text class="medal-icon">{{medal.icon || '🎖️'}}</text>
+  <!-- ========== 模块2: 赛季段位卡片 ========== -->
+  <view wx:if="{{!seasonClosed}}" class="medal-card">
+    <view class="medal-card-hd">
+      <view class="medal-icon-area">
+        <text class="medal-icon-badge">🏆</text>
       </view>
-      <text class="medal-name">{{medal.name || '青铜勋章'}}</text>
-    </view>
-
-    <!-- 经验进度条 -->
-    <view class="exp-section card-elevated">
-      <view class="exp-header">
-        <text class="exp-label">经验值</text>
-        <text class="exp-value">{{medal.currentExp || 0}} / {{medal.nextLevelExp || 100}}</text>
+      <view class="medal-title-area">
+        <text class="medal-level-name">{{medalInfo.levelName}}</text>
+        <text class="medal-rank-text">商圈排名 第{{medalInfo.rank}}名</text>
       </view>
-      <view class="progress-bar">
-        <view class="progress-fill" style="width: {{expPercent}}%"></view>
-      </view>
-      <text class="exp-percent-text">已达成 {{expPercent}}%</text>
-    </view>
-
-    <!-- 战斗力 + 排名 -->
-    <view class="combat-section card-elevated">
-      <view class="combat-row">
-        <view class="combat-item">
-          <text class="combat-number">{{combatInfo.combatPower || '--'}}</text>
-          <text class="combat-label">战斗力</text>
-        </view>
-        <view class="combat-divider"></view>
-        <view class="combat-item">
-          <text class="combat-number combat-rank">#{{combatInfo.rank || '--'}}</text>
-          <text class="combat-label">排名</text>
-        </view>
-        <view class="combat-divider"></view>
-        <view class="combat-item">
-          <text class="combat-number combat-points">{{userInfo.points || 0}}</text>
-          <text class="combat-label">积分</text>
-        </view>
+      <view class="medal-upgrade-area">
+        <view class="medal-upgrade-btn" bindtap="onUpgrade">去升级</view>
       </view>
     </view>
-
-    <!-- 三行核心数据 -->
-    <view class="core-stats card-elevated">
-      <view class="core-stat-row">
-        <text class="core-stat-label">完赛场次</text>
-        <text class="core-stat-value">{{coreStats.totalRaces || 0}}</text>
-      </view>
-      <view class="core-stat-row">
-        <text class="core-stat-label">最佳排名</text>
-        <text class="core-stat-value">{{coreStats.bestRank || '-'}}</text>
-      </view>
-      <view class="core-stat-row">
-        <text class="core-stat-label">毅力加成</text>
-        <text class="core-stat-value">+{{coreStats.perseveranceBonus || 0}}%</text>
+    <!-- 进度条 -->
+    <view class="medal-progress-wrap">
+      <view class="medal-progress-bg">
+        <view class="medal-progress-fill" style="width: {{medalInfo.expPercent}}%"></view>
       </view>
     </view>
-
+    <view class="medal-info-row">
+      <text class="medal-exp-text">{{medalInfo.currentExp}} / {{medalInfo.nextLevelExp}} 成长值</text>
+      <text class="medal-upgrade-desc">{{medalInfo.upgradeDesc}}</text>
+    </view>
   </view>
 
-  <!-- ===== 赛季未开启 ===== -->
-  <view wx:elif="{{seasonClosed}}" class="season-closed card-elevated">
+  <!-- 赛季未开启 -->
+  <view wx:elif="{{seasonClosed}}" class="season-closed-card">
     <text class="season-closed-icon">🏆</text>
     <text class="season-closed-text">赛季即将开启</text>
     <text class="season-closed-desc">敬请期待</text>
   </view>
 
-  <!-- ===== 3. 功能菜单列表 ===== -->
-  <view class="menu-section card-elevated">
-    <view class="menu-item" data-url="/pages/coupon/coupon" bindtap="onNavigate">
-      <text class="menu-icon">🎫</text>
-      <text class="menu-label">我的卡包</text>
-      <text class="menu-arrow">›</text>
+  <!-- ========== 模块3: 福利资产卡片 ========== -->
+  <view class="assets-card" bindtap="onAssetsTap">
+    <view class="assets-col">
+      <text class="assets-number assets-number-red">¥{{assets.deductible}}</text>
+      <text class="assets-label">参赛抵扣金</text>
+      <text class="assets-subtext">买参赛包直接抵扣</text>
     </view>
-    <view class="menu-divider"></view>
-    <view class="menu-item" data-url="/pages/lottery/lottery" bindtap="onNavigate">
-      <text class="menu-icon">🎰</text>
-      <text class="menu-label">积分抽奖</text>
-      <text class="menu-arrow">›</text>
+    <view class="assets-divider"></view>
+    <view class="assets-col">
+      <text class="assets-number assets-number-gold">¥{{assets.couponTotal}}</text>
+      <text class="assets-label">消费券</text>
+      <text class="assets-subtext">满减/兑换通用</text>
     </view>
-    <view class="menu-divider"></view>
-    <view class="menu-item" data-url="/pages/task/task" bindtap="onNavigate">
-      <text class="menu-icon">📋</text>
-      <text class="menu-label">任务中心</text>
-      <text class="menu-arrow">›</text>
+  </view>
+
+  <!-- ========== 模块4: 赛季数据轻览 ========== -->
+  <view class="stats-bar">
+    <view class="stats-item">
+      <text class="stats-value">{{seasonStats.totalRaces}}场</text>
+      <text class="stats-label">完赛场次</text>
     </view>
-    <view class="menu-divider"></view>
-    <view class="menu-item" data-url="/pages/evaluation/evaluation" bindtap="onNavigate">
-      <text class="menu-icon">📊</text>
-      <text class="menu-label">评估区</text>
-      <text class="menu-arrow">›</text>
+    <view class="stats-item">
+      <text class="stats-value">{{seasonStats.bestTime}}</text>
+      <text class="stats-label">最佳成绩</text>
     </view>
-    <view class="menu-divider"></view>
-    <view class="menu-item" data-url="/pages/checkin/checkin" bindtap="onNavigate">
-      <text class="menu-icon">📅</text>
-      <text class="menu-label">签到打卡</text>
-      <text class="menu-arrow">›</text>
-    </view>
-    <view class="menu-divider"></view>
-    <view class="menu-item" data-url="/pages/help/help" bindtap="onNavigate">
-      <text class="menu-icon">🤝</text>
-      <text class="menu-label">好友助力</text>
+  </view>
+
+  <!-- ========== 模块5: 功能入口列表 ========== -->
+  <view class="menu-section">
+    <view
+      wx:for="{{menuList}}"
+      wx:key="key"
+      class="menu-item"
+      data-key="{{item.key}}"
+      data-url="{{item.url}}"
+      bindtap="onMenuItemTap"
+    >
+      <text class="menu-icon">{{item.icon}}</text>
+      <text class="menu-label">{{item.label}}</text>
+      <text wx:if="{{item.rightText}}" class="menu-right-text">{{item.rightText}}</text>
       <text class="menu-arrow">›</text>
     </view>
   </view>
 
-  <!-- ===== 4. 退出登录 ===== -->
-  <view class="logout-section">
-    <view class="btn btn-ghost logout-btn" bindtap="onLogout">
-      退出登录
-    </view>
+  <!-- ========== 模块6: 退出登录按钮 ========== -->
+  <view class="logout-area">
+    <view class="logout-btn" bindtap="onLogout">退出登录</view>
   </view>
 
 </view>
