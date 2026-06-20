@@ -28,11 +28,21 @@ function operatorMiddleware(req: Request, res: Response, next: Function): void {
   next();
 }
 
+// 检测是否有全部权限的通配中间件
+function anyPermissionMiddleware(req: Request, res: Response, next: Function): void {
+  const permissions = req.user?.permissions;
+  if (!permissions || permissions.length === 0) {
+    res.status(403).json({ code: 403, message: '权限不足', data: null });
+    return;
+  }
+  next();
+}
+
 /**
  * GET /api/v1/admin/merchant/list
  * 商家列表
  */
-router.get('/', authMiddleware, adminMiddleware, operatorMiddleware, async (req: Request, res: Response) => {
+router.get('/', authMiddleware, anyPermissionMiddleware, async (req: Request, res: Response) => {
   try {
     const page = Math.max(parseInt(req.query.page as string, 10) || 1, 1);
     const pageSize = Math.min(Math.max(parseInt(req.query.pageSize as string, 10) || 20, 1), 100);
@@ -78,7 +88,7 @@ router.get('/', authMiddleware, adminMiddleware, operatorMiddleware, async (req:
  * POST /api/v1/admin/merchant
  * 创建商家
  */
-router.post('/', authMiddleware, adminMiddleware, operatorMiddleware, async (req: Request, res: Response) => {
+router.post('/', authMiddleware, anyPermissionMiddleware, async (req: Request, res: Response) => {
   const { merchantName, merchantAddress, longitude, latitude, contactName, contactPhone, logoUrl, accountPhone } = req.body;
 
   if (!merchantName) {
@@ -144,7 +154,7 @@ router.post('/', authMiddleware, adminMiddleware, operatorMiddleware, async (req
  * PUT /api/v1/admin/merchant/:id
  * 编辑商家（含坐标）
  */
-router.put('/:id', authMiddleware, adminMiddleware, operatorMiddleware, async (req: Request, res: Response) => {
+router.put('/:id', authMiddleware, anyPermissionMiddleware, async (req: Request, res: Response) => {
   const { id } = req.params;
   const { merchantName, merchantAddress, longitude, latitude, contactName, contactPhone, logoUrl, status } = req.body;
 
@@ -300,7 +310,7 @@ router.delete('/:id', authMiddleware, adminMiddleware, async (req: Request, res:
 // ============================================================
 // 启用/禁用商家
 // ============================================================
-router.patch('/:id/status', authMiddleware, adminMiddleware, operatorMiddleware, async (req: Request, res: Response) => {
+router.patch('/:id/status', authMiddleware, anyPermissionMiddleware, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { status } = req.body; // 1=启用, 0=禁用

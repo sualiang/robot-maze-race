@@ -198,11 +198,13 @@ export default function CouponManage() {
 
   const handleSubmitAudit = async (id: string) => {
     try {
-      await merchantApi.post(`/merchant/coupon/${id}/submit-audit`);
+      const res = await merchantApi.post(`/merchant/coupon/${id}/submit-audit`);
+      console.log('[提交审核] 成功:', res);
       message.success('已提交审核');
       fetchList();
-    } catch {
-      message.error('提交失败');
+    } catch (e: any) {
+      console.error('[提交审核] 失败:', e);
+      message.error(e?.message || '提交失败');
     }
   };
 
