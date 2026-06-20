@@ -215,6 +215,12 @@
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.mch-coupon-status-offline-rejected {
+  color: #a855f7;
+  background: rgba(168, 85, 247, 0.1);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+}
+
 .mch-coupon-actions-row {
   display: flex;
   gap: 8px;

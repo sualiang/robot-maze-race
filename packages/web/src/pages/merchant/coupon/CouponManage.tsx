@@ -55,11 +55,14 @@ const typeSelectOptions = [
 // ============================================================
 // 状态信息映射
 // ============================================================
-function getStatusInfo(auditStatus: number, listStatus: number): { text: string; className: string } {
+function getStatusInfo(auditStatus: number, listStatus: number, offlineRequest = 0): { text: string; className: string } {
   switch (auditStatus) {
     case AuditStatus.DRAFT: return { text: '草稿', className: 'mch-coupon-status-pending' };
     case AuditStatus.PENDING: return { text: '待审核', className: 'mch-coupon-status-pending' };
-    case AuditStatus.REJECTED: return { text: '已驳回', className: 'mch-coupon-status-rejected' };
+    case AuditStatus.REJECTED:
+      return offlineRequest === 1
+        ? { text: '申请下架已驳回', className: 'mch-coupon-status-offline-rejected' }
+        : { text: '申请上架已驳回', className: 'mch-coupon-status-rejected' };
     case AuditStatus.OFFLINE_REQ: return { text: '待下架审核', className: 'mch-coupon-status-pending' };
     case AuditStatus.PASSED:
       return listStatus === ListStatus.ON
@@ -97,6 +100,7 @@ interface CouponItem {
   status: number;
   auditStatus: number;
   auditRemark: string;
+  offlineRequest: number;
   validStart: string | null;
   validEnd: string | null;
   createdAt: number;
@@ -511,7 +515,7 @@ export default function CouponManage() {
         <div className="mch-empty-state"><div>暂无优惠券</div></div>
       ) : (
         filteredList.map((coupon) => {
-          const statusInfo = getStatusInfo(coupon.auditStatus, coupon.status);
+          const statusInfo = getStatusInfo(coupon.auditStatus, coupon.status, coupon.offlineRequest);
           return (
             <div key={coupon.id} className="mch-coupon-card">
               <div className="mch-coupon-card-header">
