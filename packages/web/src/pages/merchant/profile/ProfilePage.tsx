@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Modal, Input, message } from 'antd';
 import merchantApi from '../../../utils/merchant-api';
@@ -38,6 +38,8 @@ export default function MerchantProfilePage() {
   const [newPwd, setNewPwd] = useState('');
   const [confirmPwd, setConfirmPwd] = useState('');
   const [changingPwd, setChangingPwd] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -149,6 +151,53 @@ export default function MerchantProfilePage() {
     }
   };
 
+  const handleLogoUpload = async (file: File) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const dataUrl = e.target?.result as string;
+      if (!dataUrl) return;
+
+      setUploadingLogo(true);
+      try {
+        const token = localStorage.getItem('merchant_token');
+        const resp = await fetch('/api/v1/upload/merchant-logo', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ image: dataUrl }),
+        });
+        const json = await resp.json();
+        if (json.code === 0) {
+          message.success('Logo 上传成功');
+          setProfile(prev => prev ? { ...prev, logoUrl: json.data.url } : prev);
+        } else {
+          message.error(json.message || '上传失败');
+        }
+      } catch {
+        message.error('网络错误');
+      } finally {
+        setUploadingLogo(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      message.error('请选择图片文件');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      message.error('图片大小不能超过 2MB');
+      return;
+    }
+    handleLogoUpload(file);
+  };
+
   const handleLogout = () => {
     Modal.confirm({
       title: '退出登录',
@@ -175,10 +224,22 @@ export default function MerchantProfilePage() {
     <div className="mch-profile-page">
       {/* 商家基本信息 */}
       <div className="mch-profile-header">
-        <div className="mch-profile-logo-wrap">
-          <div className="mch-profile-logo-placeholder">
-            <span>🏪</span>
-          </div>
+        <div className="mch-profile-logo-wrap" onClick={() => fileInputRef.current?.click()}>
+          {profile?.logoUrl ? (
+            <img src={profile.logoUrl} alt="商家Logo" className="mch-profile-logo-img" />
+          ) : (
+            <div className="mch-profile-logo-placeholder">
+              <span>🏪</span>
+            </div>
+          )}
+          {uploadingLogo && <div className="mch-profile-logo-uploading">上传中...</div>}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/gif,image/webp"
+            style={{ display: 'none' }}
+            onChange={handleFileChange}
+          />
         </div>
         <div className="mch-profile-info">
           <div className="mch-profile-name">{profile?.name || '商家名称'}</div>

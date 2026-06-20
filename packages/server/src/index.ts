@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import path from 'path';
 import http from 'http';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { logger, responseTime } from './middleware/logger';
@@ -45,6 +46,7 @@ import adminSeasonRoutes from './routes/admin-season';
 import adminMerchantRoutes from './routes/admin-merchant';
 import adminPrizeRoutes from './routes/admin-prize';
 import adminTaskRoutes from './routes/admin-task';
+import uploadRoutes from './routes/upload';
 
 const app = express();
 const PORT = config.port || 3000;
@@ -124,6 +126,12 @@ app.use('/api/v1/admin/season', adminSeasonRoutes);
 app.use('/api/v1/admin/merchant', adminMerchantRoutes);
 app.use('/api/v1/admin/prize', adminPrizeRoutes);
 app.use('/api/v1/admin/task', adminTaskRoutes);
+
+// 上传（商家 Logo 等）
+app.use('/api/v1/upload', uploadRoutes);
+
+// 静态文件（上传目录）
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // 客户端错误日志（无需鉴权）
 app.use('/api/v1', clientLogRoutes);
