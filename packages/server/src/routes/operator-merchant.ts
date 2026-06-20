@@ -615,6 +615,7 @@ router.get('/merchant/coupon/rejected', authMiddleware, operatorOnly, async (req
           auditStatus: c.audit_status,
           auditRemark: c.audit_remark || '',
           opRead: c.op_read || 0,
+          rejectType: (c.audit_remark || '').indexOf('下架') >= 0 ? 'offline' : 'audit',
           version: c.version || 1,
           validStart: c.valid_start ? new Date(c.valid_start).getTime() : null,
           validEnd: c.valid_end ? new Date(c.valid_end).getTime() : null,
