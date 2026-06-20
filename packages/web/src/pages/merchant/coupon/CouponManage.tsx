@@ -548,14 +548,31 @@ export default function CouponManage() {
               <div className="mch-coupon-card-footer">
                 <span className={`mch-coupon-status-tag ${statusInfo.className}`}>
                   {statusInfo.text}
-                  {coupon.auditStatus === AuditStatus.REJECTED && coupon.auditRemark && (
-                    <span style={{ marginLeft: 4, fontSize: 11, opacity: 0.6 }} title={coupon.auditRemark}>ⓘ</span>
-                  )}
                 </span>
                 <div className="mch-coupon-actions-row">
                   {renderActions(coupon)}
                 </div>
               </div>
+
+              {coupon.auditStatus === AuditStatus.REJECTED && coupon.auditRemark && (
+                <div style={{
+                  margin: '0 -16px -12px -16px',
+                  padding: '10px 16px',
+                  background: 'rgba(255,77,79,0.1)',
+                  borderTop: '1px solid rgba(255,77,79,0.2)',
+                  borderRadius: '0 0 12px 12px',
+                  fontSize: 13,
+                  color: '#ff7875',
+                  lineHeight: 1.5,
+                }}>
+                  <span style={{ fontWeight: 600, marginRight: 6 }}>⚠ 驳回原因：</span>
+                  {coupon.auditRemark.indexOf('下架') >= 0 ? (
+                    <span>下架申请被驳回 — {coupon.auditRemark}</span>
+                  ) : (
+                    <span>{coupon.auditRemark}</span>
+                  )}
+                </div>
+              )}
             </div>
           );
         })
