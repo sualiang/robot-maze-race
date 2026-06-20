@@ -306,9 +306,9 @@ export default function MerchantList() {
       });
       message.success(approved ? '已下架' : '已驳回下架申请');
       setOfflineAuditOpen(false);
-      // 下架申请显示在待审核区，审核后刷新两个列表
-      fetchCouponList();
-      fetchOfflineList();
+      // 从列表中移除已处理的券
+      setOfflineList(prev => prev.filter(c => c.id !== couponId));
+      setCouponList(prev => prev.filter((c: any) => c.id !== couponId));
     } catch {
       message.error('操作失败');
     } finally {
