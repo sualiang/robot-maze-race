@@ -129,7 +129,7 @@ router.post('/:id/request-offline', async (req: Request, res: Response) => {
     }
 
     await execute(
-      `UPDATE merchant_coupons SET audit_status = 4, updated_at = datetime('now') WHERE id = $1`,
+      `UPDATE merchant_coupons SET audit_status = 1, offline_request = 1, updated_at = datetime('now') WHERE id = $1`,
       [id]
     );
 
@@ -160,7 +160,7 @@ router.post('/:id/cancel-offline', async (req: Request, res: Response) => {
     }
 
     await execute(
-      `UPDATE merchant_coupons SET audit_status = 2, updated_at = datetime('now') WHERE id = $1`,
+      `UPDATE merchant_coupons SET audit_status = 2, offline_request = 0, updated_at = datetime('now') WHERE id = $1`,
       [id]
     );
 

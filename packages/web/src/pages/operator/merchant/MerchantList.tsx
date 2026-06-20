@@ -43,6 +43,7 @@ interface CouponItem {
   auditStatus: number;
   auditRemark: string;
   status: number;
+  offlineRequest: number;
   createdAt: number;
 }
 
@@ -386,7 +387,7 @@ export default function MerchantList() {
     },
   ];
 
-  const couponColumns: ColumnsType<CouponItem> = [
+  const couponColumns: ColumnsType<any> = [
     { title: '优惠券名称', dataIndex: 'name', key: 'name', width: 140 },
     { title: '商家名称', dataIndex: 'merchantName', key: 'merchantName', width: 130 },
     {
@@ -400,21 +401,20 @@ export default function MerchantList() {
     { title: '库存', dataIndex: 'totalCount', key: 'totalCount', width: 60 },
     { title: '剩余', dataIndex: 'remainCount', key: 'remainCount', width: 60 },
     {
-      title: '审核状态', key: 'auditStatus', width: 90,
-      render: (_: unknown, r: CouponItem) => renderCouponStatus(r.auditStatus),
+      title: '类型', key: 'type', width: 100,
+      render: (_: unknown, r: any) => r.offlineRequest === 1 ? <Tag color="purple">下架申请</Tag> : <Tag color="blue">新券</Tag>,
     },
     {
-      title: '操作', key: 'action', width: 200, fixed: 'right',
-      render: (_: unknown, record: CouponItem) => (
+      title: '操作', key: 'action', width: 220, fixed: 'right',
+      render: (_: unknown, record: any) => (
         <Space size="small" wrap>
-          {record.auditStatus === 1 && (
-            <Button type="link" size="small" onClick={() => openCouponAudit(record)}>审核</Button>
-          )}
-          {record.auditStatus === 4 && (
+          {record.offlineRequest === 1 ? (
             <>
               <Button type="link" size="small" style={{ color: '#52c41a' }} onClick={() => openOfflineAudit(record, true)}>同意下架</Button>
               <Button type="link" size="small" danger onClick={() => openOfflineAudit(record, false)}>驳回</Button>
             </>
+          ) : record.auditStatus === 1 && (
+            <Button type="link" size="small" onClick={() => openCouponAudit(record)}>审核</Button>
           )}
         </Space>
       ),

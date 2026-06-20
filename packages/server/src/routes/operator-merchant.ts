@@ -276,7 +276,7 @@ router.get('/merchant/coupon/pending', authMiddleware, operatorOnly, async (req:
     const offset = (page - 1) * pageSize;
     const auditStatus = req.query.auditStatus as string || '1'; // 默认查待审核(1)
 
-    const conditions: string[] = ['mc.audit_status = ?', 'm.operator_id = ?'];
+    const conditions: string[] = ['mc.audit_status = ?', 'm.operator_id = ?', 'mc.offline_request = 0'];
     const params: any[] = [parseInt(auditStatus, 10), operatorId];
 
     const merchantId = req.query.merchantId as string;
@@ -322,6 +322,7 @@ router.get('/merchant/coupon/pending', authMiddleware, operatorOnly, async (req:
           status: c.status,
           auditStatus: c.audit_status,
           auditRemark: c.audit_remark || '',
+          offlineRequest: c.offline_request || 0,
           version: c.version || 1,
           validStart: c.valid_start ? new Date(c.valid_start).getTime() : null,
           validEnd: c.valid_end ? new Date(c.valid_end).getTime() : null,
@@ -429,7 +430,7 @@ router.get('/merchant/coupon/offline-pending', authMiddleware, operatorOnly, asy
     const countRow = await queryOne<{ total: number }>(
       `SELECT COUNT(*) as total FROM merchant_coupons mc
        LEFT JOIN merchants m ON mc.merchant_id = m.id
-       WHERE mc.audit_status = 4 AND m.operator_id = $1`,
+       WHERE mc.audit_status = 1 AND mc.offline_request = 1 AND m.operator_id = $1`,
       [operatorId]
     );
 
@@ -437,7 +438,7 @@ router.get('/merchant/coupon/offline-pending', authMiddleware, operatorOnly, asy
       `SELECT mc.*, m.merchant_name
        FROM merchant_coupons mc
        LEFT JOIN merchants m ON mc.merchant_id = m.id
-       WHERE mc.audit_status = 4 AND m.operator_id = $1
+       WHERE mc.audit_status = 1 AND mc.offline_request = 1 AND m.operator_id = $1
        ORDER BY mc.updated_at ASC LIMIT $2 OFFSET $3`,
       [operatorId, pageSize, offset]
     );
@@ -509,17 +510,18 @@ router.post('/merchant/coupon/offline-audit', authMiddleware, operatorOnly, asyn
       return;
     }
 
-    if (coupon.audit_status !== 4) {
+    if (coupon.audit_status !== 1 || coupon.offline_request !== 1) {
       res.json({ code: 400, message: '该优惠券不在待下架审核状态', data: null });
       return;
     }
 
     if (approved) {
-      // 同意下架：status=0(下架), audit_status=2(已通过)
+      // 同意下架：status=0(下架), audit_status=2(已通过), offline_request=0
       await execute(
         `UPDATE merchant_coupons SET
           status = 0,
           audit_status = 2,
+          offline_request = 0,
           audit_remark = $1,
           audit_time = datetime('now'),
           auditor_id = $2,
@@ -534,6 +536,7 @@ router.post('/merchant/coupon/offline-audit', authMiddleware, operatorOnly, asyn
         `UPDATE merchant_coupons SET
           audit_status = 3,
           status = 1,
+          offline_request = 0,
           audit_remark = $1,
           audit_time = datetime('now'),
           auditor_id = $2,
