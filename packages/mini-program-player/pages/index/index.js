@@ -146,35 +146,16 @@ Page({
       }
 
       var mapped = rawList.map(function (p) {
-        // 解析权益行
-        var benefits = [];
-        if (p.benefits && Array.isArray(p.benefits)) {
-          benefits = p.benefits;
-        } else if (p.description) {
-          // 从描述中提取权益点
-          var lines = p.description.split('\n');
-          for (var i = 0; i < lines.length; i++) {
-            var line = lines[i].replace(/^[\d\.]+[\.\s]*/, '').trim();
-            if (line) benefits.push(line);
-          }
-        }
-        // 至少保证有2行
-        while (benefits.length < 2) {
-          benefits.push('含参赛资格');
-        }
-
         return {
           id: p.id || p._id,
           name: p.name,
           salePriceFen: p.price || 0,
           salePriceText: ((p.price || 0) / 100).toFixed(2).replace(/\.?0+$/, ''),
-          originalPrice: p.originalPrice || 0,
-          originalPriceText: p.originalPrice ? (p.originalPrice / 100).toFixed(2).replace(/\.?0+$/, '') : '',
+          standardPriceText: p.standardPriceCents ? (p.standardPriceCents / 100).toFixed(2).replace(/\.?0+$/, '') : '',
           isHot: p.isHot || false,
           isRecommend: p.isRecommend || false,
-          times: p.race_count || 0,
+          times: p.raceCount || 0,
           tag: p.tag || (p.isHot ? '🔥 热门' : (p.isRecommend ? '💎 推荐' : '')),
-          benefits: benefits.slice(0, 2)
         };
       });
 
