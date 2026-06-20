@@ -316,22 +316,25 @@ Page({
     }).then(function (orderData) {
       wx.hideLoading();
 
-      var payParams = orderData.payParams || orderData.payment || orderData;
-      if (payParams && payParams.package) {
-        // 微信支付调起
+      // 支付参数从后端 data.paymentParams 获取
+      var orderBody = orderData && orderData.code === 0 ? orderData.data : orderData;
+      var pp = orderBody && orderBody.paymentParams;
+      if (pp) {
         wx.requestPayment({
-          timeStamp: payParams.timeStamp || payParams.timestamp || '',
-          nonceStr: payParams.nonceStr || '',
-          package: payParams.package || '',
-          signType: payParams.signType || 'MD5',
-          paySign: payParams.paySign || payParams.sign || '',
+          timeStamp: String(pp.timeStamp || pp.timestamp || ''),
+          nonceStr: String(pp.nonceStr || ''),
+          package: String(pp.package || ''),
+          signType: pp.signType || 'MD5',
+          paySign: String(pp.paySign || ''),
           success: function () {
             wx.showToast({ title: '购买成功', icon: 'success' });
             that.loadAllData();
           },
           fail: function (err) {
-            if (err.errMsg.indexOf('cancel') === -1) {
-              wx.showToast({ title: '支付失败', icon: 'none' });
+            if (err.errMsg && err.errMsg.indexOf('cancel') >= 0) {
+              wx.showToast({ title: '已取消支付', icon: 'none' });
+            } else {
+              wx.showToast({ title: '支付失败，请重试', icon: 'none' });
             }
           }
         });
