@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Card, Table, Button, Space, Tag, Modal, Form, Input,
-  InputNumber, message, Switch, Popconfirm,
+  InputNumber, message, Switch, Popconfirm, Descriptions, Divider,
 } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
-import { PlusOutlined, EditOutlined, ReloadOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
+import { PlusOutlined, ReloadOutlined, ArrowUpOutlined, ArrowDownOutlined, GiftOutlined } from '@ant-design/icons';
 import api from '../../../utils/api';
 
 interface PackageItem {
@@ -15,21 +14,33 @@ interface PackageItem {
   race_count: number;
   valid_days: number;
   is_active: boolean;
+  coupon_reward_min?: number;
+  coupon_reward_max?: number;
   created_at: string;
   updated_at: string;
 }
 
+interface MatchedCoupon {
+  couponId: string;
+  couponName: string;
+  merchantName: string;
+  denominationCents: number;
+  couponType: number;
+}
+
 // 从 localStorage 获取当前用户角色
 const operatorUserInfo = (() => {
-  try {
-    return JSON.parse(localStorage.getItem('operator_user_info') || '{}');
-  } catch { return {}; }
+  try { return JSON.parse(localStorage.getItem('operator_user_info') || '{}'); } catch { return {}; }
 })();
-const operatorRoleName: string = operatorUserInfo.role_name || '';
 const operatorRoleId: string = operatorUserInfo.role_id || '';
 const operatorPermissions: string[] = operatorUserInfo.permissions || [];
-// 运营商超管（op_super_admin）或拥有 '*' 权限 → 可删除
 const isOperatorManager = operatorRoleId === 'op_super_admin' || operatorPermissions.includes('*');
+
+const couponTypeLabels: Record<number, string> = {
+  1: '无门槛立减券',
+  3: '满减券',
+  4: '兑换券',
+};
 
 export default function PackageList() {
   const [list, setList] = useState<PackageItem[]>([]);
@@ -37,6 +48,14 @@ export default function PackageList() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form] = Form.useForm();
+  const [rewardOpen, setRewardOpen] = useState(false);
+  const [rewardPackageId, setRewardPackageId] = useState<string | null>(null);
+  const [rewardMatchLoading, setRewardMatchLoading] = useState(false);
+  const [matchedCoupons, setMatchedCoupons] = useState<MatchedCoupon[]>([]);
+  const [totalReward, setTotalReward] = useState(0);
+  const [rewardInfo, setRewardInfo] = useState<{ min: number; max: number }>({ min: 0, max: 0 });
+
+  const formatPrice = (cents: number) => `¥${(cents / 100).toFixed(2)}`;
 
   const fetchList = useCallback(async () => {
     setLoading(true);
@@ -60,6 +79,8 @@ export default function PackageList() {
       race_count: 3,
       valid_days: 30,
       is_active: true,
+      coupon_reward_min: 0,
+      coupon_reward_max: 0,
     });
     setModalOpen(true);
   };
@@ -73,6 +94,8 @@ export default function PackageList() {
       race_count: record.race_count,
       valid_days: record.valid_days,
       is_active: record.is_active,
+      coupon_reward_min: record.coupon_reward_min || 0,
+      coupon_reward_max: record.coupon_reward_max || 0,
     });
     setModalOpen(true);
   };
@@ -91,7 +114,6 @@ export default function PackageList() {
       fetchList();
     } catch (err: any) {
       console.error('[PackageList] save error:', err);
-      // 尝试从错误中提取服务端提示
       const serverMsg = err?.response?.data?.message || err?.data?.message || err?.message || '';
       message.error(serverMsg || '操作失败');
     }
@@ -104,8 +126,7 @@ export default function PackageList() {
       fetchList();
     } catch (err: any) {
       console.error('[PackageList] toggle error:', err);
-      const serverMsg = err?.response?.data?.message || err?.data?.message || err?.message || '';
-      message.error(serverMsg || '操作失败');
+      message.error(err?.response?.data?.message || err?.data?.message || err?.message || '操作失败');
     }
   };
 
@@ -115,13 +136,63 @@ export default function PackageList() {
       message.success('已删除');
       fetchList();
     } catch (err: any) {
-      console.error('[PackageList] delete error:', err);
-      const serverMsg = err?.response?.data?.message || err?.data?.message || err?.message || '';
-      message.error(serverMsg || '删除失败');
+      message.error(err?.response?.data?.message || err?.data?.message || err?.message || '删除失败');
     }
   };
 
-  const columns: ColumnsType<PackageItem> = [
+  // ============================================================
+  // 礼券匹配功能
+  // ============================================================
+  const openRewardPanel = (record: PackageItem) => {
+    setRewardPackageId(record.id);
+    setRewardInfo({
+      min: record.coupon_reward_min || 0,
+      max: record.coupon_reward_max || 0,
+    });
+    setMatchedCoupons([]);
+    setTotalReward(0);
+    setRewardOpen(true);
+  };
+
+  const handleMatchCoupons = async () => {
+    if (!rewardPackageId) return;
+    setRewardMatchLoading(true);
+    try {
+      const res: any = await api.post(`/packages/${rewardPackageId}/match-coupons`, {});
+      if (res?.data?.matched) {
+        setMatchedCoupons(res.data.matched);
+        setTotalReward(res.data.totalValue || 0);
+        if (res.data.message) {
+          message.info(res.data.message);
+        }
+      } else {
+        message.warning(res?.data?.message || '匹配无结果');
+      }
+    } catch (err: any) {
+      message.error('匹配失败');
+    } finally {
+      setRewardMatchLoading(false);
+    }
+  };
+
+  const handleSaveMatched = async () => {
+    if (!rewardPackageId) return;
+    setRewardMatchLoading(true);
+    try {
+      const res: any = await api.post(`/packages/${rewardPackageId}/save-matched-coupons`, {});
+      if (res?.data?.saved) {
+        setMatchedCoupons(res.data.saved);
+        setTotalReward(res.data.totalValue || 0);
+        message.success('礼券匹配已保存');
+      }
+    } catch {
+      message.error('保存失败');
+    } finally {
+      setRewardMatchLoading(false);
+    }
+  };
+
+  const columns = [
     { title: '名称', dataIndex: 'name', key: 'name', width: 160 },
     {
       title: '描述', dataIndex: 'description', key: 'description', ellipsis: true,
@@ -130,19 +201,27 @@ export default function PackageList() {
     {
       title: '价格(¥)', dataIndex: 'price', key: 'price', width: 100,
       render: (v: number) => `¥${v.toFixed(2)}`,
-      sorter: (a, b) => a.price - b.price,
+      sorter: (a: PackageItem, b: PackageItem) => a.price - b.price,
     },
     { title: '参赛次数', dataIndex: 'race_count', key: 'race_count', width: 90 },
+    { title: '有效期(天)', dataIndex: 'valid_days', key: 'valid_days', width: 100, render: (v: number) => `${v}天` },
     {
-      title: '有效期(天)', dataIndex: 'valid_days', key: 'valid_days', width: 100,
-      render: (v: number) => `${v}天`,
+      title: '礼券', key: 'couponReward', width: 120,
+      render: (_: unknown, record: PackageItem) => {
+        if (record.coupon_reward_min && record.coupon_reward_max) {
+          return (
+            <Tag color="purple">
+              ¥{record.coupon_reward_min}~¥{record.coupon_reward_max}
+            </Tag>
+          );
+        }
+        return <Tag style={{ opacity: 0.4 }}>未设置</Tag>;
+      }
     },
     {
       title: '状态', dataIndex: 'is_active', key: 'is_active', width: 90,
       render: (active: boolean) => (
-        <Tag color={active ? 'green' : 'default'}>
-          {active ? '在售' : '已下架'}
-        </Tag>
+        <Tag color={active ? 'green' : 'default'}>{active ? '在售' : '已下架'}</Tag>
       ),
     },
     {
@@ -150,27 +229,24 @@ export default function PackageList() {
       render: (v: string) => new Date(v).toLocaleString('zh-CN'),
     },
     {
-      title: '操作', key: 'action', width: 200, fixed: 'right',
+      title: '操作', key: 'action', width: 280, fixed: 'right',
       render: (_: unknown, record: PackageItem) => (
         <Space size="small" wrap>
-          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
-            编辑
-          </Button>
-          <Popconfirm
-            title={record.is_active ? '确定下架该参赛包？' : '确定上架该参赛包？'}
-            onConfirm={() => handleToggleStatus(record)}
-          >
-            <Button
-              type="link"
-              size="small"
+          <Button type="link" size="small" onClick={() => handleEdit(record)}>编辑</Button>
+          {record.coupon_reward_min && record.coupon_reward_max && (
+            <Button type="link" size="small" icon={<GiftOutlined />}
+              onClick={() => openRewardPanel(record)}>礼券</Button>
+          )}
+          <Popconfirm title={record.is_active ? '确定下架？' : '确定上架？'}
+            onConfirm={() => handleToggleStatus(record)}>
+            <Button type="link" size="small"
               icon={record.is_active ? <ArrowDownOutlined /> : <ArrowUpOutlined />}
-              danger={record.is_active}
-            >
+              danger={record.is_active}>
               {record.is_active ? '下架' : '上架'}
             </Button>
           </Popconfirm>
           {isOperatorManager && (
-            <Popconfirm title="确定删除？此操作不可恢复" onConfirm={() => handleDelete(record.id)}>
+            <Popconfirm title="确定删除？不可恢复" onConfirm={() => handleDelete(record.id)}>
               <Button type="link" size="small" danger>删除</Button>
             </Popconfirm>
           )}
@@ -195,17 +271,18 @@ export default function PackageList() {
           dataSource={list}
           rowKey="id"
           loading={loading}
-          scroll={{ x: 1000 }}
+          scroll={{ x: 1100 }}
           pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t: number) => `共 ${t} 个参赛包` }}
         />
       </Card>
 
+      {/* ====== 创建/编辑 Modal ====== */}
       <Modal
         title={editingId ? '编辑参赛包' : '新增参赛包'}
         open={modalOpen}
         onOk={handleSave}
         onCancel={() => setModalOpen(false)}
-        width={520}
+        width={560}
         destroyOnClose
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
@@ -226,10 +303,79 @@ export default function PackageList() {
           <Form.Item name="valid_days" label="有效期（天）" rules={[{ required: true, message: '请输入有效期' }]}>
             <InputNumber min={1} max={365} style={{ width: 200 }} />
           </Form.Item>
+
+          <Divider>🎁 礼券自动匹配（选填）</Divider>
+          <Space size={16}>
+            <Form.Item name="coupon_reward_min" label="礼券总价值下限（元）">
+              <InputNumber min={0} step={0.01} precision={2} style={{ width: 150 }}
+                placeholder="例如48元参赛包设50" />
+            </Form.Item>
+            <Form.Item name="coupon_reward_max" label="礼券总价值上限（元）">
+              <InputNumber min={0} step={0.01} precision={2} style={{ width: 150 }}
+                placeholder="例如设60" />
+            </Form.Item>
+          </Space>
+
           <Form.Item name="is_active" label="立即上架" valuePropName="checked">
             <Switch />
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* ====== 礼券匹配面板 Modal ====== */}
+      <Modal
+        title="🎁 礼券匹配详情"
+        open={rewardOpen}
+        onCancel={() => setRewardOpen(false)}
+        footer={null}
+        width={600}
+        destroyOnClose
+      >
+        <Descriptions column={2} size="small" style={{ marginBottom: 16 }}>
+          <Descriptions.Item label="匹配区间">
+            ¥{rewardInfo.min} ~ ¥{rewardInfo.max}
+          </Descriptions.Item>
+          <Descriptions.Item label="当前总价值">
+            <span style={{ color: '#52c41a', fontWeight: 'bold', fontSize: 16 }}>
+              {formatPrice(totalReward)}
+            </span>
+          </Descriptions.Item>
+        </Descriptions>
+
+        <Space style={{ marginBottom: 16 }}>
+          <Button type="primary" icon={<GiftOutlined />} loading={rewardMatchLoading}
+            onClick={handleMatchCoupons}>自动匹配</Button>
+          {matchedCoupons.length > 0 && (
+            <Button onClick={handleSaveMatched} loading={rewardMatchLoading}>保存匹配结果</Button>
+          )}
+        </Space>
+
+        {matchedCoupons.length === 0 && (
+          <div style={{ color: 'rgba(0,0,0,0.35)', textAlign: 'center', padding: 24 }}>
+            点击「自动匹配」从全平台券池中自动选配礼券组合
+          </div>
+        )}
+
+        {matchedCoupons.length > 0 && (
+          <Card size="small" title="匹配结果">
+            {matchedCoupons.map((c, i) => (
+              <div key={c.couponId} style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '8px 0', borderBottom: i < matchedCoupons.length - 1 ? '1px solid #f0f0f0' : 'none'
+              }}>
+                <div>
+                  <div style={{ fontWeight: 500 }}>{c.couponName}</div>
+                  <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)' }}>
+                    {c.merchantName} · {couponTypeLabels[c.couponType] || '券'}
+                  </div>
+                </div>
+                <div style={{ color: '#ff4d4f', fontWeight: 'bold', fontSize: 15 }}>
+                  {formatPrice(c.denominationCents)}
+                </div>
+              </div>
+            ))}
+          </Card>
+        )}
       </Modal>
     </>
   );

@@ -210,3 +210,62 @@
 }
 
 
+
+/* ===== 礼券展示 ===== */
+.pkg-reward-area {
+  margin: var(--space-sm) 0 var(--space-base);
+  padding: var(--space-sm) var(--space-base);
+  background: linear-gradient(135deg, rgba(82, 196, 26, 0.12), rgba(82, 196, 26, 0.05));
+  border-radius: var(--radius-sm);
+  border: 1rpx solid rgba(82, 196, 26, 0.2);
+}
+
+.reward-title {
+  font-size: var(--font-xs);
+  color: #52c41a;
+  font-weight: 600;
+  margin-bottom: 6rpx;
+  display: block;
+}
+
+.reward-total {
+  font-size: 36rpx;
+  font-weight: 800;
+  color: #52c41a;
+}
+
+.reward-coupon-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6rpx 0;
+  border-bottom: 1rpx solid rgba(82, 196, 26, 0.1);
+}
+
+.reward-coupon-item:last-child {
+  border-bottom: none;
+}
+
+.reward-coupon-name {
+  font-size: var(--font-xs);
+  color: rgba(255,255,255,0.75);
+  flex: 1;
+}
+
+.reward-coupon-merchant {
+  font-size: 20rpx;
+  color: rgba(255,255,255,0.35);
+  display: block;
+}
+
+.reward-coupon-value {
+  font-size: var(--font-sm);
+  color: #ff4d4f;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.tag-gift {
+  background: linear-gradient(135deg, #52c41a, #73d13d);
+  color: #fff;
+}

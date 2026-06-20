@@ -89,10 +89,26 @@ CREATE TABLE IF NOT EXISTS race_packages (
   valid_days INTEGER DEFAULT 365,
   status VARCHAR(20) NOT NULL DEFAULT 'active',
   sort_order INTEGER DEFAULT 0,
+  coupon_reward_min_cents INTEGER DEFAULT 0,
+  coupon_reward_max_cents INTEGER DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_race_packages_status ON race_packages(status);
+
+-- 参赛包关联优惠券
+CREATE TABLE IF NOT EXISTS race_package_coupons (
+  id TEXT PRIMARY KEY,
+  package_id TEXT NOT NULL REFERENCES race_packages(id),
+  coupon_id TEXT NOT NULL REFERENCES merchant_coupons(id),
+  denomination_cents INTEGER NOT NULL DEFAULT 0,
+  coupon_type INTEGER NOT NULL DEFAULT 1,
+  merchant_name TEXT DEFAULT '',
+  coupon_name TEXT DEFAULT '',
+  created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_rpc_package_id ON race_package_coupons(package_id);
+CREATE INDEX IF NOT EXISTS idx_rpc_coupon_id ON race_package_coupons(coupon_id);
 
 -- ==================== 订单表 ====================
 CREATE TABLE IF NOT EXISTS orders (

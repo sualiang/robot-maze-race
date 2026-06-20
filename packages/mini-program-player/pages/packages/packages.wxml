@@ -39,6 +39,21 @@
         </view>
       </view>
 
+      <!-- 礼券组合展示 -->
+      <view wx:if="{{item.coupons && item.coupons.length > 0}}" class="pkg-reward-area">
+        <text class="reward-title">🎁 购包即赠礼券</text>
+        <view class="reward-coupon-item" wx:for="{{item.coupons}}" wx:for-item="coupon" wx:key="couponId">
+          <view class="reward-coupon-name">
+            <text>{{coupon.couponName}}</text>
+            <text class="reward-coupon-merchant">{{coupon.merchantName}}</text>
+          </view>
+          <text class="reward-coupon-value">¥{{(coupon.denominationCents / 100).toFixed(0)}}</text>
+        </view>
+        <text class="reward-title" style="margin-top:6rpx;text-align:right;">
+          总价值 <text class="reward-total">¥{{(item.totalRewardValue / 100).toFixed(0)}}</text>
+        </text>
+      </view>
+
       <!-- 价格 & 购买 -->
       <view class="pkg-footer">
         <view class="pkg-price-area">

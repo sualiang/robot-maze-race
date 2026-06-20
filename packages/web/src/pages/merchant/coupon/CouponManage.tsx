@@ -3,80 +3,119 @@ import { Modal, message } from 'antd';
 import merchantApi from '../../../utils/merchant-api';
 import './styles.css';
 
-// 临时定义类型
-interface CouponItem {
-  id: string;
-  name: string;
-  type: 'full_reduce' | 'direct_reduce' | 'no_threshold' | 'discount';
-  value: number;
-  discount: number;
-  min_amount: number;
-  total_stock: number;
-  limit_per_user: number;
-  expiry_type: 'fixed' | 'days';
-  expiry_start: string;
-  expiry_end: string;
-  expiry_days: number;
-  channels: string[];
-  usage_rule: string;
-  status: 'pending' | 'active' | 'rejected' | 'offline';
-  reject_reason: string;
-  used_count: number;
-  created_at: string;
+// ============================================================
+// 后端 audit_status 枚举 (与后端一致)
+// ============================================================
+enum AuditStatus {
+  DRAFT = 0,       // 草稿
+  PENDING = 1,     // 待审核
+  PASSED = 2,      // 审核通过（可上架）
+  REJECTED = 3,    // 审核驳回
+  OFFLINE_REQ = 4, // 待下架审核
 }
 
-type TabKey = 'all' | 'pending' | 'active' | 'rejected' | 'offline';
+// ============================================================
+// 后端 coupon_type 枚举 (折扣券已取消)
+// ============================================================
+enum CouponType {
+  NO_THRESHOLD = 1, // 无门槛立减券
+  FULL_REDUCE = 3,  // 满减券
+  EXCHANGE = 4,     // 兑换券
+}
 
-const tabs: { key: TabKey; label: string }[] = [
+// ============================================================
+// ListStatus
+// ============================================================
+enum ListStatus {
+  OFF = 0,
+  ON = 1,
+}
+
+// ============================================================
+// 类型映射
+// ============================================================
+const typeLabels: Record<number, string> = {
+  [CouponType.NO_THRESHOLD]: '无门槛立减券',
+  [CouponType.FULL_REDUCE]: '满减券',
+  [CouponType.EXCHANGE]: '兑换券',
+};
+
+const typeClassMap: Record<number, string> = {
+  [CouponType.NO_THRESHOLD]: 'mch-coupon-type-reduce',
+  [CouponType.FULL_REDUCE]: 'mch-coupon-type-full',
+  [CouponType.EXCHANGE]: 'mch-coupon-type-nothreshold',
+};
+
+const typeSelectOptions = [
+  { value: String(CouponType.FULL_REDUCE), label: '满减券' },
+  { value: String(CouponType.NO_THRESHOLD), label: '无门槛立减券' },
+  { value: String(CouponType.EXCHANGE), label: '兑换券' },
+];
+
+// ============================================================
+// 状态信息映射
+// ============================================================
+function getStatusInfo(auditStatus: number, listStatus: number): { text: string; className: string } {
+  switch (auditStatus) {
+    case AuditStatus.DRAFT: return { text: '草稿', className: 'mch-coupon-status-pending' };
+    case AuditStatus.PENDING: return { text: '待审核', className: 'mch-coupon-status-pending' };
+    case AuditStatus.REJECTED: return { text: '已驳回', className: 'mch-coupon-status-rejected' };
+    case AuditStatus.OFFLINE_REQ: return { text: '待下架审核', className: 'mch-coupon-status-pending' };
+    case AuditStatus.PASSED:
+      return listStatus === ListStatus.ON
+        ? { text: '已上架', className: 'mch-coupon-status-active' }
+        : { text: '已下架', className: 'mch-coupon-status-offline' };
+    default: return { text: '未知', className: '' };
+  }
+}
+
+const tabConfigs = [
   { key: 'all', label: '全部' },
+  { key: 'draft', label: '草稿' },
   { key: 'pending', label: '待审核' },
   { key: 'active', label: '已上架' },
   { key: 'rejected', label: '已驳回' },
   { key: 'offline', label: '已下架' },
-];
+] as const;
+type TabKey = (typeof tabConfigs)[number]['key'];
 
-const typeLabels: Record<string, string> = {
-  full_reduce: '满减券',
-  direct_reduce: '立减券',
-  no_threshold: '无门槛券',
-  discount: '折扣券',
-};
+// ============================================================
+// 界面
+// ============================================================
 
-const typeClassMap: Record<string, string> = {
-  full_reduce: 'mch-coupon-type-full',
-  direct_reduce: 'mch-coupon-type-reduce',
-  no_threshold: 'mch-coupon-type-nothreshold',
-  discount: 'mch-coupon-type-discount',
-};
-
-const statusLabels: Record<string, string> = {
-  pending: '待审核',
-  active: '已上架',
-  rejected: '已驳回',
-  offline: '已下架',
-};
-
-const statusClassMap: Record<string, string> = {
-  pending: 'mch-coupon-status-pending',
-  active: 'mch-coupon-status-active',
-  rejected: 'mch-coupon-status-rejected',
-  offline: 'mch-coupon-status-offline',
-};
+interface CouponItem {
+  id: string;
+  name: string;
+  description: string;
+  denominationCents: number;
+  minConsumeCents: number;
+  totalCount: number;
+  remainCount: number;
+  couponType: number;
+  maxPerUser: number;
+  putChannels: string[];
+  status: number;
+  auditStatus: number;
+  auditRemark: string;
+  validStart: string | null;
+  validEnd: string | null;
+  createdAt: number;
+}
 
 export default function CouponManage() {
   const [list, setList] = useState<CouponItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>('all');
   const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState(false); // true=编辑, false=新建
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   // 表单状态
   const [formName, setFormName] = useState('');
-  const [formType, setFormType] = useState('full_reduce');
-  const [formValue, setFormValue] = useState<number | undefined>(undefined);
-  const [formDiscount, setFormDiscount] = useState<number | undefined>(undefined);
-  const [formMinAmount, setFormMinAmount] = useState<number | undefined>(undefined);
+  const [formType, setFormType] = useState(String(CouponType.FULL_REDUCE));
+  const [formValue, setFormValue] = useState<number | undefined>(undefined);  // 元
+  const [formMinAmount, setFormMinAmount] = useState<number | undefined>(undefined); // 元
   const [formTotalStock, setFormTotalStock] = useState<number | undefined>(undefined);
   const [formLimitPerUser, setFormLimitPerUser] = useState(1);
   const [formExpiryType, setFormExpiryType] = useState<'fixed' | 'days'>('fixed');
@@ -90,7 +129,7 @@ export default function CouponManage() {
     setLoading(true);
     try {
       const data: any = await merchantApi.get('/merchant/coupon/list');
-      setList(data?.list ?? data ?? []);
+      setList(Array.isArray(data?.list) ? data.list : []);
     } catch {
       setList([]);
     } finally {
@@ -100,14 +139,25 @@ export default function CouponManage() {
 
   useEffect(() => { fetchList(); }, [fetchList]);
 
-  const filteredList = activeTab === 'all' ? list : list.filter((c) => c.status === activeTab);
+  // 筛选
+  const filteredList = list.filter((item) => {
+    if (activeTab === 'all') return true;
+    if (activeTab === 'draft') return item.auditStatus === AuditStatus.DRAFT;
+    if (activeTab === 'pending') return item.auditStatus === AuditStatus.PENDING;
+    if (activeTab === 'active') return item.auditStatus === AuditStatus.PASSED && item.status === ListStatus.ON;
+    if (activeTab === 'rejected') return item.auditStatus === AuditStatus.REJECTED;
+    if (activeTab === 'offline') {
+      return item.auditStatus === AuditStatus.PASSED && item.status === ListStatus.OFF;
+    }
+    return true;
+  });
 
   const resetForm = () => {
+    setEditing(false);
     setEditingId(null);
     setFormName('');
-    setFormType('full_reduce');
+    setFormType(String(CouponType.FULL_REDUCE));
     setFormValue(undefined);
-    setFormDiscount(undefined);
     setFormMinAmount(undefined);
     setFormTotalStock(undefined);
     setFormLimitPerUser(1);
@@ -125,79 +175,60 @@ export default function CouponManage() {
   };
 
   const openEditModal = (item: CouponItem) => {
+    setEditing(true);
     setEditingId(item.id);
     setFormName(item.name);
-    setFormType(item.type);
-    setFormValue(item.value);
-    setFormDiscount(item.discount);
-    setFormMinAmount(item.min_amount);
-    setFormTotalStock(item.total_stock);
-    setFormLimitPerUser(item.limit_per_user);
-    setFormExpiryType(item.expiry_type);
-    setFormExpiryStart(item.expiry_start || '');
-    setFormExpiryEnd(item.expiry_end || '');
-    setFormExpiryDays(item.expiry_days);
-    setFormChannels(item.channels || []);
-    setFormUsageRule(item.usage_rule || '');
+    setFormType(String(item.couponType));
+    setFormValue(item.denominationCents ? item.denominationCents / 100 : undefined);
+    setFormMinAmount(item.minConsumeCents ? item.minConsumeCents / 100 : undefined);
+    setFormTotalStock(item.totalCount);
+    setFormLimitPerUser(item.maxPerUser || 1);
+    setFormExpiryType(item.validStart && item.validEnd ? 'fixed' : 'days');
+    setFormExpiryStart(item.validStart ? new Date(item.validStart).toISOString().split('T')[0] : '');
+    setFormExpiryEnd(item.validEnd ? new Date(item.validEnd).toISOString().split('T')[0] : '');
+    setFormExpiryDays(undefined);
+    setFormChannels(Array.isArray(item.putChannels) ? item.putChannels : []);
+    setFormUsageRule(item.description || '');
     setModalOpen(true);
   };
 
-  const handleSave = async () => {
-    // 基础校验
-    if (!formName.trim()) { message.error('请输入券名称'); return; }
-    if (formType === 'discount') {
-      if (!formDiscount || formDiscount < 1 || formDiscount > 99) { message.error('请输入正确的折扣（1-99）'); return; }
-    } else {
-      if (!formValue || formValue <= 0) { message.error('请输入面值'); return; }
-    }
-    if ((formType === 'full_reduce' || formType === 'direct_reduce') && (!formMinAmount || formMinAmount <= 0)) {
-      message.error('请输入最低消费金额');
-      return;
-    }
-    if (!formTotalStock || formTotalStock <= 0) { message.error('请输入总库存'); return; }
-    if (formExpiryType === 'fixed' && (!formExpiryStart || !formExpiryEnd)) { message.error('请选择有效期范围'); return; }
-    if (formExpiryType === 'days' && (!formExpiryDays || formExpiryDays <= 0)) { message.error('请输入有效天数'); return; }
-
-    const payload: Record<string, unknown> = {
-      name: formName.trim(),
-      type: formType,
-      total_stock: formTotalStock,
-      limit_per_user: formLimitPerUser,
-      expiry_type: formExpiryType,
-      channels: formChannels,
-      usage_rule: formUsageRule.trim(),
-    };
-
-    if (formType === 'discount') {
-      payload.discount = formDiscount;
-    } else {
-      payload.value = formValue;
-    }
-    if (formType === 'full_reduce' || formType === 'direct_reduce') {
-      payload.min_amount = formMinAmount;
-    }
-    if (formExpiryType === 'fixed') {
-      payload.expiry_start = formExpiryStart;
-      payload.expiry_end = formExpiryEnd;
-    } else {
-      payload.expiry_days = formExpiryDays;
-    }
-
-    setSaving(true);
+  const handleSubmitAudit = async (id: string) => {
     try {
-      if (editingId) {
-        await merchantApi.put(`/merchant/coupon/${editingId}`, payload);
-        message.success('优惠券已更新');
-      } else {
-        await merchantApi.post('/merchant/coupon/create', payload);
-        message.success('优惠券已创建');
-      }
-      setModalOpen(false);
+      await merchantApi.post(`/merchant/coupon/${id}/submit-audit`);
+      message.success('已提交审核');
+      fetchList();
+    } catch {
+      message.error('提交失败');
+    }
+  };
+
+  const handleRequestOffline = async (id: string) => {
+    try {
+      await merchantApi.post(`/merchant/coupon/${id}/request-offline`);
+      message.success('已申请下架');
       fetchList();
     } catch {
       message.error('操作失败');
-    } finally {
-      setSaving(false);
+    }
+  };
+
+  const handleCancelOffline = async (id: string) => {
+    try {
+      await merchantApi.post(`/merchant/coupon/${id}/cancel-offline`);
+      message.success('已撤销下架申请');
+      fetchList();
+    } catch {
+      message.error('操作失败');
+    }
+  };
+
+  const handleOnline = async (id: string) => {
+    try {
+      await merchantApi.post(`/merchant/coupon/${id}/online`);
+      message.success('已上架');
+      fetchList();
+    } catch {
+      message.error('上架失败');
     }
   };
 
@@ -220,18 +251,66 @@ export default function CouponManage() {
     });
   };
 
-  const handleToggleStatus = async (id: string, targetStatus: string) => {
+  const handleSave = async () => {
+    // 校验
+    if (!formName.trim()) { message.error('请输入券名称'); return; }
+    const couponTypeNum = parseInt(formType, 10);
+    if (couponTypeNum === CouponType.FULL_REDUCE || couponTypeNum === CouponType.NO_THRESHOLD) {
+      if (!formValue || formValue <= 0) { message.error('请输入面值'); return; }
+    }
+    if (couponTypeNum === CouponType.FULL_REDUCE && (!formMinAmount || formMinAmount <= 0)) {
+      message.error('请输入最低消费金额'); return;
+    }
+    if (!formTotalStock || formTotalStock <= 0) { message.error('请输入总库存'); return; }
+    if (formExpiryType === 'fixed' && (!formExpiryStart || !formExpiryEnd)) { message.error('请选择有效期'); return; }
+    if (formExpiryType === 'days' && (!formExpiryDays || formExpiryDays <= 0)) { message.error('请输入有效天数'); return; }
+
+    const payload: Record<string, unknown> = {
+      name: formName.trim(),
+      description: formUsageRule.trim(),
+      totalCount: formTotalStock,
+      couponType: couponTypeNum,
+      maxPerUser: formLimitPerUser,
+      putChannels: JSON.stringify(formChannels || []),
+    };
+
+    // 面值
+    if (couponTypeNum === CouponType.EXCHANGE) {
+      payload.denominationCents = 0;
+    } else {
+      payload.denominationCents = Math.round((formValue || 0) * 100);
+    }
+    if (couponTypeNum === CouponType.FULL_REDUCE) {
+      payload.minConsumeCents = Math.round((formMinAmount || 0) * 100);
+    }
+    // 有效期
+    if (formExpiryType === 'fixed') {
+      payload.validStart = formExpiryStart ? new Date(formExpiryStart).toISOString() : null;
+      payload.validEnd = formExpiryEnd ? new Date(formExpiryEnd).toISOString() : null;
+    } else if (formExpiryDays && formExpiryDays > 0) {
+      const end = new Date();
+      end.setDate(end.getDate() + formExpiryDays);
+      payload.validStart = new Date().toISOString();
+      payload.validEnd = end.toISOString();
+    }
+
+    setSaving(true);
     try {
-      await merchantApi.post(`/merchant/coupon/${id}/${targetStatus === 'active' ? 'online' : 'offline'}`);
-      message.success(targetStatus === 'active' ? '已上架' : '已下架');
+      if (editing && editingId) {
+        await merchantApi.put(`/merchant/coupon/${editingId}`, payload);
+        message.success('已修改');
+      } else {
+        await merchantApi.post('/merchant/coupon/create', payload);
+        message.success('创建成功');
+      }
+      setModalOpen(false);
       fetchList();
     } catch {
       message.error('操作失败');
+    } finally {
+      setSaving(false);
     }
   };
-
-  const getTypeClass = (type: string) => typeClassMap[type] || '';
-  const getStatusClass = (status: string) => statusClassMap[status] || '';
 
   const handleChannelToggle = (channel: string) => {
     setFormChannels((prev) =>
@@ -239,311 +318,262 @@ export default function CouponManage() {
     );
   };
 
+  const getTypeClass = (t: number) => typeClassMap[t] || '';
+  const formatPrice = (cents: number) => `¥${((cents || 0) / 100).toFixed(2)}`;
+
+  // ============================================================
+  // 渲染操作按钮
+  // ============================================================
+  const renderActions = (coupon: CouponItem) => {
+    const { auditStatus, status, id } = coupon;
+    const btns: React.ReactNode[] = [];
+
+    // 草稿：编辑、删除、提交审核
+    if (auditStatus === AuditStatus.DRAFT) {
+      btns.push(
+        <button key="edit" className="mch-coupon-action-btn mch-coupon-action-edit" onClick={() => openEditModal(coupon)}>编辑</button>,
+        <button key="del" className="mch-coupon-action-btn mch-coupon-action-delete" onClick={() => handleDelete(id)}>删除</button>,
+        <button key="submit" className="mch-coupon-action-btn mch-coupon-action-online" onClick={() => handleSubmitAudit(id)}>提交审核</button>,
+      );
+    }
+
+    // 待审核：无操作按钮
+    if (auditStatus === AuditStatus.PENDING) {
+      // 无操作
+    }
+
+    // 审核通过 + 已下架：编辑、删除、上架
+    if (auditStatus === AuditStatus.PASSED && status === ListStatus.OFF) {
+      btns.push(
+        <button key="edit" className="mch-coupon-action-btn mch-coupon-action-edit" onClick={() => openEditModal(coupon)}>编辑</button>,
+        <button key="del" className="mch-coupon-action-btn mch-coupon-action-delete" onClick={() => handleDelete(id)}>删除</button>,
+        <button key="online" className="mch-coupon-action-btn mch-coupon-action-online" onClick={() => handleOnline(id)}>上架</button>,
+      );
+    }
+
+    // 审核通过 + 已上架：申请下架
+    if (auditStatus === AuditStatus.PASSED && status === ListStatus.ON) {
+      btns.push(
+        <button key="offline" className="mch-coupon-action-btn mch-coupon-action-offline" onClick={() => handleRequestOffline(id)}>申请下架</button>,
+      );
+    }
+
+    // 待下架审核：撤销申请
+    if (auditStatus === AuditStatus.OFFLINE_REQ) {
+      btns.push(
+        <button key="cancel" className="mch-coupon-action-btn mch-coupon-action-edit" onClick={() => handleCancelOffline(id)}>撤销下架申请</button>,
+      );
+    }
+
+    // 已驳回：编辑、删除、提交审核
+    if (auditStatus === AuditStatus.REJECTED) {
+      btns.push(
+        <button key="edit" className="mch-coupon-action-btn mch-coupon-action-edit" onClick={() => openEditModal(coupon)}>编辑</button>,
+        <button key="del" className="mch-coupon-action-btn mch-coupon-action-delete" onClick={() => handleDelete(id)}>删除</button>,
+        <button key="resubmit" className="mch-coupon-action-btn mch-coupon-action-online" onClick={() => handleSubmitAudit(id)}>重新提交审核</button>,
+      );
+    }
+
+    return btns;
+  };
+
+  // ============================================================
+  // 渲染表单
+  // ============================================================
+  const renderFormFields = () => {
+    const couponTypeNum = parseInt(formType, 10);
+    const isExchange = couponTypeNum === CouponType.EXCHANGE;
+
+    return (
+      <>
+        <div className="mch-form-group">
+          <label className="mch-form-label">券名称</label>
+          <input className="mch-form-input" placeholder="请输入优惠券名称" value={formName}
+            onChange={(e) => setFormName(e.target.value)} maxLength={50} />
+        </div>
+
+        <div className="mch-form-group">
+          <label className="mch-form-label">券类型</label>
+          <select className="mch-form-select" value={formType} onChange={(e) => setFormType(e.target.value)}>
+            {typeSelectOptions.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {!isExchange && (
+          <div className="mch-form-group">
+            <label className="mch-form-label">面值（元）</label>
+            <input className="mch-form-input" type="number" min={0.01} step={0.01} placeholder="请输入面值"
+              value={formValue ?? ''} onChange={(e) => setFormValue(e.target.value ? Number(e.target.value) : undefined)} />
+          </div>
+        )}
+
+        {couponTypeNum === CouponType.FULL_REDUCE && (
+          <div className="mch-form-group">
+            <label className="mch-form-label">最低消费金额（元）</label>
+            <input className="mch-form-input" type="number" min={0.01} step={0.01} placeholder="满多少可用"
+              value={formMinAmount ?? ''} onChange={(e) => setFormMinAmount(e.target.value ? Number(e.target.value) : undefined)} />
+          </div>
+        )}
+
+        {isExchange && (
+          <div className="mch-form-group">
+            <label className="mch-form-label">兑换价值（元）</label>
+            <input className="mch-form-input" type="number" min={0.01} step={0.01} placeholder="凭券可兑换价值多少的商品"
+              value={formValue ?? ''} onChange={(e) => setFormValue(e.target.value ? Number(e.target.value) : undefined)} />
+          </div>
+        )}
+
+        <div className="mch-form-row">
+          <div className="mch-form-group">
+            <label className="mch-form-label">总库存</label>
+            <input className="mch-form-input" type="number" min={1} placeholder="数量"
+              value={formTotalStock ?? ''} onChange={(e) => setFormTotalStock(e.target.value ? Number(e.target.value) : undefined)} />
+          </div>
+          <div className="mch-form-group">
+            <label className="mch-form-label">每人限领</label>
+            <input className="mch-form-input" type="number" min={1} placeholder="默认1"
+              value={formLimitPerUser} onChange={(e) => setFormLimitPerUser(Number(e.target.value) || 1)} />
+          </div>
+        </div>
+
+        <div className="mch-form-group">
+          <label className="mch-form-label">有效期</label>
+          <div className="mch-expiry-options">
+            <div className={`mch-expiry-option ${formExpiryType === 'fixed' ? 'mch-expiry-active' : ''}`}
+              onClick={() => setFormExpiryType('fixed')}>固定日期</div>
+            <div className={`mch-expiry-option ${formExpiryType === 'days' ? 'mch-expiry-active' : ''}`}
+              onClick={() => setFormExpiryType('days')}>领取后N天</div>
+          </div>
+          {formExpiryType === 'fixed' ? (
+            <div className="mch-form-row">
+              <div className="mch-form-group">
+                <input className="mch-form-input" type="date" value={formExpiryStart}
+                  onChange={(e) => setFormExpiryStart(e.target.value)} />
+              </div>
+              <div className="mch-form-group">
+                <input className="mch-form-input" type="date" value={formExpiryEnd}
+                  onChange={(e) => setFormExpiryEnd(e.target.value)} />
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input className="mch-form-input" type="number" min={1} placeholder="有效天数" style={{ width: 120 }}
+                value={formExpiryDays ?? ''} onChange={(e) => setFormExpiryDays(e.target.value ? Number(e.target.value) : undefined)} />
+              <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>天</span>
+            </div>
+          )}
+        </div>
+
+        <div className="mch-form-group">
+          <label className="mch-form-label">投放渠道</label>
+          <div className="mch-form-checkbox-group">
+            {['lottery', 'package', 'checkin'].map((ch) => (
+              <label key={ch} className="mch-form-checkbox">
+                <input type="checkbox" checked={formChannels.includes(ch)}
+                  onChange={() => handleChannelToggle(ch)} />
+                {ch === 'lottery' ? '积分抽奖池' : ch === 'package' ? '参赛包赠送' : '签到赠送'}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="mch-form-group">
+          <label className="mch-form-label">使用规则说明</label>
+          <textarea className="mch-form-textarea" placeholder="请输入使用规则说明（选填）"
+            value={formUsageRule} onChange={(e) => setFormUsageRule(e.target.value)} maxLength={500} />
+        </div>
+      </>
+    );
+  };
+
   return (
     <div className="mch-coupon-page">
       {/* 顶部Tab */}
       <div className="mch-coupon-tabs">
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
+        {tabConfigs.map((tab) => (
+          <button key={tab.key}
             className={`mch-coupon-tab-item ${activeTab === tab.key ? 'mch-tab-active' : ''}`}
-            onClick={() => setActiveTab(tab.key)}
-          >
-            {tab.label}
-          </button>
+            onClick={() => setActiveTab(tab.key)}>{tab.label}</button>
         ))}
       </div>
 
       {/* 创建按钮 */}
       <div className="mch-coupon-actions">
-        <button className="mch-coupon-create-btn" onClick={openCreateModal}>
-          创建新优惠券
-        </button>
+        <button className="mch-coupon-create-btn" onClick={openCreateModal}>创建新优惠券</button>
       </div>
 
       {/* 列表 */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: 40, color: 'rgba(255,255,255,0.3)' }}>加载中...</div>
       ) : filteredList.length === 0 ? (
-        <div className="mch-empty-state">
-          <div>暂无优惠券</div>
-        </div>
+        <div className="mch-empty-state"><div>暂无优惠券</div></div>
       ) : (
-        filteredList.map((coupon) => (
-          <div key={coupon.id} className="mch-coupon-card">
-            <div className="mch-coupon-card-header">
-              <span className="mch-coupon-name">{coupon.name}</span>
-              <span className={`mch-coupon-type-tag ${getTypeClass(coupon.type)}`}>
-                {typeLabels[coupon.type] || coupon.type}
-              </span>
-            </div>
+        filteredList.map((coupon) => {
+          const statusInfo = getStatusInfo(coupon.auditStatus, coupon.status);
+          return (
+            <div key={coupon.id} className="mch-coupon-card">
+              <div className="mch-coupon-card-header">
+                <span className="mch-coupon-name">{coupon.name}</span>
+                <span className={`mch-coupon-type-tag ${getTypeClass(coupon.couponType)}`}>
+                  {typeLabels[coupon.couponType] || '未知'}
+                </span>
+              </div>
 
-            <div className="mch-coupon-card-body">
-              <div className="mch-coupon-info-item">
-                面值: <strong>{coupon.type === 'discount' ? `${coupon.discount}折` : `¥${coupon.value}`}</strong>
+              <div className="mch-coupon-card-body">
+                <div className="mch-coupon-info-item">
+                  {coupon.couponType === CouponType.EXCHANGE
+                    ? '价值:'
+                    : coupon.couponType === CouponType.FULL_REDUCE
+                      ? `满${formatPrice(coupon.minConsumeCents)}减`
+                      : '面值:'}
+                  <strong>{formatPrice(coupon.denominationCents)}</strong>
+                </div>
+                <div className="mch-coupon-info-item">
+                  库存: <strong>{coupon.remainCount}/{coupon.totalCount}</strong>
+                </div>
+                <div className="mch-coupon-info-item">
+                  有效期: <strong>
+                    {coupon.validStart && coupon.validEnd
+                      ? `${new Date(coupon.validStart).toISOString().slice(0, 10)}~${new Date(coupon.validEnd).toISOString().slice(0, 10)}`
+                      : '长期有效'}
+                  </strong>
+                </div>
+                <div className="mch-coupon-info-item">
+                  每人限领: <strong>{coupon.maxPerUser}张</strong>
+                </div>
               </div>
-              <div className="mch-coupon-info-item">
-                库存: <strong>{coupon.used_count || 0}/{coupon.total_stock}</strong>
-              </div>
-              <div className="mch-coupon-info-item">
-                有效期: <strong>{coupon.expiry_type === 'fixed'
-                  ? `${coupon.expiry_start?.slice(0, 10) || ''}~${coupon.expiry_end?.slice(0, 10) || ''}`
-                  : `领取后${coupon.expiry_days}天`}
-                </strong>
-              </div>
-              <div className="mch-coupon-info-item">
-                每人限领: <strong>{coupon.limit_per_user}张</strong>
-              </div>
-            </div>
 
-            <div className="mch-coupon-card-footer">
-              <span className={`mch-coupon-status-tag ${getStatusClass(coupon.status)}`}>
-                {statusLabels[coupon.status] || coupon.status}
-                {coupon.status === 'rejected' && coupon.reject_reason && (
-                  <span style={{ marginLeft: 4, fontSize: 11, opacity: 0.6 }} title={coupon.reject_reason}>
-                    ⓘ
-                  </span>
-                )}
-              </span>
-
-              <div className="mch-coupon-actions-row">
-                {(coupon.status === 'pending' || coupon.status === 'rejected') && (
-                  <>
-                    <button
-                      className="mch-coupon-action-btn mch-coupon-action-edit"
-                      onClick={() => openEditModal(coupon)}
-                    >
-                      编辑
-                    </button>
-                    <button
-                      className="mch-coupon-action-btn mch-coupon-action-delete"
-                      onClick={() => handleDelete(coupon.id)}
-                    >
-                      删除
-                    </button>
-                  </>
-                )}
-                {coupon.status === 'active' && (
-                  <button
-                    className="mch-coupon-action-btn mch-coupon-action-offline"
-                    onClick={() => handleToggleStatus(coupon.id, 'offline')}
-                  >
-                    下架
-                  </button>
-                )}
-                {coupon.status === 'offline' && (
-                  <button
-                    className="mch-coupon-action-btn mch-coupon-action-online"
-                    onClick={() => handleToggleStatus(coupon.id, 'active')}
-                  >
-                    上架
-                  </button>
-                )}
+              <div className="mch-coupon-card-footer">
+                <span className={`mch-coupon-status-tag ${statusInfo.className}`}>
+                  {statusInfo.text}
+                  {coupon.auditStatus === AuditStatus.REJECTED && coupon.auditRemark && (
+                    <span style={{ marginLeft: 4, fontSize: 11, opacity: 0.6 }} title={coupon.auditRemark}>ⓘ</span>
+                  )}
+                </span>
+                <div className="mch-coupon-actions-row">
+                  {renderActions(coupon)}
+                </div>
               </div>
             </div>
-          </div>
-        ))
+          );
+        })
       )}
 
       {/* 创建/编辑 Modal */}
       {modalOpen && (
         <div className="mch-modal-overlay">
           <div className="mch-modal-content">
-            <div className="mch-modal-title">{editingId ? '编辑优惠券' : '创建优惠券'}</div>
-
-            <div className="mch-form-group">
-              <label className="mch-form-label">券名称</label>
-              <input
-                className="mch-form-input"
-                placeholder="请输入优惠券名称"
-                value={formName}
-                onChange={(e) => setFormName(e.target.value)}
-                maxLength={50}
-              />
-            </div>
-
-            <div className="mch-form-group">
-              <label className="mch-form-label">券类型</label>
-              <select
-                className="mch-form-select"
-                value={formType}
-                onChange={(e) => setFormType(e.target.value)}
-              >
-                <option value="full_reduce">满减券</option>
-                <option value="direct_reduce">立减券</option>
-                <option value="no_threshold">无门槛券</option>
-                <option value="discount">折扣券</option>
-              </select>
-            </div>
-
-            {formType === 'discount' ? (
-              <div className="mch-form-group">
-                <label className="mch-form-label">折扣 (1-99)</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input
-                    className="mch-form-input"
-                    type="number"
-                    min={1}
-                    max={99}
-                    placeholder="如 85 表示85折"
-                    value={formDiscount ?? ''}
-                    onChange={(e) => setFormDiscount(e.target.value ? Number(e.target.value) : undefined)}
-                  />
-                  <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>折</span>
-                </div>
-              </div>
-            ) : (
-              <div className="mch-form-group">
-                <label className="mch-form-label">面值（元）</label>
-                <input
-                  className="mch-form-input"
-                  type="number"
-                  min={0.01}
-                  step={0.01}
-                  placeholder="请输入面值"
-                  value={formValue ?? ''}
-                  onChange={(e) => setFormValue(e.target.value ? Number(e.target.value) : undefined)}
-                />
+            <div className="mch-modal-title">{editing ? '编辑优惠券' : '创建优惠券'}</div>
+            {renderFormFields()}
+            {editing && (
+              <div style={{ padding: '8px 0', color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>
+                编辑后需重新提交审核
               </div>
             )}
-
-            {(formType === 'full_reduce' || formType === 'direct_reduce') && (
-              <div className="mch-form-group">
-                <label className="mch-form-label">最低消费金额（元）</label>
-                <input
-                  className="mch-form-input"
-                  type="number"
-                  min={0.01}
-                  step={0.01}
-                  placeholder="请输入最低消费金额"
-                  value={formMinAmount ?? ''}
-                  onChange={(e) => setFormMinAmount(e.target.value ? Number(e.target.value) : undefined)}
-                />
-              </div>
-            )}
-
-            <div className="mch-form-row">
-              <div className="mch-form-group">
-                <label className="mch-form-label">总库存</label>
-                <input
-                  className="mch-form-input"
-                  type="number"
-                  min={1}
-                  placeholder="库存数量"
-                  value={formTotalStock ?? ''}
-                  onChange={(e) => setFormTotalStock(e.target.value ? Number(e.target.value) : undefined)}
-                />
-              </div>
-              <div className="mch-form-group">
-                <label className="mch-form-label">每人限领</label>
-                <input
-                  className="mch-form-input"
-                  type="number"
-                  min={1}
-                  placeholder="默认1"
-                  value={formLimitPerUser}
-                  onChange={(e) => setFormLimitPerUser(Number(e.target.value) || 1)}
-                />
-              </div>
-            </div>
-
-            <div className="mch-form-group">
-              <label className="mch-form-label">有效期</label>
-              <div className="mch-expiry-options">
-                <div
-                  className={`mch-expiry-option ${formExpiryType === 'fixed' ? 'mch-expiry-active' : ''}`}
-                  onClick={() => setFormExpiryType('fixed')}
-                >
-                  固定日期
-                </div>
-                <div
-                  className={`mch-expiry-option ${formExpiryType === 'days' ? 'mch-expiry-active' : ''}`}
-                  onClick={() => setFormExpiryType('days')}
-                >
-                  领取后N天
-                </div>
-              </div>
-
-              {formExpiryType === 'fixed' ? (
-                <div className="mch-form-row">
-                  <div className="mch-form-group">
-                    <input
-                      className="mch-form-input"
-                      type="date"
-                      value={formExpiryStart}
-                      onChange={(e) => setFormExpiryStart(e.target.value)}
-                    />
-                  </div>
-                  <div className="mch-form-group">
-                    <input
-                      className="mch-form-input"
-                      type="date"
-                      value={formExpiryEnd}
-                      onChange={(e) => setFormExpiryEnd(e.target.value)}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input
-                    className="mch-form-input"
-                    type="number"
-                    min={1}
-                    placeholder="有效天数"
-                    value={formExpiryDays ?? ''}
-                    onChange={(e) => setFormExpiryDays(e.target.value ? Number(e.target.value) : undefined)}
-                    style={{ width: 120 }}
-                  />
-                  <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>天</span>
-                </div>
-              )}
-            </div>
-
-            <div className="mch-form-group">
-              <label className="mch-form-label">投放渠道</label>
-              <div className="mch-form-checkbox-group">
-                <label className="mch-form-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={formChannels.includes('lottery')}
-                    onChange={() => handleChannelToggle('lottery')}
-                  />
-                  积分抽奖池
-                </label>
-                <label className="mch-form-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={formChannels.includes('package')}
-                    onChange={() => handleChannelToggle('package')}
-                  />
-                  参赛包赠送
-                </label>
-                <label className="mch-form-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={formChannels.includes('checkin')}
-                    onChange={() => handleChannelToggle('checkin')}
-                  />
-                  签到赠送
-                </label>
-              </div>
-            </div>
-
-            <div className="mch-form-group">
-              <label className="mch-form-label">使用规则说明</label>
-              <textarea
-                className="mch-form-textarea"
-                placeholder="请输入使用规则说明（选填）"
-                value={formUsageRule}
-                onChange={(e) => setFormUsageRule(e.target.value)}
-                maxLength={500}
-              />
-            </div>
-
             <div className="mch-modal-buttons">
-              <button className="mch-modal-btn mch-modal-btn-cancel" onClick={() => setModalOpen(false)}>
-                取消
-              </button>
+              <button className="mch-modal-btn mch-modal-btn-cancel" onClick={() => setModalOpen(false)}>取消</button>
               <button className="mch-modal-btn mch-modal-btn-primary" onClick={handleSave} disabled={saving}>
                 {saving ? '保存中...' : '确认'}
               </button>

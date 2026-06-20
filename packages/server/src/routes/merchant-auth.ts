@@ -279,8 +279,8 @@ router.get('/profile', merchantAuthMiddleware, async (req: Request, res: Respons
 
     const admin = await queryOne<any>(
       `SELECT ma.id, ma.username, ma.phone, ma.real_name, ma.status, ma.last_login_time, ma.created_at,
-              m.id as merchant_id, m.merchant_name, m.merchant_address, m.contact_phone, m.logo_url,
-              m.longitude, m.latitude, m.region, m.business_hours, m.qrcode_url, m.audit_status,
+              m.id as merchant_id, m.merchant_name, m.merchant_address, m.contact_phone, m.qrcode_url,
+              m.region, m.business_hours, m.audit_status,
               m.operator_id
        FROM merchant_admin ma
        LEFT JOIN merchants m ON ma.merchant_id = m.id
@@ -308,9 +308,6 @@ router.get('/profile', merchantAuthMiddleware, async (req: Request, res: Respons
           name: admin.merchant_name || '',
           address: admin.merchant_address || '',
           contactPhone: admin.contact_phone || '',
-          logoUrl: admin.logo_url || '',
-          longitude: admin.longitude || 0,
-          latitude: admin.latitude || 0,
           region: admin.region || '',
           businessHours: admin.business_hours || '',
           qrcodeUrl: admin.qrcode_url || '',
@@ -332,27 +329,52 @@ router.get('/profile', merchantAuthMiddleware, async (req: Request, res: Respons
 router.put('/profile', merchantAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const adminId = req.merchantAdmin!.merchantAdminId;
-    const { phone, realName } = req.body;
+    const { phone, realName, merchantName, merchantAddress, contactPhone, businessHours } = req.body;
 
-    const updates: string[] = [];
-    const params: any[] = [];
-    let idx = 1;
+    const updatePromises: Promise<any>[] = [];
 
-    if (phone !== undefined) { updates.push(`phone = $${idx++}`); params.push(phone); }
-    if (realName !== undefined) { updates.push(`real_name = $${idx++}`); params.push(realName); }
+    // 更新 merchant_admin 表
+    const adminUpdates: string[] = [];
+    const adminParams: any[] = [];
+    let aIdx = 1;
 
-    if (updates.length === 0) {
+    if (phone !== undefined) { adminUpdates.push(`phone = $${aIdx++}`); adminParams.push(phone); }
+    if (realName !== undefined) { adminUpdates.push(`real_name = $${aIdx++}`); adminParams.push(realName); }
+
+    if (adminUpdates.length > 0) {
+      adminUpdates.push(`updated_at = datetime('now')`);
+      adminParams.push(adminId);
+      updatePromises.push(execute(
+        `UPDATE merchant_admin SET ${adminUpdates.join(', ')} WHERE id = $${aIdx}`,
+        adminParams
+      ));
+    }
+
+    // 更新 merchants 表（商家信息）
+    const merchantUpdates: string[] = [];
+    const merchantParams: any[] = [];
+    let mIdx = 1;
+
+    if (merchantName !== undefined) { merchantUpdates.push(`merchant_name = $${mIdx++}`); merchantParams.push(merchantName); }
+    if (merchantAddress !== undefined) { merchantUpdates.push(`merchant_address = $${mIdx++}`); merchantParams.push(merchantAddress); }
+    if (contactPhone !== undefined) { merchantUpdates.push(`contact_phone = $${mIdx++}`); merchantParams.push(contactPhone); }
+    if (businessHours !== undefined) { merchantUpdates.push(`business_hours = $${mIdx++}`); merchantParams.push(businessHours); }
+
+    if (merchantUpdates.length > 0) {
+      merchantUpdates.push(`updated_at = datetime('now')`);
+      merchantParams.push(req.merchantAdmin!.merchantId);
+      updatePromises.push(execute(
+        `UPDATE merchants SET ${merchantUpdates.join(', ')} WHERE id = $${mIdx}`,
+        merchantParams
+      ));
+    }
+
+    if (updatePromises.length === 0) {
       res.json({ code: 400, message: '没有需要更新的字段', data: null });
       return;
     }
 
-    updates.push(`updated_at = datetime('now')`);
-    params.push(adminId);
-
-    await execute(
-      `UPDATE merchant_admin SET ${updates.join(', ')} WHERE id = $${idx}`,
-      params
-    );
+    await Promise.all(updatePromises);
 
     res.json({ code: 0, message: '更新成功' });
   } catch (e: any) {

@@ -8,39 +8,42 @@ const router = Router();
 // 所有接口都需要商家认证
 router.use(merchantAuthMiddleware);
 
+// ============================================================
+// audit_status 枚举
+//   0 = 草稿 (创建成功默认)
+//   1 = 待审核 (商家提交审核)
+//   2 = 审核通过 (运营商审核通过，但未上架)
+//   3 = 审核驳回
+//   4 = 待下架审核 (已上架商家申请下架)
+// ============================================================
+
+// ============================================================
+// coupon_type 枚举 (折扣券已取消)
+//   1 = 无门槛立减券
+//   3 = 满减券
+//   4 = 兑换券
+// ============================================================
+
 /**
  * POST /api/v1/merchant/coupon/create
- * 创建优惠券（存入 merchant_coupons，audit_status=0）
+ * 创建优惠券 → 草稿 (audit_status=0)
  */
 router.post('/create', async (req: Request, res: Response) => {
   try {
     const merchantId = req.merchantAdmin!.merchantId;
     const {
-      name,
-      description,
-      denominationCents,
-      minConsumeCents,
-      totalCount,
-      validStart,
-      validEnd,
-      couponType,
-      discountPercent,
-      maxPerUser,
-      putChannels,
-      availableStart,
-      availableEnd,
+      name, description, denominationCents, minConsumeCents,
+      totalCount, validStart, validEnd, couponType,
+      maxPerUser, putChannels,
     } = req.body;
 
-    if (!name) {
-      res.json({ code: 400, message: '优惠券名称不能为空', data: null });
+    if (!name) { res.json({ code: 400, message: '优惠券名称不能为空', data: null }); return; }
+
+    // 兑换券不需要面值校验（也可能是需要），但为了逻辑清晰，无门槛立减和满减需要面值
+    if (couponType !== 4 && (!denominationCents || denominationCents <= 0)) {
+      res.json({ code: 400, message: '请填写面值', data: null });
       return;
     }
-
-    if (!denominationCents || denominationCents <= 0) {
-      res.json({ code: 400, message: '面值必须大于0', data: null });
-      return;
-    }
-
     if (!totalCount || totalCount <= 0) {
       res.json({ code: 400, message: '库存数量必须大于0', data: null });
       return;
@@ -49,40 +52,23 @@ router.post('/create', async (req: Request, res: Response) => {
     const id = uuidv4();
     await execute(
       `INSERT INTO merchant_coupons (
-        id, merchant_id, name, description, denomination_cents, min_consume_cents,
-        total_count, remain_count, valid_start, valid_end, status, sort_order,
-        coupon_type, discount_percent, max_per_user, put_channels,
-        available_start, available_end, audit_status, version, created_at, updated_at
-      ) VALUES (
-        $1, $2, $3, $4, $5, $6,
-        $7, $7, $8, $9, 1, 0,
-        $10, $11, $12, $13,
-        $14, $15, 0, 1, datetime('now'), datetime('now')
-      )`,
+        id, merchant_id, name, description,
+        denomination_cents, min_consume_cents,
+        total_count, remain_count,
+        valid_start, valid_end,
+        status, sort_order, coupon_type,
+        max_per_user, put_channels,
+        audit_status, version, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8, $9, 1, 0, $10, $11, $12, 0, 1, datetime('now'), datetime('now'))`,
       [
-        id,
-        merchantId,
-        name,
-        description || '',
-        denominationCents,
-        minConsumeCents || 0,
-        totalCount,
-        validStart || null,
-        validEnd || null,
-        couponType || 1,
-        discountPercent || 0,
-        maxPerUser || 1,
-        putChannels || '{}',
-        availableStart || null,
-        availableEnd || null,
+        id, merchantId, name, description || '',
+        denominationCents || 0, minConsumeCents || 0,
+        totalCount, validStart || null, validEnd || null,
+        couponType || 1, maxPerUser || 1, putChannels || '{}',
       ]
     );
 
-    res.json({
-      code: 0,
-      message: '创建成功，等待审核',
-      data: { id },
-    });
+    res.json({ code: 0, message: '创建成功', data: { id } });
   } catch (e: any) {
     console.error('[MerchantCoupon] create error:', e?.message || e);
     res.json({ code: 500, message: '创建失败', data: null });
@@ -90,137 +76,145 @@ router.post('/create', async (req: Request, res: Response) => {
 });
 
 /**
- * GET /api/v1/merchant/coupon/list
- * 优惠券列表（只返回本商家的，可筛选状态/审核状态）
+ * POST /api/v1/merchant/coupon/:id/submit-audit
+ * 提交审核：草稿→待审核 (audit_status: 0→1)
  */
-router.get('/list', async (req: Request, res: Response) => {
-  try {
-    const merchantId = req.merchantAdmin!.merchantId;
-
-    const status = req.query.status as string; // 可选: 1=上架 0=下架
-    const auditStatus = req.query.auditStatus as string; // 可选: 0=待审核 1=已通过 2=已驳回
-    const page = Math.max(parseInt(req.query.page as string, 10) || 1, 1);
-    const pageSize = Math.min(Math.max(parseInt(req.query.pageSize as string, 10) || 20, 1), 100);
-    const offset = (page - 1) * pageSize;
-
-    const conditions: string[] = ['merchant_id = ?'];
-    const params: any[] = [merchantId];
-
-    if (status) {
-      conditions.push('status = ?');
-      params.push(parseInt(status, 10));
-    }
-
-    if (auditStatus) {
-      conditions.push('audit_status = ?');
-      params.push(parseInt(auditStatus, 10));
-    }
-
-    const whereClause = 'WHERE ' + conditions.join(' AND ');
-
-    const countRow = await queryOne<{ total: number }>(
-      `SELECT COUNT(*) as total FROM merchant_coupons ${whereClause}`,
-      params
-    );
-
-    const coupons = await query<any>(
-      `SELECT * FROM merchant_coupons ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
-      [...params, pageSize, offset]
-    );
-
-    res.json({
-      code: 0,
-      data: {
-        list: (coupons || []).map((c: any) => ({
-          id: c.id,
-          name: c.name,
-          description: c.description || '',
-          denominationCents: c.denomination_cents,
-          minConsumeCents: c.min_consume_cents || 0,
-          totalCount: c.total_count,
-          remainCount: c.remain_count,
-          couponType: c.coupon_type,
-          discountPercent: c.discount_percent || 0,
-          maxPerUser: c.max_per_user || 1,
-          putChannels: (() => { try { return JSON.parse(c.put_channels || '{}'); } catch { return {}; } })(),
-          status: c.status,
-          auditStatus: c.audit_status,
-          auditRemark: c.audit_remark || '',
-          version: c.version || 1,
-          validStart: c.valid_start ? new Date(c.valid_start).getTime() : null,
-          validEnd: c.valid_end ? new Date(c.valid_end).getTime() : null,
-          availableStart: c.available_start ? new Date(c.available_start).getTime() : null,
-          availableEnd: c.available_end ? new Date(c.available_end).getTime() : null,
-          sortOrder: c.sort_order || 0,
-          createdAt: new Date(c.created_at).getTime(),
-          updatedAt: c.updated_at ? new Date(c.updated_at).getTime() : null,
-        })),
-        total: countRow?.total || 0,
-        page,
-        pageSize,
-      },
-    });
-  } catch (e: any) {
-    console.error('[MerchantCoupon] list error:', e?.message || e);
-    res.json({ code: 500, message: '查询失败', data: null });
-  }
-});
-
-/**
- * GET /api/v1/merchant/coupon/detail/:id
- * 优惠券详情
- */
-router.get('/detail/:id', async (req: Request, res: Response) => {
+router.post('/:id/submit-audit', async (req: Request, res: Response) => {
   try {
     const merchantId = req.merchantAdmin!.merchantId;
     const { id } = req.params;
 
-    const coupon = await queryOne<any>(
+    const existing = await queryOne<any>(
       `SELECT * FROM merchant_coupons WHERE id = $1 AND merchant_id = $2`,
       [id, merchantId]
     );
+    if (!existing) { res.json({ code: 404, message: '优惠券不存在', data: null }); return; }
+    if (existing.audit_status !== 0) {
+      res.json({ code: 400, message: '仅草稿状态的优惠券可提交审核', data: null });
+      return;
+    }
+    // 校验必填项
+    if (!existing.name) { res.json({ code: 400, message: '请先填写优惠券名称', data: null }); return; }
+    if (!existing.total_count || existing.total_count <= 0) { res.json({ code: 400, message: '请先设置库存数量', data: null }); return; }
 
-    if (!coupon) {
-      res.json({ code: 404, message: '优惠券不存在', data: null });
+    await execute(
+      `UPDATE merchant_coupons SET audit_status = 1, updated_at = datetime('now') WHERE id = $1`,
+      [id]
+    );
+
+    res.json({ code: 0, message: '已提交审核，请等待运营商审核' });
+  } catch (e: any) {
+    console.error('[MerchantCoupon] submit-audit error:', e?.message || e);
+    res.json({ code: 500, message: '提交失败', data: null });
+  }
+});
+
+/**
+ * POST /api/v1/merchant/coupon/:id/request-offline
+ * 申请下架：已上架→待下架审核 (audit_status: 2/已上架→4)
+ */
+router.post('/:id/request-offline', async (req: Request, res: Response) => {
+  try {
+    const merchantId = req.merchantAdmin!.merchantId;
+    const { id } = req.params;
+
+    const existing = await queryOne<any>(
+      `SELECT * FROM merchant_coupons WHERE id = $1 AND merchant_id = $2`,
+      [id, merchantId]
+    );
+    if (!existing) { res.json({ code: 404, message: '优惠券不存在', data: null }); return; }
+    if (existing.audit_status !== 2 || existing.status !== 1) {
+      res.json({ code: 400, message: '仅已上架的优惠券可申请下架', data: null });
       return;
     }
 
-    res.json({
-      code: 0,
-      data: {
-        id: coupon.id,
-        name: coupon.name,
-        description: coupon.description || '',
-        denominationCents: coupon.denomination_cents,
-        minConsumeCents: coupon.min_consume_cents || 0,
-        totalCount: coupon.total_count,
-        remainCount: coupon.remain_count,
-        couponType: coupon.coupon_type,
-        discountPercent: coupon.discount_percent || 0,
-        maxPerUser: coupon.max_per_user || 1,
-        putChannels: (() => { try { return JSON.parse(coupon.put_channels || '{}'); } catch { return {}; } })(),
-        status: coupon.status,
-        auditStatus: coupon.audit_status,
-        auditRemark: coupon.audit_remark || '',
-        version: coupon.version || 1,
-        validStart: coupon.valid_start ? new Date(coupon.valid_start).getTime() : null,
-        validEnd: coupon.valid_end ? new Date(coupon.valid_end).getTime() : null,
-        availableStart: coupon.available_start ? new Date(coupon.available_start).getTime() : null,
-        availableEnd: coupon.available_end ? new Date(coupon.available_end).getTime() : null,
-        sortOrder: coupon.sort_order || 0,
-        createdAt: new Date(coupon.created_at).getTime(),
-        updatedAt: coupon.updated_at ? new Date(coupon.updated_at).getTime() : null,
-      },
-    });
+    await execute(
+      `UPDATE merchant_coupons SET audit_status = 4, updated_at = datetime('now') WHERE id = $1`,
+      [id]
+    );
+
+    res.json({ code: 0, message: '已申请下架，请等待运营商审核' });
   } catch (e: any) {
-    console.error('[MerchantCoupon] detail error:', e?.message || e);
-    res.json({ code: 500, message: '查询失败', data: null });
+    console.error('[MerchantCoupon] request-offline error:', e?.message || e);
+    res.json({ code: 500, message: '操作失败', data: null });
+  }
+});
+
+/**
+ * POST /api/v1/merchant/coupon/:id/cancel-offline
+ * 撤销下架申请：待下架审核→回到已上架 (audit_status: 4→2)
+ */
+router.post('/:id/cancel-offline', async (req: Request, res: Response) => {
+  try {
+    const merchantId = req.merchantAdmin!.merchantId;
+    const { id } = req.params;
+
+    const existing = await queryOne<any>(
+      `SELECT * FROM merchant_coupons WHERE id = $1 AND merchant_id = $2`,
+      [id, merchantId]
+    );
+    if (!existing) { res.json({ code: 404, message: '优惠券不存在', data: null }); return; }
+    if (existing.audit_status !== 4) {
+      res.json({ code: 400, message: '仅待下架审核状态的优惠券可撤销下架申请', data: null });
+      return;
+    }
+
+    await execute(
+      `UPDATE merchant_coupons SET audit_status = 2, updated_at = datetime('now') WHERE id = $1`,
+      [id]
+    );
+
+    res.json({ code: 0, message: '已撤销下架申请' });
+  } catch (e: any) {
+    console.error('[MerchantCoupon] cancel-offline error:', e?.message || e);
+    res.json({ code: 500, message: '操作失败', data: null });
+  }
+});
+
+/**
+ * POST /api/v1/merchant/coupon/:id/online
+ * 上架：
+ *   - 审核通过（audit_status=2）→ 直接上架 (status=1)
+ *   - 已下架（audit_status=2+status=0）→ 直接上架 (status=1)
+ */
+router.post('/:id/online', async (req: Request, res: Response) => {
+  try {
+    const merchantId = req.merchantAdmin!.merchantId;
+    const { id } = req.params;
+
+    const existing = await queryOne<any>(
+      `SELECT * FROM merchant_coupons WHERE id = $1 AND merchant_id = $2`,
+      [id, merchantId]
+    );
+    if (!existing) { res.json({ code: 404, message: '优惠券不存在', data: null }); return; }
+    if (existing.audit_status !== 2) {
+      res.json({ code: 400, message: '仅审核通过的优惠券可上架', data: null });
+      return;
+    }
+    if (existing.status === 1) {
+      res.json({ code: 400, message: '优惠券已上架', data: null });
+      return;
+    }
+
+    await execute(
+      `UPDATE merchant_coupons SET status = 1, updated_at = datetime('now') WHERE id = $1`,
+      [id]
+    );
+
+    res.json({ code: 0, message: '已上架' });
+  } catch (e: any) {
+    console.error('[MerchantCoupon] online error:', e?.message || e);
+    res.json({ code: 500, message: '操作失败', data: null });
   }
 });
 
 /**
  * PUT /api/v1/merchant/coupon/:id
- * 修改优惠券（只有 audit_status=0 或 2 时可修改，修改后版本号+1，audit_status 重置为 0）
+ * 编辑优惠券
+ *   草稿(0) → 编辑后保持草稿
+ *   审核通过(2) → 编辑后回到草稿(0)，需重新提交审核
+ *   已驳回(3) → 编辑后回到草稿(0)
+ *   其他状态不允许编辑
  */
 router.put('/:id', async (req: Request, res: Response) => {
   try {
@@ -231,31 +225,26 @@ router.put('/:id', async (req: Request, res: Response) => {
       `SELECT * FROM merchant_coupons WHERE id = $1 AND merchant_id = $2`,
       [id, merchantId]
     );
+    if (!existing) { res.json({ code: 404, message: '优惠券不存在', data: null }); return; }
 
-    if (!existing) {
-      res.json({ code: 404, message: '优惠券不存在', data: null });
+    // 检查是否可编辑
+    if (existing.audit_status === 1) {
+      res.json({ code: 400, message: '待审核状态的优惠券不能修改，请等待审核结果', data: null });
       return;
     }
-
-    if (existing.audit_status === 1) {
-      res.json({ code: 400, message: '已审核通过的优惠券不能修改，如需修改请先下架', data: null });
+    if (existing.audit_status === 4) {
+      res.json({ code: 400, message: '待下架审核状态的优惠券不能修改', data: null });
+      return;
+    }
+    if (existing.audit_status === 2 && existing.status === 1) {
+      res.json({ code: 400, message: '已上架的优惠券不能编辑，如需修改请申请下架', data: null });
       return;
     }
 
     const {
-      name,
-      description,
-      denominationCents,
-      minConsumeCents,
-      totalCount,
-      validStart,
-      validEnd,
-      couponType,
-      discountPercent,
-      maxPerUser,
-      putChannels,
-      availableStart,
-      availableEnd,
+      name, description, denominationCents, minConsumeCents,
+      totalCount, validStart, validEnd, couponType,
+      maxPerUser, putChannels,
     } = req.body;
 
     const updates: string[] = [];
@@ -269,34 +258,37 @@ router.put('/:id', async (req: Request, res: Response) => {
     if (totalCount !== undefined) {
       updates.push(`total_count = $${idx++}`);
       params.push(totalCount);
-      // remainCount 不能超过 new totalCount
       if (existing.remain_count > totalCount) {
-        updates.push(`remain_count = $${idx++}`); params.push(totalCount);
+        updates.push(`remain_count = $${idx++}`);
+        params.push(totalCount);
       }
     }
     if (validStart !== undefined) { updates.push(`valid_start = $${idx++}`); params.push(validStart); }
     if (validEnd !== undefined) { updates.push(`valid_end = $${idx++}`); params.push(validEnd); }
     if (couponType !== undefined) { updates.push(`coupon_type = $${idx++}`); params.push(couponType); }
-    if (discountPercent !== undefined) { updates.push(`discount_percent = $${idx++}`); params.push(discountPercent); }
     if (maxPerUser !== undefined) { updates.push(`max_per_user = $${idx++}`); params.push(maxPerUser); }
     if (putChannels !== undefined) { updates.push(`put_channels = $${idx++}`); params.push(putChannels); }
-    if (availableStart !== undefined) { updates.push(`available_start = $${idx++}`); params.push(availableStart); }
-    if (availableEnd !== undefined) { updates.push(`available_end = $${idx++}`); params.push(availableEnd); }
 
-    // 修改后版本号+1，audit_status 重置为待审核
+    if (updates.length === 0) {
+      res.json({ code: 400, message: '没有要修改的字段', data: null });
+      return;
+    }
+
+    // 版本号+1
     updates.push(`version = version + 1`);
-    updates.push(`audit_status = 0`);
-    updates.push(`audit_remark = ''`);
+    // 如果当前是审核通过(2)或已驳回(3)，编辑后回到草稿(0)
+    if (existing.audit_status === 2 || existing.audit_status === 3) {
+      updates.push(`audit_status = 0`);
+    }
     updates.push(`updated_at = datetime('now')`);
 
     params.push(id);
-
     await execute(
       `UPDATE merchant_coupons SET ${updates.join(', ')} WHERE id = $${idx}`,
       params
     );
 
-    res.json({ code: 0, message: '修改成功，等待重新审核' });
+    res.json({ code: 0, message: '修改成功' });
   } catch (e: any) {
     console.error('[MerchantCoupon] update error:', e?.message || e);
     res.json({ code: 500, message: '修改失败', data: null });
@@ -304,10 +296,14 @@ router.put('/:id', async (req: Request, res: Response) => {
 });
 
 /**
- * POST /api/v1/merchant/coupon/:id/toggle
- * 上下架（只有 audit_status=1 的券可操作）
+ * DELETE /api/v1/merchant/coupon/:id
+ * 删除优惠券
+ *   草稿(0)、已驳回(3)、已下架(审计通过+status=0) 可删除
+ *   待审核(1) 不可删除
+ *   已上架(2+status=1) 不可删除
+ *   待下架审核(4) 不可删除
  */
-router.post('/:id/toggle', async (req: Request, res: Response) => {
+router.delete('/:id', async (req: Request, res: Response) => {
   try {
     const merchantId = req.merchantAdmin!.merchantId;
     const { id } = req.params;
@@ -316,64 +312,131 @@ router.post('/:id/toggle', async (req: Request, res: Response) => {
       `SELECT * FROM merchant_coupons WHERE id = $1 AND merchant_id = $2`,
       [id, merchantId]
     );
+    if (!existing) { res.json({ code: 404, message: '优惠券不存在', data: null }); return; }
 
-    if (!existing) {
-      res.json({ code: 404, message: '优惠券不存在', data: null });
+    if (existing.audit_status === 1) {
+      res.json({ code: 400, message: '待审核状态的优惠券不能删除，请等待审核结果', data: null });
+      return;
+    }
+    if (existing.audit_status === 2 && existing.status === 1) {
+      res.json({ code: 400, message: '已上架的优惠券不能删除，请先申请下架', data: null });
+      return;
+    }
+    if (existing.audit_status === 4) {
+      res.json({ code: 400, message: '待下架审核状态的优惠券不能删除', data: null });
       return;
     }
 
-    if (existing.audit_status !== 1) {
-      res.json({ code: 400, message: '仅审核通过的优惠券可上下架', data: null });
-      return;
-    }
+    await execute(`DELETE FROM merchant_coupons WHERE id = $1 AND merchant_id = $2`, [id, merchantId]);
+    res.json({ code: 0, message: '已删除' });
+  } catch (e: any) {
+    console.error('[MerchantCoupon] delete error:', e?.message || e);
+    res.json({ code: 500, message: '删除失败', data: null });
+  }
+});
 
-    const newStatus = existing.status === 1 ? 0 : 1;
-    await execute(
-      `UPDATE merchant_coupons SET status = $1, updated_at = datetime('now') WHERE id = $2`,
-      [newStatus, id]
+/**
+ * GET /api/v1/merchant/coupon/list
+ * 优惠券列表
+ */
+router.get('/list', async (req: Request, res: Response) => {
+  try {
+    const merchantId = req.merchantAdmin!.merchantId;
+    const page = Math.max(parseInt(req.query.page as string, 10) || 1, 1);
+    const pageSize = Math.min(Math.max(parseInt(req.query.pageSize as string, 10) || 100, 1), 200);
+    const offset = (page - 1) * pageSize;
+
+    const countRow = await queryOne<{ total: number }>(
+      `SELECT COUNT(*) as total FROM merchant_coupons WHERE merchant_id = $1`,
+      [merchantId]
     );
+
+    const coupons = await query<any>(
+      `SELECT * FROM merchant_coupons WHERE merchant_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+      [merchantId, pageSize, offset]
+    );
+
+    const mapCoupon = (c: any) => ({
+      id: c.id,
+      name: c.name,
+      description: c.description || '',
+      denominationCents: c.denomination_cents,
+      minConsumeCents: c.min_consume_cents || 0,
+      totalCount: c.total_count,
+      remainCount: c.remain_count,
+      couponType: c.coupon_type,
+      maxPerUser: c.max_per_user || 1,
+      putChannels: (() => { try { return JSON.parse(c.put_channels || '[]'); } catch { return []; } })(),
+      status: c.status,
+      auditStatus: c.audit_status,
+      auditRemark: c.audit_remark || '',
+      validStart: c.valid_start ? new Date(c.valid_start).getTime() : null,
+      validEnd: c.valid_end ? new Date(c.valid_end).getTime() : null,
+      createdAt: new Date(c.created_at).getTime(),
+    });
 
     res.json({
       code: 0,
-      message: newStatus === 1 ? '已上架' : '已下架',
-      data: { status: newStatus },
+      data: { list: (coupons || []).map(mapCoupon), total: countRow?.total || 0, page, pageSize },
     });
   } catch (e: any) {
-    console.error('[MerchantCoupon] toggle error:', e?.message || e);
-    res.json({ code: 500, message: '操作失败', data: null });
+    console.error('[MerchantCoupon] list error:', e?.message || e);
+    res.json({ code: 500, message: '查询失败', data: null });
+  }
+});
+
+/**
+ * GET /api/v1/merchant/coupon/detail/:id
+ */
+router.get('/detail/:id', async (req: Request, res: Response) => {
+  try {
+    const merchantId = req.merchantAdmin!.merchantId;
+    const { id } = req.params;
+
+    const c = await queryOne<any>(
+      `SELECT * FROM merchant_coupons WHERE id = $1 AND merchant_id = $2`,
+      [id, merchantId]
+    );
+    if (!c) { res.json({ code: 404, message: '优惠券不存在', data: null }); return; }
+
+    res.json({
+      code: 0,
+      data: {
+        id: c.id, name: c.name, description: c.description || '',
+        denominationCents: c.denomination_cents, minConsumeCents: c.min_consume_cents || 0,
+        totalCount: c.total_count, remainCount: c.remain_count,
+        couponType: c.coupon_type,
+        maxPerUser: c.max_per_user || 1,
+        putChannels: (() => { try { return JSON.parse(c.put_channels || '[]'); } catch { return []; } })(),
+        status: c.status, auditStatus: c.audit_status, auditRemark: c.audit_remark || '',
+        validStart: c.valid_start ? new Date(c.valid_start).getTime() : null,
+        validEnd: c.valid_end ? new Date(c.valid_end).getTime() : null,
+        createdAt: new Date(c.created_at).getTime(),
+      },
+    });
+  } catch (e: any) {
+    console.error('[MerchantCoupon] detail error:', e?.message || e);
+    res.json({ code: 500, message: '查询失败', data: null });
   }
 });
 
 /**
  * GET /api/v1/merchant/coupon/stats
- * 统计：累计创建、已上架、累计被领取、累计核销
  */
 router.get('/stats', async (req: Request, res: Response) => {
   try {
     const merchantId = req.merchantAdmin!.merchantId;
-
-    // 累计创建（该商家的所有优惠券模板数）
     const createdRow = await queryOne<{ total: number }>(
-      `SELECT COUNT(*) as total FROM merchant_coupons WHERE merchant_id = $1`,
-      [merchantId]
+      `SELECT COUNT(*) as total FROM merchant_coupons WHERE merchant_id = $1`, [merchantId]
     );
-
-    // 已上架（status=1 且 audit_status=1）
     const onlineRow = await queryOne<{ total: number }>(
-      `SELECT COUNT(*) as total FROM merchant_coupons WHERE merchant_id = $1 AND status = 1 AND audit_status = 1`,
-      [merchantId]
+      `SELECT COUNT(*) as total FROM merchant_coupons WHERE merchant_id = $1 AND status = 1 AND audit_status = 2`, [merchantId]
     );
-
-    // 累计被领取（该商家所有券的 remain_count 变化？更准确：查询 user_coupons 中属于该商家的记录数）
     const claimedRow = await queryOne<{ total: number }>(
-      `SELECT COUNT(*) as total FROM user_coupons WHERE merchant_id = $1`,
-      [merchantId]
+      `SELECT COUNT(*) as total FROM user_coupons WHERE merchant_id = $1`, [merchantId]
     );
-
-    // 累计核销
     const verifiedRow = await queryOne<{ total: number }>(
-      `SELECT COUNT(*) as total FROM user_coupons WHERE merchant_id = $1 AND status = 2`,
-      [merchantId]
+      `SELECT COUNT(*) as total FROM user_coupons WHERE merchant_id = $1 AND status = 2`, [merchantId]
     );
 
     res.json({

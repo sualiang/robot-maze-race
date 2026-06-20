@@ -9,6 +9,8 @@ export interface RacePackage {
   race_count: number;
   valid_days: number;
   is_active: boolean;
+  coupon_reward_min?: number;
+  coupon_reward_max?: number;
   created_at: string;
   updated_at: string;
 }
@@ -19,6 +21,8 @@ export interface CreateRacePackageParams {
   price: number;
   race_count: number;
   valid_days: number;
+  coupon_reward_min?: number;
+  coupon_reward_max?: number;
 }
 
 /** 订单 */

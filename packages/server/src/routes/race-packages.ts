@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { query, queryOne } from '../config/database';
+import { query, queryOne, execute } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import {
   ApiResponse,
@@ -12,7 +12,7 @@ import {
 const router = Router();
 
 // ============================================================
-// Race Packages 路由 — 参赛包 CRUD
+// Race Packages 路由 — 参赛包 CRUD + 礼券自动选配
 // ============================================================
 
 /** 参赛包数据库行格式 */
@@ -26,8 +26,21 @@ interface RacePackageRow {
   valid_days: number;
   status: string;
   sort_order: number;
+  coupon_reward_min_cents: number;
+  coupon_reward_max_cents: number;
   created_at: string;
   updated_at: string;
+}
+
+/** 关联优惠券行 */
+interface PackageCouponRow {
+  id: string;
+  package_id: string;
+  coupon_id: string;
+  denomination_cents: number;
+  coupon_type: number;
+  merchant_name: string;
+  coupon_name: string;
 }
 
 /** 数据库行 → API 响应格式 */
@@ -40,6 +53,8 @@ function toRacePackage(row: RacePackageRow): RacePackage {
     race_count: row.race_count,
     valid_days: row.valid_days,
     is_active: row.status === 'active',
+    coupon_reward_min: row.coupon_reward_min_cents / 100,
+    coupon_reward_max: row.coupon_reward_max_cents / 100,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -47,11 +62,7 @@ function toRacePackage(row: RacePackageRow): RacePackage {
 
 /**
  * GET /api/v1/race-packages
- * 获取参赛包列表（公开接口，用户选购参赛包）
- * @query status - 筛选状态: active | inactive（默认 active）
- * @query page - 页码，默认 1
- * @query pageSize - 每页数量，默认 20
- * @returns PaginatedResult<RacePackage>
+ * 获取参赛包列表（公开接口）
  */
 router.get('/', async (req: Request, res: Response<ApiResponse<PaginatedResult<RacePackage>>>) => {
   try {
@@ -74,15 +85,12 @@ router.get('/', async (req: Request, res: Response<ApiResponse<PaginatedResult<R
     }
 
     const countResult = await queryOne<{ count: string }>(
-      `SELECT COUNT(*) as count FROM race_packages ${whereClause}`,
-      params
+      `SELECT COUNT(*) as count FROM race_packages ${whereClause}`, params
     );
     const total = parseInt(countResult?.count || '0', 10);
 
     const rows = await query<RacePackageRow>(
-      `SELECT id, name, description, price_cents, race_count,
-              valid_days, status, sort_order, created_at, updated_at
-       FROM race_packages ${whereClause}
+      `SELECT * FROM race_packages ${whereClause}
        ORDER BY sort_order ASC, created_at DESC
        LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
       [...params, pageSize, offset]
@@ -97,157 +105,148 @@ router.get('/', async (req: Request, res: Response<ApiResponse<PaginatedResult<R
     });
   } catch (error: any) {
     console.error('[RacePackages] list error:', error.message);
-    return res.status(500).json({ code: 500, message: '获取参赛包列表失败', data: null as any });
+    return res.status(500).json({ code: 500, message: '获取失败', data: null as any });
   }
 });
 
 /**
  * GET /api/v1/race-packages/:id
- * 获取参赛包详情
- * @param id - 参赛包 UUID
- * @returns RacePackage
+ * 获取参赛包详情（含关联礼券）
  */
-router.get('/:id', async (req: Request, res: Response<ApiResponse<RacePackage>>) => {
+router.get('/:id', async (req: Request, res: Response<ApiResponse<any>>) => {
   try {
     const { id } = req.params;
 
     const row = await queryOne<RacePackageRow>(
-      `SELECT id, name, description, price_cents, race_count,
-              valid_days, status, sort_order, created_at, updated_at
-       FROM race_packages WHERE id = $1`,
-      [id]
+      `SELECT * FROM race_packages WHERE id = $1`, [id]
     );
 
     if (!row) {
       return res.status(404).json({ code: 404, message: '参赛包不存在', data: null as any });
     }
 
-    return res.json({ code: 0, message: 'ok', data: toRacePackage(row) });
+    // 查关联礼券
+    const coupons = await query<PackageCouponRow>(
+      `SELECT * FROM race_package_coupons WHERE package_id = $1`, [id]
+    );
+
+    const pkg = toRacePackage(row);
+    const couponList = (coupons || []).map((c) => ({
+      id: c.id,
+      couponId: c.coupon_id,
+      denominationCents: c.denomination_cents,
+      couponType: c.coupon_type,
+      merchantName: c.merchant_name,
+      couponName: c.coupon_name,
+    }));
+
+    const totalRewardValue = couponList.reduce((sum, c) => sum + c.denominationCents, 0);
+
+    return res.json({
+      code: 0,
+      message: 'ok',
+      data: { ...pkg, coupons: couponList, totalRewardValue },
+    });
   } catch (error: any) {
     console.error('[RacePackages] get error:', error.message);
-    return res.status(500).json({ code: 500, message: '获取参赛包详情失败', data: null as any });
+    return res.status(500).json({ code: 500, message: '获取详情失败', data: null as any });
   }
 });
 
 /**
  * POST /api/v1/race-packages
- * 创建参赛包（admin/operator 专用）
- * @header Authorization: Bearer <token>
- * @body name - 参赛包名称（必填）
- * @body description - 描述
- * @body price - 价格（元），内部会转换为分存储
- * @body race_count - 可参赛次数
- * @body valid_days - 有效天数
- * @body sort_order - 排序序号
- * @returns 创建的 RacePackage
+ * 创建参赛包
  */
 router.post('/', authMiddleware, async (req: Request, res: Response<ApiResponse<RacePackage>>) => {
   try {
-    const body = req.body as CreateRacePackageParams & { sort_order?: number };
+    const body = req.body as CreateRacePackageParams & {
+      sort_order?: number;
+      coupon_reward_min?: number;
+      coupon_reward_max?: number;
+    };
     const role = req.user!.role;
 
     if (role !== 'admin' && role !== 'operator') {
-      return res.status(403).json({ code: 403, message: '仅管理员或运营人员可创建参赛包', data: null as any });
+      return res.status(403).json({ code: 403, message: '仅管理员或运营人员可创建', data: null as any });
     }
 
     if (!body.name) {
       return res.status(400).json({ code: 400, message: '参赛包名称不能为空', data: null as any });
     }
-
     if (!body.price || body.price <= 0) {
       return res.status(400).json({ code: 400, message: '请填写有效的价格', data: null as any });
     }
-
     if (!body.race_count || body.race_count <= 0) {
       return res.status(400).json({ code: 400, message: '请填写有效的参赛次数', data: null as any });
     }
 
     const id = uuidv4();
-    const priceCents = Math.round(body.price * 100); // 元转分
+    const priceCents = Math.round(body.price * 100);
     const validDays = body.valid_days || 365;
     const sortOrder = body.sort_order || 0;
+
+    const rewardMinCents = body.coupon_reward_min !== undefined ? Math.round(body.coupon_reward_min * 100) : 0;
+    const rewardMaxCents = body.coupon_reward_max !== undefined ? Math.round(body.coupon_reward_max * 100) : 0;
 
     const opId = req.user?.operatorId || '00000000-0000-0000-0000-000000000000';
     const row = await queryOne<RacePackageRow>(
       `INSERT INTO race_packages (id, operator_id, name, description, price_cents,
-               race_count, valid_days, status, sort_order)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       RETURNING id, operator_id, name, description, price_cents, race_count,
-                 valid_days, status, sort_order, created_at, updated_at`,
-      [
-        id,
-        opId,
-        body.name,
-        body.description || null,
-        priceCents,
-        body.race_count,
-        validDays,
-        'active',
-        sortOrder,
-      ]
+               race_count, valid_days, status, sort_order,
+               coupon_reward_min_cents, coupon_reward_max_cents)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       RETURNING *`,
+      [id, opId, body.name, body.description || null, priceCents,
+       body.race_count, validDays, 'active', sortOrder,
+       rewardMinCents, rewardMaxCents]
     );
 
-    return res.status(201).json({
-      code: 0,
-      message: '参赛包创建成功',
-      data: toRacePackage(row!),
-    });
+    const created = toRacePackage(row!);
+
+    // 如果有礼券区间，自动匹配
+    if (rewardMaxCents > 0) {
+      try {
+        await autoMatchCoupons(id, rewardMinCents, rewardMaxCents);
+      } catch (matchErr) {
+        console.warn('[RacePackages] auto-match failed (non-fatal):', matchErr);
+      }
+    }
+
+    return res.status(201).json({ code: 0, message: '参赛包创建成功', data: created });
   } catch (error: any) {
     console.error('[RacePackages] create error:', error.message);
-    return res.status(500).json({ code: 500, message: '创建参赛包失败', data: null as any });
+    return res.status(500).json({ code: 500, message: '创建失败', data: null as any });
   }
 });
 
 /**
  * PUT /api/v1/race-packages/:id
- * 更新参赛包（admin/operator 专用）
- * @param id - 参赛包 UUID
- * @header Authorization: Bearer <token>
- * @body name - 名称
- * @body description - 描述
- * @body price - 价格（元）
- * @body race_count - 可参赛次数
- * @body valid_days - 有效天数
- * @body status - 状态: active | inactive
- * @body sort_order - 排序序号
- * @returns 更新后的 RacePackage
+ * 更新参赛包
  */
 router.put('/:id', authMiddleware, async (req: Request, res: Response<ApiResponse<RacePackage>>) => {
   try {
     const { id } = req.params;
     const role = req.user!.role;
-
     if (role !== 'admin' && role !== 'operator') {
-      return res.status(403).json({ code: 403, message: '仅管理员或运营人员可编辑参赛包', data: null as any });
+      return res.status(403).json({ code: 403, message: '仅管理员或运营人员可编辑', data: null as any });
     }
 
-    // 检查参赛包是否存在
-    const existing = await queryOne<{ id: string }>(
-      'SELECT id FROM race_packages WHERE id = $1',
-      [id]
-    );
+    const existing = await queryOne<{ id: string }>('SELECT id FROM race_packages WHERE id = $1', [id]);
     if (!existing) {
       return res.status(404).json({ code: 404, message: '参赛包不存在', data: null as any });
     }
 
-    // 构建动态更新
     const body = req.body as {
-      name?: string;
-      description?: string;
-      price?: number;
-      race_count?: number;
-      valid_days?: number;
-      status?: string;
-      sort_order?: number;
-      is_active?: boolean;
+      name?: string; description?: string; price?: number;
+      race_count?: number; valid_days?: number; status?: string;
+      sort_order?: number; is_active?: boolean;
+      coupon_reward_min?: number; coupon_reward_max?: number;
     };
 
     const fields: string[] = [];
     const values: any[] = [];
     let paramIdx = 1;
 
-    // 处理普通字段（排除特殊字段和 is_active，它映射到 status）
-    const excludeKeys = ['price', 'race_count', 'valid_days', 'is_active'];
+    const excludeKeys = ['price', 'race_count', 'valid_days', 'is_active', 'coupon_reward_min', 'coupon_reward_max'];
     for (const [key, val] of Object.entries(body)) {
       if (val !== undefined && !excludeKeys.includes(key)) {
         fields.push(`${key} = $${paramIdx}`);
@@ -256,42 +255,39 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response<ApiRespons
       }
     }
 
-    // is_active → status 映射
     if (body.is_active !== undefined) {
       fields.push(`status = $${paramIdx}`);
       values.push(body.is_active ? 'active' : 'inactive');
       paramIdx++;
     }
-
-    // 价格：元转分
     if (body.price !== undefined) {
       fields.push(`price_cents = $${paramIdx}`);
       values.push(Math.round(body.price * 100));
       paramIdx++;
     }
-
-    // 参赛次数
     if (body.race_count !== undefined) {
       fields.push(`race_count = $${paramIdx}`);
       values.push(body.race_count);
       paramIdx++;
     }
-
-    // 有效天数
     if (body.valid_days !== undefined) {
       fields.push(`valid_days = $${paramIdx}`);
       values.push(body.valid_days);
       paramIdx++;
     }
-
-    // 状态
+    if (body.coupon_reward_min !== undefined) {
+      fields.push(`coupon_reward_min_cents = $${paramIdx}`);
+      values.push(Math.round(body.coupon_reward_min * 100));
+      paramIdx++;
+    }
+    if (body.coupon_reward_max !== undefined) {
+      fields.push(`coupon_reward_max_cents = $${paramIdx}`);
+      values.push(Math.round(body.coupon_reward_max * 100));
+      paramIdx++;
+    }
     if (body.status !== undefined) {
       if (!['active', 'inactive'].includes(body.status)) {
-        return res.status(400).json({
-          code: 400,
-          message: '状态值无效，请使用 active 或 inactive',
-          data: null as any,
-        });
+        return res.status(400).json({ code: 400, message: '状态值无效', data: null as any });
       }
       fields.push(`status = $${paramIdx}`);
       values.push(body.status);
@@ -302,103 +298,162 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response<ApiRespons
       return res.status(400).json({ code: 400, message: '没有需要更新的字段', data: null as any });
     }
 
-    fields.push(`updated_at = $${paramIdx}`);
+    fields.push(`updated_at = $${paramIdx++}`);
     values.push(new Date().toISOString());
-    paramIdx++;
-
     values.push(id);
 
     const row = await queryOne<RacePackageRow>(
-      `UPDATE race_packages SET ${fields.join(', ')} WHERE id = $${paramIdx}
-       RETURNING id, name, description, price_cents, race_count,
-                 valid_days, status, sort_order, created_at, updated_at`,
+      `UPDATE race_packages SET ${fields.join(', ')} WHERE id = $${paramIdx} RETURNING *`,
       values
     );
 
-    return res.json({ code: 0, message: '参赛包更新成功', data: toRacePackage(row!) });
+    // 如果更新了礼券区间，重新匹配
+    if (body.coupon_reward_min !== undefined || body.coupon_reward_max !== undefined) {
+      const updated = await queryOne<RacePackageRow>('SELECT * FROM race_packages WHERE id = $1', [id]);
+      if (updated && updated.coupon_reward_max_cents > 0) {
+        try {
+          await clearAndRematchCoupons(id, updated.coupon_reward_min_cents, updated.coupon_reward_max_cents);
+        } catch (matchErr) {
+          console.warn('[RacePackages] re-match failed:', matchErr);
+        }
+      }
+    }
+
+    return res.json({ code: 0, message: '更新成功', data: toRacePackage(row!) });
   } catch (error: any) {
     console.error('[RacePackages] update error:', error.message);
-    return res.status(500).json({ code: 500, message: '更新参赛包失败', data: null as any });
+    return res.status(500).json({ code: 500, message: '更新失败', data: null as any });
+  }
+});
+
+/**
+ * POST /api/v1/race-packages/:id/match-coupons
+ * 自动匹配礼券（预览，不保存）
+ */
+router.post('/:id/match-coupons', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const pkg = await queryOne<RacePackageRow>('SELECT * FROM race_packages WHERE id = $1', [id]);
+    if (!pkg) {
+      return res.status(404).json({ code: 404, message: '参赛包不存在', data: null as any });
+    }
+
+    const minCents = pkg.coupon_reward_min_cents;
+    const maxCents = pkg.coupon_reward_max_cents;
+    if (maxCents <= 0) {
+      return res.json({
+        code: 0,
+        data: { matched: [], totalValue: 0, message: '未设置礼券匹配区间' }
+      });
+    }
+
+    const result = await doMatch(minCents, maxCents);
+    return res.json({ code: 0, data: result });
+  } catch (error: any) {
+    console.error('[RacePackages] match error:', error.message);
+    return res.status(500).json({ code: 500, message: '匹配失败', data: null as any });
+  }
+});
+
+/**
+ * POST /api/v1/race-packages/:id/save-matched-coupons
+ * 手动触发保存匹配结果
+ */
+router.post('/:id/save-matched-coupons', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const pkg = await queryOne<RacePackageRow>('SELECT * FROM race_packages WHERE id = $1', [id]);
+    if (!pkg) {
+      return res.status(404).json({ code: 404, message: '参赛包不存在', data: null as any });
+    }
+
+    const minCents = pkg.coupon_reward_min_cents;
+    const maxCents = pkg.coupon_reward_max_cents;
+    if (maxCents <= 0) {
+      return res.json({ code: 400, message: '未设置礼券匹配区间', data: null });
+    }
+
+    await clearAndRematchCoupons(id, minCents, maxCents);
+
+    const saved = await query<PackageCouponRow>(
+      `SELECT rpc.*, mc.name as coupon_name, m.merchant_name as merchant_name
+       FROM race_package_coupons rpc
+       JOIN merchant_coupons mc ON rpc.coupon_id = mc.id
+       JOIN merchants m ON mc.merchant_id = m.id
+       WHERE rpc.package_id = $1`, [id]
+    );
+
+    const totalVal = (saved || []).reduce((s, c) => s + c.denomination_cents, 0);
+
+    return res.json({
+      code: 0,
+      data: {
+        saved: (saved || []).map((c) => ({
+          id: c.id, couponId: c.coupon_id,
+          denominationCents: c.denomination_cents,
+          couponType: c.coupon_type,
+          merchantName: c.merchant_name,
+          couponName: c.coupon_name,
+        })),
+        totalValue: totalVal,
+      }
+    });
+  } catch (error: any) {
+    console.error('[RacePackages] save-matched error:', error.message);
+    return res.status(500).json({ code: 500, message: '保存失败', data: null as any });
   }
 });
 
 /**
  * DELETE /api/v1/race-packages/:id
- * 删除参赛包（软删除：设为 inactive）（admin 专用）
- * @param id - 参赛包 UUID
- * @header Authorization: Bearer <token>
+ * 删除参赛包（软删除）
  */
 router.delete('/:id', authMiddleware, async (req: Request, res: Response<ApiResponse<null>>) => {
   try {
     const { id } = req.params;
     const role = req.user!.role;
-
     if (role !== 'admin' && role !== 'operator') {
-      return res.status(403).json({ code: 403, message: '仅管理员或运营商可删除参赛包', data: null });
+      return res.status(403).json({ code: 403, message: '无权限', data: null });
     }
 
-    // 软删除：将状态设为 inactive
-    const result = await queryOne<{ id: string }>(
-      `UPDATE race_packages SET status = 'inactive', updated_at = $1
-       WHERE id = $2 RETURNING id`,
+    await query(
+      `UPDATE race_packages SET status = 'inactive', updated_at = $1 WHERE id = $2`,
       [new Date().toISOString(), id]
     );
 
-    if (!result) {
-      return res.status(404).json({ code: 404, message: '参赛包不存在', data: null });
-    }
-
-    return res.json({ code: 0, message: '参赛包已下架', data: null });
+    return res.json({ code: 0, message: '已下架', data: null });
   } catch (error: any) {
     console.error('[RacePackages] delete error:', error.message);
-    return res.status(500).json({ code: 500, message: '删除参赛包失败', data: null });
+    return res.status(500).json({ code: 500, message: '删除失败', data: null });
   }
 });
 
 /**
  * PATCH /api/v1/race-packages/:id
- * 部分更新参赛包（切换上架/下架状态等）
- * @param id - 参赛包 UUID
- * @body is_active - 是否上架
  */
 router.patch('/:id', authMiddleware, async (req: Request, res: Response<ApiResponse<RacePackage>>) => {
   try {
     const { id } = req.params;
     const role = req.user!.role;
-
     if (role !== 'admin' && role !== 'operator') {
-      return res.status(403).json({ code: 403, message: '仅管理员或运营人员可操作', data: null as any });
+      return res.status(403).json({ code: 403, message: '无权限', data: null as any });
     }
 
     const existing = await queryOne<{ id: string; status: string }>(
-      'SELECT id, status FROM race_packages WHERE id = $1',
-      [id]
+      'SELECT id, status FROM race_packages WHERE id = $1', [id]
     );
     if (!existing) {
       return res.status(404).json({ code: 404, message: '参赛包不存在', data: null as any });
     }
 
     const { is_active } = req.body as { is_active?: boolean };
-
     if (is_active !== undefined) {
       const newStatus = is_active ? 'active' : 'inactive';
-      await query(
-        `UPDATE race_packages SET status = $1, updated_at = $2 WHERE id = $3`,
-        [newStatus, new Date().toISOString(), id]
-      );
+      await query(`UPDATE race_packages SET status = $1, updated_at = $2 WHERE id = $3`,
+        [newStatus, new Date().toISOString(), id]);
 
-      const row = await queryOne<RacePackageRow>(
-        `SELECT id, name, description, price_cents, race_count,
-                valid_days, status, sort_order, created_at, updated_at
-         FROM race_packages WHERE id = $1`,
-        [id]
-      );
-
-      return res.json({
-        code: 0,
-        message: is_active ? '参赛包已上架' : '参赛包已下架',
-        data: toRacePackage(row!),
-      });
+      const row = await queryOne<RacePackageRow>('SELECT * FROM race_packages WHERE id = $1', [id]);
+      return res.json({ code: 0, message: is_active ? '已上架' : '已下架', data: toRacePackage(row!) });
     }
 
     return res.status(400).json({ code: 400, message: '没有要更新的字段', data: null as any });
@@ -407,5 +462,129 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response<ApiRespo
     return res.status(500).json({ code: 500, message: '操作失败', data: null as any });
   }
 });
+
+// ============================================================
+// 自动匹配算法
+// ============================================================
+
+/**
+ * 自动匹配礼券（背包变种）
+ * 从所有可用的券池中选出总面值在 [minCents, maxCents] 区间的组合
+ * 优先跨商家、跨类型
+ */
+async function doMatch(minCents: number, maxCents: number): Promise<{
+  matched: any[];
+  totalValue: number;
+  message: string;
+}> {
+  // 取所有已上架、审核通过、剩余库存>0的券，附带商家名
+  const allCoupons = await query<any>(`
+    SELECT mc.id, mc.name, mc.denomination_cents, mc.coupon_type,
+           mc.remain_count, mc.merchant_id, m.merchant_name as merchant_name
+    FROM merchant_coupons mc
+    JOIN merchants m ON mc.merchant_id = m.id
+    WHERE mc.audit_status = 2
+      AND mc.status = 1
+      AND mc.remain_count > 0
+    ORDER BY mc.denomination_cents DESC
+  `);
+
+  if (!allCoupons || allCoupons.length === 0) {
+    return { matched: [], totalValue: 0, message: '当前没有可用的礼券' };
+  }
+
+  // 贪心 + 回溯：先尝试大面值，尽量接近 maxCents
+  const selected: any[] = [];
+  let currentSum = 0;
+
+  // 先排序：大面值优先
+  const sorted = [...allCoupons].sort((a, b) => b.denomination_cents - a.denomination_cents);
+
+  // 如果单张最大面值超过区间上限，取最接近上限的单张
+  if (sorted[0].denomination_cents >= minCents && sorted[0].denomination_cents <= maxCents) {
+    // 直接用最大的
+    selected.push({
+      couponId: sorted[0].id,
+      couponName: sorted[0].name,
+      merchantName: sorted[0].merchant_name,
+      denominationCents: sorted[0].denomination_cents,
+      couponType: sorted[0].coupon_type,
+    });
+    currentSum = sorted[0].denomination_cents;
+  } else {
+    // 多张组合：贪心选大面值，直到接近 maxCents 或超过上限
+    let remaining = maxCents;
+    for (const c of sorted) {
+      if (c.denomination_cents > remaining) continue; // 超过剩余额度，跳过
+      selected.push({
+        couponId: c.id,
+        couponName: c.name,
+        merchantName: c.merchant_name,
+        denominationCents: c.denomination_cents,
+        couponType: c.coupon_type,
+      });
+      currentSum += c.denomination_cents;
+      remaining -= c.denomination_cents;
+      if (remaining <= 0) break;
+    }
+  }
+
+  // 检查是否达到下限
+  if (currentSum < minCents) {
+    // 没达到下限，尝试再加一张小的
+    for (const c of allCoupons) {
+      if (selected.find((s) => s.couponId === c.id)) continue;
+      const newSum = currentSum + c.denomination_cents;
+      if (newSum >= minCents && newSum <= maxCents) {
+        selected.push({
+          couponId: c.id,
+          couponName: c.name,
+          merchantName: c.merchant_name,
+          denominationCents: c.denomination_cents,
+          couponType: c.coupon_type,
+        });
+        currentSum = newSum;
+        break;
+      }
+    }
+  }
+
+  if (selected.length === 0) {
+    return { matched: [], totalValue: 0, message: '无法匹配到符合区间礼券，请调整区间或补充券' };
+  }
+
+  const msg = currentSum >= minCents && currentSum <= maxCents
+    ? '匹配成功'
+    : `当前组合总价值 ¥${(currentSum / 100).toFixed(2)}未达到区间上限，建议调整区间或补充券`;
+
+  return { matched: selected, totalValue: currentSum, message: msg };
+}
+
+/**
+ * 清除旧匹配 + 重新匹配并保存
+ */
+async function clearAndRematchCoupons(packageId: string, minCents: number, maxCents: number) {
+  // 删除旧的匹配
+  await execute(`DELETE FROM race_package_coupons WHERE package_id = $1`, [packageId]);
+  // 重新匹配
+  await autoMatchCoupons(packageId, minCents, maxCents);
+}
+
+/**
+ * 匹配并保存到 race_package_coupons
+ */
+async function autoMatchCoupons(packageId: string, minCents: number, maxCents: number) {
+  const result = await doMatch(minCents, maxCents);
+  if (result.matched.length === 0) return;
+
+  for (const m of result.matched) {
+    const id = uuidv4();
+    await execute(
+      `INSERT INTO race_package_coupons (id, package_id, coupon_id, denomination_cents, coupon_type, merchant_name, coupon_name)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [id, packageId, m.couponId, m.denominationCents, m.couponType, m.merchantName, m.couponName]
+    );
+  }
+}
 
 export default router;

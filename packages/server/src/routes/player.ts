@@ -25,17 +25,61 @@ router.get('/home', (_req: Request, res: Response) => {
   });
 });
 
-// 参赛包列表
-router.get('/packages', (_req: Request, res: Response) => {
-  res.json({
-    code: 0,
-    data: [
-      { id: 'pkg_01', name: '单次体验包', originalPrice: 4900, salePrice: 2900, description: '1次参赛机会', isActive: true },
-      { id: 'pkg_02', name: '青铜勇士包', originalPrice: 9900, salePrice: 7900, description: '3次参赛机会', isActive: true },
-      { id: 'pkg_03', name: '白银战士包', originalPrice: 19900, salePrice: 14900, description: '8次参赛机会', isActive: true },
-      { id: 'pkg_04', name: '黄金大师包', originalPrice: 29900, salePrice: 22900, description: '15次参赛机会+专属排行榜', isActive: true }
-    ]
-  });
+// 参赛包列表（从数据库取 + 返回关联礼券）
+router.get('/packages', async (_req: Request, res: Response) => {
+  try {
+    const rows = await query<any>(
+      `SELECT * FROM race_packages WHERE status = 'active' ORDER BY sort_order ASC, price_cents ASC`
+    );
+
+    const result = await Promise.all((rows || []).map(async (row: any) => {
+      const coupons = await query<any>(
+        `SELECT * FROM race_package_coupons WHERE package_id = $1`,
+        [row.id]
+      );
+      const couponList = (coupons || []).map((c: any) => ({
+        id: c.id,
+        couponId: c.coupon_id,
+        denominationCents: c.denomination_cents,
+        couponType: c.coupon_type,
+        merchantName: c.merchant_name,
+        couponName: c.coupon_name,
+      }));
+      const totalRewardValue = couponList.reduce((s: number, cc: any) => s + cc.denominationCents, 0);
+
+      return {
+        id: row.id,
+        name: row.name,
+        description: row.description || '',
+        salePrice: row.price_cents,
+        originalPrice: row.price_cents,
+        raceCount: row.race_count,
+        validDays: row.valid_days || 365,
+        isHot: row.sort_order <= 1,
+        isRecommend: row.sort_order <= 2,
+        isActive: row.status === 'active',
+        coupons: couponList,
+        totalRewardValue,
+      };
+    }));
+
+    // 有礼券信息 + 总价值说明
+    result.forEach((pkg: any) => {
+      if (pkg.totalRewardValue > 0) {
+        const rewardYuan = (pkg.totalRewardValue / 100).toFixed(0);
+        pkg.description = pkg.description
+          ? `${pkg.description}（赠价值 ¥${rewardYuan} 礼券）`
+          : `赠价值 ¥${rewardYuan} 礼券`;
+        pkg.tag = '🎁 超值礼券';
+        pkg.tagType = 'gift';
+      }
+    });
+
+    res.json({ code: 0, data: result });
+  } catch (e: any) {
+    console.error('[Player] packages error:', e?.message || e);
+    res.json({ code: 500, message: '获取参赛包失败', data: null });
+  }
 });
 
 // 排行榜
