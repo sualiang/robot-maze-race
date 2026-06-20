@@ -100,7 +100,7 @@
 }
 
 .pkg-count-number {
-  font-size: 64rpx;
+  font-size: var(--font-base);
   font-weight: 400;
   color: var(--color-primary);
   line-height: 1;
