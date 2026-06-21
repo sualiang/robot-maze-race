@@ -38,7 +38,7 @@ Page({
     // 模块5: 功能入口
     menuList: [
       { key: 'order', icon: '📋', label: '我的订单', url: '/pages/orders/orders', rightText: '' },
-      { key: 'coupon', icon: '🎫', label: '我的卡包', url: '/pages/coupon/coupon', rightText: '' },
+      { key: 'coupon', icon: '🎫', label: '我的卡券', url: '/pages/coupon/coupon', rightText: '' },
       { key: 'exchange', icon: '🎁', label: '积分兑换', url: '/pages/prize/prize', rightText: '' },
     ]
   },
@@ -130,7 +130,7 @@ Page({
     wx.switchTab({ url: '/pages/index/index' });
   },
 
-  // 跳转卡包页
+  // 跳转卡券页
   onAssetsTap: function () {
     wx.navigateTo({ url: '/pages/coupon/coupon' });
   },

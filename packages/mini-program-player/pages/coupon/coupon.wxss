@@ -1,6 +1,6 @@
-/* 我的卡券 V3.0 - 4Tab 统一页面 */
+/* 我的卡券 V3.5 - 4Tab 统一页面 */
 /* 设计基准 750rpx, 深色主题 #0F172A */
-/* 卡片背景: #1E293B, 卡片装饰: 红绿双色渐变条 */
+/* 卡片背景: #1E293B, 卡片装饰: 红绿/金色双色渐变条 */
 
 /* ===== 页面容器 ===== */
 .cc-page {
@@ -62,6 +62,29 @@
   border-radius: 2rpx;
 }
 
+/* ===== 兑换记录入口 ===== */
+.cc-exch-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16rpx 24rpx;
+  margin-bottom: 16rpx;
+  background: #1E293B;
+  border-radius: 12rpx;
+}
+.cc-exch-entry:active {
+  opacity: 0.7;
+}
+.cc-exch-entry-text {
+  font-size: 26rpx;
+  color: #00D4FF;
+  font-weight: 500;
+}
+.cc-exch-entry-arrow {
+  font-size: 30rpx;
+  color: #64748B;
+}
+
 /* ===== 模块3: 卡券列表 ===== */
 .cc-list {
   display: flex;
@@ -94,6 +117,10 @@
   width: 8rpx;
   flex-shrink: 0;
   background: linear-gradient(180deg, #FF3B5C 0%, #F59E0B 100%);
+}
+/* 参赛抵扣卡：金色渐变 */
+.cc-accent-gold {
+  background: linear-gradient(180deg, #F59E0B 0%, #FFD700 100%);
 }
 .cc-accent-inactive {
   background: linear-gradient(180deg, #475569 0%, #64748B 100%);
@@ -191,6 +218,10 @@
 .cc-info-merchant {
   color: #00D4FF;
 }
+.cc-info-gold {
+  color: #F59E0B;
+  font-weight: 600;
+}
 .cc-info-tag {
   display: inline-block;
   background: rgba(245, 158, 11, 0.15);
@@ -213,8 +244,8 @@
   border-radius: 24rpx;
 }
 .cc-action-deduct {
-  background: rgba(255, 59, 92, 0.12);
-  color: #FF3B5C;
+  background: rgba(245, 158, 11, 0.15);
+  color: #F59E0B;
 }
 .cc-action-coupon {
   background: rgba(0, 212, 255, 0.12);
@@ -253,7 +284,7 @@
   color: #64748B;
 }
 .cc-empty-btn {
-  width: 220rpx;
+  width: 280rpx;
   height: 72rpx;
   line-height: 72rpx;
   text-align: center;
@@ -268,4 +299,10 @@
 .cc-empty-btn:active {
   opacity: 0.85;
   transform: scale(0.95);
+}
+.cc-empty-btn-secondary {
+  background: linear-gradient(135deg, #1E293B 0%, #334155 100%);
+  color: #00D4FF;
+  box-shadow: none;
+  border: 2rpx solid #334155;
 }

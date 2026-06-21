@@ -118,7 +118,7 @@ Page({
   },
 
   /**
-   * 获取卡包信息 /api/v1/player/coupons
+   * 获取卡券信息 /api/v1/player/coupons
    */
   fetchCoupons: function () {
     var that = this;
@@ -287,7 +287,7 @@ Page({
   },
 
   /**
-   * 跳转卡包页
+   * 跳转卡券页
    */
   onGoCoupon: function () {
     wx.navigateTo({
@@ -296,7 +296,7 @@ Page({
   },
 
   /**
-   * 跳转卡包页（福利总览区域点击）
+   * 跳转卡券页（福利总览区域点击）
    */
   onGoCouponFromBenefits: function () {
     wx.navigateTo({

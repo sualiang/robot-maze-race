@@ -393,7 +393,7 @@ router.get('/me/profile-check', authMiddleware, async (req: Request, res: Respon
       );
       availableDeductionCents = deductionRow?.total || 0;
     } catch (deductionErr) {
-      console.error('[profile-check] 查询抵扣金失败:', (deductionErr as Error)?.message);
+      console.error('[profile-check] 查询参赛抵扣卡失败:', (deductionErr as Error)?.message);
     }
 
     // 查询消费券总额
@@ -405,7 +405,7 @@ router.get('/me/profile-check', authMiddleware, async (req: Request, res: Respon
       );
       couponTotalCents = couponRow?.total || 0;
     } catch (couponErr) {
-      console.error('[profile-check] 查询消费券总额失败:', (couponErr as Error)?.message);
+      console.error('[profile-check] 查询消费券失败:', (couponErr as Error)?.message);
     }
 
     // 查询积分余额（从 users.points 字段读取）
@@ -601,26 +601,33 @@ router.get('/deductions', authMiddleware, async (req: Request, res: Response) =>
 /**
  * GET /player/coupons
  * 获取用户的优惠券列表（按 coupon_type 分类）
- * coupon_type: 1=参赛抵扣, 2=到店满减, 3=实物兑换
+ * coupon_type: 1=立减券(无门槛), 3=满减券, 4=兑换券
  */
 router.get('/coupons', authMiddleware, async (req: Request, res: Response) => {
   const userId = req.user!.userId;
-  const { type } = req.query; // 可选筛选
+  const { type, status } = req.query; // type: 筛选coupon_type, status: 可选筛选状态
 
   try {
-    let whereClause = 'WHERE uc.user_id = $1 AND uc.status = 1';
+    let whereClause = 'WHERE uc.user_id = $1';
     const params: any[] = [userId];
 
+    // 按 coupon_type 筛选
     if (type) {
       const typeNum = parseInt(type as string, 10);
-      if ([1, 2, 3].includes(typeNum)) {
+      if ([1, 3, 4].includes(typeNum)) {
         whereClause += ' AND uc.coupon_type = $2';
         params.push(typeNum);
       }
     }
 
-    // 有效期内（未设置则不过滤）
-    whereClause += ' AND (uc.valid_end IS NULL OR uc.valid_end >= datetime(\'now\'))';
+    // 按状态筛选（可选）
+    if (status !== undefined) {
+      const statusNum = parseInt(status as string, 10);
+      if (!isNaN(statusNum)) {
+        whereClause += ' AND uc.status = $' + (params.length + 1);
+        params.push(statusNum);
+      }
+    }
 
     const coupons = await query<any>(
       `SELECT uc.id, uc.user_id, uc.coupon_id, uc.merchant_id,
@@ -662,9 +669,9 @@ router.get('/coupons', authMiddleware, async (req: Request, res: Response) => {
     }));
 
     // 按类型分类
-    const entryDiscount = couponList.filter((c: any) => c.couponType === 1);
-    const storeCoupon = couponList.filter((c: any) => c.couponType === 2);
-    const productExchange = couponList.filter((c: any) => c.couponType === 3);
+    const type1 = couponList.filter((c: any) => c.couponType === 1); // 立减券
+    const type3 = couponList.filter((c: any) => c.couponType === 3); // 满减券
+    const type4 = couponList.filter((c: any) => c.couponType === 4); // 兑换券
 
     // 总券数和总面值
     const totalCount = couponList.length;
@@ -677,17 +684,17 @@ router.get('/coupons', authMiddleware, async (req: Request, res: Response) => {
       code: 0,
       data: {
         list: couponList,
-        entryDiscount,
-        storeCoupon,
-        productExchange,
+        type1,
+        type3,
+        type4,
         summary: {
           totalCount,
           totalDenominationCents,
           totalDenominationYuan: totalDenominationCents / 100,
           categoryCounts: {
-            entryDiscount: entryDiscount.length,
-            storeCoupon: storeCoupon.length,
-            productExchange: productExchange.length,
+            type1: type1.length,
+            type3: type3.length,
+            type4: type4.length,
           },
         },
       },

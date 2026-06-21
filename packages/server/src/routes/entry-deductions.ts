@@ -19,7 +19,7 @@ router.get('/balance', authMiddleware, async (req: Request, res: Response) => {
     res.json({ code: 0, data: { availableCents } });
   } catch (e: any) {
     console.error('[EntryDeductions] balance error:', e?.message || e);
-    res.json({ code: 500, message: '查询抵扣金失败', data: null });
+    res.json({ code: 500, message: '查询参赛抵扣卡失败', data: null });
   }
 });
 
