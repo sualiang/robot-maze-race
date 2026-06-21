@@ -133,6 +133,10 @@ app.use('/api/v1/admin/task', adminTaskRoutes);
 import entryDeductionsRoutes from './routes/entry-deductions';
 app.use('/api/v1/entry-deductions', entryDeductionsRoutes);
 
+// 积分商城
+import pointsShopRoutes from './routes/points-shop';
+app.use('/api/v1', pointsShopRoutes);
+
 // 上传（商家 Logo 等）
 app.use('/api/v1/upload', uploadRoutes);
 

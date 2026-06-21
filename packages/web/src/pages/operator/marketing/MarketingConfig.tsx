@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Card, Form, Switch, InputNumber, Button, Space,
-  Divider, message, Spin, Alert, Typography, Descriptions,
+  Divider, message, Spin, Alert, Typography, Descriptions, Modal,
 } from 'antd';
 import {
-  SaveOutlined, GiftOutlined, SettingOutlined, TrophyOutlined,
+  SaveOutlined, GiftOutlined, SettingOutlined, TrophyOutlined, ThunderboltOutlined,
 } from '@ant-design/icons';
 import api from '../../../utils/api';
 
@@ -20,6 +20,8 @@ export default function MarketingConfig() {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [initLoading, setInitLoading] = useState(false);
+  const [hasData, setHasData] = useState<boolean | null>(null);
 
   // 赛季奖励参数（只读，来自总部配置）
   const [seasonConfig, setSeasonConfig] = useState<Record<string, any> | null>(null);
@@ -39,8 +41,44 @@ export default function MarketingConfig() {
   //     .finally(() => setSeasonConfigLoading(false));
   // }, []);
 
+  // 检查是否已初始化
+  const checkHasData = useCallback(async () => {
+    try {
+      const data: any = await api.get('/operator/marketing/check-init');
+      setHasData(data?.initialized ?? true);
+    } catch {
+      // 接口可能不存在，默认为有数据
+      setHasData(true);
+    }
+  }, []);
+
+  // 一键初始化
+  const handleInitTemplates = () => {
+    Modal.confirm({
+      title: '一键初始化',
+      content: '将创建以下基础数据：\n\n• 3档参赛包模板（基础68元 / 标准168元 / 专业368元）\n• 默认营销配置\n• 几张测试消费券\n\n⚠️ 仅可在系统无数据时执行一次。确认继续？',
+      okText: '确认初始化',
+      cancelText: '取消',
+      onOk: async () => {
+        setInitLoading(true);
+        try {
+          await api.post('/operator/marketing/init-templates');
+          message.success('初始化成功！基础数据已创建');
+          setHasData(true);
+          // 重新加载页面数据
+          window.location.reload();
+        } catch {
+          message.error('初始化失败，请稍后重试');
+        } finally {
+          setInitLoading(false);
+        }
+      },
+    });
+  };
+
   // 读取总部范围
   useEffect(() => {
+    checkHasData();
     api.get('/operator/marketing/range')
       .then((data: any) => {
         if (data) {
@@ -141,9 +179,22 @@ export default function MarketingConfig() {
         <Space><SettingOutlined /> 营销管理</Space>
       }
       extra={
-        <Button type="primary" icon={<SaveOutlined />} onClick={handleSave} loading={saving}>
-          保存配置
-        </Button>
+        <Space>
+          {hasData === false && (
+            <Button
+              type="primary"
+              danger
+              icon={<ThunderboltOutlined />}
+              onClick={handleInitTemplates}
+              loading={initLoading}
+            >
+              一键初始化
+            </Button>
+          )}
+          <Button type="primary" icon={<SaveOutlined />} onClick={handleSave} loading={saving}>
+            保存配置
+          </Button>
+        </Space>
       }
     >
       <Alert
@@ -179,14 +230,14 @@ export default function MarketingConfig() {
         <Spin spinning={loading}>
 
           {/* 好友助力活动 */}
-          {/* 新用户赠送参赛抵扣金 */}
+          {/* 新用户赠送参赛抵扣卡 */}
         <Divider>
           <Space><GiftOutlined /> 新用户赠送</Space>
         </Divider>
 
         <Form.Item
           name="welcome_deduction_cents"
-          label="新用户注册赠送参赛抵扣金（分）"
+          label="新用户注册赠送参赛抵扣卡（分）"
           rules={[{ required: true, message: '请输入抵扣金金额' }]}
           tooltip="单位：分。500分=5元。设为0则不赠送。"
         >

@@ -1,5 +1,5 @@
 {
-  "navigationBarTitleText": "我的卡包",
+  "navigationBarTitleText": "我的卡券",
   "usingComponents": {},
-  "enablePullDownRefresh": false
+  "enablePullDownRefresh": true
 }

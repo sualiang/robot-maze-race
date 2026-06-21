@@ -1,66 +1,114 @@
-<view class="page">
+<!-- 我的卡券 V3.0 - 4Tab 统一页面 -->
+<!-- Tab 0: 参赛抵扣卡 | Tab 1: 立减券 | Tab 2: 满减券 | Tab 3: 兑换券 -->
+<view class="cc-page">
 
-  <!-- ========== 模块1: 顶部导航栏(通过navigationBar配置) ========== -->
-  <!-- 由 navigationBarTitleText 处理标题，这里跳过了 -->
+  <!-- ========== 模块1: 页面大标题 ========== -->
+  <view class="cc-header">
+    <text class="cc-header-title">我的卡券</text>
+    <text class="cc-header-subtitle">查看和管理你所有的卡券</text>
+  </view>
 
   <!-- ========== 模块2: 分类Tab栏 ========== -->
-  <view class="coupon-tabs">
+  <view class="cc-tabs">
     <view
       wx:for="{{tabs}}"
       wx:key="key"
-      class="coupon-tab {{currentTab === item.key ? 'coupon-tab-active' : ''}}"
+      class="cc-tab {{currentTab === item.key ? 'cc-tab-active' : ''}}"
       data-key="{{item.key}}"
       bindtap="onTabChange"
     >
-      <text>{{item.label}}</text>
-      <view wx:if="{{currentTab === item.key}}" class="coupon-tab-indicator"></view>
+      <text class="cc-tab-label">{{item.label}}</text>
+      <view wx:if="{{currentTab === item.key}}" class="cc-tab-bar"></view>
     </view>
   </view>
 
-  <!-- ========== 模块3: 券列表 ========== -->
-  <view class="coupon-list" wx:if="{{coupons.length > 0 && !loading}}">
-    <view
-      wx:for="{{coupons}}"
-      wx:key="id"
-      class="coupon-card {{item.status === 'used' || item.status === 'expired' ? 'coupon-card-disabled' : ''}}"
-    >
-      <!-- 左侧: 面值数字 -->
-      <view class="coupon-left">
-        <text class="coupon-amount {{item.status === 'used' || item.status === 'expired' ? 'coupon-amount-dim' : ''}}">{{item.amount || item.denomination || '¥0'}}</text>
-        <text class="coupon-threshold">{{item.threshold || item.use_condition || item.condition || '无门槛'}}</text>
-        <text wx:if="{{item.status === 'used'}}" class="coupon-status-tag used">已使用</text>
-        <text wx:elif="{{item.status === 'expired'}}" class="coupon-status-tag expired">已过期</text>
-      </view>
+  <!-- ========== 模块3: 卡券列表 ========== -->
+  <view class="cc-list" wx:if="{{cardList.length > 0 && !loading}}">
 
-      <!-- 右侧: 说明信息 -->
-      <view class="coupon-right">
-        <text class="coupon-name">{{item.name || item.title || '优惠券'}}</text>
-        <text class="coupon-scope">{{item.scope || item.description || item.rule || ''}}</text>
-        <text class="coupon-validity">{{item.validUntil || item.expireDate || item.expire_date || ''}}</text>
-        <view class="coupon-actions">
-          <view
-            wx:if="{{item.status !== 'used' && item.status !== 'expired'}}"
-            class="coupon-use-btn"
-            data-item="{{item}}"
-            bindtap="onUseCoupon"
-          >去使用</view>
-          <text wx:elif="{{item.status === 'used'}}" class="coupon-status-text">已使用</text>
-          <text wx:elif="{{item.status === 'expired'}}" class="coupon-status-text">已过期</text>
+    <!-- 3.1 参赛抵扣卡（Tab 0） -->
+    <view
+      wx:for="{{cardList}}"
+      wx:key="id"
+      class="cc-card {{item.status === 0 ? 'cc-card-inactive' : ''}}"
+      data-item="{{item}}"
+      bindtap="onCardTap"
+    >
+      <!-- 装饰左侧渐变 -->
+      <view class="cc-card-accent {{item.status === 0 ? 'cc-accent-inactive' : ''}}"></view>
+
+      <view class="cc-card-body">
+        <!-- 顶部行：面额 + 状态 tag -->
+        <view class="cc-card-top">
+          <view class="cc-amount-area">
+            <text class="cc-amount-symbol">¥</text>
+            <text class="cc-amount-value">
+              <block wx:if="{{item.isDeduction}}">{{item.amountYuan.toFixed(2)}}</block>
+              <block wx:else>{{item.denominationYuan.toFixed(2)}}</block>
+            </text>
+            <text class="cc-amount-label">抵扣</text>
+          </view>
+          <text class="cc-status-tag cc-status-{{item.status === 1 ? 'active' : 'inactive'}}">{{item.statusText}}</text>
+        </view>
+
+        <!-- 分割线 -->
+        <view class="cc-divider"></view>
+
+        <!-- 信息行 -->
+        <view class="cc-info">
+          <!-- 参赛抵扣卡：显示来源 + 到期日 -->
+          <block wx:if="{{item.isDeduction}}">
+            <view class="cc-info-row">
+              <text class="cc-info-label">来源</text>
+              <text class="cc-info-value">{{item.source}}</text>
+            </view>
+            <view class="cc-info-row">
+              <text class="cc-info-label">到期日</text>
+              <text class="cc-info-value">{{item.expiresAt || '长期有效'}}</text>
+            </view>
+          </block>
+
+          <!-- 消费券：显示商家名称 + 满减条件 + 到期日 -->
+          <block wx:else>
+            <view class="cc-info-row">
+              <text class="cc-info-label">商家</text>
+              <text class="cc-info-value cc-info-merchant">{{item.merchantName}}</text>
+            </view>
+            <view class="cc-info-row" wx:if="{{item.minConsumeYuan > 0}}">
+              <text class="cc-info-label">满减</text>
+              <text class="cc-info-value">满¥{{item.minConsumeYuan.toFixed(2)}}可用</text>
+            </view>
+            <view class="cc-info-row" wx:if="{{item.minConsumeYuan <= 0}}">
+              <text class="cc-info-label">使用</text>
+              <text class="cc-info-value cc-info-tag">无门槛</text>
+            </view>
+            <view class="cc-info-row">
+              <text class="cc-info-label">到期</text>
+              <text class="cc-info-value">{{item.validEnd || '长期有效'}}</text>
+            </view>
+          </block>
+        </view>
+
+        <!-- 底部操作按钮 -->
+        <view class="cc-card-action" wx:if="{{item.status === 1}}">
+          <text class="cc-action-btn-text {{item.isDeduction ? 'cc-action-deduct' : 'cc-action-coupon'}}">
+            {{item.isDeduction ? '立即使用 ›' : '查看券码 ›'}}
+          </text>
         </view>
       </view>
     </view>
   </view>
 
-  <!-- 加载态 -->
-  <view wx:elif="{{loading}}" class="loading-state">
-    <text class="loading-text">加载中...</text>
+  <!-- ========== 加载态 ========== -->
+  <view wx:elif="{{loading}}" class="cc-loading">
+    <text class="cc-loading-text">加载中...</text>
   </view>
 
-  <!-- ========== 模块4: 空状态 ========== -->
-  <view wx:elif="{{isEmpty}}" class="empty-state">
-    <text class="empty-icon">🎫</text>
-    <text class="empty-title">暂无可用券</text>
-    <view class="empty-get-btn" bindtap="onGetCoupons">去获取</view>
+  <!-- ========== 空状态 ========== -->
+  <view wx:elif="{{isEmpty}}" class="cc-empty">
+    <text class="cc-empty-icon">🎫</text>
+    <text class="cc-empty-title">暂无卡券</text>
+    <text class="cc-empty-desc">快去购买参赛包获取卡券吧</text>
+    <view class="cc-empty-btn" bindtap="onGetCards">去获取</view>
   </view>
 
 </view>

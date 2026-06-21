@@ -846,36 +846,49 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
       console.error('[订单] 自动配券失败:', couponErr?.message || couponErr);
     }
 
-    // 购包成功后自动发放参赛抵扣卡（平台官方券 coupon_type=20）
+    // 购包成功后自动发放参赛抵扣卡
+    // 专业包（tag='professional'）发3张2000分参赛抵扣卡，source='order_purchase_pro'
+    // 其他包包根据 tag 发放对应的参赛抵扣卡
     try {
-      const GIFT_MAP: Record<string, { cents: number; count: number }> = {
-        'basic': { cents: 500, count: 1 },
-        'standard': { cents: 1500, count: 1 },
-        'pro': { cents: 2000, count: 3 },
-      };
-      const giftConfig = GIFT_MAP[packageId];
-      if (giftConfig) {
-        const validEnd = '2070-01-01 00:00:00';
-        for (let i = 0; i < giftConfig.count; i++) {
-          const giftCouponId = uuidv4();
+      // 查询参赛包的 tag
+      const pkgTag = await queryOne<{ tag: string }>(
+        `SELECT tag FROM race_packages WHERE id = $1`,
+        [packageId]
+      );
+      const tag = pkgTag?.tag || '';
+
+      if (tag === 'professional') {
+        // 专业包：发3张20元参赛抵扣卡到 entry_deductions
+        for (let i = 0; i < 3; i++) {
+          const dedId = uuidv4();
           await execute(
-            `INSERT INTO user_coupons (id, user_id, coupon_id, merchant_id, name, description,
-                    denomination_cents, min_consume_cents, status, valid_start, valid_end,
-                    coupon_type, extra_data, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, $9, $10, 20, $11, datetime('now'), datetime('now'))`,
-            [
-              giftCouponId, userId, giftCouponId, 'platform',
-              '购包赠·参赛抵扣卡',
-              `购买参赛包赠参赛抵扣卡`, giftConfig.cents, 0,
-              new Date().toISOString(), validEnd,
-              JSON.stringify({ source: 'purchase_gift', package_id: packageId, order_id: orderId })
-            ]
+            `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
+             VALUES ($1, $2, $3, 'order_purchase_pro', 'available', $4, $5, datetime('now', '+365 days'), datetime('now'))`,
+            [dedId, userId, 2000, orderId, packageId]
           );
         }
-        console.log(`[订单] 购包赠参赛抵扣卡：用户${userId}，参赛包${packageId}，共${giftConfig.count}张×${giftConfig.cents}分`);
+        console.log(`[订单] 专业包购包赠参赛抵扣金：用户${userId}，参赛包${packageId}，共3张×2000分`);
+      } else if (tag === 'standard') {
+        // 标准包：发1张1500分参赛抵扣卡
+        const dedId = uuidv4();
+        await execute(
+          `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
+           VALUES ($1, $2, $3, 'order_purchase', 'available', $4, $5, datetime('now', '+365 days'), datetime('now'))`,
+          [dedId, userId, 1500, orderId, packageId]
+        );
+        console.log(`[订单] 标准包购包赠参赛抵扣金：用户${userId}，1张×1500分`);
+      } else if (tag === 'basic') {
+        // 基础包：发1张500分参赛抵扣卡
+        const dedId = uuidv4();
+        await execute(
+          `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
+           VALUES ($1, $2, $3, 'order_purchase', 'available', $4, $5, datetime('now', '+365 days'), datetime('now'))`,
+          [dedId, userId, 500, orderId, packageId]
+        );
+        console.log(`[订单] 基础包购包赠参赛抵扣金：用户${userId}，1张×500分`);
       }
     } catch (giftErr: any) {
-      console.error('[订单] 赠送参赛抵扣卡失败:', giftErr?.message || giftErr);
+      console.error('[订单] 参赛包赠送抵扣金失败:', giftErr?.message || giftErr);
     }
 
     // 构造支付参数（开发环境直接返回模拟参数）

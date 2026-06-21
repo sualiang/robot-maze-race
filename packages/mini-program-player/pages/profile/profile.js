@@ -23,7 +23,7 @@ Page({
 
     // 模块3: 福利资产
     assets: {
-      deductible: 0,    // 参赛抵扣金
+      deductible: 0,    // 参赛抵扣卡
       couponCount: 0,   // 券数量
       couponTotal: 0    // 券总价值
     },

@@ -177,32 +177,8 @@ router.post('/wx-login', async (req: Request, res: Response<ApiResponse<WxLoginR
       });
       isNewUser = true;
 
-      // 新用户注册赠送参赛抵扣金（从 marketing_config 读取，默认 500分 = 5元）
-      try {
-        let welcomeDeductionCents = 500; // 默认 5 元
-        try {
-          const cfg = await queryOne<{ value: string }>(
-            `SELECT value FROM marketing_config WHERE venue_id = 'global' AND key = 'welcome_deduction_cents'`
-          );
-          if (cfg && cfg.value) {
-            const parsed = parseInt(cfg.value, 10);
-            if (!isNaN(parsed) && parsed >= 0) welcomeDeductionCents = parsed;
-          }
-        } catch (cfgErr) {
-          // 配置表不存在或没有记录，用默认值
-        }
-
-        if (welcomeDeductionCents > 0) {
-          await execute(
-            `INSERT INTO entry_deductions (user_id, amount_cents, source, status, expires_at, created_at)
-             VALUES ($1, $2, $3, $4, datetime('now', '+30 days'), datetime('now'))`,
-            [user.id, welcomeDeductionCents, 'welcome_gift', 'available']
-          );
-          console.log('[Auth] 新用户注册送参赛抵扣金:', user.id, 'amount:', welcomeDeductionCents / 100, '元');
-        }
-      } catch (deductionErr) {
-        console.error('[Auth] 赠送参赛抵扣金失败:', (deductionErr as Error)?.message);
-      }
+      // 新用户注册赠送参赛抵扣金（通过 system_config 控制开关和金额，默认 1000分=10元）
+      await grantFreeEntryDeduction(user.id);
     }
 
     // 3. 生成 JWT token
@@ -1024,27 +1000,8 @@ router.post('/register', async (req: Request, res: Response) => {
       [userId, 'plr_' + phone, phone, displayName, hash]
     );
 
-    // 注册成功赠送新人礼·参赛抵扣卡（10元，长期有效）
-    try {
-      const giftCouponId = uuidv4();
-      const validEnd = '2070-01-01 00:00:00';
-      await execute(
-        `INSERT INTO user_coupons (id, user_id, coupon_id, merchant_id, name, description,
-                denomination_cents, min_consume_cents, status, valid_start, valid_end,
-                coupon_type, extra_data, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, $9, $10, 20, $11, datetime('now'), datetime('now'))`,
-        [
-          giftCouponId, userId, giftCouponId, 'platform',
-          '新人礼·参赛抵扣卡',
-          '新用户注册赠送参赛抵扣卡', 1000, 0,
-          new Date().toISOString(), validEnd,
-          JSON.stringify({ source: 'register_gift' })
-        ]
-      );
-      console.log('[Auth] 注册赠送新人礼参赛抵扣卡：用户', userId);
-    } catch (giftErr: any) {
-      console.error('[Auth] 注册赠送参赛抵扣卡失败:', giftErr?.message || giftErr);
-    }
+    // 注册成功赠送参赛抵扣金（通过 system_config 控制开关和金额）
+    await grantFreeEntryDeduction(userId);
 
     const user: User = {
       id: userId,
@@ -1079,5 +1036,40 @@ router.post('/register', async (req: Request, res: Response) => {
     return res.status(500).json({ code: 500, message: '注册失败', data: null });
   }
 });
+
+/**
+ * 新用户注册赠送参赛抵扣金
+ * 通过 system_config 控制开关和金额
+ * key='register_deduction_cents' default=1000（10元）
+ * 发放记录写入 entry_deductions，source='register_reward'
+ */
+async function grantFreeEntryDeduction(userId: string): Promise<void> {
+  try {
+    // 从 system_config 读取配置，默认 1000分=10元
+    const cfgRow = await queryOne<{ value: string }>(
+      `SELECT value FROM system_config WHERE key = 'register_deduction_cents'`
+    );
+    let deductionCents = 1000; // 默认 10 元
+    if (cfgRow && cfgRow.value) {
+      const parsed = parseInt(cfgRow.value, 10);
+      if (!isNaN(parsed) && parsed >= 0) deductionCents = parsed;
+    }
+
+    if (deductionCents <= 0) {
+      console.log('[Auth] 注册赠送参赛抵扣金已关闭（deductionCents=0），跳过');
+      return;
+    }
+
+    const deductionId = uuidv4();
+    await execute(
+      `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, expires_at, created_at)
+       VALUES ($1, $2, $3, 'register_reward', 'available', datetime('now', '+365 days'), datetime('now'))`,
+      [deductionId, userId, deductionCents]
+    );
+    console.log('[Auth] 注册赠送参赛抵扣金:', userId, 'amount:', deductionCents / 100, '元, id:', deductionId);
+  } catch (err: any) {
+    console.error('[Auth] 注册赠送参赛抵扣金失败:', err?.message || err);
+  }
+}
 
 export default router;

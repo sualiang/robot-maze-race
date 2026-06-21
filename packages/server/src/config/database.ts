@@ -363,13 +363,13 @@ export function initSchema(): void {
     ['season_level_exp_6', '3000', '最强王者（Lv6）所需经验'],
     // 升段奖励（coupon_type=20，长期有效）
     ['season_reward_level_2_coupon_cents', '800', '白银段位升级奖励 - 参赛抵扣卡金额（分）'],
-    ['season_reward_level_2_points', '50', '白银段位升级奖励 - 积分'],
+    ['season_reward_level_2_points', '80', '白银段位升级奖励 - 积分'],
     ['season_reward_level_3_coupon_cents', '1500', '黄金段位升级奖励 - 参赛抵扣卡金额（分）'],
-    ['season_reward_level_3_points', '100', '黄金段位升级奖励 - 积分'],
+    ['season_reward_level_3_points', '150', '黄金段位升级奖励 - 积分'],
     ['season_reward_level_4_coupon_cents', '2500', '铂金段位升级奖励 - 参赛抵扣卡金额（分）'],
-    ['season_reward_level_4_points', '200', '铂金段位升级奖励 - 积分'],
+    ['season_reward_level_4_points', '300', '铂金段位升级奖励 - 积分'],
     ['season_reward_level_5_coupon_cents', '4000', '钻石段位升级奖励 - 参赛抵扣卡金额（分）'],
-    ['season_reward_level_5_points', '400', '钻石段位升级奖励 - 积分'],
+    ['season_reward_level_5_points', '500', '钻石段位升级奖励 - 积分'],
     ['season_reward_level_6_coupon_cents', '6000', '大师段位升级奖励 - 参赛抵扣卡金额（分）'],
     ['season_reward_level_6_points', '800', '大师段位升级奖励 - 积分'],
     ['season_reward_level_2_grant_once', 'true', '白银奖励终身一次'],
@@ -388,6 +388,21 @@ export function initSchema(): void {
       ).run(uuidv4(), key, value, desc);
     } catch {
       // ignore — 表不存在或已存在
+    }
+  }
+
+  // 更新已存在的段位奖励积分值（修正旧数据）
+  const levelRewardUpdates: [string, string][] = [
+    ['season_reward_level_2_points', '80'],
+    ['season_reward_level_3_points', '150'],
+    ['season_reward_level_4_points', '300'],
+    ['season_reward_level_5_points', '500'],
+  ];
+  for (const [key, value] of levelRewardUpdates) {
+    try {
+      db.prepare('UPDATE system_config SET value = ? WHERE key = ? AND value != ?').run(value, key, value);
+    } catch {
+      // ignore
     }
   }
 
@@ -515,6 +530,7 @@ export function initSchema(): void {
     ['point_rate', '2.0', '积分倍率(元:分)'],
     ['refund_coupon_return', 'false', '退款是否回收优惠券'],
     ['coupon_overdue_remind', '3', '优惠券过期前提醒天数'],
+    ['register_deduction_cents', '1000', '新用户注册赠送参赛抵扣金金额（分，0=关闭）'],
   ];
   // 仅写入不存在的键（保留已自定义的值）
   for (const [key, value, desc] of operatorDefaultConfigs) {
@@ -531,18 +547,22 @@ export function initSchema(): void {
   }
 
   // 插入默认积分商城商品（仅首次运行时生效）
-  const defaultPointItems: [string, string, number, string, string, number][] = [
-    ['point_5yuan', 'platform_coupon', 20, '5元参赛抵扣卡', '兑换后可在购买参赛包时抵扣5元报名费', 100],
-    ['point_10yuan', 'platform_coupon', 20, '10元参赛抵扣卡', '兑换后可在购买参赛包时抵扣10元报名费', 200],
-    ['point_20yuan', 'platform_coupon', 20, '20元参赛抵扣卡', '兑换后可在购买参赛包时抵扣20元报名费', 400],
-    ['point_50yuan', 'platform_coupon', 20, '50元参赛抵扣卡', '兑换后可在购买参赛包时抵扣50元报名费', 1000],
+  const defaultPointItems: [string, string, number, string, string, number, number][] = [
+    // 参赛抵扣卡类（item_type='entry_deduction'，兑换后发给 entry_deductions）
+    ['point_entry_5', 'entry_deduction', 500, '5元参赛抵扣金', '兑换后获得5元参赛抵扣金，可在购买参赛包时抵扣', 1000, 0],
+    ['point_entry_10', 'entry_deduction', 1000, '10元参赛抵扣金', '兑换后获得10元参赛抵扣金，可在购买参赛包时抵扣', 2000, 1],
+    ['point_entry_25', 'entry_deduction', 2500, '25元参赛抵扣金', '兑换后获得25元参赛抵扣金，可在购买参赛包时抵扣', 5000, 2],
+    // 商家消费券类（item_type='merchant_coupon'，兑换后发给 user_coupons）
+    ['point_coupon_5', 'merchant_coupon', 500, '5元商家消费券', '兑换后获得5元商家消费券，可在合作商家消费时抵扣', 500, 3],
+    ['point_coupon_10', 'merchant_coupon', 1000, '10元商家消费券', '兑换后获得10元商家消费券，可在合作商家消费时抵扣', 1000, 4],
+    ['point_coupon_20', 'merchant_coupon', 2000, '20元商家消费券', '兑换后获得20元商家消费券，可在合作商家消费时抵扣', 2000, 5],
   ];
-  for (const [id, itemType, itemId, name, desc, needPoints] of defaultPointItems) {
+  for (const [id, itemType, itemId, name, desc, needPoints, sortWeight] of defaultPointItems) {
     try {
       db.prepare(
         `INSERT OR IGNORE INTO point_shop (id, item_type, item_id, name, description, need_points, sort_weight, status)
          VALUES (?, ?, ?, ?, ?, ?, ?, 1)`
-      ).run(id, itemType, itemId, name, desc, needPoints, 0);
+      ).run(id, itemType, itemId, name, desc, needPoints, sortWeight);
     } catch {
       // ignore
     }

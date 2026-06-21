@@ -1,15 +1,41 @@
-/* 我的卡包 V2.0 - 完整重构 */
-/* 设计基准 750rpx */
-/* 页面背景: #0F172A, 卡片背景: #1E293B */
+/* 我的卡券 V3.0 - 4Tab 统一页面 */
+/* 设计基准 750rpx, 深色主题 #0F172A */
+/* 卡片背景: #1E293B, 卡片装饰: 红绿双色渐变条 */
+
+/* ===== 页面容器 ===== */
+.cc-page {
+  min-height: 100vh;
+  padding: 0 32rpx 48rpx;
+  background: #0F172A;
+  box-sizing: border-box;
+}
+
+/* ===== 模块1: 页面大标题 ===== */
+.cc-header {
+  padding: 32rpx 0 16rpx;
+}
+.cc-header-title {
+  display: block;
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.3;
+}
+.cc-header-subtitle {
+  display: block;
+  font-size: 26rpx;
+  color: #94A3B8;
+  margin-top: 8rpx;
+}
 
 /* ===== 模块2: 分类Tab栏 ===== */
-.coupon-tabs {
+.cc-tabs {
   display: flex;
-  height: 80rpx;
+  height: 88rpx;
   margin-bottom: 24rpx;
-  background: transparent;
+  border-bottom: 2rpx solid #1E293B;
 }
-.coupon-tab {
+.cc-tab {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -17,173 +43,229 @@
   justify-content: center;
   position: relative;
 }
-.coupon-tab text {
-  font-size: 28rpx;
-  color: #94A3B8;
+.cc-tab-label {
+  font-size: 26rpx;
+  color: #64748B;
+  transition: color 0.2s;
 }
-.coupon-tab-active text {
-  font-size: 30rpx;
+.cc-tab-active .cc-tab-label {
+  font-size: 28rpx;
   font-weight: 600;
   color: #FF3B5C;
 }
-.coupon-tab-indicator {
+.cc-tab-bar {
   position: absolute;
   bottom: 0;
-  width: 40rpx;
+  width: 48rpx;
   height: 4rpx;
   background: #FF3B5C;
   border-radius: 2rpx;
 }
 
-/* ===== 模块3: 券列表 ===== */
-.coupon-list {
+/* ===== 模块3: 卡券列表 ===== */
+.cc-list {
   display: flex;
   flex-direction: column;
   gap: 20rpx;
+  padding-bottom: 24rpx;
 }
 
-/* 单券卡片 */
-.coupon-card {
+/* ===== 单张卡券卡片 ===== */
+.cc-card {
   display: flex;
   background: #1E293B;
-  border-radius: 24rpx;
-  padding: 24rpx;
-  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.2);
+  border-radius: 20rpx;
+  overflow: hidden;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.25);
+  position: relative;
+  transition: transform 0.15s;
 }
-.coupon-card-disabled {
-  opacity: 0.5;
+.cc-card:active {
+  transform: scale(0.98);
 }
 
-/* 左侧面值区 */
-.coupon-left {
-  width: 160rpx;
+/* 禁用态（已使用/已过期） */
+.cc-card-inactive {
+  opacity: 0.55;
+}
+
+/* 左侧装饰渐变条 */
+.cc-card-accent {
+  width: 8rpx;
+  flex-shrink: 0;
+  background: linear-gradient(180deg, #FF3B5C 0%, #F59E0B 100%);
+}
+.cc-accent-inactive {
+  background: linear-gradient(180deg, #475569 0%, #64748B 100%);
+}
+
+/* 卡片主体 */
+.cc-card-body {
+  flex: 1;
+  padding: 24rpx 28rpx 20rpx;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  border-right: 1rpx dashed #334155;
-  padding-right: 24rpx;
-  margin-right: 24rpx;
-}
-.coupon-amount {
-  font-size: 48rpx;
-  font-weight: 700;
-  color: #F59E0B;
-  line-height: 1.1;
-}
-.coupon-amount-dim {
-  color: #94A3B8;
-}
-.coupon-threshold {
-  font-size: 24rpx;
-  color: #94A3B8;
-  margin-top: 8rpx;
-  text-align: center;
-}
-.coupon-status-tag {
-  font-size: 20rpx;
-  padding: 4rpx 12rpx;
-  border-radius: 20rpx;
-  margin-top: 8rpx;
-}
-.coupon-status-tag.used {
-  background: #334155;
-  color: #94A3B8;
-}
-.coupon-status-tag.expired {
-  background: #334155;
-  color: #94A3B8;
+  gap: 0;
 }
 
-/* 右侧信息区 */
-.coupon-right {
-  flex: 1;
+/* 顶部行：面额 + 状态 */
+.cc-card-top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 12rpx;
+}
+
+/* 面额区 */
+.cc-amount-area {
+  display: flex;
+  align-items: baseline;
+  gap: 4rpx;
+}
+.cc-amount-symbol {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #F59E0B;
+  line-height: 1;
+}
+.cc-amount-value {
+  font-size: 56rpx;
+  font-weight: 800;
+  color: #F59E0B;
+  line-height: 1;
+}
+.cc-amount-label {
+  font-size: 24rpx;
+  color: #94A3B8;
+  margin-left: 6rpx;
+}
+
+/* 状态 tag */
+.cc-status-tag {
+  font-size: 22rpx;
+  padding: 6rpx 16rpx;
+  border-radius: 20rpx;
+  flex-shrink: 0;
+}
+.cc-status-active {
+  background: rgba(255, 59, 92, 0.15);
+  color: #FF3B5C;
+}
+.cc-status-inactive {
+  background: #334155;
+  color: #64748B;
+}
+
+/* 分割线 */
+.cc-divider {
+  height: 1rpx;
+  background: #334155;
+  margin: 12rpx 0;
+}
+
+/* ===== 信息行区域 ===== */
+.cc-info {
   display: flex;
   flex-direction: column;
   gap: 8rpx;
-  min-width: 0;
 }
-.coupon-name {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: #E2E8F0;
-  line-height: 1.3;
+.cc-info-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
 }
-.coupon-scope {
+.cc-info-label {
   font-size: 24rpx;
-  color: #94A3B8;
-  line-height: 1.4;
+  color: #64748B;
+  flex-shrink: 0;
+  width: 3.5em;
+}
+.cc-info-value {
+  font-size: 24rpx;
+  color: #E2E8F0;
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  white-space: nowrap;
 }
-.coupon-validity {
+.cc-info-merchant {
+  color: #00D4FF;
+}
+.cc-info-tag {
+  display: inline-block;
+  background: rgba(245, 158, 11, 0.15);
+  color: #F59E0B;
+  padding: 2rpx 12rpx;
+  border-radius: 8rpx;
   font-size: 22rpx;
-  color: #64748B;
-}
-.coupon-actions {
-  margin-top: 4rpx;
-}
-.coupon-use-btn {
-  width: 160rpx;
-  height: 64rpx;
-  line-height: 64rpx;
-  text-align: center;
-  background: #FF3B5C;
-  border-radius: 12rpx;
-  color: #ffffff;
-  font-size: 26rpx;
-}
-.coupon-use-btn:active {
-  opacity: 0.9;
-  transform: scale(0.95);
-}
-.coupon-status-text {
-  font-size: 24rpx;
-  color: #94A3B8;
+  align-self: flex-start;
 }
 
-/* 加载态 */
-.loading-state {
+/* ===== 底部操作按钮 ===== */
+.cc-card-action {
+  margin-top: 14rpx;
+  display: flex;
+  justify-content: flex-end;
+}
+.cc-action-btn-text {
+  font-size: 24rpx;
+  padding: 8rpx 24rpx;
+  border-radius: 24rpx;
+}
+.cc-action-deduct {
+  background: rgba(255, 59, 92, 0.12);
+  color: #FF3B5C;
+}
+.cc-action-coupon {
+  background: rgba(0, 212, 255, 0.12);
+  color: #00D4FF;
+}
+
+/* ===== 加载态 ===== */
+.cc-loading {
   display: flex;
   justify-content: center;
-  padding: 48rpx 0;
+  padding: 80rpx 0;
 }
-.loading-text {
+.cc-loading-text {
   font-size: 28rpx;
-  color: #94A3B8;
+  color: #64748B;
 }
 
-/* ===== 模块4: 空状态 ===== */
-.empty-state {
+/* ===== 空状态 ===== */
+.cc-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 80rpx 0;
-  gap: 16rpx;
+  padding: 100rpx 0;
+  gap: 12rpx;
 }
-.empty-icon {
-  font-size: 72rpx;
+.cc-empty-icon {
+  font-size: 80rpx;
 }
-.empty-title {
-  font-size: 28rpx;
-  color: #94A3B8;
+.cc-empty-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #E2E8F0;
 }
-.empty-get-btn {
-  width: 200rpx;
+.cc-empty-desc {
+  font-size: 26rpx;
+  color: #64748B;
+}
+.cc-empty-btn {
+  width: 220rpx;
   height: 72rpx;
   line-height: 72rpx;
   text-align: center;
-  background: #FF3B5C;
-  border-radius: 16rpx;
+  background: linear-gradient(135deg, #FF3B5C 0%, #FF6B6B 100%);
+  border-radius: 36rpx;
   color: #ffffff;
   font-size: 28rpx;
-  margin-top: 16rpx;
+  font-weight: 600;
+  margin-top: 24rpx;
+  box-shadow: 0 4rpx 16rpx rgba(255, 59, 92, 0.3);
 }
-.empty-get-btn:active {
-  opacity: 0.9;
+.cc-empty-btn:active {
+  opacity: 0.85;
   transform: scale(0.95);
 }

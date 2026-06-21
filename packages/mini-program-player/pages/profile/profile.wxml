@@ -46,7 +46,7 @@
   <view class="assets-card" bindtap="onAssetsTap">
     <view class="assets-col">
       <text class="assets-number assets-number-red">¥{{assets.deductible}}</text>
-      <text class="assets-label">参赛抵扣金</text>
+      <text class="assets-label">参赛抵扣卡</text>
       <text class="assets-subtext">买参赛包直接抵扣</text>
     </view>
     <view class="assets-divider"></view>
