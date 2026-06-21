@@ -347,26 +347,41 @@ export function initSchema(): void {
     db.exec('ALTER TABLE race_packages ADD COLUMN season_id INTEGER');
   } catch { /* ignore */ }
 
-  // V2.0 插入默认赛季配置项到 system_config
-  const seasonDefaults: [string, string, string][] = [
-    ['season_level_exp_1', '0', 'Lv1所需经验(青铜勋章)'],
-    ['season_level_exp_2', '200', 'Lv2所需经验(白银勋章)'],
-    ['season_level_exp_3', '500', 'Lv3所需经验(黄金勋章)'],
-    ['season_level_exp_4', '1200', 'Lv4所需经验(铂金勋章)'],
-    ['season_level_exp_5', '2500', 'Lv5所需经验(钻石勋章)'],
-    ['season_score_buy_pkg_39', '100', '39元档购买经验值'],
-    ['season_score_buy_pkg_99', '300', '99元档购买经验值'],
-    ['season_score_buy_pkg_199', '700', '199元档购买经验值'],
-    ['season_exp_per_race', '10', '完成单场比赛经验'],
-    ['season_signin_exp', '5', '商家签到经验'],
-    ['season_points_per_race', '5', '完成单场比赛积分'],
-    ['season_points_rank_1', '100', '日榜第1名积分'],
-    ['season_points_rank_2_5', '50', '日榜2-5名积分'],
-    ['season_points_rank_6_10', '30', '日榜6-10名积分'],
-    ['season_signin_points', '10', '商家签到积分'],
+  // V2.0 迁移：users 表新增 register_coupon_granted 标记
+  try {
+    db.exec('ALTER TABLE users ADD COLUMN register_coupon_granted INTEGER NOT NULL DEFAULT 0');
+  } catch { /* ignore */ }
+
+  // V2.0 默认赛季配置项 + 段位/奖励配置
+  const defaultSeasonConfigs: [string, string, string][] = [
+    // 段位经验阈值
+    ['season_level_exp_1', '0', '青铜选手（Lv1）所需经验'],
+    ['season_level_exp_2', '100', '白银选手（Lv2）所需经验'],
+    ['season_level_exp_3', '300', '黄金选手（Lv3）所需经验'],
+    ['season_level_exp_4', '700', '铂金选手（Lv4）所需经验'],
+    ['season_level_exp_5', '1500', '钻石选手（Lv5）所需经验'],
+    ['season_level_exp_6', '3000', '最强王者（Lv6）所需经验'],
+    // 升段奖励（coupon_type=20，长期有效）
+    ['season_reward_level_2_coupon_cents', '800', '白银段位升级奖励 - 参赛抵扣卡金额（分）'],
+    ['season_reward_level_2_points', '50', '白银段位升级奖励 - 积分'],
+    ['season_reward_level_3_coupon_cents', '1500', '黄金段位升级奖励 - 参赛抵扣卡金额（分）'],
+    ['season_reward_level_3_points', '100', '黄金段位升级奖励 - 积分'],
+    ['season_reward_level_4_coupon_cents', '2500', '铂金段位升级奖励 - 参赛抵扣卡金额（分）'],
+    ['season_reward_level_4_points', '200', '铂金段位升级奖励 - 积分'],
+    ['season_reward_level_5_coupon_cents', '4000', '钻石段位升级奖励 - 参赛抵扣卡金额（分）'],
+    ['season_reward_level_5_points', '400', '钻石段位升级奖励 - 积分'],
+    ['season_reward_level_6_coupon_cents', '6000', '大师段位升级奖励 - 参赛抵扣卡金额（分）'],
+    ['season_reward_level_6_points', '800', '大师段位升级奖励 - 积分'],
+    ['season_reward_level_2_grant_once', 'true', '白银奖励终身一次'],
+    ['season_reward_level_3_grant_once', 'true', '黄金奖励终身一次'],
+    ['season_reward_level_4_grant_once', 'true', '铂金奖励终身一次'],
+    ['season_reward_level_5_grant_once', 'true', '钻石奖励终身一次'],
+    ['season_reward_level_6_grant_once', 'true', '大师奖励终身一次'],
+    // 赛季通用
+    ['season_default_days', '30', '赛季默认天数'],
     ['season_lottery_cost', '100', '单次抽奖所需积分'],
   ];
-  for (const [key, value, desc] of seasonDefaults) {
+  for (const [key, value, desc] of defaultSeasonConfigs) {
     try {
       db.prepare(
         `INSERT OR IGNORE INTO system_config (id, key, value, description) VALUES (?, ?, ?, ?)`
@@ -466,6 +481,72 @@ export function initSchema(): void {
 
   // V2.0 迁移：entry_deductions 表 CREATE TABLE IF NOT EXISTS
   // 由 schema_v2.sql 中的 DDL 处理
+
+  // V2.3 迁移：orders 表新增 remaining_times / remaining_growth 字段
+  try { db.exec('ALTER TABLE orders ADD COLUMN remaining_times INTEGER DEFAULT 0'); } catch { /* ignore */ }
+  try { db.exec('ALTER TABLE orders ADD COLUMN remaining_growth INTEGER DEFAULT 0'); } catch { /* ignore */ }
+
+  // ============================================
+  // V2.0 积分商城表：point_shop
+  // ============================================
+  try {
+    db.exec(`CREATE TABLE IF NOT EXISTS point_shop (
+      id TEXT PRIMARY KEY,
+      item_type TEXT NOT NULL,
+      item_id TEXT,
+      name TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      need_points INTEGER NOT NULL,
+      exchange_limit INTEGER DEFAULT 0,
+      sort_weight INTEGER DEFAULT 0,
+      status INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    )`);
+    console.log('[SQLite] point_shop table initialized');
+  } catch { /* ignore */ }
+
+  // 插入运营商预制模板默认配置项到 system_config
+  const operatorDefaultConfigs: [string, string, string][] = [
+    ['season_default_days', '30', '赛季默认天数'],
+    ['coupon_base_price_type', 'discount_price', '优惠券基价类型(standard_price/discount_price)'],
+    ['growth_base_rule', 'discount_price', '成长值计算基准(standard_price/discount_price)'],
+    ['point_base_rule', 'discount_price', '积分计算基准(standard_price/discount_price)'],
+    ['point_rate', '2.0', '积分倍率(元:分)'],
+    ['refund_coupon_return', 'false', '退款是否回收优惠券'],
+    ['coupon_overdue_remind', '3', '优惠券过期前提醒天数'],
+  ];
+  // 仅写入不存在的键（保留已自定义的值）
+  for (const [key, value, desc] of operatorDefaultConfigs) {
+    try {
+      const existing = db.prepare('SELECT id FROM system_config WHERE key = ?').get(key);
+      if (!existing) {
+        db.prepare(
+          'INSERT INTO system_config (id, key, value, description) VALUES (?, ?, ?, ?)'
+        ).run(uuidv4(), key, value, desc);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // 插入默认积分商城商品（仅首次运行时生效）
+  const defaultPointItems: [string, string, number, string, string, number][] = [
+    ['point_5yuan', 'platform_coupon', 20, '5元参赛抵扣卡', '兑换后可在购买参赛包时抵扣5元报名费', 100],
+    ['point_10yuan', 'platform_coupon', 20, '10元参赛抵扣卡', '兑换后可在购买参赛包时抵扣10元报名费', 200],
+    ['point_20yuan', 'platform_coupon', 20, '20元参赛抵扣卡', '兑换后可在购买参赛包时抵扣20元报名费', 400],
+    ['point_50yuan', 'platform_coupon', 20, '50元参赛抵扣卡', '兑换后可在购买参赛包时抵扣50元报名费', 1000],
+  ];
+  for (const [id, itemType, itemId, name, desc, needPoints] of defaultPointItems) {
+    try {
+      db.prepare(
+        `INSERT OR IGNORE INTO point_shop (id, item_type, item_id, name, description, need_points, sort_weight, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 1)`
+      ).run(id, itemType, itemId, name, desc, needPoints, 0);
+    } catch {
+      // ignore
+    }
+  }
 
   // ============================================
   // 插入默认超级管理员（仅首次运行时生效）

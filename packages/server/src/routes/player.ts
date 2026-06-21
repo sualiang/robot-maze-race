@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { query, queryOne, execute } from '../config/database';
 import { getConfigInt } from '../config/utils';
 import { authMiddleware } from '../middleware/auth';
+import { autoAssignMerchantCoupons } from '../services/coupon-service';
 import { rateLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
@@ -292,6 +293,10 @@ router.post('/checkin', authMiddleware, async (req: Request, res: Response) => {
        VALUES ($1, $2, $3, $4, 'queued', datetime('now'), datetime('now'), datetime('now'))`,
       [checkinId, userId, venueId, queueNumber]
     );
+
+    // 成长值发放：从已购且还有剩余次数的参赛包中，按包扣减
+    // 找到最新一个有 remaining_times > 0 的订单，扣减一次，发放 growth_value / race_count
+    await grantGrowthOnCheckin(userId, checkinId);
 
     res.json({
       code: 0,
@@ -730,9 +735,9 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
   }
 
   try {
-    // 查询参赛包
-    const pkg = await queryOne<{ id: string; name: string; price_cents: number; race_count: number; free_deduction_cents: number }>(
-      `SELECT id, name, price_cents, race_count, free_deduction_cents FROM race_packages WHERE id = $1 AND status = 'active'`,
+    // 查询参赛包（含新字段）
+    const pkg = await queryOne<{ id: string; name: string; price_cents: number; race_count: number; growth_value: number; point_value: number; free_deduction_cents: number }>(
+      `SELECT id, name, price_cents, race_count, growth_value, point_value, free_deduction_cents FROM race_packages WHERE id = $1 AND status = 'active'`,
       [packageId]
     );
 
@@ -782,14 +787,24 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
       // 抵扣金扣减失败不应阻止下单
     }
 
+    // 成长值发放机制重构：购包不直接发经验/积分，签到才发
+    // remaining_times = race_count（包的参赛次数）, remaining_growth = growth_value
+    // 每签到一次发放成长值：growth_value / race_count
+    const growthValue = (pkg as any).growth_value || 0;
+    const pointValue = (pkg as any).point_value || 0;
+    const remainingTimes = pkg.race_count || 0;
+    const remainingGrowth = growthValue;
+
     // 计算最终支付金额（最低0）
     const finalPriceCents = Math.max(0, pkg.price_cents - deductionCents);
 
-    // 创建订单（使用 discount_cents 记录抵扣金额）
+    // 创建订单（记录 remaining_times / remaining_growth 作为签到发成长值的依据）
     await query(
-      `INSERT INTO orders (id, order_no, user_id, package_id, amount_cents, discount_cents, status, paid_at, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, 'paid', datetime('now'), datetime('now'))`,
-      [orderId, orderNo, userId, packageId, pkg.price_cents, deductionCents]
+      `INSERT INTO orders (id, order_no, user_id, package_id, amount_cents, discount_cents,
+               remaining_times, remaining_growth, status, paid_at, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'paid', datetime('now'), datetime('now'))`,
+      [orderId, orderNo, userId, packageId, pkg.price_cents, deductionCents,
+       remainingTimes, remainingGrowth]
     );
 
     // 购买参赛包后，更新用户参赛次数
@@ -803,31 +818,6 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
       } catch (raceCountErr: any) {
         console.error('[订单] 更新参赛次数失败:', raceCountErr?.message || raceCountErr);
       }
-    }
-
-    // V2.0: 购买参赛包后发放经验 + 积分（根据参赛包价格档位）
-    const expAwardMapping: Record<string, { expKey: string }> = {
-      '3900': { expKey: 'season_score_buy_pkg_39' },
-      '9900': { expKey: 'season_score_buy_pkg_99' },
-      '19900': { expKey: 'season_score_buy_pkg_199' },
-    };
-
-    // 根据价格近似匹配档位
-    const priceKey = String(pkg.price_cents);
-    let expAward = 0;
-    if (pkg.price_cents >= 19900) {
-      expAward = await getConfigInt('season_score_buy_pkg_199', 700);
-    } else if (pkg.price_cents >= 9900) {
-      expAward = await getConfigInt('season_score_buy_pkg_99', 300);
-    } else {
-      expAward = await getConfigInt('season_score_buy_pkg_39', 100);
-    }
-
-    if (expAward > 0) {
-      await execute(
-        `UPDATE users SET exp = COALESCE(exp, 0) + $1, updated_at = datetime('now') WHERE id = $2`,
-        [expAward, userId]
-      );
     }
 
     // 购买后自动赠送抵扣金（如参赛包有 free_deduction_cents 配置）
@@ -846,111 +836,46 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
       }
     }
 
-    // 购买后根据参赛包档位自动赠送消费券（随机从各商家选取）
-    // 消费券包总面额：基础包=6000分, 标准包=18000分, 专业包=40000分
-    const COUPON_PACK_TARGETS: Record<string, number> = {
-      'basic': 6000,
-      'standard': 18000,
-      'pro': 40000,
-    };
-    const couponTargetCents = COUPON_PACK_TARGETS[packageId] || 0;
-    if (couponTargetCents > 0) {
-      try {
-        // 获取所有已审核、有库存的消费券
-        const availableCoupons = await query<any>(
-          `SELECT c.id, c.merchant_id, c.name, c.description, c.denomination_cents,
-                  c.coupon_type, c.min_consume_cents, m.merchant_name
-           FROM merchant_coupons c
-           JOIN merchants m ON c.merchant_id = m.id
-           WHERE c.audit_status = 3 AND c.remain_count > 0
-           ORDER BY c.denomination_cents ASC`
-        );
-
-        if (availableCoupons && availableCoupons.length > 0) {
-          // 算法：从各商家随机选券，覆盖尽量多商家，总面额接近目标
-          // 每张券选完后从列表中移除，确保不重复
-          let remaining = couponTargetCents;
-          const grantedCoupons: any[] = [];
-          const usedMerchantIds = new Set<string>();
-          let pool = [...availableCoupons].filter((c: any) => c.denomination_cents > 0);
-
-          // 将池按商家分组
-          const merchantGroups = new Map<string, any[]>();
-          for (const c of pool) {
-            if (!merchantGroups.has(c.merchant_id)) merchantGroups.set(c.merchant_id, []);
-            merchantGroups.get(c.merchant_id)!.push(c);
-          }
-
-          // 第一轮：轮询各商家，每家选一张最小面额 ≤ remaining 且未用过的券
-          let changed = true;
-          while (changed) {
-            changed = false;
-            for (const [merchantId, coupons] of merchantGroups) {
-              if (remaining <= 0) break;
-              // 从小到大找第一张可用的
-              const usable = coupons
-                .filter((c: any) => !grantedCoupons.some((g: any) => g.id === c.id) && c.denomination_cents <= remaining)
-                .sort((a: any, b: any) => a.denomination_cents - b.denomination_cents);
-              if (usable.length > 0) {
-                const pick = usable[0];
-                grantedCoupons.push(pick);
-                usedMerchantIds.add(merchantId);
-                remaining -= pick.denomination_cents;
-                changed = true;
-              }
-            }
-          }
-
-          // 第二轮：如果还有剩余，从任意商家选一张最小面额 ≤ remaining 的券
-          if (remaining > 0) {
-            const remainingCoupons = pool
-              .filter((c: any) => !grantedCoupons.some((g: any) => g.id === c.id) && c.denomination_cents <= remaining)
-              .sort((a: any, b: any) => b.denomination_cents - a.denomination_cents); // 降序，尽量靠近
-            for (const coupon of remainingCoupons) {
-              if (remaining <= 0) break;
-              grantedCoupons.push(coupon);
-              usedMerchantIds.add(coupon.merchant_id);
-              remaining -= coupon.denomination_cents;
-            }
-          }
-
-          // 第三轮：如果剩余 < 300分，允许超一点（补最小面额）
-          if (remaining > 0 && remaining < 300) {
-            const smallest = pool.find((c: any) => !grantedCoupons.some((g: any) => g.id === c.id) && c.denomination_cents > 0);
-            if (smallest) {
-              grantedCoupons.push(smallest);
-              usedMerchantIds.add(smallest.merchant_id);
-              remaining -= smallest.denomination_cents;
-            }
-          }
-
-          // 写入 user_coupons
-          const validEnd = new Date(Date.now() + 30 * 86400000).toISOString();
-          let grantedCount = 0;
-          for (const coupon of grantedCoupons) {
-            // 扣减库存
-            await execute(
-              `UPDATE merchant_coupons SET remain_count = remain_count - 1, updated_at = datetime('now') WHERE id = $1 AND remain_count > 0`,
-              [coupon.id]
-            );
-            // 插入用户券
-            const userCouponId = uuidv4();
-            await execute(
-              `INSERT INTO user_coupons (id, user_id, coupon_id, merchant_id, name, description,
-                      denomination_cents, min_consume_cents, status, valid_start, valid_end,
-                      coupon_type, created_at, updated_at)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, datetime('now'), datetime('now'))`,
-              [userCouponId, userId, coupon.id, coupon.merchant_id, coupon.name,
-               coupon.description || '', coupon.denomination_cents, coupon.min_consume_cents,
-               1, new Date().toISOString(), validEnd, coupon.coupon_type]
-            );
-            grantedCount++;
-          }
-          console.log(`[订单] 购买参赛包赠送消费券共计${grantedCount}张，总面额${couponTargetCents - remaining}分（目标${couponTargetCents}分），覆盖${usedMerchantIds.size}家商家`);
-        }
-      } catch (couponErr: any) {
-        console.error('[订单] 赠送消费券失败:', couponErr?.message || couponErr);
+    // 购买后自动配消费券（从券池按算法匹配，详见 coupon-service）
+    try {
+      const assignResult = await autoAssignMerchantCoupons(userId, orderId, packageId);
+      if (assignResult.grantedCount > 0) {
+        console.log(`[订单] 自动配券: ${assignResult.grantedCount}张, 总面额${assignResult.totalCents}分, 覆盖${assignResult.merchantCount}家商家`);
       }
+    } catch (couponErr: any) {
+      console.error('[订单] 自动配券失败:', couponErr?.message || couponErr);
+    }
+
+    // 购包成功后自动发放参赛抵扣卡（平台官方券 coupon_type=20）
+    try {
+      const GIFT_MAP: Record<string, { cents: number; count: number }> = {
+        'basic': { cents: 500, count: 1 },
+        'standard': { cents: 1500, count: 1 },
+        'pro': { cents: 2000, count: 3 },
+      };
+      const giftConfig = GIFT_MAP[packageId];
+      if (giftConfig) {
+        const validEnd = '2070-01-01 00:00:00';
+        for (let i = 0; i < giftConfig.count; i++) {
+          const giftCouponId = uuidv4();
+          await execute(
+            `INSERT INTO user_coupons (id, user_id, coupon_id, merchant_id, name, description,
+                    denomination_cents, min_consume_cents, status, valid_start, valid_end,
+                    coupon_type, extra_data, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, $9, $10, 20, $11, datetime('now'), datetime('now'))`,
+            [
+              giftCouponId, userId, giftCouponId, 'platform',
+              '购包赠·参赛抵扣卡',
+              `购买参赛包赠参赛抵扣卡`, giftConfig.cents, 0,
+              new Date().toISOString(), validEnd,
+              JSON.stringify({ source: 'purchase_gift', package_id: packageId, order_id: orderId })
+            ]
+          );
+        }
+        console.log(`[订单] 购包赠参赛抵扣卡：用户${userId}，参赛包${packageId}，共${giftConfig.count}张×${giftConfig.cents}分`);
+      }
+    } catch (giftErr: any) {
+      console.error('[订单] 赠送参赛抵扣卡失败:', giftErr?.message || giftErr);
     }
 
     // 构造支付参数（开发环境直接返回模拟参数）
@@ -973,7 +898,6 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
         deductionCents,
         finalPrice: finalPriceCents,
         raceCount: pkg.race_count,
-        expAward,
         paymentParams,
         status: 'paid',
       }
@@ -1039,26 +963,14 @@ async function getSystemConfig(key: string, defaultVal: string): Promise<string>
  */
 async function getUserRemainingRaces(userId: string): Promise<number> {
   try {
-    // 来源①：查出所有已支付订单
-    const orders = await query<any>(
-      `SELECT rp.race_count
-       FROM orders o
-       JOIN race_packages rp ON o.package_id = rp.id
-       WHERE o.user_id = $1 AND o.status = 'paid'`,
+    // 来源①：从 orders.remaining_times 统计剩余次数
+    // 优先使用 remaining_times 字段（成长值重构后的字段）
+    const remainingTimesRow = await queryOne<{ total: number }>(
+      `SELECT COALESCE(SUM(remaining_times), 0) as total FROM orders
+       WHERE user_id = $1 AND status = 'paid' AND remaining_times > 0`,
       [userId]
     );
-
-    const purchasedTotal = (orders || []).reduce(
-      (sum: number, o: any) => sum + (o.race_count || 0),
-      0
-    );
-
-    // 已使用的参赛次数
-    const usedRow = await queryOne<{ used: number }>(
-      `SELECT COUNT(*) as used FROM checkins WHERE user_id = $1 AND status != 'cancelled'`,
-      [userId]
-    );
-    const used = usedRow?.used ?? 0;
+    const fromOrders = remainingTimesRow?.total ?? 0;
 
     // 来源②：好友助力奖励的参赛次数（users.race_count）
     const userRow = await queryOne<{ race_count: number }>(
@@ -1067,9 +979,80 @@ async function getUserRemainingRaces(userId: string): Promise<number> {
     );
     const bonusRaces = userRow?.race_count ?? 0;
 
-    return purchasedTotal - used + bonusRaces;
+    return fromOrders + bonusRaces;
   } catch {
     return 0;
+  }
+}
+
+/**
+ * 签到发放成长值（exp）
+ * 从用户已购订单中找 remaining_times > 0 的订单，按包扣减一次
+ * 每次发放额 = remaining_growth / original_game_times = growth_value / race_count
+ * 点数 = point_value / race_count
+ */
+async function grantGrowthOnCheckin(userId: string, checkinId: string): Promise<void> {
+  try {
+    // 找到用户 remaining_times > 0 的订单（最早购买的优先消耗）
+    const order = await queryOne<any>(
+      `SELECT o.id, o.remaining_times, o.remaining_growth, rp.race_count, rp.growth_value, rp.point_value
+       FROM orders o
+       JOIN race_packages rp ON o.package_id = rp.id
+       WHERE o.user_id = $1 AND o.status = 'paid' AND o.remaining_times > 0
+       ORDER BY o.paid_at ASC
+       LIMIT 1`,
+      [userId]
+    );
+
+    if (!order) {
+      console.log('[成长值发放] 用户', userId, '无可用参赛包剩余次数');
+      return;
+    }
+
+    const raceCount = order.race_count || 1;
+    const perCheckinGrowth = Math.floor((order.growth_value || 0) / raceCount);
+    const perCheckinPoints = Math.floor((order.point_value || 0) / raceCount);
+
+    if (perCheckinGrowth > 0) {
+      // 发放成长值到 season_user_info
+      const season = await queryOne<{ id: string }>(
+        `SELECT id FROM seasons WHERE status = 1 ORDER BY created_at DESC LIMIT 1`
+      );
+      if (season) {
+        const existingSeasonUser = await queryOne<{ id: string; exp: number; points: number }>(
+          `SELECT id, exp, points FROM season_user_info WHERE user_id = $1 AND season_id = $2`,
+          [userId, season.id]
+        );
+        if (existingSeasonUser) {
+          await execute(
+            `UPDATE season_user_info SET exp = exp + $1, points = points + $2, updated_at = datetime('now') WHERE id = $3`,
+            [perCheckinGrowth, perCheckinPoints, existingSeasonUser.id]
+          );
+        } else {
+          await query(
+            `INSERT INTO season_user_info (id, user_id, season_id, level, exp, points)
+             VALUES ($1, $2, $3, 1, $4, $5)`,
+            [uuidv4(), userId, season.id, perCheckinGrowth, perCheckinPoints]
+          );
+        }
+      }
+
+      // 同时更新 users 表的 exp/points（供非赛季场景使用）
+      await execute(
+        `UPDATE users SET exp = COALESCE(exp, 0) + $1, points = COALESCE(points, 0) + $2, updated_at = datetime('now') WHERE id = $3`,
+        [perCheckinGrowth, perCheckinPoints, userId]
+      );
+
+      console.log('[成长值发放] 用户', userId, '签到获得成长值:', perCheckinGrowth, '积分:', perCheckinPoints);
+    }
+
+    // 扣减订单的剩余次数和剩余成长值
+    await execute(
+      `UPDATE orders SET remaining_times = remaining_times - 1, updated_at = datetime('now') WHERE id = $1 AND remaining_times > 0`,
+      [order.id]
+    );
+  } catch (err: any) {
+    console.error('[成长值发放] 失败:', err?.message || err);
   }
 }
 

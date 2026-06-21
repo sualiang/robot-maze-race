@@ -83,7 +83,7 @@ router.get('/user/info', authMiddleware, async (req: Request, res: Response) => 
       const nextCouponCents = await getConfigInt(`season_reward_level_${nextLevel}_coupon_cents`, 0);
       const nextPoints = await getConfigInt(`season_reward_level_${nextLevel}_points`, 0);
       const parts: string[] = [];
-      if (nextCouponCents > 0) parts.push(`${(nextCouponCents / 100).toFixed(0)}元无门槛参赛抵价券`);
+      if (nextCouponCents > 0) parts.push(`${(nextCouponCents / 100).toFixed(0)}元无门槛参赛抵扣卡`);
       if (nextPoints > 0) parts.push(`${nextPoints}积分`);
       if (parts.length > 0) upgradeDesc = `升级${levelNames[nextLevel] || ''}立得：${parts.join(' + ')}`;
     }
@@ -324,22 +324,19 @@ async function grantLevelUpReward(userId: string, level: number): Promise<void> 
     // 获取配置
     const couponCents = await getConfigInt(`season_reward_level_${level}_coupon_cents`, 0);
     const rewardPoints = await getConfigInt(`season_reward_level_${level}_points`, 0);
-    const validDays = await getConfigInt(`season_reward_level_${level}_coupon_valid_days`, 30);
 
     if (couponCents <= 0 && rewardPoints <= 0) {
       console.log('[Season] no reward config for level', level);
       return;
     }
 
-    const now = new Date();
-    const validEnd = new Date(now.getTime() + validDays * 24 * 60 * 60 * 1000);
-    const fmt = (d: Date) => d.toISOString().replace('T', ' ').substring(0, 19);
+    const validEnd = '2070-01-01 00:00:00';
 
     // 优惠券名称
     const levelNames: Record<number, string> = {
       2: '白银', 3: '黄金', 4: '铂金', 5: '钻石', 6: '大师',
     };
-    const couponName = `升段奖励·${levelNames[level] || level}级参赛抵价券`;
+    const couponName = `升段奖励·${levelNames[level] || level}级参赛抵扣卡`;
 
     if (couponCents > 0) {
       const couponId = uuidv4();
@@ -349,8 +346,8 @@ async function grantLevelUpReward(userId: string, level: number): Promise<void> 
         [
           couponId, userId, couponId, 'platform',
           couponName,
-          `升到${levelNames[level] || level}级奖励参赛抵价券`, couponCents, 0,
-          fmt(now), fmt(validEnd),
+          `升到${levelNames[level] || level}级奖励参赛抵扣卡`, couponCents, 0,
+          new Date().toISOString(), validEnd,
           JSON.stringify({ levelUpReward: level })
         ]
       );

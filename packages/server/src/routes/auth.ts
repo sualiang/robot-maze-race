@@ -1019,10 +1019,32 @@ router.post('/register', async (req: Request, res: Response) => {
     const displayName = nickname || '玩家_' + phone.slice(-4);
 
     await query(
-      `INSERT INTO users (id, openid, phone, nickname, password, role, race_count, avatar_url, first_login, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, 'player', 3, '', 0, datetime('now'), datetime('now'))`,
+      `INSERT INTO users (id, openid, phone, nickname, password, role, race_count, avatar_url, first_login, register_coupon_granted, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, 'player', 3, '', 0, 1, datetime('now'), datetime('now'))`,
       [userId, 'plr_' + phone, phone, displayName, hash]
     );
+
+    // 注册成功赠送新人礼·参赛抵扣卡（10元，长期有效）
+    try {
+      const giftCouponId = uuidv4();
+      const validEnd = '2070-01-01 00:00:00';
+      await execute(
+        `INSERT INTO user_coupons (id, user_id, coupon_id, merchant_id, name, description,
+                denomination_cents, min_consume_cents, status, valid_start, valid_end,
+                coupon_type, extra_data, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, $9, $10, 20, $11, datetime('now'), datetime('now'))`,
+        [
+          giftCouponId, userId, giftCouponId, 'platform',
+          '新人礼·参赛抵扣卡',
+          '新用户注册赠送参赛抵扣卡', 1000, 0,
+          new Date().toISOString(), validEnd,
+          JSON.stringify({ source: 'register_gift' })
+        ]
+      );
+      console.log('[Auth] 注册赠送新人礼参赛抵扣卡：用户', userId);
+    } catch (giftErr: any) {
+      console.error('[Auth] 注册赠送参赛抵扣卡失败:', giftErr?.message || giftErr);
+    }
 
     const user: User = {
       id: userId,

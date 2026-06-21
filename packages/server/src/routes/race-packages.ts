@@ -202,14 +202,27 @@ router.post('/', authMiddleware, async (req: Request, res: Response<ApiResponse<
     const rewardMaxCents = body.coupon_reward_max !== undefined ? Math.round(body.coupon_reward_max * 100) : 0;
     const freeDeductionCents = body.free_deduction_cents !== undefined ? body.free_deduction_cents : 0;
 
+    // 新字段（通过 any 访问，body 类型为 CreateRacePackageParams 扩展）
+    const b = body as any;
+    const standardPriceCents = b.standardPriceCents !== undefined ? b.standardPriceCents : priceCents;
+    const discountPriceCents = b.discountPriceCents !== undefined ? b.discountPriceCents : priceCents;
+    const tag = b.tag || '';
+    const specialRights = b.specialRights || '';
+    const growthValue = b.growthValue || 0;
+    const pointValue = b.pointValue || 0;
+
     const opId = req.user?.operatorId || '00000000-0000-0000-0000-000000000000';
     const row = await queryOne<RacePackageRow>(
       `INSERT INTO race_packages (id, operator_id, name, description, price_cents,
+               standard_price_cents, discount_price_cents, tag, special_rights,
+               growth_value, point_value,
                race_count, valid_days, status, sort_order,
                coupon_reward_min_cents, coupon_reward_max_cents, free_deduction_cents)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
        RETURNING *`,
       [id, opId, body.name, body.description || null, priceCents,
+       standardPriceCents, discountPriceCents, tag, specialRights,
+       growthValue, pointValue,
        body.race_count, validDays, 'active', sortOrder,
        rewardMinCents, rewardMaxCents, freeDeductionCents]
     );
