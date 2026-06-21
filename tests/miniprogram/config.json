@@ -1,0 +1,13 @@
+{
+  "debug": false,
+  "enable": true,
+  "test_port": 9420,
+  "project_path": "/Users/longshe/.openclaw/workspace/robot-maze-race/packages/mini-program-player",
+  "dev_tool_path": "/Applications/wechatwebdevtools.app/Contents/MacOS/cli",
+  "appid": "wx619c9f373868ab63",
+  "platform": "ide",
+  "close_ide": false,
+  "test_suit_path": "/Users/longshe/.openclaw/workspace/robot-maze-race/tests/miniprogram/specs",
+  "output_path": "/Users/longshe/.openclaw/workspace/robot-maze-race/tests/miniprogram/reports",
+  "print_server_log": false
+}

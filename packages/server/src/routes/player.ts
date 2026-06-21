@@ -639,8 +639,7 @@ router.get('/coupons', authMiddleware, async (req: Request, res: Response) => {
               COALESCE(m.merchant_name, '') as merchant_name,
               COALESCE(m.logo_url, '') as merchant_logo,
               COALESCE(m.merchant_address, '') as merchant_address,
-              COALESCE(m.longitude, 0) as merchant_lng,
-              COALESCE(m.latitude, 0) as merchant_lat
+              COALESCE(m.logo_url, '') as merchant_logo
        FROM user_coupons uc
        LEFT JOIN merchants m ON uc.merchant_id = m.id
        ${whereClause}
@@ -656,8 +655,8 @@ router.get('/coupons', authMiddleware, async (req: Request, res: Response) => {
       merchantName: c.merchant_name || '',
       merchantLogo: c.merchant_logo || '',
       merchantAddress: c.merchant_address || '',
-      merchantLat: c.merchant_lat || 0,
-      merchantLng: c.merchant_lng || 0,
+      merchantLat: 0,
+      merchantLng: 0,
       name: c.name || '',
       description: c.description || '',
       denominationCents: c.denomination_cents || 0,
