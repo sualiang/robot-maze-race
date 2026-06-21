@@ -1,5 +1,5 @@
-<!-- 我的卡券 V3.5 - 4Tab 统一页面 -->
-<!-- Tab 0: 参赛抵扣卡 | Tab 1: 立减券 | Tab 2: 满减券 | Tab 3: 兑换券 -->
+<!-- 我的卡券 V3.6 - 4Tab 统一页面 -->
+<!-- Tab 0: 参赛抵扣卡（保持原样） | Tab 1: 立减券 | Tab 2: 满减券 | Tab 3: 兑换券 -->
 <view class="cc-page">
 
   <!-- ========== 模块1: 页面大标题 ========== -->
@@ -31,38 +31,25 @@
   <!-- ========== 模块3: 卡券列表 ========== -->
   <view class="cc-list" wx:if="{{cardList.length > 0 && !loading}}">
 
-    <view
-      wx:for="{{cardList}}"
-      wx:key="id"
-      class="cc-card {{item.status === 0 ? 'cc-card-inactive' : ''}}"
-      data-item="{{item}}"
-      bindtap="onCardTap"
-    >
-      <!-- 装饰左侧渐变：参赛抵扣卡金色，消费券红蓝 -->
-      <view class="cc-card-accent {{item.status === 0 ? 'cc-accent-inactive' : (item.isDeduction ? 'cc-accent-gold' : '')}}"></view>
-
-      <view class="cc-card-body">
-        <!-- 顶部行：面额 + 状态 tag -->
-        <view class="cc-card-top">
-          <view class="cc-amount-area">
-            <text class="cc-amount-symbol">¥</text>
-            <text class="cc-amount-value">
-              <block wx:if="{{item.isDeduction}}">{{item.amountYuan.toFixed(2)}}</block>
-              <block wx:else>{{item.denominationYuan.toFixed(2)}}</block>
-            </text>
-            <text class="cc-amount-label" wx:if="{{item.isDeduction}}">参赛抵扣</text>
-            <text class="cc-amount-label" wx:else>消费券</text>
+    <block wx:for="{{cardList}}" wx:key="id">
+      <!-- ===== 参赛抵扣卡（Tab 0）— 保持原样 ===== -->
+      <view wx:if="{{item.isDeduction}}"
+        class="cc-card {{item.status === 0 ? 'cc-card-inactive' : ''}}"
+        data-item="{{item}}"
+        bindtap="onCardTap"
+      >
+        <view class="cc-card-accent {{item.status === 0 ? 'cc-accent-inactive' : 'cc-accent-gold'}}"></view>
+        <view class="cc-card-body">
+          <view class="cc-card-top">
+            <view class="cc-amount-area">
+              <text class="cc-amount-symbol">¥</text>
+              <text class="cc-amount-value">{{item.amountYuan.toFixed(2)}}</text>
+              <text class="cc-amount-label">参赛抵扣</text>
+            </view>
+            <text class="cc-status-tag cc-status-{{item.status === 1 ? 'active' : 'inactive'}}">{{item.statusText}}</text>
           </view>
-          <text class="cc-status-tag cc-status-{{item.status === 1 ? 'active' : 'inactive'}}">{{item.statusText}}</text>
-        </view>
-
-        <!-- 分割线 -->
-        <view class="cc-divider"></view>
-
-        <!-- 信息行 -->
-        <view class="cc-info">
-          <!-- 参赛抵扣卡（Tab 0）：显示来源 + 到期日 + 卡片说明 -->
-          <block wx:if="{{item.isDeduction}}">
+          <view class="cc-divider"></view>
+          <view class="cc-info">
             <view class="cc-info-row">
               <text class="cc-info-label">类型</text>
               <text class="cc-info-value cc-info-gold">参赛抵扣卡</text>
@@ -75,44 +62,74 @@
               <text class="cc-info-label">到期日</text>
               <text class="cc-info-value">{{item.expiresAt || '长期有效'}}</text>
             </view>
-          </block>
-
-          <!-- 立减券 / 满减券 / 兑换券（Tab 1/2/3） -->
-          <block wx:else>
-            <view class="cc-info-row">
-              <text class="cc-info-label">商家</text>
-              <text class="cc-info-value cc-info-merchant">{{item.merchantName}}</text>
-            </view>
-            <!-- 立减券（coupon_type=1）：无门槛 -->
-            <view wx:if="{{item.couponType === 1}}" class="cc-info-row">
-              <text class="cc-info-label">使用</text>
-              <text class="cc-info-value cc-info-tag">无门槛立减</text>
-            </view>
-            <!-- 满减券（coupon_type=3）：满X减Y -->
-            <view wx:elif="{{item.couponType === 3 && item.minConsumeYuan > 0}}" class="cc-info-row">
-              <text class="cc-info-label">满减</text>
-              <text class="cc-info-value">满¥{{item.minConsumeYuan.toFixed(2)}}减¥{{item.denominationYuan.toFixed(2)}}</text>
-            </view>
-            <!-- 兑换券（coupon_type=4）：显示商品描述 -->
-            <view wx:elif="{{item.couponType === 4}}" class="cc-info-row">
-              <text class="cc-info-label">商品</text>
-              <text class="cc-info-value">{{item.description || item.name || '兑换商品'}}</text>
-            </view>
-            <view class="cc-info-row">
-              <text class="cc-info-label">到期</text>
-              <text class="cc-info-value">{{item.validEnd || '长期有效'}}</text>
-            </view>
-          </block>
-        </view>
-
-        <!-- 底部操作按钮 -->
-        <view class="cc-card-action" wx:if="{{item.status === 1}}">
-          <text class="cc-action-btn-text {{item.isDeduction ? 'cc-action-deduct' : 'cc-action-coupon'}}">
-            {{item.isDeduction ? '立即使用 ›' : '查看券码 ›'}}
-          </text>
+          </view>
+          <view class="cc-card-action" wx:if="{{item.status === 1}}">
+            <text class="cc-action-btn-text cc-action-deduct">立即使用 ›</text>
+          </view>
         </view>
       </view>
-    </view>
+
+      <!-- ===== 消费券卡片（立减/满减/兑换）— 全新样式 ===== -->
+      <view wx:else
+        class="coup-card {{item.status !== 1 ? 'coup-card-inactive' : ''}}"
+        data-item="{{item}}"
+      >
+        <!-- 顶部：商家logo + 名称 + 券信息 -->
+        <view class="coup-card-header">
+          <image class="coup-merchant-logo" src="{{item.merchantLogo}}" mode="aspectFill" wx:if="{{item.merchantLogo}}"></image>
+          <view class="coup-merchant-no-logo" wx:else>
+            <text class="coup-merchant-no-logo-text">{{item.merchantName.charAt(0)}}</text>
+          </view>
+          <view class="coup-merchant-info">
+            <text class="coup-merchant-name">{{item.merchantName || '商家'}}</text>
+            <text class="coup-coupon-name">{{item.name}}</text>
+          </view>
+        </view>
+
+        <!-- 面额区 -->
+        <view class="coup-amount-area">
+          <text class="coup-amount-symbol">¥</text>
+          <text class="coup-amount-value">{{item.denominationYuan.toFixed(0)}}</text>
+          <text class="coup-amount-label" wx:if="{{item.couponType === 1}}">立减券</text>
+          <text class="coup-amount-label" wx:elif="{{item.couponType === 3}}">满减券</text>
+          <text class="coup-amount-label" wx:elif="{{item.couponType === 4}}">兑换券</text>
+        </view>
+
+        <!-- 信息行：券种类 + 有效期 + 有效/超期状态 -->
+        <view class="coup-info-row">
+          <text class="coup-type-tag">
+            <block wx:if="{{item.couponType === 1}}">无门槛立减</block>
+            <block wx:elif="{{item.couponType === 3 && item.minConsumeYuan > 0}}">满¥{{item.minConsumeYuan.toFixed(0)}}减</block>
+            <block wx:elif="{{item.couponType === 4}}">兑换券</block>
+          </text>
+          <text class="coup-valid-range">{{item.validEnd || '长期有效'}}</text>
+          <text class="coup-status-badge coup-status-{{item.status === 1 ? 'ok' : 'expired'}}">{{item.statusText}}</text>
+        </view>
+
+        <!-- 满减条件（额外显示） -->
+        <view wx:if="{{item.couponType === 3 && item.minConsumeYuan > 0}}" class="coup-condition-row">
+          <text class="coup-condition-text">满¥{{item.minConsumeYuan.toFixed(2)}}可用</text>
+        </view>
+
+        <!-- 兑换券商品描述 -->
+        <view wx:if="{{item.couponType === 4 && item.description}}" class="coup-condition-row">
+          <text class="coup-condition-text">{{item.description}}</text>
+        </view>
+
+        <!-- 底部操作栏 -->
+        <view class="coup-card-footer">
+          <!-- 商家地址（可点击导航） -->
+          <view class="coup-address-row" wx:if="{{item.merchantAddress}}" data-item="{{item}}" bindtap="onNavigateStore">
+            <text class="coup-address-icon">📍</text>
+            <text class="coup-address-text">{{item.merchantAddress}}</text>
+          </view>
+          <!-- 立即使用按钮 -->
+          <view class="coup-use-btn" wx:if="{{item.status === 1}}" data-item="{{item}}" bindtap="onUseCoupon">
+            <text class="coup-use-btn-text">立即使用</text>
+          </view>
+        </view>
+      </view>
+    </block>
   </view>
 
   <!-- ========== 加载态 ========== -->
@@ -146,6 +163,27 @@
       <text class="cc-empty-desc">购买参赛包可获赠商家兑换券</text>
       <view class="cc-empty-btn cc-empty-btn-secondary" bindtap="onGetCards">去购买参赛包 →</view>
     </block>
+  </view>
+
+  <!-- ========== 核销弹窗 ========== -->
+  <view wx:if="{{showVerifyModal && verifyItem}}" class="verify-mask" bindtap="onCloseVerify">
+    <view class="verify-modal" catchtap="">
+      <view class="verify-modal-close" bindtap="onCloseVerify">✕</view>
+      <view class="verify-modal-title">核销二维码</view>
+
+      <!-- 二维码展示区 — 用 verifyCode 文本展示，带防伪装饰 -->
+      <view class="verify-qr-area">
+        <text class="verify-qr-code">{{verifyItem.verifyCode}}</text>
+      </view>
+
+      <!-- 核销码数字 -->
+      <view class="verify-code-area">
+        <text class="verify-code-label">核销码</text>
+        <text class="verify-code-value">{{verifyItem.verifyCode}}</text>
+      </view>
+
+      <view class="verify-modal-hint">请向商家出示此码</view>
+    </view>
   </view>
 
 </view>

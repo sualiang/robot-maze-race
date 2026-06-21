@@ -19,7 +19,10 @@ Page({
     cardList: [],
     isEmpty: false,
     loading: false,
-    pageTitle: '我的卡券'
+    pageTitle: '我的卡券',
+    // 核销弹窗
+    showVerifyModal: false,
+    verifyItem: null
   },
 
   onLoad: function () {
@@ -27,7 +30,6 @@ Page({
   },
 
   onShow: function () {
-    // 从其他页面返回时刷新
     this.fetchCards();
   },
 
@@ -35,7 +37,7 @@ Page({
   onTabChange: function (e) {
     var key = parseInt(e.currentTarget.dataset.key, 10);
     if (key === this.data.currentTab) return;
-    this.setData({ currentTab: key, cardList: [], isEmpty: false });
+    this.setData({ currentTab: key, cardList: [], isEmpty: false, showVerifyModal: false });
     this.fetchCards();
   },
 
@@ -58,11 +60,9 @@ Page({
         }
 
         var mapped = list.map(function (d) {
-          // 状态: available=未使用(1), used/expired=已使用过期(0)
           var status = d.status === 'available' ? 1 : 0;
           return {
             id: d.id,
-            // 参赛抵扣卡专用字段
             isDeduction: true,
             source: d.racePackageId ? '参赛包赠送' : '新用户专享',
             amountYuan: (d.amountCents || 0) / 100,
@@ -71,12 +71,10 @@ Page({
             statusText: status === 1 ? '可用' : (d.status === 'used' ? '已使用' : '已过期'),
             createdAt: (d.createdAt || '').substring(0, 10),
             expiresAt: (d.expiresAt || '').substring(0, 10),
-            // 排序权重：未使用=0，已使用/过期=1
             _sortWeight: status === 1 ? 0 : 1
           };
         });
 
-        // 排序：未使用优先
         mapped.sort(function (a, b) { return a._sortWeight - b._sortWeight; });
 
         that.setData({
@@ -102,27 +100,27 @@ Page({
       }
 
       var mapped = list.map(function (item) {
-        // 解析券状态: status=1 或 status='available' 或 used=0 → 未使用
         var rawStatus = item.status;
         var isAvailable = rawStatus === 1 || rawStatus === 'available' || rawStatus === 0 || item.used === 0;
         var isExpired = rawStatus === -1 || rawStatus === 'expired' || item.used === -1;
 
-        var displayStatus = 0; // 默认已使用
+        var displayStatus = 0;
         if (isAvailable) displayStatus = 1;
         else if (isExpired) displayStatus = -1;
 
         var statusText = '已使用';
-        if (displayStatus === 1) statusText = '可用';
-        else if (displayStatus === -1) statusText = '已过期';
+        if (displayStatus === 1) statusText = '有效';
+        else if (displayStatus === -1) statusText = '超期';
 
-        // 统一消费券展示字段
         return {
           id: item.id || item._id,
           isDeduction: false,
           // 商家信息
-          merchantName: item.merchantName || item.merchant_name || item.store_name || '商家',
-          merchantLat: item.merchantLat || item.merchant_lat || item.store_lat || 0,
-          merchantLng: item.merchantLng || item.merchant_lng || item.store_lng || 0,
+          merchantName: item.merchantName || item.merchant_name || item.store_name || '',
+          merchantLogo: item.merchantLogo || item.merchant_logo || item.logo_url || '',
+          merchantAddress: item.merchantAddress || item.merchant_address || '',
+          merchantLat: parseFloat(item.merchantLat || item.merchant_lat || item.store_lat || 0),
+          merchantLng: parseFloat(item.merchantLng || item.merchant_lng || item.store_lng || 0),
           // 券信息
           name: item.name || item.title || '消费券',
           description: item.description || '',
@@ -138,13 +136,12 @@ Page({
           validStart: (item.validStart || item.valid_start || item.startDate || item.start_date || '').substring(0, 10),
           validEnd: (item.validEnd || item.valid_end || item.expireDate || item.expire_date || '').substring(0, 10),
           // 核销码
-          qrCode: item.qrcode || item.qr_code || item.code || item.coupon_code || '',
-          // 排序权重：未使用=0 < 已使用=1 < 已过期=2
+          verifyCode: item.verifyCode || item.verify_code || item.qrcode || item.qr_code || item.code || item.coupon_code || '',
+          // 排序权重
           _sortWeight: displayStatus === 1 ? 0 : (displayStatus === 0 ? 1 : 2)
         };
       });
 
-      // 排序：未使用(权重0) → 已使用(权重1) → 已过期(权重2)
       mapped.sort(function (a, b) { return a._sortWeight - b._sortWeight; });
 
       that.setData({
@@ -161,55 +158,48 @@ Page({
     });
   },
 
-  // 点击卡片
+  // ========== 参赛抵扣卡（Tab 0）点击 ==========
   onCardTap: function (e) {
     var item = e.currentTarget.dataset.item;
     if (!item) return;
 
     if (item.isDeduction) {
-      // 参赛抵扣卡 -> 跳首页购买参赛包使用
       wx.switchTab({ url: '/pages/index/index' });
-    } else {
-      // 消费券 -> 展示操作菜单
-      this.showCouponDetail(item);
     }
+    // 消费券不再走 actionSheet — 改为使用按钮触发
   },
 
-  // 展示券详情: 核销二维码 + 商家导航
-  showCouponDetail: function (item) {
-    var that = this;
-    wx.showActionSheet({
-      itemList: ['查看核销二维码', '导航到店'],
-      success: function (res) {
-        if (res.tapIndex === 0) {
-          that.showQRCode(item);
-        } else if (res.tapIndex === 1) {
-          that.navigateToStore(item);
-        }
-      },
-      fail: function () {}
+  // ========== 消费券「立即使用」按钮 ==========
+  onUseCoupon: function (e) {
+    var item = e.currentTarget.dataset.item;
+    if (!item) return;
+
+    // 只对未使用的消费券生效
+    if (item.status !== 1) return;
+
+    this.setData({
+      showVerifyModal: true,
+      verifyItem: item
     });
   },
 
-  // 展示核销二维码
-  showQRCode: function (item) {
-    var code = item.qrCode || '';
-    if (!code) {
-      wx.showToast({ title: '暂无核销码', icon: 'none' });
-      return;
-    }
-    wx.showModal({
-      title: '核销二维码',
-      content: '核销码: ' + code + '\n请向商家出示',
-      showCancel: false
+  // 关闭核销弹窗
+  onCloseVerify: function () {
+    this.setData({
+      showVerifyModal: false,
+      verifyItem: null
     });
   },
 
-  // 导航到店
-  navigateToStore: function (item) {
+  // ========== 导航到店 ==========
+  onNavigateStore: function (e) {
+    var item = e.currentTarget.dataset.item;
+    if (!item) return;
+
     var lat = parseFloat(item.merchantLat || 0);
     var lng = parseFloat(item.merchantLng || 0);
     var name = item.merchantName || '商家';
+    var address = item.merchantAddress || '';
 
     if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) {
       wx.showToast({ title: '暂无门店地址', icon: 'none' });
@@ -220,6 +210,7 @@ Page({
       latitude: lat,
       longitude: lng,
       name: name,
+      address: address,
       scale: 15
     });
   },
@@ -229,7 +220,7 @@ Page({
     wx.navigateTo({ url: '/pages/packages/packages' });
   },
 
-  // 跳转兑换记录（预留积分兑换记录页）
+  // 跳转兑换记录
   onExchangeRecords: function () {
     wx.navigateTo({ url: '/pages/prize/prize' });
   }
