@@ -140,9 +140,17 @@ Page({
 
       wx.showToast({ title: '登录成功', icon: 'success', duration: 1500 });
 
-      // 延迟跳转到编辑个人信息页
+      // 判断是否已完善个人信息：有 nickname 表示已完善
+      var hasProfile = d.user && d.user.nickname && d.user.nickname.trim() !== '';
+
       setTimeout(function () {
-        wx.redirectTo({ url: '/pages/edit-profile/edit-profile' });
+        if (!hasProfile) {
+          // 新用户 → 跳编辑个人信息页
+          wx.redirectTo({ url: '/pages/edit-profile/edit-profile' });
+        } else {
+          // 老用户 → 直接跳首页
+          wx.switchTab({ url: '/pages/index/index' });
+        }
       }, 1500);
     }).catch(function (err) {
       that.setData({ loading: false });
@@ -186,17 +194,20 @@ Page({
   // ===== 注册（暂无注册页，提示引导） =====
   doRegister: function () {
     var that = this;
-    var phone = that.data.phone.trim();
+    var raw = that.data.phone;
+    var phone = String(raw || '').replace(/\D/g, '');
+    var phoneValid = phone && phone.length === 11;
+    console.log('[注册] raw:', raw, 'strip:', phone, 'valid:', phoneValid);
 
     wx.showModal({
       title: '快速注册',
-      content: phone && /^\d{11}$/.test(phone)
-        ? '将用手机号 ' + phone + ' 进行注册，是否继续？'
+      content: phoneValid
+        ? '将用手机号 ' + phone + ' 进行注册，密码默认 admin123，是否继续？'
         : '请输入11位手机号后点击注册',
-      confirmText: phone && /^\d{11}$/.test(phone) ? '立即注册' : '我知道了',
+      confirmText: phoneValid ? '立即注册' : '我知道了',
       confirmColor: '#e94560',
       success: function (res) {
-        if (res.confirm && phone && /^\d{11}$/.test(phone)) {
+        if (res.confirm && phoneValid) {
           that.doRegisterSubmit(phone);
         }
       }

@@ -184,3 +184,19 @@ CREATE TABLE IF NOT EXISTS merchants (
   updated_at TEXT DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_merchants_status ON merchants(status);
+
+-- ==================== 参赛抵扣金表 ====================
+CREATE TABLE IF NOT EXISTS entry_deductions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  amount_cents INTEGER NOT NULL DEFAULT 0,
+  source TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'available',
+  order_id TEXT,
+  race_package_id TEXT,
+  expires_at TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  used_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_entry_deductions_user ON entry_deductions(user_id);
+CREATE INDEX IF NOT EXISTS idx_entry_deductions_status ON entry_deductions(status);

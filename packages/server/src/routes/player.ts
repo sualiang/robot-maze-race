@@ -25,7 +25,26 @@ router.get('/home', (_req: Request, res: Response) => {
   });
 });
 
-// 参赛包列表（从数据库取 + 返回关联礼券）
+// 参赛包列表 — V2.0 三档设计
+// 从数据库取 active 参赛包，合并关联礼券信息
+// 三档标签根据 price_cents 自动判断:
+//   39元档 / 99元档 / 199元档
+// 成长值(growValue)和积分(points)从 system_config 读取
+const PACKAGE_TIERS = [
+  { maxCents: 6900, tag: '基础体验', growExpKey: 'season_score_buy_pkg_39', defaultExp: 100 },
+  { maxCents: 19900, tag: '标准竞赛', growExpKey: 'season_score_buy_pkg_99', defaultExp: 300 },
+  { maxCents: Infinity, tag: '专业训练', growExpKey: 'season_score_buy_pkg_199', defaultExp: 700 },
+];
+
+function getTierInfo(priceCents: number) {
+  for (const tier of PACKAGE_TIERS) {
+    if (priceCents <= tier.maxCents) {
+      return tier;
+    }
+  }
+  return PACKAGE_TIERS[PACKAGE_TIERS.length - 1];
+}
+
 router.get('/packages', async (_req: Request, res: Response) => {
   try {
     const rows = await query<any>(
@@ -45,35 +64,41 @@ router.get('/packages', async (_req: Request, res: Response) => {
         merchantName: c.merchant_name,
         couponName: c.coupon_name,
       }));
+
       const totalRewardValue = couponList.reduce((s: number, cc: any) => s + cc.denominationCents, 0);
+
+      // 根据价格档位判断成长值和积分
+      const tier = getTierInfo(row.price_cents);
+      const growValue = await getConfigInt(tier.growExpKey, tier.defaultExp);
+      const points = await getConfigInt('season_points_per_race', 5);
 
       return {
         id: row.id,
         name: row.name,
         description: row.description || '',
-        salePrice: row.price_cents,
-        originalPrice: row.price_cents,
+        price: row.price_cents,
+        standardPriceCents: row.standard_price_cents || 0,
+        tag: row.tag || '',
+        growthValue: row.growth_value || 0,
+        pointValue: row.point_value || 0,
         raceCount: row.race_count,
         validDays: row.valid_days || 365,
+        couponPackage: couponList.map((c: any) => ({
+          id: c.id,
+          couponId: c.couponId,
+          denominationCents: c.denominationCents,
+          couponType: c.couponType,
+          merchantName: c.merchantName,
+          couponName: c.couponName,
+        })),
+        totalRewardValue,
+        growValue,
+        points,
         isHot: row.sort_order <= 1,
         isRecommend: row.sort_order <= 2,
         isActive: row.status === 'active',
-        coupons: couponList,
-        totalRewardValue,
       };
     }));
-
-    // 有礼券信息 + 总价值说明
-    result.forEach((pkg: any) => {
-      if (pkg.totalRewardValue > 0) {
-        const rewardYuan = (pkg.totalRewardValue / 100).toFixed(0);
-        pkg.description = pkg.description
-          ? `${pkg.description}（赠价值 ¥${rewardYuan} 礼券）`
-          : `赠价值 ¥${rewardYuan} 礼券`;
-        pkg.tag = '🎁 超值礼券';
-        pkg.tagType = 'gift';
-      }
-    });
 
     res.json({ code: 0, data: result });
   } catch (e: any) {
@@ -349,17 +374,66 @@ router.get('/checkin/queue', authMiddleware, async (req: Request, res: Response)
 router.get('/me/profile-check', authMiddleware, async (req: Request, res: Response) => {
   const userId = req.user!.userId;
   try {
-    const user = await queryOne<{ nickname: string; phone: string; gender: string }>(
-      `SELECT nickname, phone, gender FROM users WHERE id = $1`,
+    const user = await queryOne<{ nickname: string; phone: string; gender: string; race_count: number }>(
+      `SELECT nickname, phone, gender, race_count FROM users WHERE id = $1`,
       [userId]
     );
+
+    // 查询可用抵扣金余额
+    let availableDeductionCents = 0;
+    try {
+      const deductionRow = await queryOne<{ total: number }>(
+        `SELECT COALESCE(SUM(amount_cents), 0) as total FROM entry_deductions WHERE user_id = $1 AND status = 'available'`,
+        [userId]
+      );
+      availableDeductionCents = deductionRow?.total || 0;
+    } catch (deductionErr) {
+      console.error('[profile-check] 查询抵扣金失败:', (deductionErr as Error)?.message);
+    }
+
+    // 查询消费券总额
+    let couponTotalCents = 0;
+    try {
+      const couponRow = await queryOne<{ total: number }>(
+        `SELECT COALESCE(SUM(denomination_cents), 0) as total FROM user_coupons WHERE user_id = $1 AND status = 1 AND (valid_end IS NULL OR valid_end >= datetime('now'))`,
+        [userId]
+      );
+      couponTotalCents = couponRow?.total || 0;
+    } catch (couponErr) {
+      console.error('[profile-check] 查询消费券总额失败:', (couponErr as Error)?.message);
+    }
+
+    // 查询积分余额（从 users.points 字段读取）
+    let pointsBalance = 0;
+    try {
+      const pointsRow = await queryOne<{ points: number }>(
+        `SELECT COALESCE(points, 0) as points FROM users WHERE id = $1`,
+        [userId]
+      );
+      pointsBalance = pointsRow?.points || 0;
+    } catch (pointsErr) {
+      // 静默失败，可能是旧版本没有 points 字段
+    }
+
     const needPhone = !user || !user.nickname || !user.phone;
     res.json({
       code: 0,
-      data: { needPhone, nickname: user?.nickname || '', phone: user?.phone || '', gender: user?.gender || '' }
+      data: {
+        needPhone,
+        nickname: user?.nickname || '',
+        phone: user?.phone || '',
+        gender: user?.gender || '',
+        raceCount: user?.race_count || 0,
+        availableDeductionCents,
+        availableDeductionYuan: availableDeductionCents / 100,
+        couponTotalCents,
+        couponTotalYuan: couponTotalCents / 100,
+        pointsBalance,
+      }
     });
-  } catch {
-    res.json({ code: 0, data: { needPhone: true, nickname: '', phone: '', gender: '' } });
+  } catch (e: any) {
+    console.error('[profile-check] error:', e?.message || e);
+    res.json({ code: 0, data: { needPhone: true, nickname: '', phone: '', gender: '', raceCount: 0, availableDeductionCents: 0, availableDeductionYuan: 0, couponTotalCents: 0, couponTotalYuan: 0, pointsBalance: 0 } });
   }
 });
 
@@ -448,15 +522,198 @@ router.get('/me/stats', authMiddleware, async (req: Request, res: Response) => {
   }
 });
 
-// 参赛记录
-router.get('/me/race-records', (_req: Request, res: Response) => {
-  res.json({
-    code: 0,
-    data: [
-      { id: 'r1', arenaName: '北京主赛场', bestTime: 38.1, rank: 3, createdAt: Date.now() - 86400000 },
-      { id: 'r2', arenaName: '上海分赛场', bestTime: 42.5, rank: 5, createdAt: Date.now() - 172800000 }
-    ]
-  });
+/**
+ * GET /player/me/race-records
+ * 返回历史参赛记录列表
+ * 从 race_results 表查询
+ */
+router.get('/me/race-records', authMiddleware, async (req: Request, res: Response) => {
+  const userId = req.user!.userId;
+  try {
+    const records = await query<any>(
+      `SELECT rr.id, rr.score_ms, rr.rank, rr.status, rr.finished_at, rr.created_at,
+              v.name as venue_name
+       FROM race_results rr
+       LEFT JOIN venues v ON rr.venue_id = v.id
+       WHERE rr.user_id = $1
+       ORDER BY rr.created_at DESC
+       LIMIT 50`,
+      [userId]
+    );
+
+    const result = (records || []).map((r: any) => ({
+      id: r.id,
+      score: r.score_ms || 0,
+      rank: r.rank || 0,
+      date: r.finished_at || r.created_at,
+      growValue: 0,   // 成长值在 V2 暂从 race_results 不直接关联，后续可扩展
+      points: 0,       // 积分奖励在完成比赛时已写入 users.points，此处展示历史固定值
+      venueName: r.venue_name || '',
+      status: r.status || '',
+    }));
+
+    res.json({ code: 0, data: result });
+  } catch (e: any) {
+    console.error('[Player] race-records error:', e?.message || e);
+    res.json({ code: 500, message: '查询参赛记录失败', data: null });
+  }
+});
+
+/**
+ * GET /player/deductions
+ * 获取用户的参赛抵扣金列表
+ */
+router.get('/deductions', authMiddleware, async (req: Request, res: Response) => {
+  const userId = req.user!.userId;
+  try {
+    const deductions = await query<any>(
+      `SELECT id, amount_cents, amount_cents as used_cents, source, status, order_id,
+              race_package_id, expires_at, created_at
+       FROM entry_deductions
+       WHERE user_id = $1
+       ORDER BY created_at DESC`,
+      [userId]
+    );
+    const list = (deductions || []).map((d: any) => ({
+      id: d.id,
+      amountCents: d.amount_cents || 0,
+      amountYuan: (d.amount_cents || 0) / 100,
+      usedCents: d.used_cents || 0,
+      source: d.source,
+      status: d.status,
+      orderId: d.order_id,
+      racePackageId: d.race_package_id,
+      expiresAt: d.expires_at,
+      createdAt: d.created_at,
+    }));
+    res.json({ code: 0, data: { list } });
+  } catch (e: any) {
+    console.error('[Player] deductions error:', e?.message || e);
+    res.json({ code: 500, message: '查询失败', data: null });
+  }
+});
+
+/**
+ * GET /player/coupons
+ * 获取用户的优惠券列表（按 coupon_type 分类）
+ * coupon_type: 1=参赛抵扣, 2=到店满减, 3=实物兑换
+ */
+router.get('/coupons', authMiddleware, async (req: Request, res: Response) => {
+  const userId = req.user!.userId;
+  const { type } = req.query; // 可选筛选
+
+  try {
+    let whereClause = 'WHERE uc.user_id = $1 AND uc.status = 1';
+    const params: any[] = [userId];
+
+    if (type) {
+      const typeNum = parseInt(type as string, 10);
+      if ([1, 2, 3].includes(typeNum)) {
+        whereClause += ' AND uc.coupon_type = $2';
+        params.push(typeNum);
+      }
+    }
+
+    // 有效期内（未设置则不过滤）
+    whereClause += ' AND (uc.valid_end IS NULL OR uc.valid_end >= datetime(\'now\'))';
+
+    const coupons = await query<any>(
+      `SELECT uc.id, uc.user_id, uc.coupon_id, uc.merchant_id,
+              uc.name, uc.description, uc.denomination_cents,
+              uc.min_consume_cents, uc.status, uc.used_at,
+              uc.valid_start, uc.valid_end, uc.coupon_type,
+              uc.discount_percent, uc.extra_data, uc.verify_code,
+              uc.created_at,
+              COALESCE(m.merchant_name, '') as merchant_name
+       FROM user_coupons uc
+       LEFT JOIN merchants m ON uc.merchant_id = m.id
+       ${whereClause}
+       ORDER BY uc.created_at DESC`,
+      params
+    );
+
+    const couponList = (coupons || []).map((c: any) => ({
+      id: c.id,
+      userId: c.user_id,
+      couponId: c.coupon_id,
+      merchantId: c.merchant_id,
+      merchantName: c.merchant_name || '',
+      name: c.name || '',
+      description: c.description || '',
+      denominationCents: c.denomination_cents || 0,
+      denominationYuan: (c.denomination_cents || 0) / 100,
+      minConsumeCents: c.min_consume_cents || 0,
+      minConsumeYuan: (c.min_consume_cents || 0) / 100,
+      couponType: c.coupon_type || 1,
+      coupon_type: c.coupon_type || 1,
+      discountPercent: c.discount_percent || 0,
+      extraData: c.extra_data || '{}',
+      verifyCode: c.verify_code || '',
+      status: c.status,
+      validStart: c.valid_start || null,
+      validEnd: c.valid_end || null,
+      usedAt: c.used_at || null,
+      createdAt: c.created_at,
+    }));
+
+    // 按类型分类
+    const entryDiscount = couponList.filter((c: any) => c.couponType === 1);
+    const storeCoupon = couponList.filter((c: any) => c.couponType === 2);
+    const productExchange = couponList.filter((c: any) => c.couponType === 3);
+
+    // 总券数和总面值
+    const totalCount = couponList.length;
+    const totalDenominationCents = couponList.reduce(
+      (sum: number, c: any) => sum + (c.denominationCents || 0),
+      0
+    );
+
+    res.json({
+      code: 0,
+      data: {
+        list: couponList,
+        entryDiscount,
+        storeCoupon,
+        productExchange,
+        summary: {
+          totalCount,
+          totalDenominationCents,
+          totalDenominationYuan: totalDenominationCents / 100,
+          categoryCounts: {
+            entryDiscount: entryDiscount.length,
+            storeCoupon: storeCoupon.length,
+            productExchange: productExchange.length,
+          },
+        },
+      },
+    });
+  } catch (e: any) {
+    console.error('[Player] coupons error:', e?.message || e);
+    res.json({ code: 500, message: '查询优惠券失败', data: null });
+  }
+});
+
+/**
+ * GET /player/orders
+ * 查询用户订单列表
+ */
+router.get('/orders', authMiddleware, async (req: Request, res: Response) => {
+  const userId = req.user!.userId;
+  try {
+    const orders = await query<any>(
+      `SELECT o.id, o.order_no, o.package_id, rp.name as package_name, o.amount_cents, o.discount_cents,
+              o.status, o.paid_at, o.created_at
+       FROM orders o
+       LEFT JOIN race_packages rp ON o.package_id = rp.id
+       WHERE o.user_id = $1
+       ORDER BY o.created_at DESC`,
+      [userId]
+    );
+    res.json({ code: 0, data: { list: orders || [] } });
+  } catch (e: any) {
+    console.error('[玩家] 查询订单失败:', e?.message || e);
+    res.json({ code: 500, message: '查询失败', data: null });
+  }
 });
 
 /**
@@ -474,8 +731,8 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
 
   try {
     // 查询参赛包
-    const pkg = await queryOne<{ id: string; name: string; price_cents: number; race_count: number }>(
-      `SELECT id, name, price_cents, race_count FROM race_packages WHERE id = $1 AND status = 'active'`,
+    const pkg = await queryOne<{ id: string; name: string; price_cents: number; race_count: number; free_deduction_cents: number }>(
+      `SELECT id, name, price_cents, race_count, free_deduction_cents FROM race_packages WHERE id = $1 AND status = 'active'`,
       [packageId]
     );
 
@@ -487,12 +744,66 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
     const orderId = uuidv4();
     const orderNo = 'ORD_' + Date.now() + '_' + userId.substring(0, 8);
 
-    // 创建订单
+    // 自动使用可用参赛抵扣金
+    let deductionCents = 0;
+    let deductionRecordIds: string[] = [];
+    try {
+      // 查询用户所有可用抵扣金（按创建时间升序）
+      const deductions = await query<{ id: any; amount_cents: number }>(
+        `SELECT id, amount_cents FROM entry_deductions
+         WHERE user_id = $1 AND status = 'available'
+         ORDER BY created_at ASC`,
+        [userId]
+      );
+
+      if (deductions && deductions.length > 0) {
+        let remainingPrice = pkg.price_cents;
+
+        for (const d of deductions) {
+          if (remainingPrice <= 0) break;
+          const useAmount = Math.min(d.amount_cents, remainingPrice);
+          deductionCents += useAmount;
+          remainingPrice -= useAmount;
+
+          // 标记已使用的抵扣金
+          await execute(
+            `UPDATE entry_deductions
+             SET status = 'used', order_id = $1, used_at = datetime('now')
+             WHERE id = $2`,
+            [orderId, d.id]
+          );
+          deductionRecordIds.push(String(d.id));
+        }
+
+        console.log(`[订单] 用户${userId}使用抵扣金${deductionCents}分（${deductionRecordIds.length}张）`);
+      }
+    } catch (deductionErr: any) {
+      console.error('[订单] 扣减抵扣金失败（不阻止下单）:', deductionErr?.message || deductionErr);
+      // 抵扣金扣减失败不应阻止下单
+    }
+
+    // 计算最终支付金额（最低0）
+    const finalPriceCents = Math.max(0, pkg.price_cents - deductionCents);
+
+    // 创建订单（使用 discount_cents 记录抵扣金额）
     await query(
-      `INSERT INTO orders (id, order_no, user_id, package_id, amount_cents, status, paid_at, created_at)
-       VALUES ($1, $2, $3, $4, $5, 'paid', datetime('now'), datetime('now'))`,
-      [orderId, orderNo, userId, packageId, pkg.price_cents]
+      `INSERT INTO orders (id, order_no, user_id, package_id, amount_cents, discount_cents, status, paid_at, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, 'paid', datetime('now'), datetime('now'))`,
+      [orderId, orderNo, userId, packageId, pkg.price_cents, deductionCents]
     );
+
+    // 购买参赛包后，更新用户参赛次数
+    if (pkg.race_count > 0) {
+      try {
+        await execute(
+          `UPDATE users SET race_count = COALESCE(race_count, 0) + $1, updated_at = datetime('now') WHERE id = $2`,
+          [pkg.race_count, userId]
+        );
+        console.log('[订单] 购买参赛包增加参赛次数:', pkg.race_count, '次');
+      } catch (raceCountErr: any) {
+        console.error('[订单] 更新参赛次数失败:', raceCountErr?.message || raceCountErr);
+      }
+    }
 
     // V2.0: 购买参赛包后发放经验 + 积分（根据参赛包价格档位）
     const expAwardMapping: Record<string, { expKey: string }> = {
@@ -519,6 +830,129 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
       );
     }
 
+    // 购买后自动赠送抵扣金（如参赛包有 free_deduction_cents 配置）
+    const freeDeductionCents = (pkg as any).free_deduction_cents || 0;
+    if (freeDeductionCents > 0) {
+      try {
+        const deductionId = uuidv4();
+        await query(
+          `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
+           VALUES ($1, $2, $3, 'order_purchase', 'available', $4, $5, datetime('now', '+365 days'), datetime('now'))`,
+          [deductionId, userId, freeDeductionCents, orderId, packageId]
+        );
+        console.log(`[订单] 购买参赛包赠送抵扣金${freeDeductionCents}分`);
+      } catch (grantErr: any) {
+        console.error('[订单] 赠送抵扣金失败:', grantErr?.message || grantErr);
+      }
+    }
+
+    // 购买后根据参赛包档位自动赠送消费券（随机从各商家选取）
+    // 消费券包总面额：基础包=6000分, 标准包=18000分, 专业包=40000分
+    const COUPON_PACK_TARGETS: Record<string, number> = {
+      'basic': 6000,
+      'standard': 18000,
+      'pro': 40000,
+    };
+    const couponTargetCents = COUPON_PACK_TARGETS[packageId] || 0;
+    if (couponTargetCents > 0) {
+      try {
+        // 获取所有已审核、有库存的消费券
+        const availableCoupons = await query<any>(
+          `SELECT c.id, c.merchant_id, c.name, c.description, c.denomination_cents,
+                  c.coupon_type, c.min_consume_cents, m.merchant_name
+           FROM merchant_coupons c
+           JOIN merchants m ON c.merchant_id = m.id
+           WHERE c.audit_status = 3 AND c.remain_count > 0
+           ORDER BY c.denomination_cents ASC`
+        );
+
+        if (availableCoupons && availableCoupons.length > 0) {
+          // 算法：从各商家随机选券，覆盖尽量多商家，总面额接近目标
+          // 每张券选完后从列表中移除，确保不重复
+          let remaining = couponTargetCents;
+          const grantedCoupons: any[] = [];
+          const usedMerchantIds = new Set<string>();
+          let pool = [...availableCoupons].filter((c: any) => c.denomination_cents > 0);
+
+          // 将池按商家分组
+          const merchantGroups = new Map<string, any[]>();
+          for (const c of pool) {
+            if (!merchantGroups.has(c.merchant_id)) merchantGroups.set(c.merchant_id, []);
+            merchantGroups.get(c.merchant_id)!.push(c);
+          }
+
+          // 第一轮：轮询各商家，每家选一张最小面额 ≤ remaining 且未用过的券
+          let changed = true;
+          while (changed) {
+            changed = false;
+            for (const [merchantId, coupons] of merchantGroups) {
+              if (remaining <= 0) break;
+              // 从小到大找第一张可用的
+              const usable = coupons
+                .filter((c: any) => !grantedCoupons.some((g: any) => g.id === c.id) && c.denomination_cents <= remaining)
+                .sort((a: any, b: any) => a.denomination_cents - b.denomination_cents);
+              if (usable.length > 0) {
+                const pick = usable[0];
+                grantedCoupons.push(pick);
+                usedMerchantIds.add(merchantId);
+                remaining -= pick.denomination_cents;
+                changed = true;
+              }
+            }
+          }
+
+          // 第二轮：如果还有剩余，从任意商家选一张最小面额 ≤ remaining 的券
+          if (remaining > 0) {
+            const remainingCoupons = pool
+              .filter((c: any) => !grantedCoupons.some((g: any) => g.id === c.id) && c.denomination_cents <= remaining)
+              .sort((a: any, b: any) => b.denomination_cents - a.denomination_cents); // 降序，尽量靠近
+            for (const coupon of remainingCoupons) {
+              if (remaining <= 0) break;
+              grantedCoupons.push(coupon);
+              usedMerchantIds.add(coupon.merchant_id);
+              remaining -= coupon.denomination_cents;
+            }
+          }
+
+          // 第三轮：如果剩余 < 300分，允许超一点（补最小面额）
+          if (remaining > 0 && remaining < 300) {
+            const smallest = pool.find((c: any) => !grantedCoupons.some((g: any) => g.id === c.id) && c.denomination_cents > 0);
+            if (smallest) {
+              grantedCoupons.push(smallest);
+              usedMerchantIds.add(smallest.merchant_id);
+              remaining -= smallest.denomination_cents;
+            }
+          }
+
+          // 写入 user_coupons
+          const validEnd = new Date(Date.now() + 30 * 86400000).toISOString();
+          let grantedCount = 0;
+          for (const coupon of grantedCoupons) {
+            // 扣减库存
+            await execute(
+              `UPDATE merchant_coupons SET remain_count = remain_count - 1, updated_at = datetime('now') WHERE id = $1 AND remain_count > 0`,
+              [coupon.id]
+            );
+            // 插入用户券
+            const userCouponId = uuidv4();
+            await execute(
+              `INSERT INTO user_coupons (id, user_id, coupon_id, merchant_id, name, description,
+                      denomination_cents, min_consume_cents, status, valid_start, valid_end,
+                      coupon_type, created_at, updated_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, datetime('now'), datetime('now'))`,
+              [userCouponId, userId, coupon.id, coupon.merchant_id, coupon.name,
+               coupon.description || '', coupon.denomination_cents, coupon.min_consume_cents,
+               1, new Date().toISOString(), validEnd, coupon.coupon_type]
+            );
+            grantedCount++;
+          }
+          console.log(`[订单] 购买参赛包赠送消费券共计${grantedCount}张，总面额${couponTargetCents - remaining}分（目标${couponTargetCents}分），覆盖${usedMerchantIds.size}家商家`);
+        }
+      } catch (couponErr: any) {
+        console.error('[订单] 赠送消费券失败:', couponErr?.message || couponErr);
+      }
+    }
+
     // 构造支付参数（开发环境直接返回模拟参数）
     const paymentParams = {
       timeStamp: String(Math.floor(Date.now() / 1000)),
@@ -536,7 +970,8 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
         packageId,
         packageName: pkg.name,
         originalPrice: pkg.price_cents,
-        finalPrice: pkg.price_cents,
+        deductionCents,
+        finalPrice: finalPriceCents,
         raceCount: pkg.race_count,
         expAward,
         paymentParams,

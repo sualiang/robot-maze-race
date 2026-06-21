@@ -461,6 +461,12 @@ export function initSchema(): void {
     db.exec('CREATE INDEX IF NOT EXISTS idx_invite_code ON merchant_invite_codes(code)');
   } catch { /* ignore */ }
 
+  // V2.0 迁移：race_packages 表新增 free_deduction_cents 字段
+  try { db.exec('ALTER TABLE race_packages ADD COLUMN free_deduction_cents INTEGER NOT NULL DEFAULT 0'); } catch { /* ignore */ }
+
+  // V2.0 迁移：entry_deductions 表 CREATE TABLE IF NOT EXISTS
+  // 由 schema_v2.sql 中的 DDL 处理
+
   // ============================================
   // 插入默认超级管理员（仅首次运行时生效）
   // ============================================

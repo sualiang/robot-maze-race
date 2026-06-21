@@ -40,6 +40,7 @@ import merchantAuthRoutes from './routes/merchant-auth';
 import merchantCouponRoutes from './routes/merchant-coupon';
 import merchantVerifyRoutes from './routes/merchant-verify';
 import operatorMerchantRoutes from './routes/operator-merchant';
+import rankRoutes from './routes/rank';
 import prizeRoutes from './routes/prize';
 import taskRoutes from './routes/task';
 import adminSeasonRoutes from './routes/admin-season';
@@ -110,6 +111,7 @@ app.use('/api/v1/admin/players', adminPlayersRouter);
 app.use('/api/v1/operator/players', operatorPlayersRouter);
 
 // V2.0 路由
+app.use('/api/v1/rank', rankRoutes);
 app.use('/api/v1/season', seasonRoutes);
 app.use('/api/v1/points', pointsRoutes);
 app.use('/api/v1/prize', prizeRoutes);
@@ -118,7 +120,7 @@ app.use('/api/v1/prize', prizeRoutes);
 app.use('/api/v1/merchant/auth', merchantAuthRoutes);
 app.use('/api/v1/merchant/coupon', merchantCouponRoutes);
 app.use('/api/v1/merchant/verify', merchantVerifyRoutes);
-app.use('/api/v1/merchant', merchantRoutes);
+app.use('/api/v1/player', merchantRoutes);
 app.use('/api/v1/merchant/verify', merchantVerifyRoutes);
 app.use('/api/v1/operator', operatorMerchantRoutes);
 app.use('/api/v1/task', taskRoutes);
@@ -126,6 +128,10 @@ app.use('/api/v1/admin/season', adminSeasonRoutes);
 app.use('/api/v1/admin/merchant', adminMerchantRoutes);
 app.use('/api/v1/admin/prize', adminPrizeRoutes);
 app.use('/api/v1/admin/task', adminTaskRoutes);
+
+// 参赛抵扣金
+import entryDeductionsRoutes from './routes/entry-deductions';
+app.use('/api/v1/entry-deductions', entryDeductionsRoutes);
 
 // 上传（商家 Logo 等）
 app.use('/api/v1/upload', uploadRoutes);

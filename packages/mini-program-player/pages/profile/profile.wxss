@@ -1,234 +1,286 @@
-/* 个人中心 V2.0 */
+/* 我的页面 V2.0 - 完整重构 */
+/* 设计基准 750rpx */
+/* 页面背景: #0F172A, 卡片背景: #1E293B */
 
-/* ===== 用户信息 ===== */
-.profile-header {
-  margin-bottom: var(--space-base);
-}
-.profile-user-row {
+/* ===== 模块1: 用户信息栏 ===== */
+.user-card {
   display: flex;
   align-items: center;
+  padding: 32rpx;
+  margin-bottom: 24rpx;
+  background: transparent;
 }
-.profile-avatar {
+.user-avatar {
   width: 100rpx;
   height: 100rpx;
-  border-radius: var(--radius-round);
-  background: var(--color-bg-input);
+  border-radius: 50%;
+  background: var(--color-bg-card, #1E293B);
   flex-shrink: 0;
 }
-.profile-user-text {
-  margin-left: var(--space-base);
+.user-info {
+  margin-left: 24rpx;
   display: flex;
   flex-direction: column;
   gap: 6rpx;
 }
-.profile-nickname-row {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-}
-.profile-nickname {
-  font-size: var(--font-xl);
-  font-weight: 700;
-  color: var(--color-text);
-}
-.profile-gender {
-  font-size: 30rpx;
-  font-weight: 700;
-}
-.profile-gender.male { color: #64b5f6; }
-.profile-gender.female { color: #f48fb1; }
-.profile-phone {
-  font-size: var(--font-sm);
-  color: var(--color-text-secondary);
-}
-
-/* ===== 等级勋章 ===== */
-.medal-section {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: var(--space-lg) var(--space-base);
-  margin-bottom: var(--space-base);
-  border: 2rpx solid #ffd700;
-  box-shadow: 0 0 20rpx rgba(255, 215, 0, 0.15);
-  border-radius: var(--radius-lg);
-}
-.medal-icon-wrapper {
-  width: 100rpx;
-  height: 100rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: var(--space-sm);
-}
-.medal-icon {
-  font-size: 80rpx;
-}
-.medal-name {
-  font-size: var(--font-xl);
-  font-weight: 700;
-  color: #ffd700;
-  text-shadow: 0 0 10rpx rgba(255, 215, 0, 0.3);
-}
-
-/* ===== 经验进度条 ===== */
-.exp-section {
-  margin-bottom: var(--space-base);
-}
-.exp-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--space-sm);
-}
-.exp-label {
-  font-size: var(--font-sm);
-  color: var(--color-text-secondary);
-}
-.exp-value {
-  font-size: var(--font-sm);
-  color: var(--color-text);
+.user-nickname {
+  font-size: 32rpx;
   font-weight: 600;
+  color: #ffffff;
 }
-.progress-bar {
-  height: 14rpx;
-  background: var(--color-bg-input);
-  border-radius: 7rpx;
-  overflow: hidden;
-}
-.progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #e94560, #ff6b81, #ffd700);
-  border-radius: 7rpx;
-  transition: width 0.3s;
-}
-.exp-percent-text {
-  font-size: var(--font-xs);
-  color: var(--color-text-light);
-  text-align: center;
-  margin-top: var(--space-xs);
+.user-phone {
+  font-size: 24rpx;
+  color: #94A3B8;
 }
 
-/* ===== 战斗力 + 排名 + 积分 ===== */
-.combat-section {
-  margin-bottom: var(--space-base);
+/* ===== 模块2: 赛季段位卡片 ===== */
+.medal-card {
+  width: 686rpx;
+  background: #1E293B;
+  border-radius: 24rpx;
+  padding: 32rpx;
+  margin: 24rpx auto;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.2);
+  position: relative;
 }
-.combat-row {
+.medal-card-hd {
   display: flex;
-  align-items: center;
-  justify-content: space-around;
+  align-items: flex-start;
+  gap: 20rpx;
 }
-.combat-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+.medal-upgrade-area {
+  flex-shrink: 0;
+  margin-left: auto;
+  align-self: center;
+}
+.medal-icon-area {
+  flex-shrink: 0;
+}
+.medal-icon-badge {
+  font-size: 72rpx;
+  display: block;
+  line-height: 1;
+}
+.trophy-icon {
+  width: 80rpx;
+  height: 80rpx;
+  display: block;
+}
+.medal-title-area {
   flex: 1;
 }
-.combat-number {
-  font-size: var(--font-huge);
-  font-weight: 900;
-  color: var(--color-primary);
-  line-height: 1.1;
+.medal-level-name {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #ffffff;
+  display: block;
 }
-.combat-rank {
-  font-size: var(--font-xxl);
-}
-.combat-points {
-  font-size: var(--font-xxl);
-  color: var(--color-warning);
-}
-.combat-label {
-  font-size: var(--font-xs);
-  color: var(--color-text-light);
+.medal-rank-text {
+  font-size: 24rpx;
+  color: #94A3B8;
+  display: block;
   margin-top: 4rpx;
 }
-.combat-divider {
-  width: 1rpx;
-  height: 48rpx;
-  background: var(--color-border);
+
+/* 进度条 */
+.medal-progress-wrap {
+  margin-top: 24rpx;
+}
+.medal-progress-bg {
+  height: 12rpx;
+  background: #334155;
+  border-radius: 6rpx;
+  overflow: hidden;
+}
+.medal-progress-fill {
+  height: 100%;
+  background: #F59E0B;
+  border-radius: 6rpx;
+  transition: width 0.3s ease;
 }
 
-/* ===== 三行核心数据 ===== */
-.core-stats {
-  margin-bottom: var(--space-base);
-}
-.core-stat-row {
+.medal-info-row {
+  margin-top: 16rpx;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--space-sm) 0;
+  flex-direction: column;
+  gap: 4rpx;
 }
-.core-stat-row + .core-stat-row {
-  border-top: 1rpx solid var(--color-border);
+.medal-exp-text {
+  font-size: 24rpx;
+  color: #94A3B8;
 }
-.core-stat-label {
-  font-size: var(--font-base);
-  color: var(--color-text-secondary);
-}
-.core-stat-value {
-  font-size: var(--font-lg);
-  color: var(--color-text);
-  font-weight: 700;
+.medal-upgrade-desc {
+  font-size: 22rpx;
+  color: #94A3B8;
+  line-height: 1.4;
 }
 
-/* ===== 赛季未开启 ===== */
-.season-closed {
+.medal-upgrade-btn {
+  width: 140rpx;
+  height: 56rpx;
+  line-height: 56rpx;
+  text-align: center;
+  background: #FF3B5C;
+  border-radius: 28rpx;
+  color: #ffffff;
+  font-size: 24rpx;
+}
+.medal-upgrade-btn:active {
+  opacity: 0.9;
+  transform: scale(0.95);
+}
+
+/* 赛季未开启 */
+.season-closed-card {
+  width: 686rpx;
+  margin: 24rpx auto;
+  background: #1E293B;
+  border-radius: 24rpx;
+  padding: 48rpx 32rpx;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: var(--space-xl) var(--space-base);
-  margin-bottom: var(--space-base);
+  gap: 12rpx;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.2);
 }
 .season-closed-icon {
-  font-size: 80rpx;
-  margin-bottom: var(--space-base);
+  font-size: 72rpx;
+  width: 80rpx;
+  height: 80rpx;
 }
 .season-closed-text {
-  font-size: var(--font-xl);
-  font-weight: 700;
-  color: var(--color-text);
-  margin-bottom: var(--space-sm);
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #ffffff;
 }
 .season-closed-desc {
-  font-size: var(--font-sm);
-  color: var(--color-text-light);
+  font-size: 24rpx;
+  color: #94A3B8;
 }
 
-/* ===== 菜单列表 ===== */
+/* ===== 模块3: 福利资产卡片 ===== */
+.assets-card {
+  display: flex;
+  background: #1E293B;
+  border-radius: 24rpx;
+  padding: 32rpx;
+  margin-bottom: 24rpx;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.2);
+}
+.assets-card:active {
+  opacity: 0.9;
+}
+.assets-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4rpx;
+}
+.assets-divider {
+  width: 1rpx;
+  background: #334155;
+  margin: 0 24rpx;
+}
+.assets-number {
+  font-size: 36rpx;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.assets-number-red {
+  color: #FF3B5C;
+}
+.assets-number-gold {
+  color: #F59E0B;
+}
+.assets-label {
+  font-size: 28rpx;
+  color: #E2E8F0;
+}
+.assets-subtext {
+  font-size: 22rpx;
+  color: #94A3B8;
+}
+
+/* ===== 模块4: 赛季数据轻览 ===== */
+.stats-bar {
+  display: flex;
+  background: transparent;
+  margin-bottom: 24rpx;
+}
+.stats-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4rpx;
+}
+.stats-value {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #E2E8F0;
+}
+.stats-label {
+  font-size: 24rpx;
+  color: #94A3B8;
+}
+
+/* ===== 模块5: 功能入口列表 ===== */
 .menu-section {
-  margin-bottom: var(--space-base);
-  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+  margin-bottom: 24rpx;
 }
 .menu-item {
   display: flex;
   align-items: center;
-  padding: var(--space-base);
+  height: 96rpx;
+  padding: 0 32rpx;
+  background: #1E293B;
+  border-radius: 16rpx;
+  gap: 16rpx;
+}
+.menu-item:active {
+  opacity: 0.9;
 }
 .menu-icon {
-  font-size: 36rpx;
-  margin-right: var(--space-base);
+  font-size: 32rpx;
+  flex-shrink: 0;
 }
 .menu-label {
   flex: 1;
-  font-size: var(--font-base);
-  color: var(--color-text);
+  font-size: 30rpx;
+  color: #ffffff;
+}
+.menu-right-text {
+  font-size: 24rpx;
+  color: #F59E0B;
+  flex-shrink: 0;
 }
 .menu-arrow {
-  font-size: var(--font-xl);
-  color: var(--color-text-light);
-}
-.menu-divider {
-  height: 1rpx;
-  background: var(--color-border);
-  margin: 0 var(--space-base);
+  font-size: 32rpx;
+  color: #94A3B8;
+  flex-shrink: 0;
 }
 
-/* ===== 退出登录 ===== */
-.logout-section {
-  margin-top: var(--space-xl);
-  padding-bottom: calc(var(--space-xl) + env(safe-area-inset-bottom));
+/* ===== 模块6: 退出登录按钮 ===== */
+.logout-area {
+  margin-top: 48rpx;
+  padding-bottom: calc(48rpx + env(safe-area-inset-bottom));
+  display: flex;
+  justify-content: center;
 }
 .logout-btn {
-  color: var(--color-text-light);
-  border: 1rpx solid var(--color-border);
+  width: 300rpx;
+  height: 80rpx;
+  line-height: 80rpx;
+  text-align: center;
+  border: 1rpx solid #334155;
+  border-radius: 16rpx;
+  color: #94A3B8;
+  font-size: 28rpx;
+}
+.logout-btn:active {
+  opacity: 0.7;
 }

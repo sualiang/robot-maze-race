@@ -22,12 +22,18 @@ interface RacePackageRow {
   name: string;
   description: string | null;
   price_cents: number;
+  standard_price_cents: number;
+  tag: string;
+  special_rights: string;
+  growth_value: number;
+  point_value: number;
   race_count: number;
   valid_days: number;
   status: string;
   sort_order: number;
   coupon_reward_min_cents: number;
   coupon_reward_max_cents: number;
+  free_deduction_cents: number;
   created_at: string;
   updated_at: string;
 }
@@ -44,17 +50,23 @@ interface PackageCouponRow {
 }
 
 /** 数据库行 → API 响应格式 */
-function toRacePackage(row: RacePackageRow): RacePackage {
+function toRacePackage(row: RacePackageRow): any {
   return {
     id: row.id,
     name: row.name,
     description: row.description || undefined,
     price: row.price_cents / 100,
+    standard_price_cents: row.standard_price_cents || 0,
+    tag: row.tag || '',
+    special_rights: row.special_rights || '',
     race_count: row.race_count,
     valid_days: row.valid_days,
     is_active: row.status === 'active',
     coupon_reward_min: row.coupon_reward_min_cents / 100,
     coupon_reward_max: row.coupon_reward_max_cents / 100,
+    free_deduction_cents: row.free_deduction_cents || 0,
+    growth_value: row.growth_value || 0,
+    point_value: row.point_value || 0,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -163,6 +175,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response<ApiResponse<
       sort_order?: number;
       coupon_reward_min?: number;
       coupon_reward_max?: number;
+      free_deduction_cents?: number;
     };
     const role = req.user!.role;
 
@@ -187,17 +200,18 @@ router.post('/', authMiddleware, async (req: Request, res: Response<ApiResponse<
 
     const rewardMinCents = body.coupon_reward_min !== undefined ? Math.round(body.coupon_reward_min * 100) : 0;
     const rewardMaxCents = body.coupon_reward_max !== undefined ? Math.round(body.coupon_reward_max * 100) : 0;
+    const freeDeductionCents = body.free_deduction_cents !== undefined ? body.free_deduction_cents : 0;
 
     const opId = req.user?.operatorId || '00000000-0000-0000-0000-000000000000';
     const row = await queryOne<RacePackageRow>(
       `INSERT INTO race_packages (id, operator_id, name, description, price_cents,
                race_count, valid_days, status, sort_order,
-               coupon_reward_min_cents, coupon_reward_max_cents)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+               coupon_reward_min_cents, coupon_reward_max_cents, free_deduction_cents)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
       [id, opId, body.name, body.description || null, priceCents,
        body.race_count, validDays, 'active', sortOrder,
-       rewardMinCents, rewardMaxCents]
+       rewardMinCents, rewardMaxCents, freeDeductionCents]
     );
 
     const created = toRacePackage(row!);
@@ -235,18 +249,14 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response<ApiRespons
       return res.status(404).json({ code: 404, message: '参赛包不存在', data: null as any });
     }
 
-    const body = req.body as {
-      name?: string; description?: string; price?: number;
-      race_count?: number; valid_days?: number; status?: string;
-      sort_order?: number; is_active?: boolean;
-      coupon_reward_min?: number; coupon_reward_max?: number;
-    };
+    const body = req.body as any;
 
     const fields: string[] = [];
     const values: any[] = [];
     let paramIdx = 1;
 
-    const excludeKeys = ['price', 'race_count', 'valid_days', 'is_active', 'coupon_reward_min', 'coupon_reward_max'];
+    const excludeKeys = ['price', 'race_count', 'valid_days', 'is_active', 'coupon_reward_min', 'coupon_reward_max', 'free_deduction_cents',
+      'standardPriceCents', 'tag', 'specialRights', 'growthValue', 'pointValue', 'discountPriceCents'];
     for (const [key, val] of Object.entries(body)) {
       if (val !== undefined && !excludeKeys.includes(key)) {
         fields.push(`${key} = $${paramIdx}`);
@@ -263,6 +273,36 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response<ApiRespons
     if (body.price !== undefined) {
       fields.push(`price_cents = $${paramIdx}`);
       values.push(Math.round(body.price * 100));
+      paramIdx++;
+    }
+    if (body.standardPriceCents !== undefined) {
+      fields.push(`standard_price_cents = $${paramIdx}`);
+      values.push(body.standardPriceCents);
+      paramIdx++;
+    }
+    if (body.discountPriceCents !== undefined) {
+      fields.push(`discount_price_cents = $${paramIdx}`);
+      values.push(body.discountPriceCents);
+      paramIdx++;
+    }
+    if (body.tag !== undefined) {
+      fields.push(`tag = $${paramIdx}`);
+      values.push(body.tag);
+      paramIdx++;
+    }
+    if (body.specialRights !== undefined) {
+      fields.push(`special_rights = $${paramIdx}`);
+      values.push(body.specialRights);
+      paramIdx++;
+    }
+    if (body.growthValue !== undefined) {
+      fields.push(`growth_value = $${paramIdx}`);
+      values.push(body.growthValue);
+      paramIdx++;
+    }
+    if (body.pointValue !== undefined) {
+      fields.push(`point_value = $${paramIdx}`);
+      values.push(body.pointValue);
       paramIdx++;
     }
     if (body.race_count !== undefined) {
@@ -283,6 +323,11 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response<ApiRespons
     if (body.coupon_reward_max !== undefined) {
       fields.push(`coupon_reward_max_cents = $${paramIdx}`);
       values.push(Math.round(body.coupon_reward_max * 100));
+      paramIdx++;
+    }
+    if (body.free_deduction_cents !== undefined) {
+      fields.push(`free_deduction_cents = $${paramIdx}`);
+      values.push(body.free_deduction_cents);
       paramIdx++;
     }
     if (body.status !== undefined) {
@@ -321,7 +366,7 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response<ApiRespons
 
     return res.json({ code: 0, message: '更新成功', data: toRacePackage(row!) });
   } catch (error: any) {
-    console.error('[RacePackages] update error:', error.message);
+    console.error('[RacePackages] update error:', error.message, error.stack);
     return res.status(500).json({ code: 500, message: '更新失败', data: null as any });
   }
 });
@@ -406,7 +451,7 @@ router.post('/:id/save-matched-coupons', authMiddleware, async (req: Request, re
 
 /**
  * DELETE /api/v1/race-packages/:id
- * 删除参赛包（软删除）
+ * 真删除参赛包
  */
 router.delete('/:id', authMiddleware, async (req: Request, res: Response<ApiResponse<null>>) => {
   try {
@@ -416,12 +461,12 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response<ApiResp
       return res.status(403).json({ code: 403, message: '无权限', data: null });
     }
 
-    await query(
-      `UPDATE race_packages SET status = 'inactive', updated_at = $1 WHERE id = $2`,
-      [new Date().toISOString(), id]
-    );
+    // 先删除关联的 race_package_coupons
+    await execute(`DELETE FROM race_package_coupons WHERE package_id = $1`, [id]);
+    // 再删除参赛包本身
+    await execute(`DELETE FROM race_packages WHERE id = $1`, [id]);
 
-    return res.json({ code: 0, message: '已下架', data: null });
+    return res.json({ code: 0, message: '已删除', data: null });
   } catch (error: any) {
     console.error('[RacePackages] delete error:', error.message);
     return res.status(500).json({ code: 500, message: '删除失败', data: null });

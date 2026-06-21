@@ -5,11 +5,11 @@ import { authMiddleware } from '../middleware/auth';
 const router = Router();
 
 /**
- * GET /api/v1/merchant/coupon/list
- * 获取用户卡包列表
+ * GET /api/v1/player/coupons
+ * 获取玩家卡包列表
  * querystring: status=1(未使用) / 2(已使用) / 3(已过期)
  */
-router.get('/coupon/list', authMiddleware, async (req: Request, res: Response) => {
+router.get('/coupons', authMiddleware, async (req: Request, res: Response) => {
   const userId = req.user!.userId;
   const status = parseInt(req.query.status as string, 10) || 1; // 默认查未使用
 

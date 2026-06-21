@@ -58,7 +58,7 @@
         <view class="pkg-price-area">
           <text class="price-symbol">¥</text>
           <text class="price-number">{{item.salePriceText}}</text>
-          <text wx:if="{{item.originalPrice > item.salePrice}}" class="price-original">¥{{item.originalPriceText}}</text>
+          <text wx:if="{{item.standardPriceText}}" class="price-original">¥{{item.standardPriceText}}</text>
         </view>
         <button
           class="btn btn-primary buy-btn"

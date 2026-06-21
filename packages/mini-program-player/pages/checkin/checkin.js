@@ -40,6 +40,11 @@ Page({
       var user = storage.getSync(storage.STORAGE_KEYS.USER, {});
       var sex = user.sex || (Math.random() > 0.5 ? '男' : '女');
 
+      // 缓存赛场名供首页顶部显示
+      if (venueData.name) {
+        wx.setStorageSync('last_venue_name', venueData.name);
+      }
+
       that.setData({
         venue: {
           name: venueData.name || '昙花庵路赛场',

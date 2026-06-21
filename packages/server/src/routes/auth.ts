@@ -51,7 +51,7 @@ async function wxCode2Session(code: string): Promise<WxCode2SessionResult> {
  */
 async function findUserByOpenid(openid: string): Promise<User | null> {
   return queryOne<User>(
-    `SELECT id, openid, unionid, nickname, avatar_url, phone, role, race_count,
+    `SELECT id, openid, unionid, nickname, avatar_url, phone, gender, role, race_count,
             total_race_time_ms, best_score_ms, created_at, updated_at
      FROM users WHERE openid = $1`,
     [openid]
@@ -127,7 +127,8 @@ router.post('/wx-login', async (req: Request, res: Response<ApiResponse<WxLoginR
     let sessionKey: string;
     let unionid: string | undefined;
 
-    if (config.isDev && code === 'dev-test-code') {
+    // 模拟模式：本地开发 或 传了测试 code 或 微信未配置时
+    if (code === 'dev-test-code' || !config.wechat.appId) {
       // 开发/测试模式：使用模拟数据
       openid = `dev_openid_${Date.now()}`;
       sessionKey = `dev_session_key_${Date.now()}`;
@@ -144,6 +145,27 @@ router.post('/wx-login', async (req: Request, res: Response<ApiResponse<WxLoginR
     let isNewUser = false;
 
     if (!user) {
+      // 2a. 尝试用手机号查已有用户（绑定微信时用到）
+      const reqPhone = (req.body as any).phone || '';
+      if (reqPhone) {
+        user = await queryOne<User>(
+          `SELECT id, openid, unionid, nickname, avatar_url, phone, gender, role, race_count,
+                  total_race_time_ms, best_score_ms, created_at, updated_at
+           FROM users WHERE phone = $1 AND role = 'player'`,
+          [reqPhone]
+        );
+        if (user) {
+          // 已有账户，绑定新 openid 但不覆盖原 openid
+          await execute(
+            'UPDATE users SET unionid = COALESCE(NULLIF($1, \'\'), unionid), updated_at = datetime(\'now\') WHERE id = $2',
+            [unionid || null, user.id]
+          );
+          console.log('[Auth] wx-login bound openid to existing phone account:', reqPhone, 'userId:', user.id);
+        }
+      }
+    }
+
+    if (!user) {
       const nickname = req.body.nickname || `玩家${Date.now().toString(36).slice(-6)}`;
       const avatarUrl = req.body.avatar_url || '';
       user = await createUser({
@@ -154,6 +176,33 @@ router.post('/wx-login', async (req: Request, res: Response<ApiResponse<WxLoginR
         role: UserRole.PLAYER,
       });
       isNewUser = true;
+
+      // 新用户注册赠送参赛抵扣金（从 marketing_config 读取，默认 500分 = 5元）
+      try {
+        let welcomeDeductionCents = 500; // 默认 5 元
+        try {
+          const cfg = await queryOne<{ value: string }>(
+            `SELECT value FROM marketing_config WHERE venue_id = 'global' AND key = 'welcome_deduction_cents'`
+          );
+          if (cfg && cfg.value) {
+            const parsed = parseInt(cfg.value, 10);
+            if (!isNaN(parsed) && parsed >= 0) welcomeDeductionCents = parsed;
+          }
+        } catch (cfgErr) {
+          // 配置表不存在或没有记录，用默认值
+        }
+
+        if (welcomeDeductionCents > 0) {
+          await execute(
+            `INSERT INTO entry_deductions (user_id, amount_cents, source, status, expires_at, created_at)
+             VALUES ($1, $2, $3, $4, datetime('now', '+30 days'), datetime('now'))`,
+            [user.id, welcomeDeductionCents, 'welcome_gift', 'available']
+          );
+          console.log('[Auth] 新用户注册送参赛抵扣金:', user.id, 'amount:', welcomeDeductionCents / 100, '元');
+        }
+      } catch (deductionErr) {
+        console.error('[Auth] 赠送参赛抵扣金失败:', (deductionErr as Error)?.message);
+      }
     }
 
     // 3. 生成 JWT token
@@ -528,9 +577,10 @@ router.post('/login', async (req: Request, res: Response) => {
       role: string;
       race_count: number;
       avatar_url: string;
+      gender: string;
       first_login: number;
     }>(
-      `SELECT id, phone, nickname, password, role, race_count, avatar_url, first_login FROM users WHERE phone = $1 AND role = 'player'`,
+      `SELECT id, phone, nickname, password, role, race_count, avatar_url, gender, first_login FROM users WHERE phone = $1 AND role = 'player'`,
       [phone]
     );
 
@@ -554,6 +604,7 @@ router.post('/login', async (req: Request, res: Response) => {
             id: playerUser.id,
             nickname: playerUser.nickname || '玩家',
             avatarUrl: playerUser.avatar_url || '',
+            gender: playerUser.gender || '',
             role: 'player',
             raceCount: playerUser.race_count || 0
           }

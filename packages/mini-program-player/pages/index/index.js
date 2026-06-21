@@ -47,14 +47,43 @@ Page({
     // 读本地存储的赛场名（扫码入场时存储）
     // 占位 — 赛场名称此前保留为将来扩展
 
-    // 并行拉取所有数据
-    that.fetchUserProfile();
-    that.fetchCoupons();
+    // 统一从 profile-check 拿参赛次数 + 福利总额 + 积分
+    that.fetchProfileSummary();
+
+    // 并行拉取其他数据
     that.fetchPackages();
     that.fetchSeasonUserInfo();
     that.fetchSeasonConfig();
 
     return Promise.resolve();
+  },
+
+  /**
+   * 统一从 profile-check 批量获取统计数据
+   */
+  fetchProfileSummary: function () {
+    var that = this;
+    var app = getApp();
+
+    if (!app.globalData.isLoggedIn) {
+      that.setData({
+        remainCount: 0,
+        couponValue: 0
+      });
+      return;
+    }
+
+    request.silentGet('/player/me/profile-check').then(function (data) {
+      var d = data.data || data;
+      var points = d.pointsBalance || 0;
+      that.setData({
+        remainCount: d.raceCount || 0,
+        couponValue: d.couponTotalYuan || 0,
+        pointsBalance: points
+      });
+    }).catch(function () {
+      that.setData({ remainCount: 0, couponValue: 0 });
+    });
   },
 
   /**

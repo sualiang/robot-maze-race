@@ -95,10 +95,10 @@
           <!-- 名称 -->
           <text class="pkg-name">{{item.name}}</text>
 
-          <!-- 价格 + 次数 -->
+          <!-- 价格：标准价划线 + 折后价主推 -->
           <view class="pkg-price-row">
             <text class="pkg-price">¥{{item.salePriceText}}</text>
-            <text wx:if="{{item.originalPriceText}}" class="pkg-original-price">¥{{item.originalPriceText}}</text>
+            <text wx:if="{{item.standardPriceText}}" class="pkg-original-price">¥{{item.standardPriceText}}</text>
             <text class="pkg-times">{{item.times}}次</text>
           </view>
 

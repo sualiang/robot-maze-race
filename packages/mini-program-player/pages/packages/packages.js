@@ -75,7 +75,7 @@ Page({
         // 格式化价格：分 → 元
         item.salePrice = item.price || 0;
         item.salePriceText = (item.price / 100).toFixed(2).replace(/\.?0+$/, '');
-        item.originalPriceText = (item.originalPrice / 100).toFixed(2).replace(/\.?0+$/, '');
+        item.standardPriceText = item.standardPriceCents ? (item.standardPriceCents / 100).toFixed(2).replace(/\.?0+$/, '') : '';
         // 格式化礼券价格
         if (item.coupons && item.coupons.length > 0) {
           for (var j = 0; j < item.coupons.length; j++) {

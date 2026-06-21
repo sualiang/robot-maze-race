@@ -54,20 +54,13 @@ export default function FinanceCenter() {
   const fetchRevenue = useCallback(async () => {
     setLoadingRevenue(true);
     try {
-      const res: any = await api.get('/operator/finance/revenue', {
-        params: {
-          start_date: dayjs().startOf('month').format('YYYY-MM-DD'),
-          end_date: dayjs().format('YYYY-MM-DD'),
-        },
-      });
-      const list = res?.list ?? res ?? [];
-      setRevenueList(list);
-      // 累计统计
-      const today = list.find((r: RevenueItem) => r.date === dayjs().format('YYYY-MM-DD'));
-      setTodayRevenue(today?.revenue ?? 0);
-      setTodayOrders(today?.order_count ?? 0);
-      setMonthRevenue(list.reduce((s: number, r: RevenueItem) => s + r.revenue, 0));
-      setMonthOrders(list.reduce((s: number, r: RevenueItem) => s + r.order_count, 0));
+      const res: any = await api.get('/operator/finance/summary');
+      const s = res?.settlements ?? {};
+      setRevenueList([]);
+      setTodayRevenue(Math.round((s.settled_amount_cents ?? 0) / 100));
+      setTodayOrders(s.settled_count ?? 0);
+      setMonthRevenue(Math.round(((s.settled_amount_cents ?? 0) + (s.pending_amount_cents ?? 0)) / 100));
+      setMonthOrders((s.settled_count ?? 0) + (s.pending_count ?? 0));
     } catch { setRevenueList([]); }
     finally { setLoadingRevenue(false); }
   }, []);
@@ -75,8 +68,8 @@ export default function FinanceCenter() {
   const fetchSettlements = useCallback(async () => {
     setLoadingSettlement(true);
     try {
-      const res: any = await api.get('/operator/finance/settlements');
-      setSettlementList(res?.list ?? res ?? []);
+      const res: any = await api.get('/operator/finance/summary');
+      setSettlementList([]);
     } catch { setSettlementList([]); }
     finally { setLoadingSettlement(false); }
   }, []);

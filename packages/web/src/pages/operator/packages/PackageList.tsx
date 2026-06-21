@@ -11,11 +11,15 @@ interface PackageItem {
   name: string;
   description?: string;
   price: number;
+  standard_price_cents?: number;
+  tag?: string;
+  special_rights?: string;
   race_count: number;
   valid_days: number;
   is_active: boolean;
   coupon_reward_min?: number;
   coupon_reward_max?: number;
+  free_deduction_cents?: number;
   created_at: string;
   updated_at: string;
 }
@@ -81,6 +85,11 @@ export default function PackageList() {
       is_active: true,
       coupon_reward_min: 0,
       coupon_reward_max: 0,
+      free_deduction_cents: 0,
+      growth_value: 0,
+      point_value: 0,
+      tag: '',
+      specialRights: '',
     });
     setModalOpen(true);
   };
@@ -91,23 +100,39 @@ export default function PackageList() {
       name: record.name,
       description: record.description,
       price: record.price,
+      tag: record.tag || '',
+      standardPriceCents: (record.standard_price_cents || 0) / 100,
+      specialRights: record.special_rights || '',
       race_count: record.race_count,
       valid_days: record.valid_days,
       is_active: record.is_active,
       coupon_reward_min: record.coupon_reward_min || 0,
       coupon_reward_max: record.coupon_reward_max || 0,
+      free_deduction_cents: (record.free_deduction_cents || 0) / 100,
+      growth_value: record.growth_value || 0,
+      point_value: record.point_value || 0,
     });
     setModalOpen(true);
   };
 
   const handleSave = async () => {
     const values = await form.validateFields();
+    // 元转分
+    if (values.free_deduction_cents !== undefined) {
+      values.free_deduction_cents = values.free_deduction_cents * 100;
+    }
+    const submitData = {
+      ...values,
+      standardPriceCents: Math.round(parseFloat(values.standardPriceCents || 0) * 100),
+      growthValue: values.growth_value,
+      pointValue: values.point_value,
+    };
     try {
       if (editingId) {
-        await api.put(`/packages/${editingId}`, values);
+        await api.put(`/packages/${editingId}`, submitData);
         message.success('更新成功');
       } else {
-        await api.post('/packages', values);
+        await api.post('/packages', submitData);
         message.success('创建成功');
       }
       setModalOpen(false);
@@ -194,28 +219,44 @@ export default function PackageList() {
 
   const columns = [
     { title: '名称', dataIndex: 'name', key: 'name', width: 160 },
+
     {
-      title: '描述', dataIndex: 'description', key: 'description', ellipsis: true,
-      render: (v: string) => v || '-',
-    },
-    {
-      title: '价格(¥)', dataIndex: 'price', key: 'price', width: 100,
+      title: '折扣价(¥)', dataIndex: 'price', key: 'price', width: 100,
       render: (v: number) => `¥${v.toFixed(2)}`,
       sorter: (a: PackageItem, b: PackageItem) => a.price - b.price,
+    },
+    {
+      title: '标准价', dataIndex: 'standard_price_cents', key: 'standard_price_cents', width: 100,
+      render: (v: number | undefined) => v ? `¥${(v / 100).toFixed(2)}` : '-',
+    },
+    {
+      title: '标签', dataIndex: 'tag', key: 'tag', width: 100,
+      render: (v: string | undefined) => v ? <Tag color="blue">{v}</Tag> : '-',
+    },
+    {
+      title: '专属权益', dataIndex: 'special_rights', key: 'special_rights', width: 140, ellipsis: true,
+      render: (v: string | undefined) => v || '-',
     },
     { title: '参赛次数', dataIndex: 'race_count', key: 'race_count', width: 90 },
     { title: '有效期(天)', dataIndex: 'valid_days', key: 'valid_days', width: 100, render: (v: number) => `${v}天` },
     {
-      title: '礼券', key: 'couponReward', width: 120,
+      title: '抵扣金', key: 'freeDeduction', width: 100,
       render: (_: unknown, record: PackageItem) => {
-        if (record.coupon_reward_min && record.coupon_reward_max) {
+        const cents = record.free_deduction_cents || 0;
+        return cents > 0 ? `${(cents / 100).toFixed(0)}元` : '-';
+      },
+    },
+    {
+      title: '消费券包', key: 'couponReward', width: 150,
+      render: (_: unknown, record: PackageItem) => {
+        const min = record.coupon_reward_min || 0;
+        const max = record.coupon_reward_max || 0;
+        if (max > 0) {
           return (
-            <Tag color="purple">
-              ¥{record.coupon_reward_min}~¥{record.coupon_reward_max}
-            </Tag>
+            <span>¥{min.toFixed(0)} ~ ¥{max.toFixed(0)}</span>
           );
         }
-        return <Tag style={{ opacity: 0.4 }}>未设置</Tag>;
+        return '-';
       }
     },
     {
@@ -223,6 +264,14 @@ export default function PackageList() {
       render: (active: boolean) => (
         <Tag color={active ? 'green' : 'default'}>{active ? '在售' : '已下架'}</Tag>
       ),
+    },
+    {
+      title: '成长值', dataIndex: 'growth_value', key: 'growth_value', width: 80,
+      render: (v: number | undefined) => (v || 0) > 0 ? v : '-',
+    },
+    {
+      title: '积分', dataIndex: 'point_value', key: 'point_value', width: 80,
+      render: (v: number | undefined) => (v || 0) > 0 ? v : '-',
     },
     {
       title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 160,
@@ -233,7 +282,7 @@ export default function PackageList() {
       render: (_: unknown, record: PackageItem) => (
         <Space size="small" wrap>
           <Button type="link" size="small" onClick={() => handleEdit(record)}>编辑</Button>
-          {record.coupon_reward_min && record.coupon_reward_max && (
+          {record.coupon_reward_min !== undefined && record.coupon_reward_min > 0 && record.coupon_reward_max > 0 && (
             <Button type="link" size="small" icon={<GiftOutlined />}
               onClick={() => openRewardPanel(record)}>礼券</Button>
           )}
@@ -271,7 +320,7 @@ export default function PackageList() {
           dataSource={list}
           rowKey="id"
           loading={loading}
-          scroll={{ x: 1100 }}
+          scroll={{ x: 1500 }}
           pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t: number) => `共 ${t} 个参赛包` }}
         />
       </Card>
@@ -289,17 +338,23 @@ export default function PackageList() {
           <Form.Item name="name" label="参赛包名称" rules={[{ required: true, message: '请输入名称' }]}>
             <Input placeholder="例如：新手体验包" maxLength={30} />
           </Form.Item>
-          <Form.Item name="description" label="描述">
-            <Input.TextArea rows={3} placeholder="描述信息（选填）" maxLength={200} showCount />
+          <Form.Item name="tag" label="标签">
+            <Input placeholder="如：新人尝鲜" maxLength={20} />
           </Form.Item>
           <Space size={16}>
-            <Form.Item name="price" label="价格（元）" rules={[{ required: true, message: '请输入价格' }]}>
+            <Form.Item name="standardPriceCents" label="标准指导价（元）">
+              <InputNumber min={0} max={999999} step={0.01} precision={2} style={{ width: 160 }} />
+            </Form.Item>
+            <Form.Item name="price" label="平台折扣价（元）" rules={[{ required: true, message: '请输入折扣价' }]}>
               <InputNumber min={0.01} max={99999} step={0.01} precision={2} style={{ width: 160 }} />
             </Form.Item>
             <Form.Item name="race_count" label="参赛次数" rules={[{ required: true, message: '请输入次数' }]}>
               <InputNumber min={1} max={100} style={{ width: 160 }} />
             </Form.Item>
           </Space>
+          <Form.Item name="specialRights" label="专属权益">
+            <Input placeholder="如：赛季决赛直通资格 × 1" maxLength={200} />
+          </Form.Item>
           <Form.Item name="valid_days" label="有效期（天）" rules={[{ required: true, message: '请输入有效期' }]}>
             <InputNumber min={1} max={365} style={{ width: 200 }} />
           </Form.Item>
@@ -313,6 +368,21 @@ export default function PackageList() {
             <Form.Item name="coupon_reward_max" label="礼券总价值上限（元）">
               <InputNumber min={0} step={0.01} precision={2} style={{ width: 150 }}
                 placeholder="例如设60" />
+            </Form.Item>
+          </Space>
+          <Form.Item name="free_deduction_cents" label="赠送参赛包抵扣金（元）"
+            rules={[{ pattern: /^\d+$/, message: '请输入非负整数' }]}>
+            <InputNumber min={0} precision={0} style={{ width: 200 }}
+              placeholder="0表示不赠送" addonAfter="元" />
+          </Form.Item>
+          <Space size={16}>
+            <Form.Item name="growth_value" label="成长值"
+              rules={[{ pattern: /^\d+$/, message: '请输入非负整数' }]}>
+              <InputNumber min={0} precision={0} style={{ width: 150 }} placeholder="0表示不赠送" />
+            </Form.Item>
+            <Form.Item name="point_value" label="积分"
+              rules={[{ pattern: /^\d+$/, message: '请输入非负整数' }]}>
+              <InputNumber min={0} precision={0} style={{ width: 150 }} placeholder="0表示不赠送" />
             </Form.Item>
           </Space>
 

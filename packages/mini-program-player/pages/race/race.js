@@ -1,45 +1,26 @@
-// pages/race/race.js - 比赛页
+/**
+ * pages/race/race.js - 比赛页 (V2 重做)
+ * 设计基准: 750rpx | 背景 #0F172A | 卡片 #1E293B
+ * API: GET /api/v1/player/me/race-records, GET /api/v1/season/user/info
+ */
 var request = require('../../utils/request');
 
 Page({
   data: {
-    // 页面状态: idle | queuing | finished
-    raceStatus: 'idle',
+    // 全局
     pageLoading: true,
-
-    // 通用
     isLoggedIn: false,
-    remainCount: 0,
 
-    // 状态1 - idle：历史记录
+    // 赛季最佳成绩（模块2 状态B）
+    seasonBest: null,        // { scoreText, rank, beatPercent } 或 null(无记录)
+    hasSeasonBest: false,
+
+    // 历史参赛列表（模块3）
     historyRecords: [],
     historyLoading: false,
 
-    // 状态2 - queuing：排队信息
-    queueInfo: {
-      queueNumber: 3,
-      aheadCount: 2,
-      estimatedWait: 5,
-      currentCallNumber: 1,
-      venueName: '铁甲快狗·万象城赛场',
-      venueAddress: '万象城B1层中庭'
-    },
-
-    // 状态3 - finished：比赛结果
-    raceResult: {
-      score: 42.3,
-      scoreText: '42.3s',
-      timeText: '42.3秒',
-      rank: 1,
-      medalEmoji: '🥇',
-      beatPercent: 87,
-      trackName: '极速赛道A',
-      venueName: '铁甲快狗·万象城赛场',
-      dateText: '6月16日 13:00'
-    },
-
-    // 轮询定时器
-    pollTimer: null
+    // 参赛次数/购买逻辑
+    remainCount: 0
   },
 
   onLoad: function () {
@@ -47,157 +28,167 @@ Page({
   },
 
   onShow: function () {
-    this.checkLogin();
+    // 每次显示刷新数据
+    if (getApp().globalData.isLoggedIn) {
+      this.fetchAll();
+    } else {
+      this.checkLogin();
+    }
   },
 
-  onHide: function () {
-    this.stopPolling();
-  },
-
-  onUnload: function () {
-    this.stopPolling();
+  onPullDownRefresh: function () {
+    if (getApp().globalData.isLoggedIn) {
+      this.fetchAll().then(function () {
+        wx.stopPullDownRefresh();
+      }).catch(function () {
+        wx.stopPullDownRefresh();
+      });
+    } else {
+      wx.stopPullDownRefresh();
+    }
   },
 
   /**
-   * 检查登录状态 & 获取最新比赛状态
+   * 检查登录状态
    */
   checkLogin: function () {
+    var that = this;
     var app = getApp();
-    var loggedIn = !!app.globalData.isLoggedIn;
 
-    this.setData({
-      isLoggedIn: loggedIn
-    });
-
-    if (loggedIn) {
-      this.fetchRaceStatus();
-      this.fetchHistoryRecords();
+    if (app.globalData.isLoggedIn) {
+      this.setData({ isLoggedIn: true });
+      this.fetchAll();
     } else {
-      this.setData({
-        pageLoading: false,
-        raceStatus: 'idle'
+      // 尝试静默登录
+      var auth = require('../../utils/auth');
+      auth.wxLogin().then(function () {
+        that.setData({ isLoggedIn: true });
+        that.fetchAll();
+      }).catch(function () {
+        that.setData({
+          isLoggedIn: false,
+          pageLoading: false,
+          hasSeasonBest: false,
+          historyRecords: []
+        });
       });
     }
   },
 
   /**
-   * 获取当前比赛状态（空闲/排队/完成）
+   * 拉取所有数据
    */
-  fetchRaceStatus: function () {
+  fetchAll: function () {
     var that = this;
 
-    request.get('/player/me/stats').then(function (data) {
-      var status = data && data.status ? data.status : 'idle';
+    return Promise.all([
+      that.fetchSeasonInfo(),
+      that.fetchHistoryRecords()
+    ]).then(function () {
+      that.setData({ pageLoading: false });
+    }).catch(function () {
+      that.setData({ pageLoading: false });
+    });
+  },
 
-      if (status === 'queuing') {
+  /**
+   * GET /api/v1/season/user/info — 赛季信息(最佳成绩/排名)
+   */
+  fetchSeasonInfo: function () {
+    var that = this;
+
+    return request.get('/season/user/info').then(function (data) {
+      if (!data) {
         that.setData({
-          raceStatus: 'queuing',
-          queueInfo: {
-            queueNumber: data.queueNumber || 3,
-            aheadCount: data.aheadCount || 2,
-            estimatedWait: data.estimatedWait || 5,
-            currentCallNumber: data.currentCallNumber || 1,
-            venueName: data.venueName || '铁甲快狗·万象城赛场',
-            venueAddress: data.venueAddress || '万象城B1层中庭'
-          },
-          pageLoading: false
+          hasSeasonBest: false,
+          seasonBest: null
         });
-        that.startPolling();
-
-      } else if (status === 'finished') {
-        var result = data.raceResult || {};
-        var score = result.score || 42.3;
-        var scoreText = score < 60 ? score.toFixed(1) + 's' : Math.floor(score / 60) + 'm' + (score % 60).toFixed(1) + 's';
-        var rank = result.rank || 1;
-        var medalMap = ['', '🥇', '🥈', '🥉'];
-
-        that.setData({
-          raceStatus: 'finished',
-          remainCount: data.remainCount || that.data.remainCount,
-          raceResult: {
-            score: score,
-            scoreText: scoreText,
-            timeText: result.timeText || scoreText,
-            rank: rank,
-            medalEmoji: rank <= 3 ? medalMap[rank] : '🏅',
-            beatPercent: result.beatPercent || 0,
-            trackName: result.trackName || '极速赛道A',
-            venueName: result.venueName || '铁甲快狗·万象城赛场',
-            dateText: result.dateText || '6月16日 13:00'
-          },
-          pageLoading: false
-        });
-
-      } else {
-        // idle
-        var remainCount = data && data.remainCount !== undefined ? data.remainCount : 0;
-        that.setData({
-          raceStatus: 'idle',
-          remainCount: remainCount,
-          pageLoading: false
-        });
+        return;
       }
-    }).catch(function (err) {
-      console.error('获取比赛状态失败', err);
-      // fallback: 从本地统计获取剩余次数
-      that.fetchRemainCount();
+
+      // 后端格式: { bestScore, bestRank, beatPercent, remainCount }
+      var score = data.bestScore || data.score || 0;
+      var rank = data.bestRank || data.rank || 0;
+
+      // 如果成绩为0或没有,视为无记录
+      if (score <= 0) {
+        that.setData({
+          hasSeasonBest: false,
+          seasonBest: null,
+          remainCount: data.remainCount || 0
+        });
+        return;
+      }
+
+      var scoreText = formatScore(score);
+
       that.setData({
-        pageLoading: false,
-        raceStatus: 'idle'
+        hasSeasonBest: true,
+        remainCount: data.remainCount || 0,
+        seasonBest: {
+          score: score,
+          scoreText: scoreText,
+          rank: rank,
+          beatPercent: data.beatPercent || 0
+        }
+      });
+    }).catch(function (err) {
+      console.error('获取赛季信息失败', err);
+      // 不阻塞页面,标记无记录
+      that.setData({
+        hasSeasonBest: false
       });
     });
   },
 
   /**
-   * 获取剩余参赛次数（降级方案）
-   */
-  fetchRemainCount: function () {
-    var that = this;
-    request.silentGet('/player/me/stats').then(function (stats) {
-      if (stats && stats.raceCount !== undefined) {
-        that.setData({ remainCount: stats.raceCount });
-      }
-    }).catch(function () {});
-  },
-
-  /**
-   * 获取历史参赛记录
+   * GET /api/v1/player/me/race-records — 历史参赛记录
    */
   fetchHistoryRecords: function () {
     var that = this;
     that.setData({ historyLoading: true });
 
-    request.get('/player/me/race-records').then(function (records) {
+    return request.get('/player/me/race-records').then(function (records) {
       var list = records || [];
       var mapped = list.map(function (item) {
-        var score = item.bestTime || item.score || 0;
-        var scoreText = '';
-        var timeText = '';
-        if (score < 60) {
-          scoreText = score.toFixed(1) + 's';
-          timeText = score.toFixed(1) + '秒';
-        } else {
-          var m = Math.floor(score / 60);
-          var s = (score % 60).toFixed(1);
-          scoreText = m + 'm' + s + 's';
-          timeText = m + '分' + s + '秒';
-        }
+        var score = item.bestTime || item.score || item.time || 0;
+        var scoreText = formatScore(score);
+        var rank = item.rank || 0;
 
+        // 日期
         var dateText = '';
         if (item.createdAt || item.date) {
           var d = new Date(item.createdAt || item.date);
-          dateText = (d.getMonth() + 1) + '月' + d.getDate() + '日';
+          dateText = (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+        }
+
+        // 奖牌
+        var medal = '';
+        if (rank === 1) medal = '🥇';
+        else if (rank === 2) medal = '🥈';
+        else if (rank === 3) medal = '🥉';
+        else if (rank <= 10) medal = '🏆';  // 前十展示奖杯
+
+        // 成长/积分 (mock or from backend)
+        var growth = item.growth || 0;
+        var points = item.points || 0;
+
+        var bonusText = '';
+        if (growth > 0) bonusText += '成长+' + growth;
+        if (points > 0) {
+          if (bonusText) bonusText += ' ';
+          bonusText += '积分+' + points;
         }
 
         return {
           id: item.id || '',
-          venueName: item.venueName || item.venue_name || '',
           score: score,
           scoreText: scoreText,
-          timeText: timeText,
-          rank: item.rank || '-',
-          rankText: item.rank ? '第' + item.rank + '名' : '-',
-          dateText: dateText
+          rank: rank,
+          rankText: rank > 0 ? '第' + rank + '名' : '',
+          medal: medal,
+          dateText: dateText,
+          bonusText: bonusText
         };
       });
 
@@ -207,92 +198,65 @@ Page({
       });
     }).catch(function (err) {
       console.error('获取历史记录失败', err);
-      that.setData({ historyLoading: false });
-    });
-  },
-
-  /**
-   * 轮询：每10秒更新排队状态
-   */
-  startPolling: function () {
-    this.stopPolling();
-
-    var that = this;
-    var timer = setInterval(function () {
-      request.silentGet('/player/checkin/queue').then(function (data) {
-        if (!data) return;
-
-        var newStatus = data.status || 'queuing';
-
-        if (newStatus === 'finished') {
-          // 排队结束，切换到完成状态
-          that.stopPolling();
-          that.fetchRaceStatus();
-          return;
-        }
-
-        that.setData({
-          'queueInfo.queueNumber': data.queueNumber || that.data.queueInfo.queueNumber,
-          'queueInfo.aheadCount': data.aheadCount || 0,
-          'queueInfo.estimatedWait': data.estimatedWait || 0,
-          'queueInfo.currentCallNumber': data.currentCallNumber || that.data.queueInfo.currentCallNumber
-        });
-      }).catch(function (err) {
-        console.error('轮询排队状态失败', err);
+      that.setData({
+        historyRecords: [],
+        historyLoading: false
       });
-    }, 10000);
-
-    that.setData({ pollTimer: timer });
-  },
-
-  /**
-   * 停止轮询
-   */
-  stopPolling: function () {
-    var timer = this.data.pollTimer;
-    if (timer) {
-      clearInterval(timer);
-      this.setData({ pollTimer: null });
-    }
+    });
   },
 
   // ===== 事件处理 =====
 
   /**
-   * 去扫码参赛 → 跳转首页tab
+   * 去扫码参赛
    */
-  onGoCheckin: function () {
+  onScanToRace: function () {
+    var that = this;
+
     if (!this.data.isLoggedIn) {
       this.promptLogin();
       return;
     }
-    wx.switchTab({
-      url: '/pages/index/index'
-    });
-  },
 
-  /**
-   * 点开叫号提醒订阅
-   */
-  onSubscribeNotify: function () {
-    var that = this;
-    wx.requestSubscribeMessage({
-      tmplIds: ['排队提醒模板ID'], // 替换为实际模板ID
-      success: function (res) {
-        if (res['排队提醒模板ID'] === 'accept') {
-          wx.showToast({ title: '已开启提醒', icon: 'success' });
-        } else {
-          wx.showToast({ title: '已取消订阅', icon: 'none' });
+    // 检查是否有剩余参赛次数
+    if (this.data.remainCount <= 0) {
+      wx.showModal({
+        title: '参赛次数不足',
+        content: '当前没有可用的参赛次数，是否前往购买参赛包？',
+        confirmText: '去购买',
+        success: function (res) {
+          if (res.confirm) {
+            that.onBuyPackage();
+          }
         }
+      });
+      return;
+    }
+
+    wx.scanCode({
+      onlyFromCamera: false,
+      success: function (res) {
+        // 扫码成功，交给后端解析
+        wx.showLoading({ title: '处理中...' });
+        request.post('/race/result', {
+          code: res.result
+        }).then(function () {
+          wx.hideLoading();
+          // 刷新数据
+          that.fetchAll();
+        }).catch(function (err) {
+          wx.hideLoading();
+          wx.showToast({ title: (err && err.message) || '扫码失败', icon: 'none' });
+        });
       },
       fail: function () {
-        wx.showToast({ title: '订阅失败', icon: 'none' });
+        // 用户取消扫码
       }
     });
   },
 
   /**
-   * 查看排行榜
+   * 点击最佳成绩卡片 → 跳转排行榜
    */
   onGoLeaderboard: function () {
     wx.switchTab({
@@ -301,74 +265,33 @@ Page({
   },
 
   /**
-   * 查看赛场规则
-   */
-  onGoRules: function () {
-    wx.navigateTo({
-      url: '/pages/help/help'
-    });
-  },
-
-  /**
-   * 点击历史参赛记录
+   * 点击历史记录 → 弹详情
    */
   onTapHistoryRecord: function (e) {
-    var id = e.currentTarget.dataset.id;
-    // 可扩展：跳转详情页
-    wx.showToast({ title: '查看记录详情', icon: 'none' });
-  },
+    var record = e.currentTarget.dataset;
+    if (!record) return;
 
-  /**
-   * 再来一局（重新排队）
-   */
-  onRaceAgain: function () {
-    var that = this;
+    var detailParts = [];
+    if (record.scoretext) detailParts.push('成绩: ' + record.scoretext);
+    if (record.ranktext) detailParts.push('排名: ' + record.ranktext);
+    if (record.datetext) detailParts.push('时间: ' + record.datetext);
+    if (record.bonustext) detailParts.push(record.bonustext);
+
     wx.showModal({
-      title: '再来一局',
-      content: '确定要重新排队参赛吗？',
-      success: function (res) {
-        if (res.confirm) {
-          request.post('/checkin/quick-checkin').then(function (data) {
-            var queueNum = data && data.queueNumber ? data.queueNumber : 1;
-            var venueName = data && data.venueName ? data.venueName : '铁甲快狗·万象城赛场';
-            var venueAddress = data && data.venueAddress ? data.venueAddress : '';
-            var aheadCount = data && data.aheadCount !== undefined ? data.aheadCount : 0;
-
-            that.setData({
-              raceStatus: 'queuing',
-              'queueInfo.queueNumber': queueNum,
-              'queueInfo.venueName': venueName,
-              'queueInfo.venueAddress': venueAddress,
-              'queueInfo.aheadCount': aheadCount,
-              'queueInfo.estimatedWait': Math.ceil(aheadCount * 2),
-              'queueInfo.currentCallNumber': 1
-            });
-
-            that.startPolling();
-
-            wx.showToast({ title: '已加入排队', icon: 'success' });
-          }).catch(function (err) {
-            wx.showToast({ title: (err && err.message) || '排队失败', icon: 'none' });
-          });
-        }
-      }
+      title: '记录详情',
+      content: detailParts.join('\n'),
+      showCancel: false,
+      confirmText: '知道了'
     });
   },
 
   /**
-   * 购买参赛包
+   * 购买参赛包 (底部固定条 + 次数不足引导)
    */
   onBuyPackage: function () {
     wx.navigateTo({
       url: '/pages/packages/packages'
     });
-  },
-
-  /**
-   * 邀请好友助力
-   */
-  onInviteFriend: function () {
-    wx.showToast({ title: '暂未开放', icon: 'none' });
   },
 
   /**
@@ -378,7 +301,7 @@ Page({
     var that = this;
     wx.showModal({
       title: '提示',
-      content: '请先登录',
+      content: '请先登录后再参赛',
       cancelText: '稍后再说',
       success: function (res) {
         if (res.confirm) {
@@ -389,13 +312,24 @@ Page({
         }
       }
     });
-  },
-
-  /**
-   * 下拉刷新
-   */
-  onPullDownRefresh: function () {
-    this.checkLogin();
-    wx.stopPullDownRefresh();
   }
 });
+
+/**
+ * 格式化成绩
+ * 小于60秒: "38.1s"
+ * 大于60秒: "1m23.4s"
+ */
+function formatScore(score) {
+  if (typeof score !== 'number') return '--';
+  if (score < 60) {
+    return score.toFixed(1) + 's';
+  }
+  var m = Math.floor(score / 60);
+  var s = (score % 60).toFixed(1);
+  return m + 'm' + s + 's';
+}
+
+function pad(n) {
+  return n < 10 ? '0' + n : '' + n;
+}

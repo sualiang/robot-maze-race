@@ -23,21 +23,21 @@ export default function MarketingConfig() {
 
   // 赛季奖励参数（只读，来自总部配置）
   const [seasonConfig, setSeasonConfig] = useState<Record<string, any> | null>(null);
-  const [seasonConfigLoading, setSeasonConfigLoading] = useState(true);
+  const [seasonConfigLoading, setSeasonConfigLoading] = useState(false);
 
   // 总部范围
   const [ranges, setRanges] = useState<Record<string, Range>>({});
   const [rangeLoading, setRangeLoading] = useState(true);
 
-  // 读取赛季奖励参数（只读）
-  useEffect(() => {
-    api.get('/operator/marketing/season-rewards')
-      .then((data: any) => {
-        if (data) setSeasonConfig(data);
-      })
-      .catch(() => {})
-      .finally(() => setSeasonConfigLoading(false));
-  }, []);
+  // 赛季奖励参数暂未实现，注释掉避免 404 错误
+  // useEffect(() => {
+  //   api.get('/operator/marketing/season-rewards')
+  //     .then((data: any) => {
+  //       if (data) setSeasonConfig(data);
+  //     })
+  //     .catch(() => {})
+  //     .finally(() => setSeasonConfigLoading(false));
+  // }, []);
 
   // 读取总部范围
   useEffect(() => {
@@ -72,6 +72,7 @@ export default function MarketingConfig() {
         help_enabled: true,
         help_required_count: ranges.help_required_count?.default ?? 3,
         help_reward_count: ranges.help_reward_count?.default ?? 1,
+        welcome_deduction_cents: 500,
       };
     }
 
@@ -87,6 +88,7 @@ export default function MarketingConfig() {
           if (config.help_enabled !== undefined) fields.help_enabled = config.help_enabled === 'true';
           if (config.help_required_count !== undefined) fields.help_required_count = Number(config.help_required_count);
           if (config.help_reward_count !== undefined) fields.help_reward_count = Number(config.help_reward_count);
+          if (config.welcome_deduction_cents !== undefined) fields.welcome_deduction_cents = Number(config.welcome_deduction_cents);
         }
         form.setFieldsValue(fields);
       })
@@ -117,6 +119,7 @@ export default function MarketingConfig() {
         { key: 'help_enabled', value: String(values.help_enabled) },
         { key: 'help_required_count', value: String(values.help_required_count) },
         { key: 'help_reward_count', value: String(values.help_reward_count) },
+        { key: 'welcome_deduction_cents', value: String(values.welcome_deduction_cents) },
       ];
       // 不传 venue_id，保存为运营商全局配置
       await api.post('/operator/marketing/batch', { configs });
@@ -128,7 +131,7 @@ export default function MarketingConfig() {
     }
   };
 
-  if (rangeLoading || seasonConfigLoading) {
+  if (rangeLoading) {
     return <Card><div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" /></div></Card>;
   }
 
@@ -176,7 +179,26 @@ export default function MarketingConfig() {
         <Spin spinning={loading}>
 
           {/* 好友助力活动 */}
-          <Divider >
+          {/* 新用户赠送参赛抵扣金 */}
+        <Divider>
+          <Space><GiftOutlined /> 新用户赠送</Space>
+        </Divider>
+
+        <Form.Item
+          name="welcome_deduction_cents"
+          label="新用户注册赠送参赛抵扣金（分）"
+          rules={[{ required: true, message: '请输入抵扣金金额' }]}
+          tooltip="单位：分。500分=5元。设为0则不赠送。"
+        >
+          <InputNumber
+            min={0}
+            max={50000}
+            style={{ width: 200 }}
+            addonAfter="分"
+          />
+        </Form.Item>
+
+        <Divider >
             <Space><GiftOutlined /> 好友助力活动</Space>
           </Divider>
 

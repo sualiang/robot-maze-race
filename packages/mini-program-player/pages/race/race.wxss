@@ -1,298 +1,285 @@
-/* pages/race/race.wxss - 比赛页样式 */
+/**
+ * pages/race/race.wxss - 比赛页 V2 重做
+ * 设计基准: 750rpx
+ * 配色: #0F172A 背景 | #1E293B 卡片 | #FF3B5C 主色 | #F59E0B 金色
+ *       #E2E8F0 一级正文 | #94A3B8 二级辅助 | #334155 分割线
+ */
 
-/* ===== 通用 ===== */
-.page-wrapper {
+/* ===== 页面容器 ===== */
+.race-page {
   min-height: 100vh;
-  padding: var(--space-base);
-  padding-bottom: calc(var(--space-xl) + env(safe-area-inset-bottom));
+  background: #0F172A;
+  padding: 0 32rpx 140rpx; /* 底部留足安全区域 + footer bar */
 }
 
-.page-loading {
+/* ===== 加载遮罩 ===== */
+.loading-mask {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 60vh;
+  min-height: 70vh;
 }
 
-.section-header {
+/* ===== 模块1: 顶部标题 ===== */
+.race-header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 32rpx 0;
+}
+
+.race-header-title {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: #E2E8F0;
+}
+
+/* ===== 模块2 — 状态A: 无记录空态 ===== */
+.action-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 48rpx 0 40rpx;
+}
+
+.action-empty-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #E2E8F0;
+  text-align: center;
+  margin-bottom: 12rpx;
+}
+
+.action-empty-desc {
+  font-size: 26rpx;
+  color: #94A3B8;
+  text-align: center;
+  margin-bottom: 32rpx;
+}
+
+.action-empty-illustration {
+  width: 160rpx;
+  height: 160rpx;
+  font-size: 100rpx;
+  line-height: 160rpx;
+  text-align: center;
+  margin-bottom: 40rpx;
+}
+
+/* 去扫码参赛按钮 */
+.btn-scan {
+  width: 320rpx;
+  height: 88rpx;
+  background: #FF3B5C;
+  border-radius: 16rpx;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin: var(--space-lg) 0 var(--space-sm) 0;
+  justify-content: center;
 }
 
-.section-title {
-  font-size: var(--font-lg);
+.btn-scan text {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+
+.btn-scan:active {
+  opacity: 0.9;
+  transform: scale(0.95);
+}
+
+/* ===== 模块2 — 状态B: 最佳成绩卡片 ===== */
+.best-card {
+  width: 686rpx;
+  margin: 0 auto;
+  background: #1E293B;
+  border-radius: 24rpx;
+  padding: 40rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.2);
+}
+
+.best-card:active {
+  opacity: 0.9;
+  transform: scale(0.97);
+}
+
+.best-card-label {
+  font-size: 28rpx;
+  font-weight: 400;
+  color: #94A3B8;
+  margin-bottom: 16rpx;
+}
+
+.best-card-score {
+  font-size: 72rpx;
   font-weight: 700;
-  color: var(--color-text);
+  color: #F59E0B;
+  line-height: 1.2;
+  margin-bottom: 12rpx;
 }
 
-/* ===== 状态1 — idle（无活跃比赛） ===== */
-.race-icon {
-  font-size: 88rpx;
-  margin-bottom: var(--space-base);
+.best-card-desc {
+  font-size: 26rpx;
+  color: #94A3B8;
+  text-align: center;
+  margin-bottom: 24rpx;
 }
 
-.race-empty-title {
-  font-size: var(--font-xxl);
-  font-weight: 700;
-  color: var(--color-text);
-  margin-bottom: var(--space-sm);
-}
-
-.race-empty-desc {
-  font-size: var(--font-sm);
-  color: var(--color-text-light);
-  margin-bottom: var(--space-lg);
+.best-card-tip {
+  font-size: 24rpx;
+  color: #FF3B5C;
   text-align: center;
 }
 
-.race-empty-btn {
-  width: 360rpx;
-}
-
-/* 历史记录 */
+/* ===== 模块3: 历史参赛记录 ===== */
 .history-section {
-  margin-top: var(--space-lg);
+  margin-top: 16rpx; /* 与上方模块自然分隔 */
 }
 
+.history-title {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #E2E8F0;
+  padding: 24rpx 0;
+}
+
+/* 加载骨架 */
+.history-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.history-skeleton-item {
+  height: 120rpx;
+  background: #1E293B;
+  border-radius: 16rpx;
+  opacity: 0.5;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.8; }
+}
+
+/* 单条记录 */
 .history-item {
-  cursor: pointer;
-}
-
-.history-top {
+  height: 120rpx;
+  background: #1E293B;
+  border-radius: 16rpx;
+  margin-bottom: 16rpx;
+  padding: 0 24rpx;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-sm);
+  /* 三栏布局: 左侧成绩日期 | 中间排名奖牌 | 右侧成长积分 */
 }
 
-.history-venue {
-  font-size: var(--font-base);
+.history-item:active {
+  background: #243044;
+}
+
+/* 左侧: 成绩 + 日期 */
+.history-left {
+  display: flex;
+  flex-direction: column;
+  min-width: 140rpx;
+  flex-shrink: 0;
+}
+
+.history-score {
+  font-size: 36rpx;
   font-weight: 600;
-  color: var(--color-text);
+  color: #E2E8F0;
+  line-height: 1.3;
 }
 
 .history-date {
-  font-size: var(--font-xs);
-}
-
-.history-detail {
-  display: flex;
-  align-items: center;
-  gap: var(--space-lg);
-}
-
-.history-stat {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  flex: 1;
-}
-
-.history-stat-value {
-  font-size: var(--font-lg);
-  font-weight: 700;
-  color: var(--color-text);
-}
-
-.history-stat-label {
-  font-size: var(--font-xs);
-  color: var(--color-text-light);
+  font-size: 24rpx;
+  color: #94A3B8;
+  line-height: 1.3;
   margin-top: 4rpx;
 }
 
-/* ===== 状态2 — queuing（排队中） ===== */
-.queue-number-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: var(--space-xl) var(--space-base);
-  background: linear-gradient(135deg, var(--color-bg-card), var(--color-bg-elevated));
-  border: 1rpx solid var(--color-border);
-}
-
-.queue-label {
-  font-size: var(--font-sm);
-  color: var(--color-text-secondary);
-  margin-bottom: var(--space-sm);
-}
-
-.queue-number {
-  font-size: var(--font-giant);
-  font-weight: 800;
-  color: var(--color-primary);
-  line-height: 1.2;
-  text-shadow: 0 0 30rpx rgba(233, 69, 96, 0.4);
-  margin-bottom: var(--space-lg);
-}
-
-.queue-meta {
-  width: 100%;
-}
-
-.queue-meta-item {
-  align-items: center;
-}
-
-.queue-meta-label {
-  font-size: var(--font-xs);
-  color: var(--color-text-light);
-  margin-bottom: 4rpx;
-}
-
-.queue-meta-value {
-  font-size: var(--font-xl);
-  font-weight: 700;
-}
-
-/* 赛场信息 */
-.queue-venue {
-  margin-top: var(--space-sm);
-}
-
-.queue-venue-icon {
-  font-size: 36rpx;
-  margin-right: var(--space-sm);
-}
-
-.queue-venue-info {
-  flex: 1;
-}
-
-.queue-venue-name {
-  font-size: var(--font-base);
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-.queue-venue-addr {
-  margin-top: 4rpx;
-}
-
-/* 叫号提醒按钮 */
-.queue-notify-btn {
-  width: 320rpx;
-  margin: var(--space-base) auto 0;
-}
-
-/* 等待时可看看 */
-.queue-browse-section {
-  margin-top: var(--space-lg);
-}
-
-.queue-browse-actions {
-  gap: var(--space-base);
-  margin-top: var(--space-sm);
-}
-
-.queue-browse-item {
+/* 中间: 排名 + 奖牌 */
+.history-middle {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: var(--space-lg) var(--space-sm);
-  cursor: pointer;
-  min-height: 140rpx;
 }
 
-.browse-icon {
-  font-size: 48rpx;
-  margin-bottom: var(--space-xs);
-}
-
-.browse-label {
-  font-size: var(--font-sm);
-  color: var(--color-text-secondary);
-}
-
-/* ===== 状态3 — finished（比赛完成） ===== */
-.result-hero {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: var(--space-xl) 0;
-  background: linear-gradient(180deg, rgba(233, 69, 96, 0.15) 0%, transparent 100%);
-  border-radius: var(--radius-lg);
-  margin-bottom: var(--space-lg);
-}
-
-.result-hero-label {
-  font-size: var(--font-sm);
-  color: var(--color-text-secondary);
-  margin-bottom: var(--space-sm);
-}
-
-.result-hero-score {
-  font-size: 120rpx;
-  font-weight: 800;
-  color: var(--color-primary);
+.history-medal {
+  font-size: 32rpx;
   line-height: 1.2;
-  text-shadow: 0 0 40rpx rgba(233, 69, 96, 0.4);
 }
 
-.result-rank-row {
+.history-rank {
+  font-size: 30rpx;
+  font-weight: 500;
+  color: #E2E8F0;
+  line-height: 1.3;
+}
+
+/* 右侧: 成长 + 积分 */
+.history-right {
+  flex-shrink: 0;
+  margin-left: auto;
   display: flex;
   align-items: center;
-  margin-top: var(--space-sm);
 }
 
-.result-rank-medal {
-  font-size: 40rpx;
-  margin-right: var(--space-xs);
+.history-bonus {
+  font-size: 24rpx;
+  color: #F59E0B;
+  text-align: right;
+  line-height: 1.3;
 }
 
-.result-rank-text {
-  font-size: var(--font-lg);
-  font-weight: 600;
-  color: var(--color-warning);
+/* 无记录占位 */
+.history-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48rpx 0;
 }
 
-/* 成绩详情卡 */
-.result-detail-card {
-  margin-bottom: var(--space-base);
+.history-empty-text {
+  font-size: 28rpx;
+  color: #94A3B8;
 }
 
-.result-detail-row {
-  padding: var(--space-sm) 0;
+/* ===== 模块4: 底部固定转化条 ===== */
+.race-footer-bar {
+  position: fixed;
+  bottom: 100rpx; /* 假设Tab栏约100rpx */
+  left: 0;
+  right: 0;
+  height: 80rpx;
+  background: rgba(30, 41, 59, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  /* 配合安全区域 */
+  padding-bottom: env(safe-area-inset-bottom, 0);
 }
 
-.result-detail-row + .result-detail-row {
-  border-top: 1rpx solid var(--color-border);
+.race-footer-bar:active {
+  opacity: 0.85;
 }
 
-/* 剩余参赛次数 */
-.result-remain {
-  flex-direction: row;
-}
-
-.remain-count {
-  font-size: var(--font-xxl);
-  font-weight: 800;
-}
-
-/* 操作按钮 */
-.result-actions {
-  margin-top: var(--space-lg);
-}
-
-/* 次数用完 */
-.result-exhausted {
-  margin-top: var(--space-lg);
-}
-
-.exhausted-card {
+.footer-bar-text {
+  font-size: 28rpx;
+  color: #94A3B8;
   text-align: center;
 }
 
-.exhausted-title {
-  font-size: var(--font-base);
-  color: var(--color-text-light);
-  margin-bottom: var(--space-lg);
-  display: block;
-}
-
-.exhausted-card .btn {
-  width: 100%;
+.footer-bar-highlight {
+  color: #FF3B5C;
 }

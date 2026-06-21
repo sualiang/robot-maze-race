@@ -2,7 +2,7 @@
 
   <!-- ========== 模块1: 用户信息栏 ========== -->
   <view class="user-card" bindtap="onEditProfile">
-    <image class="user-avatar" src="{{userInfo.avatar || userInfo.avatarUrl || userInfo.avatar_url || '/assets/images/default-avatar.png'}}" mode="aspectFill" />
+    <image class="user-avatar" src="{{userInfo.avatar_url || userInfo.avatarUrl || '/assets/images/default-avatar.png'}}" mode="aspectFill" />
     <view class="user-info">
       <text class="user-nickname">{{userInfo.nickname || '未设置昵称'}}</text>
       <text class="user-phone">{{userInfo.phone || ''}}</text>
@@ -13,7 +13,7 @@
   <view wx:if="{{!seasonClosed}}" class="medal-card">
     <view class="medal-card-hd">
       <view class="medal-icon-area">
-        <text class="medal-icon-badge">🏆</text>
+        <image class="medal-icon-badge trophy-icon" src="/assets/images/trophy-{{medalInfo.level}}.svg" mode="aspectFit" />
       </view>
       <view class="medal-title-area">
         <text class="medal-level-name">{{medalInfo.levelName}}</text>
@@ -37,7 +37,7 @@
 
   <!-- 赛季未开启 -->
   <view wx:elif="{{seasonClosed}}" class="season-closed-card">
-    <text class="season-closed-icon">🏆</text>
+    <image class="season-closed-icon" src="/assets/images/trophy-1.svg" mode="aspectFit" />
     <text class="season-closed-text">赛季即将开启</text>
     <text class="season-closed-desc">敬请期待</text>
   </view>

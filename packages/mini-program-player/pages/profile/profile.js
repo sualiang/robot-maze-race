@@ -1,28 +1,46 @@
-// 个人中心 V2.0 - 改版
+// 个人中心 V2.0 - 完整重构
+// 模块：用户信息 | 赛季段位 | 福利资产 | 赛季数据 | 功能入口 | 退出登录
 var request = require('../../utils/request');
 var storage = require('../../utils/storage');
 var app = getApp();
 
 Page({
   data: {
+    // 模块1: 用户信息
     userInfo: {},
+
+    // 模块2: 赛季段位
     seasonClosed: false,
-    medal: {
-      icon: '🎖️',
-      name: '青铜勋章',
+    medalInfo: {
+      level: 1,
+      levelName: '青铜选手',
       currentExp: 0,
-      nextLevelExp: 100
+      nextLevelExp: 100,
+      rank: 0,
+      expPercent: 0,
+      upgradeDesc: '升级白银立得：5元无门槛参赛抵价券 + 50积分'
     },
-    expPercent: 0,
-    combatInfo: {
-      combatPower: '--',
-      rank: '--'
+
+    // 模块3: 福利资产
+    assets: {
+      deductible: 0,    // 参赛抵扣金
+      couponCount: 0,   // 券数量
+      couponTotal: 0    // 券总价值
     },
-    coreStats: {
+
+    // 模块4: 赛季数据
+    seasonStats: {
       totalRaces: 0,
-      bestRank: '-',
-      perseveranceBonus: 0
-    }
+      bestTime: '--',
+      totalPoints: 0
+    },
+
+    // 模块5: 功能入口
+    menuList: [
+      { key: 'order', icon: '📋', label: '我的订单', url: '/pages/orders/orders', rightText: '' },
+      { key: 'coupon', icon: '🎫', label: '我的卡包', url: '/pages/coupon/coupon', rightText: '' },
+      { key: 'exchange', icon: '🎁', label: '积分兑换', url: '/pages/prize/prize', rightText: '' },
+    ]
   },
 
   onShow: function () {
@@ -36,54 +54,65 @@ Page({
   loadData: function () {
     var that = this;
 
-    // 从缓存获取基本信息
+    // 从缓存取基本信息
     var user = storage.getSync(storage.STORAGE_KEYS.USER, {});
     that.setData({ userInfo: user });
 
-    // 拉取用户基本信息
-    request.silentGet('/player/me/profile-check').then(function (res) {
+    // 1. GET /api/v1/player/me/profile - 用户信息
+    request.silentGet('/player/me/profile').then(function (res) {
       if (res) {
-        var merged = Object.assign({}, that.data.userInfo, res);
+        var profileData = res.code === 0 && res.data ? res.data : res;
+        // 补全驼峰→蛇形字段映射，避免覆盖本地缓存中的蛇形字段
+        if (profileData.avatarUrl && !profileData.avatar_url) {
+          profileData.avatar_url = profileData.avatarUrl;
+        }
+        if (profileData.raceCount && !profileData.race_count) {
+          profileData.race_count = profileData.raceCount;
+        }
+        var merged = Object.assign({}, that.data.userInfo, profileData);
         that.setData({ userInfo: merged });
         storage.setSync(storage.STORAGE_KEYS.USER, merged);
       }
-    }).catch(function () {
-      // 静默失败
-    });
+    }).catch(function () {});
 
-    // 拉取赛季数据
+    // 2. 统一从 profile-check 获取所有汇总数据
+    request.silentGet('/player/me/profile-check').then(function (res) {
+      var d = res.data || res;
+      var balance = d.pointsBalance || 0;
+
+      that.setData({
+        assets: {
+          deductible: (d.availableDeductionCents || 0) / 100,
+          couponCount: 0,
+          couponTotal: d.couponTotalYuan || 0
+        },
+        'menuList[2].rightText': '当前' + balance + '积分',
+        'userInfo.points': balance
+      });
+    }).catch(function () {});
+
+    // 3. GET /api/v1/season/user/info - 段位/排名/成长值
     request.silentGet('/season/user/info').then(function (res) {
       if (res) {
-        var medal = res.medal || {};
-        var expPercent = 0;
-        var currentExp = medal.currentExp || 0;
-        var nextLevelExp = medal.nextLevelExp || 100;
-        if (nextLevelExp > 0) {
-          expPercent = Math.min(100, Math.round((currentExp / nextLevelExp) * 100));
-        }
+        var currentExp = res.exp || res.currentExp || res.current_exp || 0;
+        var nextLevelExp = res.nextLevelExp || res.next_level_exp || 200;
+        var expPercent = nextLevelExp > 0 ? Math.min(100, Math.round((currentExp / nextLevelExp) * 100)) : 0;
+
+        var level = res.level || 1;
         that.setData({
-          medal: {
-            icon: medal.icon || '🎖️',
-            name: medal.name || '青铜勋章',
+          medalInfo: {
+            level: level,
+            levelName: res.levelName || res.level_name || '青铜选手',
             currentExp: currentExp,
-            nextLevelExp: nextLevelExp
+            nextLevelExp: nextLevelExp,
+            rank: res.rank || res.rank_number || 0,
+            expPercent: expPercent,
+            upgradeDesc: res.upgradeDesc || res.upgrade_desc || '升级白银立得：5元无门槛参赛抵价券 + 50积分'
           },
-          expPercent: expPercent,
-          combatInfo: {
-            combatPower: res.combatPower || res.combat_power || '--',
-            rank: res.rank || '--'
-          },
-          coreStats: {
-            totalRaces: res.totalRaces || res.total_races || 0,
-            bestRank: res.bestRank || res.best_rank || '-',
-            perseveranceBonus: res.perseveranceBonus || res.perseverance_bonus || 0
-          },
-          'userInfo.points': res.points || res.points_balance || 0
         });
       }
     }).catch(function (err) {
-      // 403 = 赛季未开启
-      if (err && err.code === 403) {
+      if (err && (err.code === 403 || err.statusCode === 403)) {
         that.setData({ seasonClosed: true });
       }
     });
@@ -91,17 +120,30 @@ Page({
     wx.stopPullDownRefresh();
   },
 
-  onNavigate: function (e) {
+  // 跳转编辑资料
+  onEditProfile: function () {
+    wx.navigateTo({ url: '/pages/edit-profile/edit-profile' });
+  },
+
+  // 去升级 → 跳转首页参赛包区域
+  onUpgrade: function () {
+    wx.switchTab({ url: '/pages/index/index' });
+  },
+
+  // 跳转卡包页
+  onAssetsTap: function () {
+    wx.navigateTo({ url: '/pages/coupon/coupon' });
+  },
+
+  // 功能入口点击
+  onMenuItemTap: function (e) {
     var url = e.currentTarget.dataset.url;
     if (url) {
       wx.navigateTo({ url: url });
     }
   },
 
-  onEditProfile: function () {
-    wx.navigateTo({ url: '/pages/edit-profile/edit-profile' });
-  },
-
+  // 退出登录
   onLogout: function () {
     var that = this;
     wx.showModal({
