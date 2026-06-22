@@ -300,7 +300,7 @@ Page({
    */
   onGoCouponFromBenefits: function () {
     wx.navigateTo({
-      url: '/pages/coupon/coupon'
+      url: '/pages/coupon/coupon?tab=1'
     });
   },
 

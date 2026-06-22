@@ -25,7 +25,16 @@ Page({
     verifyItem: null
   },
 
-  onLoad: function () {
+  onLoad: function (options) {
+    // 支持从外部传 tab 参数：0=参赛抵扣卡 1=立减券 3=满减券 4=兑换券
+    var defaultTab = 0;
+    if (options && options.tab !== undefined) {
+      var parsed = parseInt(options.tab, 10);
+      if (!isNaN(parsed) && [0, 1, 3, 4].indexOf(parsed) !== -1) {
+        defaultTab = parsed;
+      }
+    }
+    this.setData({ currentTab: defaultTab });
     this.fetchCards();
   },
 

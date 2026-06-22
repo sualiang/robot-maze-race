@@ -130,9 +130,9 @@ Page({
     wx.switchTab({ url: '/pages/index/index' });
   },
 
-  // 跳转卡券页
+  // 跳转卡券页（消费券 → Tab 1 立减券）
   onAssetsTap: function () {
-    wx.navigateTo({ url: '/pages/coupon/coupon' });
+    wx.navigateTo({ url: '/pages/coupon/coupon?tab=1' });
   },
 
   // 功能入口点击
