@@ -76,9 +76,9 @@
   <view class="modal {{showConfirm ? 'modal-show' : ''}}">
     <view class="modal-content">
       <text class="modal-title">确认兑换</text>
-      <text class="modal-body">使用 <text class="highlight">{{targetItem?.needPoints}}</text> 积分兑换</text>
-      <text class="modal-body">{{targetItem?.name}}</text>
-      <text class="modal-body" wx:if="{{targetItem?.description}}">{{targetItem?.description}}</text>
+      <text class="modal-body" wx:if="{{targetItem}}">使用 <text class="highlight">{{targetItem.needPoints}}</text> 积分兑换</text>
+      <text class="modal-body" wx:if="{{targetItem}}">{{targetItem.name}}</text>
+      <text class="modal-body" wx:if="{{targetItem && targetItem.description}}">{{targetItem.description}}</text>
     </view>
     <view class="modal-btns">
       <button class="modal-btn modal-btn-cancel" bindtap="onCloseConfirm">取消</button>
