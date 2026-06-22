@@ -110,7 +110,7 @@ Page({
   fetchUserInfo: function () {
     var that = this;
     return request.get('/player/me/profile-check').then(function (profile) {
-      var remain = (profile && profile.remainCount != null) ? profile.remainCount : 0;
+      var remain = (profile && profile.remainCount != null) ? profile.remainCount : (profile.raceCount || 0);
       that.setData({ remainCount: remain });
     }).catch(function (err) {
       console.error('获取用户信息失败', err);

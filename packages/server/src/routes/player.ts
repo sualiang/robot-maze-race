@@ -421,6 +421,7 @@ router.get('/me/profile-check', authMiddleware, async (req: Request, res: Respon
     }
 
     const needPhone = !user || !user.nickname || !user.phone;
+    const remainCount = await getUserRemainingRaces(userId);
     res.json({
       code: 0,
       data: {
@@ -429,6 +430,7 @@ router.get('/me/profile-check', authMiddleware, async (req: Request, res: Respon
         phone: user?.phone || '',
         gender: user?.gender || '',
         raceCount: user?.race_count || 0,
+        remainCount,
         availableDeductionCents,
         availableDeductionYuan: availableDeductionCents / 100,
         couponTotalCents,
@@ -438,7 +440,7 @@ router.get('/me/profile-check', authMiddleware, async (req: Request, res: Respon
     });
   } catch (e: any) {
     console.error('[profile-check] error:', e?.message || e);
-    res.json({ code: 0, data: { needPhone: true, nickname: '', phone: '', gender: '', raceCount: 0, availableDeductionCents: 0, availableDeductionYuan: 0, couponTotalCents: 0, couponTotalYuan: 0, pointsBalance: 0 } });
+    res.json({ code: 0, data: { needPhone: true, nickname: '', phone: '', gender: '', raceCount: 0, remainCount: 0, availableDeductionCents: 0, availableDeductionYuan: 0, couponTotalCents: 0, couponTotalYuan: 0, pointsBalance: 0 } });
   }
 });
 
