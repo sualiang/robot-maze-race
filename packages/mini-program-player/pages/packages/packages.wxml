@@ -6,7 +6,8 @@
   <!-- ===== 顶部提示条 ===== -->
   <view wx:if="{{!loading}}" class="top-banner">
     <text class="banner-icon">📢</text>
-    <text class="banner-text">当前剩余 <text class="banner-count">{{remainCount}}</text> 次，需要补充参赛次数</text>
+    <text wx:if="{{remainCount < 4}}" class="banner-text">当前剩余 <text class="banner-count">{{remainCount}}</text> 次，需要补充参赛次数</text>
+    <text wx:else class="banner-text">当前剩余 <text class="banner-count">{{remainCount}}</text> 次</text>
   </view>
 
   <!-- ===== 参赛包列表 ===== -->
