@@ -1,0 +1,91 @@
+<view class="page">
+  <!-- 顶部用户积分 -->
+  <view class="user-points-bar">
+    <text class="points-label">我的积分</text>
+    <text class="points-value">{{userPoints}}</text>
+    <text class="points-unit">分</text>
+  </view>
+
+  <!-- 参赛抵扣卡分区 -->
+  <view class="section" wx:if="{{entryItems.length > 0}}">
+    <view class="section-title">
+      <text>🎫 参赛抵扣卡</text>
+      <text class="section-subtitle">可用于抵扣参赛报名费</text>
+    </view>
+    <view class="item-grid">
+      <view
+        wx:for="{{entryItems}}"
+        wx:key="id"
+        class="item-card"
+        data-id="{{item.id}}"
+        bindtap="onExchange"
+      >
+        <view class="card-value">{{item.name}}</view>
+        <view class="card-desc" wx:if="{{item.description}}">{{item.description}}</view>
+        <view class="card-footer">
+          <view class="card-points">
+            <text class="card-points-icon">⭐</text>
+            <text class="card-points-text">{{item.needPoints}}分</text>
+          </view>
+          <button class="exchange-btn" size="mini" disabled="{{userPoints < item.needPoints}}">
+            {{userPoints < item.needPoints ? '积分不足' : '立即兑换'}}
+          </button>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 商家消费券分区 -->
+  <view class="section" wx:if="{{couponItems.length > 0}}">
+    <view class="section-title">
+      <text>🎟️ 商家消费券</text>
+      <text class="section-subtitle">可在合作商家消费时抵扣</text>
+    </view>
+    <view class="item-grid">
+      <view
+        wx:for="{{couponItems}}"
+        wx:key="id"
+        class="item-card"
+        data-id="{{item.id}}"
+        bindtap="onExchange"
+      >
+        <view class="card-value">{{item.name}}</view>
+        <view class="card-desc" wx:if="{{item.description}}">{{item.description}}</view>
+        <view class="card-footer">
+          <view class="card-points">
+            <text class="card-points-icon">⭐</text>
+            <text class="card-points-text">{{item.needPoints}}分</text>
+          </view>
+          <button class="exchange-btn" size="mini" disabled="{{userPoints < item.needPoints}}">
+            {{userPoints < item.needPoints ? '积分不足' : '立即兑换'}}
+          </button>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view wx:if="{{entryItems.length === 0 && couponItems.length === 0}}" class="empty-state">
+    <text class="empty-icon">🛍️</text>
+    <text class="empty-title">积分商城</text>
+    <text class="empty-desc">暂无兑换商品</text>
+  </view>
+
+  <!-- 兑换确认弹窗 -->
+  <view class="modal-mask {{showConfirm ? 'modal-show' : ''}}" bindtap="onCloseConfirm"></view>
+  <view class="modal {{showConfirm ? 'modal-show' : ''}}">
+    <view class="modal-content">
+      <text class="modal-title">确认兑换</text>
+      <text class="modal-body">使用 <text class="highlight">{{targetItem?.needPoints}}</text> 积分兑换</text>
+      <text class="modal-body">{{targetItem?.name}}</text>
+      <text class="modal-body" wx:if="{{targetItem?.description}}">{{targetItem?.description}}</text>
+    </view>
+    <view class="modal-btns">
+      <button class="modal-btn modal-btn-cancel" bindtap="onCloseConfirm">取消</button>
+      <button class="modal-btn modal-btn-confirm" bindtap="onConfirmExchange" loading="{{exchanging}}" disabled="{{exchanging}}">确认兑换</button>
+    </view>
+  </view>
+
+  <!-- toast -->
+  <view class="toast {{toastMsg ? 'toast-show' : ''}}">{{toastMsg}}</view>
+</view>

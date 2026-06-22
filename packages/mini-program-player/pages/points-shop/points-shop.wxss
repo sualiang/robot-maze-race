@@ -1,0 +1,228 @@
+/* 积分商城 */
+
+/* 顶部积分条 */
+.user-points-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  padding: 32rpx 24rpx;
+  background: linear-gradient(135deg, #1a1a2e, #2a1a3e);
+  border-radius: 0 0 32rpx 32rpx;
+  margin-bottom: 24rpx;
+}
+.points-label {
+  font-size: 28rpx;
+  color: #aaa;
+}
+.points-value {
+  font-size: 56rpx;
+  font-weight: 900;
+  color: #ffd700;
+  line-height: 1.1;
+}
+.points-unit {
+  font-size: 28rpx;
+  color: #ffd700;
+}
+
+/* 分区标题 */
+.section {
+  padding: 0 24rpx;
+  margin-bottom: 24rpx;
+}
+.section-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+  margin-bottom: 16rpx;
+  font-size: 34rpx;
+  font-weight: 700;
+  color: var(--color-text);
+}
+.section-subtitle {
+  font-size: 24rpx;
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+/* 商品格子 */
+.item-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+.item-card {
+  width: calc(50% - 8rpx);
+  background: var(--color-bg-card);
+  border-radius: 16rpx;
+  padding: 24rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  box-sizing: border-box;
+}
+.card-value {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: var(--color-text);
+}
+.card-desc {
+  font-size: 22rpx;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+.card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 12rpx;
+}
+.card-points {
+  display: flex;
+  align-items: center;
+  gap: 4rpx;
+}
+.card-points-icon {
+  font-size: 24rpx;
+}
+.card-points-text {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--color-warning);
+}
+.exchange-btn {
+  font-size: 24rpx;
+  padding: 8rpx 20rpx;
+  background: var(--color-primary);
+  color: #fff;
+  border-radius: 8rpx;
+  line-height: 1.8;
+}
+.exchange-btn[disabled] {
+  background: var(--color-bg-input);
+  color: var(--color-text-light);
+  opacity: 0.6;
+}
+.exchange-btn::after {
+  border: none;
+}
+
+/* 弹窗 */
+.modal-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  z-index: 100;
+  display: none;
+}
+.modal {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 580rpx;
+  background: var(--color-bg-card);
+  border-radius: 24rpx;
+  z-index: 101;
+  display: none;
+  overflow: hidden;
+}
+.modal-show {
+  display: flex;
+  flex-direction: column;
+}
+.modal-content {
+  padding: 48rpx 32rpx 32rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+.modal-title {
+  font-size: 34rpx;
+  font-weight: 700;
+  text-align: center;
+  color: var(--color-text);
+}
+.modal-body {
+  font-size: 28rpx;
+  color: var(--color-text-secondary);
+  text-align: center;
+  line-height: 1.5;
+}
+.highlight {
+  color: var(--color-warning);
+  font-weight: 700;
+}
+.modal-btns {
+  display: flex;
+  border-top: 1rpx solid var(--color-border);
+}
+.modal-btn {
+  flex: 1;
+  text-align: center;
+  padding: 28rpx 0;
+  font-size: 30rpx;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text);
+}
+.modal-btn::after {
+  border: none;
+}
+.modal-btn-cancel {
+  color: var(--color-text-secondary);
+  border-right: 1rpx solid var(--color-border);
+}
+.modal-btn-confirm {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+.modal-btn[disabled] {
+  opacity: 0.5;
+}
+
+/* toast */
+.toast {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0,0,0,0.75);
+  color: #fff;
+  padding: 16rpx 32rpx;
+  border-radius: 12rpx;
+  font-size: 28rpx;
+  z-index: 200;
+  display: none;
+  pointer-events: none;
+}
+.toast-show {
+  display: block;
+}
+
+/* 空状态 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 120rpx 0;
+}
+.empty-icon {
+  font-size: 80rpx;
+  margin-bottom: 24rpx;
+}
+.empty-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 8rpx;
+}
+.empty-desc {
+  font-size: 26rpx;
+  color: var(--color-text-light);
+}
