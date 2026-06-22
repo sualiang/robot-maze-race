@@ -112,12 +112,11 @@ router.post('/points-shop/exchange', authMiddleware, async (req: Request, res: R
     const itemValue = item.item_id; // 对于 entry_deduction 是金额（分），对于 merchant_coupon 也是金额（分）
 
     if (itemType === 'entry_deduction') {
-      // 发放参赛抵扣金到 entry_deductions
-      const deductionId = uuidv4();
+      // 发放参赛抵扣金到 entry_deductions（id 是 INTEGER 自增主键，传 NULL）
       await execute(
         `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, expires_at, created_at)
-         VALUES ($1, $2, $3, 'point_shop_exchange', 'available', datetime('now', '+365 days'), datetime('now'))`,
-        [deductionId, userId, itemValue]
+         VALUES (NULL, $1, $2, 'point_shop_exchange', 'available', datetime('now', '+365 days'), datetime('now'))`,
+        [userId, itemValue]
       );
       console.log('[PointsShop] 兑换参赛抵扣金:', userId, 'item:', item.name, '金额:', itemValue / 100, '元');
     } else if (itemType === 'merchant_coupon') {
