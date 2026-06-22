@@ -992,23 +992,13 @@ async function getSystemConfig(key: string, defaultVal: string): Promise<string>
  */
 async function getUserRemainingRaces(userId: string): Promise<number> {
   try {
-    // 来源①：从 orders.remaining_times 统计剩余次数
-    // 优先使用 remaining_times 字段（成长值重构后的字段）
-    const remainingTimesRow = await queryOne<{ total: number }>(
+    // 从 orders.remaining_times 统计剩余可用参赛次数
+    const row = await queryOne<{ total: number }>(
       `SELECT COALESCE(SUM(remaining_times), 0) as total FROM orders
        WHERE user_id = $1 AND status = 'paid' AND remaining_times > 0`,
       [userId]
     );
-    const fromOrders = remainingTimesRow?.total ?? 0;
-
-    // 来源②：好友助力奖励的参赛次数（users.race_count）
-    const userRow = await queryOne<{ race_count: number }>(
-      `SELECT race_count FROM users WHERE id = $1`,
-      [userId]
-    );
-    const bonusRaces = userRow?.race_count ?? 0;
-
-    return fromOrders + bonusRaces;
+    return row?.total ?? 0;
   } catch {
     return 0;
   }

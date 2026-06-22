@@ -184,4 +184,28 @@ router.post('/batch', authMiddleware, operatorOnly, async (req: Request, res: Re
   }
 });
 
+// ============================================================
+// POST /api/v1/operator/marketing/announcement
+// 设置首页公告（纯文字，最多30字）
+// body: { text: string }
+// ============================================================
+router.post('/announcement', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
+  try {
+    const { text } = req.body;
+    if (typeof text !== 'string' || text.length > 30) {
+      return res.status(400).json({ code: 400, message: '公告内容不能为空且不超过30字', data: null });
+    }
+    const existing = await queryOne<{ id: string }>('SELECT id FROM system_config WHERE key = $1', ['home_announcement']);
+    if (existing) {
+      await execute("UPDATE system_config SET value = $1, updated_at = datetime('now') WHERE key = 'home_announcement'", [text]);
+    } else {
+      await execute('INSERT INTO system_config (id, key, value) VALUES ($1, $2, $3)', [uuidv4(), 'home_announcement', text]);
+    }
+    return res.json({ code: 0, message: '公告已更新', data: { text, updatedAt: new Date().toISOString() } });
+  } catch (error: any) {
+    console.error('[OperatorMarketing] set announcement error:', error.message);
+    return res.status(500).json({ code: 500, message: '更新公告失败', data: null });
+  }
+});
+
 export default router;

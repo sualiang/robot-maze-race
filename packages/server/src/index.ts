@@ -146,6 +146,10 @@ app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 // 客户端错误日志（无需鉴权）
 app.use('/api/v1', clientLogRoutes);
 
+// 首页公告栏
+import announcementRoutes from './routes/announcement';
+app.use('/api/v1/announcement', announcementRoutes);
+
 // ============================================================
 // 404 和全局错误处理
 // ============================================================

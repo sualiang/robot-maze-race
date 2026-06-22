@@ -7,6 +7,25 @@
   <!-- 模块1: 顶部导航栏（已精简） -->
 
   <!-- ============================================================ -->
+  <!-- 公告栏（从运营商后台同步，30字内滚动文字） -->
+  <!-- ============================================================ -->
+  <view wx:if="{{announcementText}}" class="announcement-bar">
+    <text class="announcement-icon">📢</text>
+    <swiper
+      class="announcement-swiper"
+      vertical
+      autoplay
+      interval="5000"
+      circular="{{false}}"
+      display-multiple-items="1"
+    >
+      <swiper-item>
+        <text class="announcement-text">{{announcementText}}</text>
+      </swiper-item>
+    </swiper>
+  </view>
+
+  <!-- ============================================================ -->
   <!-- 模块2: 主视觉Banner -->
   <!-- ============================================================ -->
   <view class="hero-banner-image">

@@ -12,6 +12,7 @@ Page({
     couponCount: 0,
     // 模块2: Banner
     remainCount: 0,
+    announcementText: '',
     // 模块3: 参赛状态&福利
     couponValue: 0,
     // 模块4: 福利条
@@ -50,6 +51,9 @@ Page({
     // 统一从 profile-check 拿参赛次数 + 福利总额 + 积分
     that.fetchProfileSummary();
 
+    // 取首页公告
+    that.fetchAnnouncement();
+
     // 并行拉取其他数据
     that.fetchPackages();
     that.fetchSeasonUserInfo();
@@ -84,6 +88,16 @@ Page({
     }).catch(function () {
       that.setData({ remainCount: 0, couponValue: 0 });
     });
+  },
+
+  // 获取首页公告
+  fetchAnnouncement: function () {
+    var that = this;
+    request.silentGet('/announcement').then(function (data) {
+      if (data && data.text) {
+        that.setData({ announcementText: data.text });
+      }
+    }).catch(function () {});
   },
 
   /**
