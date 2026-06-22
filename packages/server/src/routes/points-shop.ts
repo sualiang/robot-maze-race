@@ -5,9 +5,20 @@ import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();
 
+// ============================================================
+// 辅助：仅运营商/admin可操作
+// ============================================================
+function operatorOnly(req: Request, res: Response, next: Function): void {
+  if (req.user?.role !== 'operator' && req.user?.role !== 'admin') {
+    res.status(403).json({ code: 403, message: '仅运营商可操作', data: null });
+    return;
+  }
+  next();
+}
+
 /**
  * GET /api/v1/points-shop/items
- * 列出积分商城可兑换商品
+ * 列出积分商城可兑换商品（玩家端，仅上架商品）
  */
 router.get('/points-shop/items', authMiddleware, async (req: Request, res: Response) => {
   try {
@@ -50,10 +61,116 @@ router.get('/points-shop/items', authMiddleware, async (req: Request, res: Respo
 });
 
 /**
+ * GET /api/v1/points-shop/items/all
+ * 获取全部商品（含下架）（运营后台使用）
+ * ⚠️ 放在 /items/:id 之前避免 all 被当作 id 捕获
+ */
+router.get('/points-shop/items/all', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
+  try {
+    const items = await query<any>(
+      `SELECT id, item_type, item_id, name, description, need_points, sort_weight, status, created_at, updated_at
+       FROM point_shop
+       ORDER BY sort_weight ASC, created_at ASC`
+    );
+    res.json({
+      code: 0,
+      data: (items || []).map((item: any) => ({
+        id: item.id,
+        itemType: item.item_type,
+        itemId: item.item_id,
+        name: item.name,
+        description: item.description,
+        needPoints: item.need_points,
+        sortWeight: item.sort_weight || 0,
+        status: item.status,
+        createdAt: item.created_at,
+        updatedAt: item.updated_at,
+      }))
+    });
+  } catch (error: any) {
+    console.error('[PointsShop] list all error:', error.message);
+    res.status(500).json({ code: 500, message: '获取商品列表失败', data: null });
+  }
+});
+
+/**
+ * POST /api/v1/points-shop/items
+ * 新建积分商品（运营后台）
+ */
+router.post('/points-shop/items', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
+  try {
+    const { name, itemType, itemId, description, needPoints, sortWeight } = req.body;
+    if (!name || !itemType || !needPoints) {
+      return res.status(400).json({ code: 400, message: 'name, itemType, needPoints 不能为空', data: null });
+    }
+    const id = uuidv4();
+    await execute(
+      `INSERT INTO point_shop (id, item_type, item_id, name, description, need_points, sort_weight)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [id, itemType, itemId || '', name, description || '', needPoints, sortWeight || 0]
+    );
+    res.status(201).json({ code: 0, message: '商品已创建', data: { id } });
+  } catch (error: any) {
+    console.error('[PointsShop] create error:', error.message);
+    res.status(500).json({ code: 500, message: '创建商品失败', data: null });
+  }
+});
+
+/**
+ * PUT /api/v1/points-shop/items/:id
+ * 更新积分商品（运营后台）
+ */
+router.put('/points-shop/items/:id', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { name, itemType, itemId, description, needPoints, sortWeight, status } = req.body;
+
+    const updates: string[] = [];
+    const params: any[] = [];
+    let idx = 1;
+
+    if (name !== undefined) { updates.push(`name = $${idx++}`); params.push(name); }
+    if (itemType !== undefined) { updates.push(`item_type = $${idx++}`); params.push(itemType); }
+    if (itemId !== undefined) { updates.push(`item_id = $${idx++}`); params.push(String(itemId)); }
+    if (description !== undefined) { updates.push(`description = $${idx++}`); params.push(description); }
+    if (needPoints !== undefined) { updates.push(`need_points = $${idx++}`); params.push(needPoints); }
+    if (sortWeight !== undefined) { updates.push(`sort_weight = $${idx++}`); params.push(sortWeight); }
+    if (status !== undefined) { updates.push(`status = $${idx++}`); params.push(status); }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ code: 400, message: '没有要更新的字段', data: null });
+    }
+
+    updates.push(`updated_at = datetime('now')`);
+    params.push(id);
+
+    await execute(`UPDATE point_shop SET ${updates.join(', ')} WHERE id = $${idx}`, params);
+    res.json({ code: 0, message: '商品已更新', data: null });
+  } catch (error: any) {
+    console.error('[PointsShop] update error:', error.message);
+    res.status(500).json({ code: 500, message: '更新商品失败', data: null });
+  }
+});
+
+/**
+ * DELETE /api/v1/points-shop/items/:id
+ * 删除积分商品（运营后台）
+ */
+router.delete('/points-shop/items/:id', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await execute('DELETE FROM point_shop WHERE id = $1', [id]);
+    res.json({ code: 0, message: '商品已删除', data: null });
+  } catch (error: any) {
+    console.error('[PointsShop] delete error:', error.message);
+    res.status(500).json({ code: 500, message: '删除商品失败', data: null });
+  }
+});
+
+/**
  * POST /api/v1/points-shop/exchange
  * 兑换积分商品
  * @param body.itemId - 商品 ID
- * @returns { data: { exchangeId, itemName, needPoints } }
  */
 router.post('/points-shop/exchange', authMiddleware, async (req: Request, res: Response) => {
   const userId = req.user!.userId;
@@ -169,7 +286,6 @@ router.post('/points-shop/exchange', authMiddleware, async (req: Request, res: R
     // 6. 记录兑换日志
     const exchangeId = uuidv4();
     try {
-      // 先尝试创建兑换日志表（如不存在）
       await execute(
         `CREATE TABLE IF NOT EXISTS points_exchange_log (
           id TEXT PRIMARY KEY,
@@ -181,18 +297,14 @@ router.post('/points-shop/exchange', authMiddleware, async (req: Request, res: R
           created_at TEXT DEFAULT (datetime('now'))
         )`
       );
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
     try {
       await execute(
         `INSERT INTO points_exchange_log (id, user_id, item_id, item_type, item_name, spent_points)
          VALUES ($1, $2, $3, $4, $5, $6)`,
         [exchangeId, userId, itemId, itemType, item.name, needPoints]
       );
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
 
     // 7. 记积分流水
     try {
@@ -202,36 +314,21 @@ router.post('/points-shop/exchange', authMiddleware, async (req: Request, res: R
          VALUES ($1, $2, $3, 'point_shop_exchange', $4)`,
         [txnId, userId, -needPoints, `积分商城兑换·${item.name}`]
       );
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
 
     res.json({
       code: 0,
-      data: {
-        exchangeId,
-        itemName: item.name,
-        itemType,
-        needPoints,
-      },
+      data: { exchangeId, itemName: item.name, itemType, needPoints },
     });
   } catch (e: any) {
     console.error('[PointsShop] exchange error:', e?.message || e);
     // 尝试回滚积分
     try {
-      const item = await queryOne<any>(
-        `SELECT need_points FROM point_shop WHERE id = $1`,
-        [req.body.itemId]
-      );
+      const item = await queryOne<any>(`SELECT need_points FROM point_shop WHERE id = $1`, [req.body.itemId]);
       if (item) {
-        await execute(
-          `UPDATE users SET points = points + $1 WHERE id = $2`,
-          [item.need_points, req.body.userId]
-        );
+        await execute(`UPDATE users SET points = points + $1 WHERE id = $2`, [item.need_points, req.body.userId]);
       }
-    } catch {
-      // ignore rollback failure
-    }
+    } catch { /* ignore rollback failure */ }
     res.json({ code: 500, message: '兑换失败，积分已返还', data: null });
   }
 });
@@ -272,121 +369,3 @@ router.get('/points-shop/history', authMiddleware, async (req: Request, res: Res
 });
 
 export default router;
-
-// ============================================================
-// 运营后台管理接口（需要 operator/admin 角色）
-// ============================================================
-
-function operatorOnly(req: Request, res: Response, next: Function): void {
-  if (req.user?.role !== 'operator' && req.user?.role !== 'admin') {
-    res.status(403).json({ code: 403, message: '仅运营商可操作', data: null });
-    return;
-  }
-  next();
-}
-
-/**
- * POST /api/v1/points-shop/items
- * 新增积分商品
- */
-router.post('/points-shop/items', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
-  try {
-    const { name, itemType, itemId, description, needPoints, sortWeight } = req.body;
-    if (!name || !itemType || !needPoints) {
-      return res.status(400).json({ code: 400, message: 'name, itemType, needPoints 不能为空', data: null });
-    }
-    const id = uuidv4();
-    await execute(
-      `INSERT INTO point_shop (id, item_type, item_id, name, description, need_points, sort_weight)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [id, itemType, itemId || '', name, description || '', needPoints, sortWeight || 0]
-    );
-    res.status(201).json({ code: 0, message: '商品已创建', data: { id } });
-  } catch (error: any) {
-    console.error('[PointsShop] create error:', error.message);
-    res.status(500).json({ code: 500, message: '创建商品失败', data: null });
-  }
-});
-
-/**
- * PUT /api/v1/points-shop/items/:id
- * 更新积分商品
- */
-router.put('/points-shop/items/:id', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { name, itemType, itemId, description, needPoints, sortWeight, status } = req.body;
-
-    const updates: string[] = [];
-    const params: any[] = [];
-    let idx = 1;
-
-    if (name !== undefined) { updates.push(`name = $${idx++}`); params.push(name); }
-    if (itemType !== undefined) { updates.push(`item_type = $${idx++}`); params.push(itemType); }
-    if (itemId !== undefined) { updates.push(`item_id = $${idx++}`); params.push(String(itemId)); }
-    if (description !== undefined) { updates.push(`description = $${idx++}`); params.push(description); }
-    if (needPoints !== undefined) { updates.push(`need_points = $${idx++}`); params.push(needPoints); }
-    if (sortWeight !== undefined) { updates.push(`sort_weight = $${idx++}`); params.push(sortWeight); }
-    if (status !== undefined) { updates.push(`status = $${idx++}`); params.push(status); }
-
-    if (updates.length === 0) {
-      return res.status(400).json({ code: 400, message: '没有要更新的字段', data: null });
-    }
-
-    updates.push(`updated_at = datetime('now')`);
-    params.push(id);
-
-    await execute(`UPDATE point_shop SET ${updates.join(', ')} WHERE id = $${idx}`, params);
-    res.json({ code: 0, message: '商品已更新', data: null });
-  } catch (error: any) {
-    console.error('[PointsShop] update error:', error.message);
-    res.status(500).json({ code: 500, message: '更新商品失败', data: null });
-  }
-});
-
-/**
- * DELETE /api/v1/points-shop/items/:id
- * 删除积分商品
- */
-router.delete('/points-shop/items/:id', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    await execute('DELETE FROM point_shop WHERE id = $1', [id]);
-    res.json({ code: 0, message: '商品已删除', data: null });
-  } catch (error: any) {
-    console.error('[PointsShop] delete error:', error.message);
-    res.status(500).json({ code: 500, message: '删除商品失败', data: null });
-  }
-});
-
-/**
- * GET /api/v1/points-shop/items/all
- * 获取全部商品（含下架）— 仅运营后台使用
- */
-router.get('/points-shop/items/all', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
-  try {
-    const items = await query<any>(
-      `SELECT id, item_type, item_id, name, description, need_points, sort_weight, status, created_at, updated_at
-       FROM point_shop
-       ORDER BY sort_weight ASC, created_at ASC`
-    );
-    res.json({
-      code: 0,
-      data: (items || []).map((item: any) => ({
-        id: item.id,
-        itemType: item.item_type,
-        itemId: item.item_id,
-        name: item.name,
-        description: item.description,
-        needPoints: item.need_points,
-        sortWeight: item.sort_weight || 0,
-        status: item.status,
-        createdAt: item.created_at,
-        updatedAt: item.updated_at,
-      }))
-    });
-  } catch (error: any) {
-    console.error('[PointsShop] list all error:', error.message);
-    res.status(500).json({ code: 500, message: '获取商品列表失败', data: null });
-  }
-});
