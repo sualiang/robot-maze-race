@@ -2,8 +2,8 @@
  * pages/leaderboard/leaderboard.js - 排行榜 V2 重做
  * 设计基准: 750rpx
  * 接口:
- *   GET /api/v1/season/user/info       — 用户赛季信息(含我的排名)
- *   GET /api/v1/rank/daily|weekly|total — 榜单数据
+ *   GET /api/v1/rank/daily|weekly|total — 榜单数据(含我的排名)
+ *   GET /api/v1/rank/my               — (备用)用户赛季排名
  *   GET /api/v1/season/config           — 赛季配置(规则弹窗用)
  */
 
@@ -26,11 +26,11 @@ Page({
       disclaimer: '最终解释权归主办方所有'
     },
 
-    // 模块2: 我的排名卡片
+    // 模块2: 我的排名卡片（随 Tab 切换）
     myRanking: null,
-    // 距决赛入围还差X名
+    // 距决赛入围还差X名（随 Tab 切换）
     gapToFinal: null,
-    // 再玩X局有望晋级
+    // 再玩X局有望晋级（随 Tab 切换）
     racesToAdvance: null,
 
     // 模块3: Tab
@@ -63,10 +63,9 @@ Page({
       that.setData({ myUserId: userInfo.id });
     }
 
-    // 并行加载赛季配置 + 用户赛季信息 + 榜单
+    // 并行加载赛季配置 + 榜单（从榜单数据中提取我的排名）
     Promise.all([
       that._loadSeasonConfig(),
-      that._loadMyRanking(),
       that._loadRankList('weekly', 1)
     ]).catch(function (err) {
       console.error('排行榜页加载异常:', err);
@@ -79,7 +78,6 @@ Page({
     // Tab 间切换刷新
     if (!this.data.pageLoading && this.data.entries.length > 0) {
       this._loadRankList(this.data.currentTab, 1);
-      this._loadMyRanking();
     }
   },
 
@@ -107,29 +105,35 @@ Page({
   },
 
   /**
-   * 获取"我的排名"数据
+   * 从榜单数据中提取"我的排名"，更新 myRanking
    */
-  _loadMyRanking: function () {
+  _updateMyRanking: function (entries) {
     var that = this;
-    return request.silentGet('/season/user/info').then(function (res) {
-      if (!res) return;
+    var myUserId = that.data.myUserId;
+    var myEntry = null;
 
+    for (var i = 0; i < entries.length; i++) {
+      if (entries[i].userId && entries[i].userId === myUserId) {
+        myEntry = entries[i];
+        break;
+      }
+    }
+
+    if (myEntry) {
       var myRanking = {
-        rank: res.rank || res.myRank || '-',
-        bestScore: res.bestScore || '--',
-        races: res.races || res.totalRaces || 0,
-        beatPercent: res.beatPercent || 0
+        rank: myEntry.rank || '-',
+        bestScore: myEntry.bestScore || '--',
+        races: myEntry.totalRaces || 0,
+        beatPercent: myEntry.beatPercent || 0
       };
 
-      // 计算距决赛入围的差距
+      // 计算距决赛入围的差距（暂按固定前20名）
       var gap = null;
       var racesToAdvance = null;
       if (myRanking.rank && myRanking.rank !== '-') {
         gap = Math.max(0, 20 - myRanking.rank);
-        // 估算需要再玩的局数：每玩一局按平均提升 0.5 名估算
         racesToAdvance = Math.ceil(gap / 0.5);
         if (racesToAdvance < 1) racesToAdvance = 1;
-        // 如果已经在前 20 名，不显示底部提示
         if (gap === 0) {
           gap = null;
           racesToAdvance = null;
@@ -141,13 +145,45 @@ Page({
         gapToFinal: gap,
         racesToAdvance: racesToAdvance
       });
+    } else {
+      // 用户不在当前榜单前100，尝试从接口获取独立排名
+      that._loadFallbackRanking();
+    }
+  },
+
+  /**
+   * 备用：用户不在榜单前100时，从 rank/my 接口获取排名
+   */
+  _loadFallbackRanking: function () {
+    var that = this;
+    request.silentGet('/rank/my').then(function (res) {
+      if (!res) return;
+      var myRanking = {
+        rank: res.rank || res.myRank || '-',
+        bestScore: res.bestScore || '--',
+        races: res.races || res.totalRaces || 0,
+        beatPercent: res.beatPercent || 0
+      };
+      var gap = null;
+      var racesToAdvance = null;
+      if (myRanking.rank && myRanking.rank !== '-') {
+        gap = Math.max(0, 20 - myRanking.rank);
+        racesToAdvance = Math.ceil(gap / 0.5);
+        if (racesToAdvance < 1) racesToAdvance = 1;
+        if (gap === 0) { gap = null; racesToAdvance = null; }
+      }
+      that.setData({
+        myRanking: myRanking,
+        gapToFinal: gap,
+        racesToAdvance: racesToAdvance
+      });
     }).catch(function () {
-      // 用户信息不可用时保持默认状态
+      // 都不行就留空
     });
   },
 
   /**
-   * 加载榜单数据
+   * 加载榜单数据，并更新"我的排名"
    */
   _loadRankList: function (tabKey, pageNum) {
     var that = this;
@@ -163,24 +199,13 @@ Page({
       pageSize: 20
     }).then(function (res) {
       var list = (res && res.list) || [];
-      var myEntry = null;
+      var myUserId = that.data.myUserId;
 
       // 标记用户自身条目
-      var myUserId = that.data.myUserId;
       list = list.map(function (item) {
         item.isMe = item.userId && myUserId && item.userId === myUserId;
-        if (item.isMe) myEntry = item;
         return item;
       });
-
-      // 如果自身不在榜单中但已知排名，加到底部
-      if (!list.some(function (item) { return item.isMe; })) {
-        var myRank = that.data.myRanking;
-        if (myRank && myRank.rank && myRank.rank !== '-' && pageNum === 1) {
-          // 创建一个占位条目放在列表末尾
-          // 用户自己作为单独条目处理
-        }
-      }
 
       if (pageNum === 1) {
         that.setData({
@@ -189,6 +214,8 @@ Page({
           hasMore: list.length >= 20,
           listLoading: false
         });
+        // 首次加载时从榜单数据更新"我的排名"
+        that._updateMyRanking(list);
       } else {
         that.setData({
           entries: that.data.entries.concat(list),
@@ -228,16 +255,9 @@ Page({
       });
     }
 
-    // 确保我的排名卡片可见
+    // 从 mock 数据更新我的排名
+    that._updateMyRanking(mockEntries);
     that.setData({
-      myRanking: that.data.myRanking || {
-        rank: 5,
-        bestScore: '38.1s',
-        races: 3,
-        beatPercent: 92
-      },
-      gapToFinal: that.data.gapToFinal || 15,
-      racesToAdvance: that.data.racesToAdvance || 30,
       entries: mockEntries,
       hasMore: false,
       listLoading: false
