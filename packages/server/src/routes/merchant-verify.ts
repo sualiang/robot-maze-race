@@ -46,7 +46,7 @@ async function doVerify(
   if (coupon.valid_end && new Date(coupon.valid_end) < new Date()) {
     // 标记为过期
     await execute(
-      `UPDATE user_coupons SET status = 3, updated_at = datetime('now') WHERE id = $1`,
+      `UPDATE user_coupons SET status = 3, updated_at = NOW() WHERE id = $1`,
       [coupon.id]
     );
     return { code: 40022, message: '该券已过期' };
@@ -60,13 +60,13 @@ async function doVerify(
   // 标记为已使用
   const now = new Date().toISOString();
   await execute(
-    `UPDATE user_coupons SET status = 2, used_at = datetime('now'), updated_at = datetime('now') WHERE id = $1 AND status = 1`,
+    `UPDATE user_coupons SET status = 2, used_at = NOW(), updated_at = NOW() WHERE id = $1 AND status = 1`,
     [coupon.id]
   );
 
   // 扣减 merchant_coupons.remain_count
   await execute(
-    `UPDATE merchant_coupons SET remain_count = remain_count - 1, updated_at = datetime('now')
+    `UPDATE merchant_coupons SET remain_count = remain_count - 1, updated_at = NOW()
      WHERE id = $1 AND remain_count > 0`,
     [coupon.coupon_id]
   );
@@ -78,7 +78,7 @@ async function doVerify(
       user_id, coupon_name, denomination_cents, verify_type, verify_time, created_at
     ) VALUES (
       $1, $2, $3, $4, $5,
-      $6, $7, $8, $9, datetime('now'), datetime('now')
+      $6, $7, $8, $9, NOW(), NOW()
     )`,
     [
       uuidv4(),

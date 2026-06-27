@@ -124,13 +124,13 @@ router.post('/register', async (req: Request, res: Response) => {
     const passwordHash = hashPassword(password);
     await execute(
       `INSERT INTO merchant_admin (id, merchant_id, username, password_hash, phone, real_name, status, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, 1, datetime('now'), datetime('now'))`,
+       VALUES ($1, $2, $3, $4, $5, $6, 1, NOW(), NOW())`,
       [id, invite.merchant_id, username, passwordHash, phone || '', realName || '']
     );
 
     // 标记邀请码已使用
     await execute(
-      `UPDATE merchant_invite_codes SET used = 1, used_by = $1, used_at = datetime('now') WHERE id = $2`,
+      `UPDATE merchant_invite_codes SET used = 1, used_by = $1, used_at = NOW() WHERE id = $2`,
       [id, invite.id]
     );
 
@@ -185,7 +185,7 @@ router.post('/login', async (req: Request, res: Response) => {
 
     // 更新最后登录时间
     await execute(
-      `UPDATE merchant_admin SET last_login_time = datetime('now'), updated_at = datetime('now') WHERE id = $1`,
+      `UPDATE merchant_admin SET last_login_time = NOW(), updated_at = NOW() WHERE id = $1`,
       [admin.id]
     );
 
@@ -258,7 +258,7 @@ router.post('/change-password', merchantAuthMiddleware, async (req: Request, res
 
     const newHash = hashPassword(newPassword);
     await execute(
-      `UPDATE merchant_admin SET password_hash = $1, first_login = 0, updated_at = datetime('now') WHERE id = $2`,
+      `UPDATE merchant_admin SET password_hash = $1, first_login = 0, updated_at = NOW() WHERE id = $2`,
       [newHash, adminId]
     );
 
@@ -342,7 +342,7 @@ router.put('/profile', merchantAuthMiddleware, async (req: Request, res: Respons
     if (realName !== undefined) { adminUpdates.push(`real_name = $${aIdx++}`); adminParams.push(realName); }
 
     if (adminUpdates.length > 0) {
-      adminUpdates.push(`updated_at = datetime('now')`);
+      adminUpdates.push(`updated_at = NOW()`);
       adminParams.push(adminId);
       updatePromises.push(execute(
         `UPDATE merchant_admin SET ${adminUpdates.join(', ')} WHERE id = $${aIdx}`,
@@ -361,7 +361,7 @@ router.put('/profile', merchantAuthMiddleware, async (req: Request, res: Respons
     if (businessHours !== undefined) { merchantUpdates.push(`business_hours = $${mIdx++}`); merchantParams.push(businessHours); }
 
     if (merchantUpdates.length > 0) {
-      merchantUpdates.push(`updated_at = datetime('now')`);
+      merchantUpdates.push(`updated_at = NOW()`);
       merchantParams.push(req.merchantAdmin!.merchantId);
       updatePromises.push(execute(
         `UPDATE merchants SET ${merchantUpdates.join(', ')} WHERE id = $${mIdx}`,

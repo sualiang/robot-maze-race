@@ -59,7 +59,7 @@ router.post('/create', async (req: Request, res: Response) => {
         status, sort_order, coupon_type,
         max_per_user, put_channels,
         audit_status, version, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8, $9, 1, 0, $10, $11, $12, 0, 1, datetime('now'), datetime('now'))`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8, $9, 1, 0, $10, $11, $12, 0, 1, NOW(), NOW())`,
       [
         id, merchantId, name, description || '',
         denominationCents || 0, minConsumeCents || 0,
@@ -98,7 +98,7 @@ router.post('/:id/submit-audit', async (req: Request, res: Response) => {
     if (!existing.total_count || existing.total_count <= 0) { res.json({ code: 400, message: '请先设置库存数量', data: null }); return; }
 
     await execute(
-      `UPDATE merchant_coupons SET audit_status = 1, updated_at = datetime('now') WHERE id = $1`,
+      `UPDATE merchant_coupons SET audit_status = 1, updated_at = NOW() WHERE id = $1`,
       [id]
     );
 
@@ -129,7 +129,7 @@ router.post('/:id/request-offline', async (req: Request, res: Response) => {
     }
 
     await execute(
-      `UPDATE merchant_coupons SET audit_status = 1, offline_request = 1, updated_at = datetime('now') WHERE id = $1`,
+      `UPDATE merchant_coupons SET audit_status = 1, offline_request = 1, updated_at = NOW() WHERE id = $1`,
       [id]
     );
 
@@ -160,7 +160,7 @@ router.post('/:id/cancel-offline', async (req: Request, res: Response) => {
     }
 
     await execute(
-      `UPDATE merchant_coupons SET audit_status = 2, offline_request = 0, updated_at = datetime('now') WHERE id = $1`,
+      `UPDATE merchant_coupons SET audit_status = 2, offline_request = 0, updated_at = NOW() WHERE id = $1`,
       [id]
     );
 
@@ -197,7 +197,7 @@ router.post('/:id/online', async (req: Request, res: Response) => {
     }
 
     await execute(
-      `UPDATE merchant_coupons SET status = 1, updated_at = datetime('now') WHERE id = $1`,
+      `UPDATE merchant_coupons SET status = 1, updated_at = NOW() WHERE id = $1`,
       [id]
     );
 
@@ -280,7 +280,7 @@ router.put('/:id', async (req: Request, res: Response) => {
     if (existing.audit_status === 2 || existing.audit_status === 3) {
       updates.push(`audit_status = 0`);
     }
-    updates.push(`updated_at = datetime('now')`);
+    updates.push(`updated_at = NOW()`);
 
     params.push(id);
     await execute(

@@ -92,7 +92,7 @@ router.post('/coupon/use', authMiddleware, async (req: Request, res: Response) =
     // 检查有效期
     if (coupon.valid_end && new Date(coupon.valid_end) < new Date()) {
       await execute(
-        `UPDATE user_coupons SET status = 3, updated_at = datetime('now') WHERE id = $1`,
+        `UPDATE user_coupons SET status = 3, updated_at = NOW() WHERE id = $1`,
         [couponId]
       );
       res.json({ code: 400, message: '优惠券已过期', data: null });
@@ -101,7 +101,7 @@ router.post('/coupon/use', authMiddleware, async (req: Request, res: Response) =
 
     // 标记为已使用
     await execute(
-      `UPDATE user_coupons SET status = 2, used_at = datetime('now'), updated_at = datetime('now') WHERE id = $1 AND status = 1`,
+      `UPDATE user_coupons SET status = 2, used_at = NOW(), updated_at = NOW() WHERE id = $1 AND status = 1`,
       [couponId]
     );
 
