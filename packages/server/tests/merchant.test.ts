@@ -54,15 +54,15 @@ function createMerchantToken(overrides?: Partial<{
 
 // 插入种子数据的辅助函数
 async function seedTestData(): Promise<void> {
-  const mysql = require('mysql2/promise');
+  const mysql = require("mysql2/promise");
+  const parsedUrl = new URL(process.env.DATABASE_URL || "mysql://robot_maze_race:RobotRace2026!Pass@localhost:3307/robot_maze_race");
   const conn = await mysql.createConnection({
-    host: '172.19.0.2',
-    port: 3306,
-    user: 'robot_race_test',
-    password: 'robot_race_test',
-    database: 'robot_race_test',
+    host: parsedUrl.hostname,
+    port: parseInt(parsedUrl.port || "3306"),
+    user: decodeURIComponent(parsedUrl.username),
+    password: decodeURIComponent(parsedUrl.password),
+    database: parsedUrl.pathname.slice(1),
   });
-
   try {
     // 清理之前的UT数据
     await conn.execute(`DELETE FROM merchant_invite_codes WHERE code LIKE '${TEST_PREFIX}%'`);
@@ -122,7 +122,7 @@ describe('Merchant Auth', () => {
 
   beforeAll(async () => {
     if (!isTestEnv) {
-      console.warn('[WARN] DATABASE_URL does not point to robot_race_test — tests may affect production data!');
+      console.warn('[WARN] DATABASE_URL does not point to robot_maze_race — tests may affect production data!');
     }
     // 先加载 app（需要 app 已 import）
     app = require('../src/index').default;
@@ -442,12 +442,13 @@ describe('Merchant Verify', () => {
 
     // 创建一个可用于核销的优惠券（创建→提交审核→审核通过→上架）
     const mysql = require('mysql2/promise');
+    const parsedUrl = new URL(process.env.DATABASE_URL || 'mysql://robot_maze_race:RobotRace2026!Pass@localhost:3307/robot_maze_race');
     const conn = await mysql.createConnection({
-      host: '172.19.0.2',
-      port: 3306,
-      user: 'robot_race_test',
-      password: 'robot_race_test',
-      database: 'robot_race_test',
+      host: parsedUrl.hostname,
+      port: parseInt(parsedUrl.port || '3306'),
+      user: decodeURIComponent(parsedUrl.username),
+      password: decodeURIComponent(parsedUrl.password),
+      database: parsedUrl.pathname.slice(1),
     });
 
     try {
@@ -456,7 +457,7 @@ describe('Merchant Verify', () => {
       testVerifyCode = `${TEST_PREFIX}_CODE_001`;
       await conn.execute(
         `INSERT INTO merchant_coupons (id, merchant_id, name, denomination_cents, total_count, remain_count, 
-          coupon_type, max_per_user, audit_status, coupon_status, valid_start, valid_end, created_at, updated_at)
+          coupon_type, max_per_user, audit_status, status, valid_start, valid_end, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, 1, 1, 2, 1, '2026-06-01 00:00:00', '2026-12-31 23:59:59', NOW(), NOW())`,
         [testCouponId, testMerchantId, `${TEST_PREFIX}_核销券`, 500, 100, 100]
       );
@@ -510,15 +511,15 @@ describe('Merchant Verify', () => {
     beforeAll(async () => {
       // 再建一个可手动核销的
       manualVerifyCode = `${TEST_PREFIX}_CODE_MAN`;
-      const mysql = require('mysql2/promise');
+      const mysql = require("mysql2/promise");
+      const parsedUrl = new URL(process.env.DATABASE_URL || "mysql://robot_maze_race:RobotRace2026!Pass@localhost:3307/robot_maze_race");
       const conn = await mysql.createConnection({
-        host: '172.19.0.2',
-        port: 3306,
-        user: 'robot_race_test',
-        password: 'robot_race_test',
-        database: 'robot_race_test',
+        host: parsedUrl.hostname,
+        port: parseInt(parsedUrl.port || "3306"),
+        user: decodeURIComponent(parsedUrl.username),
+        password: decodeURIComponent(parsedUrl.password),
+        database: parsedUrl.pathname.slice(1),
       });
-      try {
         await conn.execute(
           `INSERT INTO user_coupons (id, user_id, coupon_id, merchant_id, coupon_name, denomination_cents,
             min_consume_cents, coupon_type, verify_code, used, created_at, updated_at)

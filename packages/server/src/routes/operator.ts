@@ -140,7 +140,7 @@ router.get('/rbac/roles', authMiddleware, operatorOnly, async (req: Request, res
   try {
     // 运营商后台看到其可分配的角色：scope='operator' 或 scope='admin' 中非 super_admin 的角色
     const roles = await query<any>(
-      `SELECT id AS key, name, label, permissions FROM admin_roles WHERE scope = 'operator' ORDER BY name ASC`
+      `SELECT id AS \`key\`, name, label, permissions FROM admin_roles WHERE scope = 'operator' ORDER BY name ASC`
     );
     const result = roles.map((r: any) => {
       let perms: string[] = [];
@@ -1122,7 +1122,7 @@ router.get('/settings', authMiddleware, async (req: Request, res: Response) => {
 async function initOperatorRoles() {
   try {
     const roles = await query<any>(
-      `SELECT id AS key, label AS name, label, permissions FROM admin_roles WHERE scope = 'operator' ORDER BY name ASC`
+      `SELECT id AS `key`, label AS name, label, permissions FROM admin_roles WHERE scope = 'operator' ORDER BY name ASC`
     );
     OPERATOR_ROLES = roles.map((r: any) => ({
       ...r,

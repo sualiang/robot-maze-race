@@ -11,12 +11,13 @@ export const config = {
   // 运行环境
   nodeEnv: process.env.NODE_ENV || 'development',
 
-  // 数据库
+  // MySQL 数据库连接（DATABASE_URL 优先）
   db: {
+    url: process.env.DATABASE_URL || '',
     host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '5432', 10),
+    port: parseInt(process.env.DB_PORT || '3306', 10),
     database: process.env.DB_NAME || 'robot_maze_race',
-    user: process.env.DB_USER || 'postgres',
+    user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
     max: parseInt(process.env.DB_POOL_MAX || '20', 10),
     idleTimeoutMillis: parseInt(process.env.DB_POOL_IDLE_TIMEOUT || '30000', 10),
