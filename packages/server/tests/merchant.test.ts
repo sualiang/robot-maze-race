@@ -520,6 +520,7 @@ describe('Merchant Verify', () => {
         password: decodeURIComponent(parsedUrl.password),
         database: parsedUrl.pathname.slice(1),
       });
+      try {
         await conn.execute(
           `INSERT INTO user_coupons (id, user_id, coupon_id, merchant_id, coupon_name, denomination_cents,
             min_consume_cents, coupon_type, verify_code, used, created_at, updated_at)
