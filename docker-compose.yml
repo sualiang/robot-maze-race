@@ -1,0 +1,23 @@
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=mysql://root:RobotRace2026!Root@localhost:3307/robot_maze_race
+      - JWT_SECRET=${JWT_SECRET:-robot-maze-race-dev-secret}
+      - REDIS_HOST=${REDIS_HOST:-localhost}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - UPLOAD_DIR=/app/uploads
+    volumes:
+      - uploads-data:/app/uploads
+    restart: unless-stopped
+    network_mode: host
+
+volumes:
+  uploads-data:

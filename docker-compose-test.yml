@@ -1,0 +1,29 @@
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: robot-race-backend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=mysql://robot_race:robot_race@robotrent-mysql:3306/robot_race
+      - JWT_SECRET=${JWT_SECRET:-robot-maze-race-dev-secret}
+      - REDIS_HOST=${REDIS_HOST:-robotrent-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - UPLOAD_DIR=/app/uploads
+    volumes:
+      - uploads-data:/app/uploads
+    restart: unless-stopped
+    networks:
+      - robotrent_app-net
+
+volumes:
+  uploads-data:
+
+networks:
+  robotrent_app-net:
+    external: true

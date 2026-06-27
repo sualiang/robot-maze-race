@@ -1122,7 +1122,7 @@ router.get('/settings', authMiddleware, async (req: Request, res: Response) => {
 async function initOperatorRoles() {
   try {
     const roles = await query<any>(
-      `SELECT id AS `key`, label AS name, label, permissions FROM admin_roles WHERE scope = 'operator' ORDER BY name ASC`
+      `SELECT id AS \`key\`, label AS name, label, permissions FROM admin_roles WHERE scope = 'operator' ORDER BY name ASC`
     );
     OPERATOR_ROLES = roles.map((r: any) => ({
       ...r,
