@@ -290,7 +290,7 @@ router.post('/checkin', authMiddleware, async (req: Request, res: Response) => {
     const checkinId = uuidv4();
     await query(
       `INSERT INTO checkins (id, user_id, venue_id, queue_number, status, checked_in_at, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, 'queued', datetime('now'), datetime('now'), datetime('now'))`,
+       VALUES ($1, $2, $3, $4, 'queued', NOW(), NOW(), NOW())`,
       [checkinId, userId, venueId, queueNumber]
     );
 
@@ -400,7 +400,7 @@ router.get('/me/profile-check', authMiddleware, async (req: Request, res: Respon
     let couponTotalCents = 0;
     try {
       const couponRow = await queryOne<{ total: number }>(
-        `SELECT COALESCE(SUM(denomination_cents), 0) as total FROM user_coupons WHERE user_id = $1 AND status = 1 AND (valid_end IS NULL OR valid_end >= datetime('now'))`,
+        `SELECT COALESCE(SUM(denomination_cents), 0) as total FROM user_coupons WHERE user_id = $1 AND status = 1 AND (valid_end IS NULL OR valid_end >= NOW())`,
         [userId]
       );
       couponTotalCents = couponRow?.total || 0;
@@ -790,7 +790,7 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
           // 标记已使用的抵扣金
           await execute(
             `UPDATE entry_deductions
-             SET status = 'used', order_id = $1, used_at = datetime('now')
+             SET status = 'used', order_id = $1, used_at = NOW()
              WHERE id = $2`,
             [orderId, d.id]
           );
@@ -819,7 +819,7 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
     await query(
       `INSERT INTO orders (id, order_no, user_id, package_id, amount_cents, discount_cents,
                remaining_times, remaining_growth, status, paid_at, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'paid', datetime('now'), datetime('now'))`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'paid', NOW(), NOW())`,
       [orderId, orderNo, userId, packageId, pkg.price_cents, deductionCents,
        remainingTimes, remainingGrowth]
     );
@@ -828,7 +828,7 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
     if (pkg.race_count > 0) {
       try {
         await execute(
-          `UPDATE users SET race_count = COALESCE(race_count, 0) + $1, updated_at = datetime('now') WHERE id = $2`,
+          `UPDATE users SET race_count = COALESCE(race_count, 0) + $1, updated_at = NOW() WHERE id = $2`,
           [pkg.race_count, userId]
         );
         console.log('[订单] 购买参赛包增加参赛次数:', pkg.race_count, '次');
@@ -844,7 +844,7 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
         const deductionId = uuidv4();
         await query(
           `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
-           VALUES ($1, $2, $3, 'order_purchase', 'available', $4, $5, datetime('now', '+365 days'), datetime('now'))`,
+           VALUES ($1, $2, $3, 'order_purchase', 'available', $4, $5, DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
           [deductionId, userId, freeDeductionCents, orderId, packageId]
         );
         console.log(`[订单] 购买参赛包赠送抵扣金${freeDeductionCents}分`);
@@ -880,7 +880,7 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
           const dedId = uuidv4();
           await execute(
             `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
-             VALUES ($1, $2, $3, 'order_purchase_pro', 'available', $4, $5, datetime('now', '+365 days'), datetime('now'))`,
+             VALUES ($1, $2, $3, 'order_purchase_pro', 'available', $4, $5, DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
             [dedId, userId, 2000, orderId, packageId]
           );
         }
@@ -890,7 +890,7 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
         const dedId = uuidv4();
         await execute(
           `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
-           VALUES ($1, $2, $3, 'order_purchase', 'available', $4, $5, datetime('now', '+365 days'), datetime('now'))`,
+           VALUES ($1, $2, $3, 'order_purchase', 'available', $4, $5, DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
           [dedId, userId, 1500, orderId, packageId]
         );
         console.log(`[订单] 标准包购包赠参赛抵扣金：用户${userId}，1张×1500分`);
@@ -899,7 +899,7 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
         const dedId = uuidv4();
         await execute(
           `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
-           VALUES ($1, $2, $3, 'order_purchase', 'available', $4, $5, datetime('now', '+365 days'), datetime('now'))`,
+           VALUES ($1, $2, $3, 'order_purchase', 'available', $4, $5, DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
           [dedId, userId, 500, orderId, packageId]
         );
         console.log(`[订单] 基础包购包赠参赛抵扣金：用户${userId}，1张×500分`);
@@ -974,7 +974,7 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
 async function getSystemConfig(key: string, defaultVal: string): Promise<string> {
   try {
     const row = await queryOne<{ value: string }>(
-      `SELECT value FROM system_config WHERE key = $1`,
+      `SELECT value FROM system_config WHERE \`key\` = $1`,
       [key]
     );
     return row?.value ?? defaultVal;
@@ -1045,7 +1045,7 @@ async function grantGrowthOnCheckin(userId: string, checkinId: string): Promise<
         );
         if (existingSeasonUser) {
           await execute(
-            `UPDATE season_user_info SET exp = exp + $1, points = points + $2, updated_at = datetime('now') WHERE id = $3`,
+            `UPDATE season_user_info SET exp = exp + $1, points = points + $2, updated_at = NOW() WHERE id = $3`,
             [perCheckinGrowth, perCheckinPoints, existingSeasonUser.id]
           );
         } else {
@@ -1059,7 +1059,7 @@ async function grantGrowthOnCheckin(userId: string, checkinId: string): Promise<
 
       // 同时更新 users 表的 exp/points（供非赛季场景使用）
       await execute(
-        `UPDATE users SET exp = COALESCE(exp, 0) + $1, points = COALESCE(points, 0) + $2, updated_at = datetime('now') WHERE id = $3`,
+        `UPDATE users SET exp = COALESCE(exp, 0) + $1, points = COALESCE(points, 0) + $2, updated_at = NOW() WHERE id = $3`,
         [perCheckinGrowth, perCheckinPoints, userId]
       );
 
@@ -1068,7 +1068,7 @@ async function grantGrowthOnCheckin(userId: string, checkinId: string): Promise<
 
     // 扣减订单的剩余次数和剩余成长值
     await execute(
-      `UPDATE orders SET remaining_times = remaining_times - 1, updated_at = datetime('now') WHERE id = $1 AND remaining_times > 0`,
+      `UPDATE orders SET remaining_times = remaining_times - 1, updated_at = NOW() WHERE id = $1 AND remaining_times > 0`,
       [order.id]
     );
   } catch (err: any) {
@@ -1123,7 +1123,7 @@ async function checkIdempotency(key: string | undefined, res: Response): Promise
   if (!key) return false;
   try {
     const existing = await queryOne<{ response: string }>(
-      `SELECT response FROM idempotency_keys WHERE key = $1`,
+      `SELECT response FROM idempotency_keys WHERE \`key\` = $1`,
       [key]
     );
     if (existing) {
@@ -1142,7 +1142,7 @@ async function saveIdempotency(key: string | undefined, result: any): Promise<vo
   if (!key) return;
   try {
     await query(
-      `INSERT INTO idempotency_keys (id, key, response, created_at) VALUES ($1, $2, $3, datetime('now'))`,
+      `INSERT INTO idempotency_keys (id, \`key\`, response, created_at) VALUES ($1, $2, $3, NOW())`,
       [uuidv4(), key, JSON.stringify(result)]
     );
   } catch (e: any) {
@@ -1154,7 +1154,7 @@ async function saveIdempotency(key: string | undefined, result: any): Promise<vo
 async function getUserActiveHelpCount(userId: string): Promise<number> {
   try {
     const row = await queryOne<{ cnt: number }>(
-      `SELECT COUNT(*) as cnt FROM helps WHERE initiator_id = $1 AND status = 'active' AND (expires_at IS NULL OR expires_at > datetime('now'))`,
+      `SELECT COUNT(*) as cnt FROM helps WHERE initiator_id = $1 AND status = 'active' AND (expires_at IS NULL OR expires_at > NOW())`,
       [userId]
     );
     return row?.cnt ?? 0;
@@ -1318,7 +1318,7 @@ router.post('/help/create', authMiddleware, rateLimiter(), async (req: Request, 
   try {
     await query(
       `INSERT INTO helps (id, initiator_id, required_help_count, current_help_count, status, initiated_at, expires_at, created_at)
-       VALUES ($1, $2, $3, 0, 'active', datetime('now'), datetime('now', '+' || $4 || ' days'), datetime('now'))`,
+       VALUES ($1, $2, $3, 0, 'active', NOW(), DATE_ADD(NOW(), INTERVAL CAST($4 AS SIGNED) DAY), NOW())`,
       [helpId, userId, requiredHelpCount, helpValidDays]
     );
   } catch (e: any) {
@@ -1384,7 +1384,7 @@ router.get('/help/detail', async (req: Request, res: Response) => {
     if (help.status === 'active' && help.expires_at && help.expires_at < now) {
       // 自动标记过期（静默更新）
       try {
-        await query(`UPDATE helps SET status = 'expired' WHERE id = $1 AND status = 'active' AND expires_at < datetime('now')`, [helpId]);
+        await query(`UPDATE helps SET status = 'expired' WHERE id = $1 AND status = 'active' AND expires_at < NOW()`, [helpId]);
       } catch {}
       help.status = 'expired';
     }
@@ -1563,18 +1563,18 @@ router.post('/help/assist', authMiddleware, rateLimiter(), async (req: Request, 
 
     if (deviceId) {
       if (isComplete) {
-        sql = `UPDATE helps SET current_help_count = $1, status = 'completed', helper_id = $2, helped_at = datetime('now'), helper_device_id = $3 WHERE id = $4`;
+        sql = `UPDATE helps SET current_help_count = $1, status = 'completed', helper_id = $2, helped_at = NOW(), helper_device_id = $3 WHERE id = $4`;
         sqlParams = [newCount, helperUserId, deviceId, helpId];
       } else {
-        sql = `UPDATE helps SET current_help_count = $1, helper_id = $2, helped_at = datetime('now'), helper_device_id = $3 WHERE id = $4 AND current_help_count = $5`;
+        sql = `UPDATE helps SET current_help_count = $1, helper_id = $2, helped_at = NOW(), helper_device_id = $3 WHERE id = $4 AND current_help_count = $5`;
         sqlParams = [newCount, helperUserId, deviceId, helpId, help.current_help_count];
       }
     } else {
       if (isComplete) {
-        sql = `UPDATE helps SET current_help_count = $1, status = 'completed', helper_id = $2, helped_at = datetime('now') WHERE id = $3`;
+        sql = `UPDATE helps SET current_help_count = $1, status = 'completed', helper_id = $2, helped_at = NOW() WHERE id = $3`;
         sqlParams = [newCount, helperUserId, helpId];
       } else {
-        sql = `UPDATE helps SET current_help_count = $1, helper_id = $2, helped_at = datetime('now') WHERE id = $3 AND current_help_count = $4`;
+        sql = `UPDATE helps SET current_help_count = $1, helper_id = $2, helped_at = NOW() WHERE id = $3 AND current_help_count = $4`;
         sqlParams = [newCount, helperUserId, helpId, help.current_help_count];
       }
     }
@@ -1585,7 +1585,7 @@ router.post('/help/assist', authMiddleware, rateLimiter(), async (req: Request, 
     const helpHelperId = uuidv4();
     await query(
       `INSERT INTO help_helpers (id, help_id, user_id, device_id, helped_at)
-       VALUES ($1, $2, $3, $4, datetime('now'))`,
+       VALUES ($1, $2, $3, $4, NOW())`,
       [helpHelperId, helpId, helperUserId, deviceId || null]
     );
 
@@ -1637,7 +1637,7 @@ async function issueRaceCountRewardForCompletion(initiatorId: string, helpId: st
 
     // 直接给用户加参赛次数
     await query(
-      `UPDATE users SET race_count = race_count + $1, updated_at = datetime('now') WHERE id = $2`,
+      `UPDATE users SET race_count = race_count + $1, updated_at = NOW() WHERE id = $2`,
       [rewardCount, initiatorId]
     );
 

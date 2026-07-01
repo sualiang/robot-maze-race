@@ -139,9 +139,9 @@ router.post('/merchant/audit', authMiddleware, operatorOnly, async (req: Request
     const updates: string[] = [
       `audit_status = $1`,
       `audit_remark = $2`,
-      `audit_time = datetime('now')`,
+      `audit_time = NOW()`,
       `auditor_id = $3`,
-      `updated_at = datetime('now')`,
+      `updated_at = NOW()`,
     ];
     const params: any[] = [auditStatus, auditRemark || '', auditorName];
 
@@ -244,7 +244,7 @@ router.post('/merchant/invite-code', authMiddleware, operatorOnly, async (req: R
 
     await execute(
       `INSERT INTO merchant_invite_codes (id, code, merchant_id, used, created_at)
-       VALUES ($1, $2, $3, 0, datetime('now'))`,
+       VALUES ($1, $2, $3, 0, NOW())`,
       [id, code, merchantId]
     );
 
@@ -397,10 +397,10 @@ router.post('/merchant/coupon/audit', authMiddleware, operatorOnly, async (req: 
       `UPDATE merchant_coupons SET
         audit_status = $1,
         audit_remark = $2,
-        audit_time = datetime('now'),
+        audit_time = NOW(),
         auditor_id = $3,
         op_read = $4,
-        updated_at = datetime('now')
+        updated_at = NOW()
        WHERE id = $5`,
       [auditStatus, auditRemark || '', operatorId, isRejected ? 0 : 1, couponId] // 驳回未读，通过已读
     );
@@ -526,10 +526,10 @@ router.post('/merchant/coupon/offline-audit', authMiddleware, operatorOnly, asyn
           audit_status = 2,
           offline_request = 0,
           audit_remark = $1,
-          audit_time = datetime('now'),
+          audit_time = NOW(),
           auditor_id = $2,
           op_read = 0,
-          updated_at = datetime('now')
+          updated_at = NOW()
          WHERE id = $3`,
         [auditRemark || '运营商同意下架', operatorId, couponId]
       );
@@ -541,10 +541,10 @@ router.post('/merchant/coupon/offline-audit', authMiddleware, operatorOnly, asyn
           status = 1,
           offline_request = 0,
           audit_remark = $1,
-          audit_time = datetime('now'),
+          audit_time = NOW(),
           auditor_id = $2,
           op_read = 0,
-          updated_at = datetime('now')
+          updated_at = NOW()
          WHERE id = $3`,
         [auditRemark || '下架申请被驳回', operatorId, couponId]
       );

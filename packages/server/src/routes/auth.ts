@@ -893,13 +893,13 @@ router.post('/member/change-password', authMiddleware, async (req: Request, res:
     if (isOperatorSuperAdmin) {
       // 运营商超管 → 更新 operators 表
       await query(
-        "UPDATE operators SET operator_password_hash = $1, password_change_required = 0, updated_at = datetime('now') WHERE id = $2",
+        "UPDATE operators SET operator_password_hash = $1, password_change_required = 0, updated_at = NOW() WHERE id = $2",
         [hashedPassword, userId]
       );
     } else {
       // 运营商角色成员 → 更新 operator_members 表
       await query(
-        "UPDATE operator_members SET password_hash = $1, first_login = 0, updated_at = datetime('now') WHERE id = $2",
+        "UPDATE operator_members SET password_hash = $1, first_login = 0, updated_at = NOW() WHERE id = $2",
         [hashedPassword, userId]
       );
     }
@@ -996,7 +996,7 @@ router.post('/register', async (req: Request, res: Response) => {
 
     await query(
       `INSERT INTO users (id, openid, phone, nickname, password, role, race_count, avatar_url, first_login, register_coupon_granted, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, 'player', 3, '', 0, 1, datetime('now'), datetime('now'))`,
+       VALUES ($1, $2, $3, $4, $5, 'player', 3, '', 0, 1, NOW(), NOW())`,
       [userId, 'plr_' + phone, phone, displayName, hash]
     );
 
@@ -1047,7 +1047,7 @@ async function grantFreeEntryDeduction(userId: string): Promise<void> {
   try {
     // 从 system_config 读取配置，默认 1000分=10元
     const cfgRow = await queryOne<{ value: string }>(
-      `SELECT value FROM system_config WHERE key = 'register_deduction_cents'`
+      `SELECT value FROM system_config WHERE \`key\` = 'register_deduction_cents'`
     );
     let deductionCents = 1000; // 默认 10 元
     if (cfgRow && cfgRow.value) {
@@ -1063,7 +1063,7 @@ async function grantFreeEntryDeduction(userId: string): Promise<void> {
     const deductionId = uuidv4();
     await execute(
       `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, expires_at, created_at)
-       VALUES ($1, $2, $3, 'register_reward', 'available', datetime('now', '+365 days'), datetime('now'))`,
+       VALUES ($1, $2, $3, 'register_reward', 'available', DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
       [deductionId, userId, deductionCents]
     );
     console.log('[Auth] 注册赠送参赛抵扣金:', userId, 'amount:', deductionCents / 100, '元, id:', deductionId);

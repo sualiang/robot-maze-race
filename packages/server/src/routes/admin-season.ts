@@ -66,7 +66,7 @@ router.post('/season', authMiddleware, adminMiddleware, async (req: Request, res
     const id = uuidv4();
     await execute(
       `INSERT INTO seasons (id, name, description, start_time, end_time, status, sort_order, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, 0, $6, datetime('now'), datetime('now'))`,
+       VALUES ($1, $2, $3, $4, $5, 0, $6, NOW(), NOW())`,
       [id, name, description || '', startTime || null, endTime || null, sortOrder || 0]
     );
 
@@ -111,7 +111,7 @@ router.put('/season/:id', authMiddleware, adminMiddleware, async (req: Request, 
       return;
     }
 
-    updates.push(`updated_at = datetime('now')`);
+    updates.push(`updated_at = NOW()`);
     params.push(id);
 
     await execute(
@@ -142,7 +142,7 @@ router.post('/season/:id/toggle', authMiddleware, adminMiddleware, async (req: R
 
     const newStatus = season.status === 1 ? 0 : 1;
     await execute(
-      `UPDATE seasons SET status = $1, updated_at = datetime('now') WHERE id = $2`,
+      `UPDATE seasons SET status = $1, updated_at = NOW() WHERE id = $2`,
       [newStatus, id]
     );
 

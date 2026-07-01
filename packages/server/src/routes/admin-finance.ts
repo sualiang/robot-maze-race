@@ -147,7 +147,7 @@ router.post('/withdraws/:id/approve', authMiddleware, checkPermission('finance:w
     }
 
     await execute(
-      "UPDATE settlements SET status = 'approved', settled_at = datetime('now'), updated_at = datetime('now') WHERE id = $1",
+      "UPDATE settlements SET status = 'approved', settled_at = NOW(), updated_at = NOW() WHERE id = $1",
       [id]
     );
 
@@ -180,7 +180,7 @@ router.post('/withdraws/:id/reject', authMiddleware, checkPermission('finance:wi
     }
 
     await execute(
-      "UPDATE settlements SET status = 'rejected', settled_at = datetime('now'), updated_at = datetime('now') WHERE id = $1",
+      "UPDATE settlements SET status = 'rejected', settled_at = NOW(), updated_at = NOW() WHERE id = $1",
       [id]
     );
 

@@ -98,24 +98,24 @@ router.post('/reward', authMiddleware, async (req: Request, res: Response) => {
 
     if (rewardType === 'exp') {
       await execute(
-        `UPDATE users SET exp = exp + $1, updated_at = datetime('now') WHERE id = $2`,
+        `UPDATE users SET exp = exp + $1, updated_at = NOW() WHERE id = $2`,
         [rewardValue, userId]
       );
     } else if (rewardType === 'points') {
       await execute(
-        `UPDATE users SET points = points + $1, updated_at = datetime('now') WHERE id = $2`,
+        `UPDATE users SET points = points + $1, updated_at = NOW() WHERE id = $2`,
         [rewardValue, userId]
       );
     } else if (rewardType === 'race_count') {
       await execute(
-        `UPDATE users SET race_count = race_count + $1, updated_at = datetime('now') WHERE id = $2`,
+        `UPDATE users SET race_count = race_count + $1, updated_at = NOW() WHERE id = $2`,
         [rewardValue, userId]
       );
     }
 
     // 标记为已领取
     await execute(
-      `UPDATE user_tasks SET status = 1, rewarded_at = datetime('now'), updated_at = datetime('now')
+      `UPDATE user_tasks SET status = 1, rewarded_at = NOW(), updated_at = NOW()
        WHERE user_id = $1 AND task_id = $2 AND status = 0`,
       [userId, taskId]
     );

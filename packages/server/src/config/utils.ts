@@ -11,7 +11,7 @@ import { queryOne } from './database';
 export async function getConfig(key: string, defaultVal: string = ''): Promise<string> {
   try {
     const row = await queryOne<{ value: string }>(
-      `SELECT value FROM system_config WHERE key = $1`,
+      `SELECT value FROM system_config WHERE \`key\` = $1`,
       [key]
     );
     return row?.value ?? defaultVal;

@@ -155,7 +155,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response<ApiResponse<
 
     // 读取系统默认分润比例
     const rateRow = await queryOne<{ value: string }>(
-      `SELECT value FROM settings WHERE key = 'default_profit_share_rate'`
+      `SELECT value FROM settings WHERE \`key\` = 'default_profit_share_rate'`
     );
     const defaultRate = parseInt(rateRow?.value || '80', 10);
 

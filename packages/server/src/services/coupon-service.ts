@@ -104,7 +104,7 @@ export async function autoAssignMerchantCoupons(
     for (const coupon of selectedCoupons) {
       // 扣减库存（乐观锁）
       const updateResult = await execute(
-        `UPDATE merchant_coupons SET remain_count = remain_count - 1, updated_at = datetime('now')
+        `UPDATE merchant_coupons SET remain_count = remain_count - 1, updated_at = NOW()
          WHERE id = $1 AND remain_count > 0`,
         [coupon.id]
       );
@@ -127,7 +127,7 @@ export async function autoAssignMerchantCoupons(
         `INSERT INTO user_coupons (id, user_id, coupon_id, merchant_id, name, description,
                 denomination_cents, min_consume_cents, status, valid_start, valid_end,
                 coupon_type, extra_data, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, datetime('now'), datetime('now'))`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())`,
         [
           userCouponId, userId, coupon.id, coupon.merchant_id,
           coupon.name, coupon.description || '',
@@ -274,7 +274,7 @@ export async function grantExchangeCoupon(
     `INSERT INTO user_coupons (id, user_id, coupon_id, merchant_id, name, description,
             denomination_cents, min_consume_cents, status, valid_start, valid_end,
             coupon_type, extra_data, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, datetime('now'), datetime('now'))`,
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())`,
     [
       id, userId, 'point_shop_' + id, 'platform', name, description,
       denominationCents, 0, 1, new Date().toISOString(),

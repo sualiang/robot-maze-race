@@ -160,7 +160,7 @@ router.post('/', authMiddleware, checkPermission('operators:create'), async (req
 
     // 读取系统默认分润比例
     const defaultProfitSetting = await queryOne<{ value: string }>(
-      `SELECT value FROM settings WHERE key = 'default_profit_share_rate'`
+      `SELECT value FROM settings WHERE \`key\` = 'default_profit_share_rate'`
     );
     const defaultProfitRate = defaultProfitSetting ? parseInt(defaultProfitSetting.value, 10) : 80;
 
@@ -282,7 +282,7 @@ router.put('/:id', authMiddleware, checkPermission('operators:edit'), async (req
 
     // 读取系统默认分润比例
     const defProfitSetting = await queryOne<{ value: string }>(
-      `SELECT value FROM settings WHERE key = 'default_profit_share_rate'`
+      `SELECT value FROM settings WHERE \`key\` = 'default_profit_share_rate'`
     );
     const defaultProfitRate = defProfitSetting ? parseInt(defProfitSetting.value, 10) : 80;
 
@@ -292,7 +292,7 @@ router.put('/:id', authMiddleware, checkPermission('operators:edit'), async (req
            profit_share_rate = $6, bank_account = $7, bank_name = $8,
            contact_person = $9, status = $10,
            province = $11, city = $12, district = $13, company_address = $14,
-           updated_at = datetime('now')
+           updated_at = NOW()
        WHERE id = $15
        RETURNING ${SELECT_FIELDS}`,
       [
@@ -346,7 +346,7 @@ router.patch('/:id', authMiddleware, checkPermission('operators:edit'), async (r
     }
 
     const operator = await queryOne<Operator>(
-      `UPDATE operators SET status = $1, updated_at = datetime('now')
+      `UPDATE operators SET status = $1, updated_at = NOW()
        WHERE id = $2
        RETURNING ${SELECT_FIELDS}`,
       [status, id]

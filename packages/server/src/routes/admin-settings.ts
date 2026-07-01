@@ -38,9 +38,9 @@ function rowsToFlatObject(rows: { key: string; value: string }[]): Record<string
 
 /** 确保配置项存在 */
 async function ensureSettingKey(key: string, defaultValue: string): Promise<void> {
-  const existing = await queryOne<{ id: string }>('SELECT id FROM system_config WHERE key = $1', [key]);
+  const existing = await queryOne<{ id: string }>('SELECT id FROM system_config WHERE `key` = $1', [key]);
   if (!existing) {
-    await execute('INSERT INTO system_config (id, key, value) VALUES ($1, $2, $3)', [uuidv4(), key, defaultValue]);
+    await execute('INSERT INTO system_config (id, `key`, value) VALUES ($1, $2, $3)', [uuidv4(), key, defaultValue]);
   }
 }
 
@@ -95,11 +95,11 @@ router.put('/', authMiddleware, superAdminOnly, async (req: Request, res: Respon
       const key = `cfg_${fieldName}`;
       const value = String(fieldValue);
 
-      const existing = await queryOne<{ id: string }>('SELECT id FROM system_config WHERE key = $1', [key]);
+      const existing = await queryOne<{ id: string }>('SELECT id FROM system_config WHERE `key` = $1', [key]);
       if (existing) {
-        await execute("UPDATE system_config SET value = $1, updated_at = datetime('now') WHERE key = $2", [value, key]);
+        await execute("UPDATE system_config SET value = $1, updated_at = NOW() WHERE `key` = $2", [value, key]);
       } else {
-        await execute('INSERT INTO system_config (id, key, value) VALUES ($1, $2, $3)', [uuidv4(), key, value]);
+        await execute('INSERT INTO system_config (id, `key`, value) VALUES ($1, $2, $3)', [uuidv4(), key, value]);
       }
     }
 
@@ -117,7 +117,7 @@ router.put('/', authMiddleware, superAdminOnly, async (req: Request, res: Respon
 router.get('/profit-share-rate', authMiddleware, async (req: Request, res: Response) => {
   try {
     const row = await queryOne<{ value: string }>(
-      `SELECT value FROM settings WHERE key = 'default_profit_share_rate'`
+      `SELECT value FROM settings WHERE \`key\` = 'default_profit_share_rate'`
     );
     return res.json({
       code: 0,
@@ -141,8 +141,8 @@ router.put('/profit-share-rate', authMiddleware, async (req: Request, res: Respo
     }
     const rateStr = String(rate);
     await execute(
-      `INSERT INTO settings (key, value) VALUES ('default_profit_share_rate', $1)
-       ON CONFLICT(key) DO UPDATE SET value = $2, updated_at = datetime('now')`,
+      `INSERT INTO settings (\`key\`, value) VALUES ('default_profit_share_rate', $1)
+       ON CONFLICT(\`key\`) DO UPDATE SET value = $2, updated_at = NOW()`,
       [rateStr, rateStr]
     );
 
@@ -181,14 +181,14 @@ router.put('/:key', authMiddleware, superAdminOnly, async (req: Request, res: Re
     }
 
     const existing = await queryOne<{ id: string }>(
-      'SELECT id FROM system_config WHERE key = $1',
+      'SELECT id FROM system_config WHERE `key` = $1',
       [key]
     );
     if (!existing) {
       return res.status(404).json({ code: 404, message: '配置项不存在', data: null });
     }
 
-    await execute("UPDATE system_config SET value = $1, updated_at = datetime('now') WHERE key = $2", [value, key]);
+    await execute("UPDATE system_config SET value = $1, updated_at = NOW() WHERE `key` = $2", [value, key]);
 
     return res.json({ code: 0, message: '配置已更新', data: null });
   } catch (error: any) {

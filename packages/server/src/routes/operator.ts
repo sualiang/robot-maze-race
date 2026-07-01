@@ -257,7 +257,7 @@ router.post('/rbac/users', authMiddleware, operatorOnly, async (req: Request, re
 
     await query(
       `INSERT INTO operator_members (id, name, password_hash, phone, role, operator_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
+       VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [id, phone, hashedPassword, phone, role_key, operatorId]
     );
 
@@ -328,7 +328,7 @@ router.put('/rbac/users/:id', authMiddleware, operatorOnly, async (req: Request,
       return res.status(400).json({ code: 400, message: '没有要更新的字段', data: null });
     }
 
-    sets.push("updated_at = datetime('now')");
+    sets.push("updated_at = NOW()");
     params.push(id);
 
     await query(
@@ -415,7 +415,7 @@ router.post('/rbac/users/:id/reset-password', authMiddleware, operatorOnly, asyn
     const plainPassword = generateSecurePassword();
     const hashed = bcrypt.hashSync(plainPassword, 10);
     await query(
-      `UPDATE operator_members SET password_hash = ?, updated_at = datetime('now') WHERE id = ?`,
+      `UPDATE operator_members SET password_hash = ?, updated_at = NOW() WHERE id = ?`,
       [hashed, id]
     );
 
@@ -1026,7 +1026,7 @@ router.post('/change-password', authMiddleware, async (req: Request, res: Respon
     const newHash = bcrypt.hashSync(newPassword, 10);
     await query(
       `UPDATE operators SET operator_password_hash = $1, password_change_required = 0,
-       updated_at = datetime('now') WHERE id = $2`,
+       updated_at = NOW() WHERE id = $2`,
       [newHash, userId]
     );
 
@@ -1088,7 +1088,7 @@ router.get('/regions', async (req: Request, res: Response) => {
 router.get('/profit-share-rate', authMiddleware, async (_req: Request, res: Response) => {
   try {
     const row = await queryOne<{ value: string }>(
-      `SELECT value FROM settings WHERE key = 'default_profit_share_rate'`
+      `SELECT value FROM settings WHERE \`key\` = 'default_profit_share_rate'`
     );
     return res.json({
       code: 0,

@@ -24,9 +24,9 @@ function rowsToMap(rows: { key: string; value: string }[]): Record<string, any> 
 
 /** 确保配置项存在 */
 async function ensureConfigKey(key: string, defaultValue: string): Promise<void> {
-  const existing = await queryOne<{ id: string }>('SELECT id FROM system_config WHERE key = $1', [key]);
+  const existing = await queryOne<{ id: string }>('SELECT id FROM system_config WHERE `key` = $1', [key]);
   if (!existing) {
-    await execute('INSERT INTO system_config (id, key, value) VALUES ($1, $2, $3)', [uuidv4(), key, defaultValue]);
+    await execute('INSERT INTO system_config (id, `key`, value) VALUES ($1, $2, $3)', [uuidv4(), key, defaultValue]);
   }
 }
 
@@ -77,11 +77,11 @@ router.put('/config', authMiddleware, checkPermission('marketing:edit'), async (
       const key = `mkt_${fieldName}`;
       const value = String(fieldValue);
 
-      const existing = await queryOne<{ id: string }>('SELECT id FROM system_config WHERE key = $1', [key]);
+      const existing = await queryOne<{ id: string }>('SELECT id FROM system_config WHERE `key` = $1', [key]);
       if (existing) {
-        await execute("UPDATE system_config SET value = $1, updated_at = datetime('now') WHERE key = $2", [value, key]);
+        await execute("UPDATE system_config SET value = $1, updated_at = NOW() WHERE `key` = $2", [value, key]);
       } else {
-        await execute('INSERT INTO system_config (id, key, value) VALUES ($1, $2, $3)', [uuidv4(), key, value]);
+        await execute('INSERT INTO system_config (id, `key`, value) VALUES ($1, $2, $3)', [uuidv4(), key, value]);
       }
     }
 
@@ -156,7 +156,7 @@ router.get('/operators', authMiddleware, checkPermission('marketing:read'), asyn
 router.get('/', authMiddleware, checkPermission('marketing:read'), async (req: Request, res: Response) => {
   try {
     const configs = await query<any>(
-      `SELECT id, key, value, description, created_at, updated_at
+      `SELECT id, \`key\`, value, description, created_at, updated_at
        FROM system_config
        WHERE key LIKE 'mkt_%'
        ORDER BY key ASC`
@@ -179,16 +179,16 @@ router.put('/', authMiddleware, checkPermission('marketing:edit'), async (req: R
       return res.status(400).json({ code: 400, message: 'key 和 value 不能为空', data: null });
     }
     const existing = await queryOne<{ id: string }>(
-      'SELECT id FROM system_config WHERE key = $1',
+      'SELECT id FROM system_config WHERE `key` = $1',
       [key]
     );
     if (!existing) {
       return res.status(404).json({ code: 404, message: '配置项不存在', data: null });
     }
     const updated = await queryOne<any>(
-      `UPDATE system_config SET value = $1, updated_at = datetime('now')
-       WHERE key = $2
-       RETURNING id, key, value, description, created_at, updated_at`,
+      `UPDATE system_config SET value = $1, updated_at = NOW()
+       WHERE \`key\` = $2
+       RETURNING id, \`key\`, value, description, created_at, updated_at`,
       [value, key]
     );
     return res.json({ code: 0, message: '营销配置已更新', data: updated! });
@@ -212,16 +212,16 @@ router.post('/', authMiddleware, checkPermission('marketing:edit'), async (req: 
       return res.status(400).json({ code: 400, message: '营销配置 key 必须以 mkt_ 开头', data: null });
     }
     const existing = await queryOne<{ id: string }>(
-      'SELECT id FROM system_config WHERE key = $1',
+      'SELECT id FROM system_config WHERE `key` = $1',
       [key]
     );
     if (existing) {
       return res.status(409).json({ code: 409, message: '配置项已存在，请使用 PUT 更新', data: null });
     }
     const id = uuidv4();
-    await execute('INSERT INTO system_config (id, key, value, description) VALUES ($1, $2, $3, $4)', [id, key, value, description || null]);
+    await execute('INSERT INTO system_config (id, `key`, value, description) VALUES ($1, $2, $3, $4)', [id, key, value, description || null]);
     const created = await queryOne<any>(
-      'SELECT id, key, value, description, created_at, updated_at FROM system_config WHERE id = $1',
+      'SELECT id, `key`, value, description, created_at, updated_at FROM system_config WHERE id = $1',
       [id]
     );
     return res.status(201).json({ code: 0, message: '营销配置已创建', data: created! });

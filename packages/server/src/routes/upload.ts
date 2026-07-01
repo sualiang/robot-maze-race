@@ -56,7 +56,7 @@ router.post('/merchant-logo', merchantAuthMiddleware, async (req: Request, res: 
     const merchantId = req.merchantAdmin?.merchantId;
     if (merchantId) {
       await execute(
-        `UPDATE merchants SET logo_url = $1, updated_at = datetime('now') WHERE id = $2`,
+        `UPDATE merchants SET logo_url = $1, updated_at = NOW() WHERE id = $2`,
         [url, merchantId]
       );
     }
@@ -86,7 +86,7 @@ router.post('/admin-merchant-logo', authMiddleware, async (req: Request, res: Re
     }
 
     await execute(
-      `UPDATE merchants SET logo_url = $1, updated_at = datetime('now') WHERE id = $2`,
+      `UPDATE merchants SET logo_url = $1, updated_at = NOW() WHERE id = $2`,
       [logoUrl, merchantId]
     );
 

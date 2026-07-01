@@ -70,7 +70,7 @@ router.post('/prize', authMiddleware, adminMiddleware, async (req: Request, res:
     const remainCount = totalCount || 0;
     await execute(
       `INSERT INTO lottery_prizes (id, name, image_url, prize_type, prize_value, total_count, remain_count, probability, weight, status, sort_order, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 1, $10, datetime('now'), datetime('now'))`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 1, $10, NOW(), NOW())`,
       [
         id,
         name,
@@ -130,7 +130,7 @@ router.put('/prize/:id', authMiddleware, adminMiddleware, async (req: Request, r
       return;
     }
 
-    updates.push(`updated_at = datetime('now')`);
+    updates.push(`updated_at = NOW()`);
     params.push(id);
 
     await execute(
@@ -161,7 +161,7 @@ router.delete('/prize/:id', authMiddleware, adminMiddleware, async (req: Request
 
     // 将状态设为 0（下架）
     await execute(
-      `UPDATE lottery_prizes SET status = 0, updated_at = datetime('now') WHERE id = $1`,
+      `UPDATE lottery_prizes SET status = 0, updated_at = NOW() WHERE id = $1`,
       [id]
     );
 

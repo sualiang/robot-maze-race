@@ -16,13 +16,13 @@ async function getCurrentSeason(): Promise<{
 }> {
   const seasonName =
     (await queryOne<{ value: string }>(
-      `SELECT value FROM system_config WHERE key = $1`,
+      `SELECT value FROM system_config WHERE \`key\` = $1`,
       ['season_name']
     ))?.value || 'S1 赛季';
 
   const seasonCycle =
     (await queryOne<{ value: string }>(
-      `SELECT value FROM system_config WHERE key = $1`,
+      `SELECT value FROM system_config WHERE \`key\` = $1`,
       ['season_cycle']
     ))?.value || 'daily';
 
@@ -194,7 +194,7 @@ router.get('/:type', authMiddleware, async (req: Request, res: Response) => {
     let timeWhere: string;
     if (type === 'daily') {
       // 今日成绩
-      timeWhere = `rr.finished_at >= datetime('now', 'start of day')`;
+      timeWhere = `rr.finished_at >= CURDATE()`;
     } else if (type === 'weekly') {
       // 本周成绩（周一起）
       timeWhere = `rr.finished_at >= date('now', 'weekday 1', '-7 days')`;
@@ -287,7 +287,7 @@ router.get('/:type', authMiddleware, async (req: Request, res: Response) => {
            AND rr.score_ms IS NOT NULL
            AND rr.score_ms > 0
            ${type === 'daily'
-             ? `AND rr.finished_at >= datetime('now', 'start of day')`
+             ? `AND rr.finished_at >= CURDATE()`
              : type === 'weekly'
                ? `AND rr.finished_at >= date('now', 'weekday 1', '-7 days')`
                : `AND rr.finished_at >= $2`
@@ -305,7 +305,7 @@ router.get('/:type', authMiddleware, async (req: Request, res: Response) => {
              AND rr.score_ms > 0
              AND rr.score_ms < $1
              ${type === 'daily'
-               ? `AND rr.finished_at >= datetime('now', 'start of day')`
+               ? `AND rr.finished_at >= CURDATE()`
                : type === 'weekly'
                  ? `AND rr.finished_at >= date('now', 'weekday 1', '-7 days')`
                  : `AND rr.finished_at >= $2`

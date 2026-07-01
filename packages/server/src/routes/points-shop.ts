@@ -141,7 +141,7 @@ router.put('/points-shop/items/:id', authMiddleware, operatorOnly, async (req: R
       return res.status(400).json({ code: 400, message: '没有要更新的字段', data: null });
     }
 
-    updates.push(`updated_at = datetime('now')`);
+    updates.push(`updated_at = NOW()`);
     params.push(id);
 
     await execute(`UPDATE point_shop SET ${updates.join(', ')} WHERE id = $${idx}`, params);
@@ -232,7 +232,7 @@ router.post('/points-shop/exchange', authMiddleware, async (req: Request, res: R
       // 发放参赛抵扣金到 entry_deductions（id 是 INTEGER 自增主键，传 NULL）
       await execute(
         `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, expires_at, created_at)
-         VALUES (NULL, $1, $2, 'point_shop_exchange', 'available', datetime('now', '+365 days'), datetime('now'))`,
+         VALUES (NULL, $1, $2, 'point_shop_exchange', 'available', DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
         [userId, itemValue]
       );
       console.log('[PointsShop] 兑换参赛抵扣金:', userId, 'item:', item.name, '金额:', itemValue / 100, '元');
@@ -244,7 +244,7 @@ router.post('/points-shop/exchange', authMiddleware, async (req: Request, res: R
         `INSERT INTO user_coupons (id, user_id, coupon_id, merchant_id, name, description,
                 denomination_cents, min_consume_cents, status, valid_start, valid_end,
                 coupon_type, extra_data, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, $9, $10, 11, $11, datetime('now'), datetime('now'))`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, $9, $10, 11, $11, NOW(), NOW())`,
         [
           couponId, userId, couponId, 'platform',
           item.name,
@@ -263,7 +263,7 @@ router.post('/points-shop/exchange', authMiddleware, async (req: Request, res: R
         `INSERT INTO user_coupons (id, user_id, coupon_id, merchant_id, name, description,
                 denomination_cents, min_consume_cents, status, valid_start, valid_end,
                 coupon_type, extra_data, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, $9, $10, $11, $12, datetime('now'), datetime('now'))`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, $9, $10, $11, $12, NOW(), NOW())`,
         [
           couponId, userId, couponId, 'platform',
           item.name,
@@ -294,7 +294,7 @@ router.post('/points-shop/exchange', authMiddleware, async (req: Request, res: R
           item_type TEXT NOT NULL,
           item_name TEXT NOT NULL,
           spent_points INTEGER NOT NULL,
-          created_at TEXT DEFAULT (datetime('now'))
+          created_at TEXT DEFAULT (NOW())
         )`
       );
     } catch { /* ignore */ }

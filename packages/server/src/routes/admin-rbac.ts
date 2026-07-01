@@ -196,7 +196,7 @@ router.put('/users/:id', authMiddleware, async (req: Request, res: Response) => 
       return res.status(400).json({ code: 400, message: '没有要更新的字段', data: null });
     }
 
-    sets.push("updated_at = datetime('now')");
+    sets.push("updated_at = NOW()");
     params.push(id);
 
     await query(
@@ -280,7 +280,7 @@ router.post('/users/:id/reset-password', authMiddleware, async (req: Request, re
     const plainPassword = generateSecurePassword();
     const hashed = bcrypt.hashSync(plainPassword, 10);
     await query(
-      `UPDATE admin_users SET password = $1, first_login = 1, updated_at = datetime('now') WHERE id = $2`,
+      `UPDATE admin_users SET password = $1, first_login = 1, updated_at = NOW() WHERE id = $2`,
       [hashed, id]
     );
 

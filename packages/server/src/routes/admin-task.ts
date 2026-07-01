@@ -67,7 +67,7 @@ router.post('/task', authMiddleware, adminMiddleware, async (req: Request, res: 
     const id = uuidv4();
     await execute(
       `INSERT INTO tasks (id, name, description, task_type, target_value, reward_type, reward_value, status, sort_order, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 1, $8, datetime('now'), datetime('now'))`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 1, $8, NOW(), NOW())`,
       [
         id,
         name,
@@ -123,7 +123,7 @@ router.put('/task/:id', authMiddleware, adminMiddleware, async (req: Request, re
       return;
     }
 
-    updates.push(`updated_at = datetime('now')`);
+    updates.push(`updated_at = NOW()`);
     params.push(id);
 
     await execute(

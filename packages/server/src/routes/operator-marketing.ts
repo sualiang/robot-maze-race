@@ -46,7 +46,7 @@ router.get('/', authMiddleware, operatorOnly, async (req: Request, res: Response
       created_at: string;
       updated_at: string;
     }>(
-      `SELECT id, venue_id, key, value, description, created_at, updated_at
+      `SELECT id, venue_id, \`key\`, value, description, created_at, updated_at
        FROM marketing_config
        WHERE venue_id = $1
        ORDER BY key ASC`,
@@ -74,7 +74,7 @@ router.put('/', authMiddleware, operatorOnly, async (req: Request, res: Response
     }
 
     const existing = await queryOne<{ id: string }>(
-      'SELECT id FROM marketing_config WHERE venue_id = $1 AND key = $2',
+      'SELECT id FROM marketing_config WHERE venue_id = $1 AND `key` = $2',
       [venue_id, key]
     );
 
@@ -88,9 +88,9 @@ router.put('/', authMiddleware, operatorOnly, async (req: Request, res: Response
         description: string | null;
       }>(
         `UPDATE marketing_config
-         SET value = $1, description = COALESCE($2, description), updated_at = datetime('now')
-         WHERE venue_id = $3 AND key = $4
-         RETURNING id, venue_id, key, value, description, created_at, updated_at`,
+         SET value = $1, description = COALESCE($2, description), updated_at = NOW()
+         WHERE venue_id = $3 AND \`key\` = $4
+         RETURNING id, venue_id, \`key\`, value, description, created_at, updated_at`,
         [value, description || null, venue_id, key]
       );
 
@@ -105,9 +105,9 @@ router.put('/', authMiddleware, operatorOnly, async (req: Request, res: Response
         value: string;
         description: string | null;
       }>(
-        `INSERT INTO marketing_config (id, venue_id, key, value, description)
+        `INSERT INTO marketing_config (id, venue_id, \`key\`, value, description)
          VALUES ($1, $2, $3, $4, $5)
-         RETURNING id, venue_id, key, value, description, created_at, updated_at`,
+         RETURNING id, venue_id, \`key\`, value, description, created_at, updated_at`,
         [id, venue_id, key, value, description || null]
       );
 
@@ -169,11 +169,11 @@ router.post('/batch', authMiddleware, operatorOnly, async (req: Request, res: Re
     }
 
     for (const { key, value } of configs) {
-      const existing = await queryOne<{ id: string }>('SELECT id FROM marketing_config WHERE venue_id = $1 AND key = $2', [venue_id, key]);
+      const existing = await queryOne<{ id: string }>('SELECT id FROM marketing_config WHERE venue_id = $1 AND `key` = $2', [venue_id, key]);
       if (existing) {
-        await execute("UPDATE marketing_config SET value = $1, updated_at = datetime('now') WHERE venue_id = $2 AND key = $3", [value, venue_id, key]);
+        await execute("UPDATE marketing_config SET value = $1, updated_at = NOW() WHERE venue_id = $2 AND `key` = $3", [value, venue_id, key]);
       } else {
-        await execute('INSERT INTO marketing_config (id, venue_id, key, value) VALUES ($1, $2, $3, $4)', [uuidv4(), venue_id, key, value]);
+        await execute('INSERT INTO marketing_config (id, venue_id, `key`, value) VALUES ($1, $2, $3, $4)', [uuidv4(), venue_id, key, value]);
       }
     }
 
@@ -195,11 +195,11 @@ router.post('/announcement', authMiddleware, operatorOnly, async (req: Request, 
     if (typeof text !== 'string' || text.length > 30) {
       return res.status(400).json({ code: 400, message: '公告内容不能为空且不超过30字', data: null });
     }
-    const existing = await queryOne<{ id: string }>('SELECT id FROM system_config WHERE key = $1', ['home_announcement']);
+    const existing = await queryOne<{ id: string }>('SELECT id FROM system_config WHERE `key` = $1', ['home_announcement']);
     if (existing) {
-      await execute("UPDATE system_config SET value = $1, updated_at = datetime('now') WHERE key = 'home_announcement'", [text]);
+      await execute("UPDATE system_config SET value = $1, updated_at = NOW() WHERE `key` = 'home_announcement'", [text]);
     } else {
-      await execute('INSERT INTO system_config (id, key, value) VALUES ($1, $2, $3)', [uuidv4(), 'home_announcement', text]);
+      await execute('INSERT INTO system_config (id, `key`, value) VALUES ($1, $2, $3)', [uuidv4(), 'home_announcement', text]);
     }
     return res.json({ code: 0, message: '公告已更新', data: { text, updatedAt: new Date().toISOString() } });
   } catch (error: any) {

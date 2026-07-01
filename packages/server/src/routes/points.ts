@@ -121,14 +121,14 @@ router.post('/lottery/draw', authMiddleware, async (req: Request, res: Response)
 
     // 扣除积分
     await execute(
-      `UPDATE users SET points = points - $1, updated_at = datetime('now') WHERE id = $2`,
+      `UPDATE users SET points = points - $1, updated_at = NOW() WHERE id = $2`,
       [totalCost, userId]
     );
 
     // 记录积分支出流水
     await execute(
       `INSERT INTO points_transactions (id, user_id, points, type, remark, created_at)
-       VALUES ($1, $2, $3, $4, $5, datetime('now'))`,
+       VALUES ($1, $2, $3, $4, $5, NOW())`,
       [uuidv4(), userId, -totalCost, 'lottery', `抽奖${drawCount}次`]
     );
 
@@ -168,7 +168,7 @@ async function doDraw(
     // 没有可用奖品，返回未中奖
     await execute(
       `INSERT INTO lottery_records (id, user_id, prize_id, prize_name, points_cost, is_win, created_at)
-       VALUES ($1, $2, NULL, '未中奖', $3, 0, datetime('now'))`,
+       VALUES ($1, $2, NULL, '未中奖', $3, 0, NOW())`,
       [recordId, userId, lotteryCost]
     );
     return {
@@ -207,14 +207,14 @@ async function doDraw(
   if (isWin) {
     await execute(
       `INSERT INTO lottery_records (id, user_id, prize_id, prize_name, points_cost, is_win, created_at)
-       VALUES ($1, $2, $3, $4, $5, 1, datetime('now'))`,
+       VALUES ($1, $2, $3, $4, $5, 1, NOW())`,
       [recordId, userId, selectedPrize.id, selectedPrize.name, lotteryCost]
     );
   } else {
     // 库存已空
     await execute(
       `INSERT INTO lottery_records (id, user_id, prize_id, prize_name, points_cost, is_win, created_at)
-       VALUES ($1, $2, NULL, '未中奖', $3, 0, datetime('now'))`,
+       VALUES ($1, $2, NULL, '未中奖', $3, 0, NOW())`,
       [recordId, userId, lotteryCost]
     );
   }
@@ -260,7 +260,7 @@ async function getExchangeItems(): Promise<any[]> {
   // 降级: 从 system_config 读取 JSON 配置
   try {
     const configRow = await queryOne<{ value: string }>(
-      `SELECT value FROM system_config WHERE key = $1`,
+      `SELECT value FROM system_config WHERE \`key\` = $1`,
       ['exchange_mall_items']
     );
     if (configRow && configRow.value) {
@@ -372,7 +372,7 @@ router.post('/mall/exchange', authMiddleware, async (req: Request, res: Response
 
     // 扣减积分
     await execute(
-      `UPDATE users SET points = points - $1, updated_at = datetime('now') WHERE id = $2`,
+      `UPDATE users SET points = points - $1, updated_at = NOW() WHERE id = $2`,
       [item.pointsCost, userId]
     );
 
@@ -380,7 +380,7 @@ router.post('/mall/exchange', authMiddleware, async (req: Request, res: Response
     const txId = uuidv4();
     await execute(
       `INSERT INTO points_transactions (id, user_id, points, type, remark, created_at)
-       VALUES ($1, $2, $3, $4, $5, datetime('now'))`,
+       VALUES ($1, $2, $3, $4, $5, NOW())`,
       [txId, userId, -item.pointsCost, 'exchange', `兑换 ${item.name}`]
     );
 
@@ -394,7 +394,7 @@ router.post('/mall/exchange', authMiddleware, async (req: Request, res: Response
         `INSERT INTO user_coupons (id, user_id, coupon_id, merchant_id, name, description,
                 denomination_cents, min_consume_cents, status, valid_start, valid_end,
                 coupon_type, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, datetime('now'), datetime('now'))`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())`,
         [couponId, userId, itemId, 'exchange_mall', item.name, item.description,
          0, 0, 1,
          new Date().toISOString(),
@@ -409,7 +409,7 @@ router.post('/mall/exchange', authMiddleware, async (req: Request, res: Response
         `INSERT INTO user_coupons (id, user_id, coupon_id, merchant_id, name, description,
                 denomination_cents, min_consume_cents, status, valid_start, valid_end,
                 coupon_type, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, datetime('now'), datetime('now'))`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())`,
         [couponId, userId, itemId, 'exchange_mall', item.name, item.description,
          item.pointsCost * 10, 0, 1,
          new Date().toISOString(),
@@ -422,7 +422,7 @@ router.post('/mall/exchange', authMiddleware, async (req: Request, res: Response
       try {
         await execute(
           `INSERT INTO ticket_redemptions (id, user_id, item_name, item_type, points_cost, status, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6, datetime('now'))`,
+           VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
           [uuidv4(), userId, item.name, 'product', item.pointsCost, 'pending']
         );
       } catch {
@@ -435,7 +435,7 @@ router.post('/mall/exchange', authMiddleware, async (req: Request, res: Response
       try {
         await execute(
           `INSERT INTO ticket_redemptions (id, user_id, item_name, item_type, points_cost, status, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6, datetime('now'))`,
+           VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
           [uuidv4(), userId, item.name, 'gift', item.pointsCost, 'pending']
         );
       } catch {
@@ -583,7 +583,7 @@ router.post('/redeem', authMiddleware, async (req: Request, res: Response) => {
 
     // 扣减积分
     await execute(
-      `UPDATE users SET points = points - $1, updated_at = datetime('now') WHERE id = $2`,
+      `UPDATE users SET points = points - $1, updated_at = NOW() WHERE id = $2`,
       [needPoints, userId]
     );
 
@@ -591,7 +591,7 @@ router.post('/redeem', authMiddleware, async (req: Request, res: Response) => {
     const txId = uuidv4();
     await execute(
       `INSERT INTO points_transactions (id, user_id, points, type, remark, created_at)
-       VALUES ($1, $2, $3, $4, $5, datetime('now'))`,
+       VALUES ($1, $2, $3, $4, $5, NOW())`,
       [txId, userId, -needPoints, 'exchange', `兑换 ${item.name}`]
     );
 
@@ -630,7 +630,7 @@ router.post('/redeem', authMiddleware, async (req: Request, res: Response) => {
         if (!merchantCoupon) {
           // 券已用完或下架，退款积分
           await execute(
-            `UPDATE users SET points = points + $1, updated_at = datetime('now') WHERE id = $2`,
+            `UPDATE users SET points = points + $1, updated_at = NOW() WHERE id = $2`,
             [needPoints, userId]
           );
           res.json({ code: 400, message: '该商家券已兑完，积分已退回', data: null });
@@ -639,7 +639,7 @@ router.post('/redeem', authMiddleware, async (req: Request, res: Response) => {
 
         // 扣减商家券库存
         await execute(
-          `UPDATE merchant_coupons SET remain_count = remain_count - 1, updated_at = datetime('now')
+          `UPDATE merchant_coupons SET remain_count = remain_count - 1, updated_at = NOW()
            WHERE id = $1 AND remain_count > 0`,
           [merchantCoupon.id]
         );
@@ -660,7 +660,7 @@ router.post('/redeem', authMiddleware, async (req: Request, res: Response) => {
           `INSERT INTO user_coupons (id, user_id, coupon_id, merchant_id, name, description,
                   denomination_cents, min_consume_cents, status, valid_start, valid_end,
                   coupon_type, extra_data, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, datetime('now'), datetime('now'))`,
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())`,
           [
             userCouponId, userId, merchantCoupon.id, merchantCoupon.merchant_id,
             merchantCoupon.name, merchantCoupon.description || '',

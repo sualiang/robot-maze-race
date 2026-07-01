@@ -167,25 +167,25 @@ router.get('/config', async (_req: Request, res: Response) => {
   try {
     const seasonName =
       (await queryOne<{ value: string }>(
-        `SELECT value FROM system_config WHERE key = $1`,
+        `SELECT value FROM system_config WHERE \`key\` = $1`,
         ['season_name']
       ))?.value || 'S1 赛季';
 
     const seasonCycle =
       (await queryOne<{ value: string }>(
-        `SELECT value FROM system_config WHERE key = $1`,
+        `SELECT value FROM system_config WHERE \`key\` = $1`,
         ['season_cycle']
       ))?.value || 'daily';
 
     const raceDesc =
       (await queryOne<{ value: string }>(
-        `SELECT value FROM system_config WHERE key = $1`,
+        `SELECT value FROM system_config WHERE \`key\` = $1`,
         ['season_race_desc']
       ))?.value || '完成迷宫挑战，用时越短成绩越好。';
 
     const finalRules =
       (await queryOne<{ value: string }>(
-        `SELECT value FROM system_config WHERE key = $1`,
+        `SELECT value FROM system_config WHERE \`key\` = $1`,
         ['season_final_rules']
       ))?.value || '赛季结束时，积分榜前16名进入决赛，单败淘汰制决出冠军。';
 

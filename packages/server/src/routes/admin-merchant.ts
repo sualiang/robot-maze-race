@@ -100,7 +100,7 @@ router.post('/', authMiddleware, anyPermissionMiddleware, async (req: Request, r
     const merchantId = uuidv4();
     await execute(
       `INSERT INTO merchants (id, merchant_name, merchant_address, longitude, latitude, contact_name, contact_phone, logo_url, status, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, datetime('now'), datetime('now'))`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, NOW(), NOW())`,
       [
         merchantId,
         merchantName,
@@ -127,7 +127,7 @@ router.post('/', authMiddleware, anyPermissionMiddleware, async (req: Request, r
       const passwordHash = crypto.createHash('sha256').update(adminPassword).digest('hex');
       await execute(
         `INSERT INTO merchant_admin (id, merchant_id, username, password_hash, phone, real_name, status, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, '', 1, datetime('now'), datetime('now'))`,
+         VALUES ($1, $2, $3, $4, $5, '', 1, NOW(), NOW())`,
         [adminId, merchantId, adminPhone, passwordHash, adminPhone]
       );
     }
@@ -183,7 +183,7 @@ router.put('/:id', authMiddleware, anyPermissionMiddleware, async (req: Request,
       return;
     }
 
-    updates.push(`updated_at = datetime('now')`);
+    updates.push(`updated_at = NOW()`);
     params.push(id);
 
     await execute(
@@ -265,7 +265,7 @@ router.post('/coupon/:id/force-offline', authMiddleware, adminMiddleware, async 
     }
 
     await execute(
-      `UPDATE merchant_coupons SET status = 0, audit_remark = $1, updated_at = datetime('now') WHERE id = $2`,
+      `UPDATE merchant_coupons SET status = 0, audit_remark = $1, updated_at = NOW() WHERE id = $2`,
       ['总部强制下架', id]
     );
 
@@ -368,7 +368,7 @@ router.post('/:id/reset-password', operatorMiddleware, async (req: Request, res:
 
     // 更新密码 + 标记首次登录
     await execute(
-      `UPDATE merchant_admin SET password_hash = $1, first_login = 1, updated_at = datetime('now') WHERE id = $2`,
+      `UPDATE merchant_admin SET password_hash = $1, first_login = 1, updated_at = NOW() WHERE id = $2`,
       [passwordHash, admin.id]
     );
 

@@ -13,7 +13,7 @@ const router = Router();
 router.get('/', async (_req: Request, res: Response) => {
   try {
     const row = await queryOne<{ value: string; updated_at: string }>(
-      `SELECT value, updated_at FROM system_config WHERE key = 'home_announcement'`
+      `SELECT value, updated_at FROM system_config WHERE \`key\` = 'home_announcement'`
     );
     return res.json({
       code: 0,
