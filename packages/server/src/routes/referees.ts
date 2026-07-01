@@ -250,6 +250,69 @@ router.get('/my', authMiddleware, async (req: Request, res: Response<ApiResponse
   }
 });
 
+
+/**
+ * GET /api/v1/referees/application-status
+ * 查看当前用户的裁判申请状态
+ * @header Authorization: Bearer <token>
+ * @returns RefereeApplicationStatus
+ */
+router.get('/application-status', authMiddleware, async (req: Request, res: Response<ApiResponse<RefereeApplicationStatus>>) => {
+  try {
+    const userId = req.user!.userId;
+    const openid = req.user!.openid || '';
+
+    // 先通过 user_id 查找
+    let application = await queryOne<any>(
+      `SELECT id, name, phone, status, apply_remark, review_remark, reviewed_at, created_at
+       FROM referees WHERE user_id = $1
+       ORDER BY created_at DESC LIMIT 1`,
+      [userId]
+    );
+
+    // 如果没找到，通过 openid 关联查找
+    if (!application && openid) {
+      application = await queryOne<any>(
+        `SELECT r.id, r.name, r.phone, r.status, r.apply_remark, r.review_remark,
+                r.reviewed_at, r.created_at
+         FROM referees r
+         JOIN users u ON r.user_id = u.id
+         WHERE u.openid = $1 OR u.mp_openid = $2
+         ORDER BY r.created_at DESC LIMIT 1`,
+        [openid, openid]
+      );
+    }
+
+    if (!application) {
+      return res.json({
+        code: 0,
+        message: 'ok',
+        data: { has_application: false, application: null },
+      });
+    }
+
+    return res.json({
+      code: 0,
+      message: 'ok',
+      data: {
+        has_application: true,
+        application: {
+          id: application.id,
+          name: application.name,
+          phone: application.phone,
+          status: application.status,
+          apply_remark: application.apply_remark || '',
+          review_remark: application.review_remark || '',
+          reviewed_at: application.reviewed_at,
+          created_at: application.created_at,
+        },
+      },
+    });
+  } catch (error: any) {
+    console.error('[Referees] application-status error:', error.message);
+    return res.status(500).json({ code: 500, message: '查询申请状态失败', data: null as any });
+  }
+});
 /**
  * GET /api/v1/referees/:id
  * 获取裁判详情
@@ -392,69 +455,6 @@ router.post('/apply', authMiddleware, async (req: Request, res: Response<ApiResp
   } catch (error: any) {
     console.error('[Referees] apply error:', error.message);
     return res.status(500).json({ code: 500, message: '提交申请失败: ' + error.message, data: null });
-  }
-});
-
-/**
- * GET /api/v1/referees/application-status
- * 查看当前用户的裁判申请状态
- * @header Authorization: Bearer <token>
- * @returns RefereeApplicationStatus
- */
-router.get('/application-status', authMiddleware, async (req: Request, res: Response<ApiResponse<RefereeApplicationStatus>>) => {
-  try {
-    const userId = req.user!.userId;
-    const openid = req.user!.openid || '';
-
-    // 先通过 user_id 查找
-    let application = await queryOne<any>(
-      `SELECT id, name, phone, status, apply_remark, review_remark, reviewed_at, created_at
-       FROM referees WHERE user_id = $1
-       ORDER BY created_at DESC LIMIT 1`,
-      [userId]
-    );
-
-    // 如果没找到，通过 openid 关联查找
-    if (!application && openid) {
-      application = await queryOne<any>(
-        `SELECT r.id, r.name, r.phone, r.status, r.apply_remark, r.review_remark,
-                r.reviewed_at, r.created_at
-         FROM referees r
-         JOIN users u ON r.user_id = u.id
-         WHERE u.openid = $1 OR u.mp_openid = $2
-         ORDER BY r.created_at DESC LIMIT 1`,
-        [openid, openid]
-      );
-    }
-
-    if (!application) {
-      return res.json({
-        code: 0,
-        message: 'ok',
-        data: { has_application: false, application: null },
-      });
-    }
-
-    return res.json({
-      code: 0,
-      message: 'ok',
-      data: {
-        has_application: true,
-        application: {
-          id: application.id,
-          name: application.name,
-          phone: application.phone,
-          status: application.status,
-          apply_remark: application.apply_remark || '',
-          review_remark: application.review_remark || '',
-          reviewed_at: application.reviewed_at,
-          created_at: application.created_at,
-        },
-      },
-    });
-  } catch (error: any) {
-    console.error('[Referees] application-status error:', error.message);
-    return res.status(500).json({ code: 500, message: '查询申请状态失败', data: null as any });
   }
 });
 

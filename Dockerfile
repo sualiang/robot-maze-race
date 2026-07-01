@@ -16,6 +16,9 @@ COPY packages/shared/tsconfig.json ./packages/shared/
 COPY packages/server/src ./packages/server/src
 COPY packages/server/tsconfig.json ./packages/server/
 
+# banks.json 被 gitignore，可能不存在，创建默认空数据
+RUN printf '[]' > packages/server/src/banks.json
+
 # 构建 shared 和 server
 RUN CI=true pnpm install --offline && pnpm --filter @robot-race/shared build && pnpm --filter @robot-race/server build
 
@@ -50,6 +53,8 @@ COPY --from=deps /tmp/server-prod/node_modules ./node_modules
 COPY --from=builder /app/packages/server/dist ./dist
 # banks.json 在源码中通过 readFileSync 加载（非 import），tsc 不会自动复制
 COPY --from=builder /app/packages/server/src/banks.json ./dist/banks.json
+# 确保 banks.json 有效（gitignored 文件可能为空）
+RUN if [ ! -s ./dist/banks.json ]; then printf '[]' > ./dist/banks.json; fi
 RUN mkdir -p /app/dist/db
 COPY --from=builder /app/packages/server/src/db/schema.mysql.sql ./dist/db/
 COPY --from=builder /app/packages/shared/dist ./shared
