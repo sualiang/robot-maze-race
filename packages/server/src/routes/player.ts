@@ -446,11 +446,12 @@ router.get('/me/profile-check', authMiddleware, async (req: Request, res: Respon
 
 /**
  * POST /player/me/profile
- * 更新玩家个人信息（昵称、手机号、头像）
+ * 更新玩家个人信息（昵称、手机号、头像、性别）
  */
 router.post('/me/profile', authMiddleware, async (req: Request, res: Response) => {
   const userId = req.user!.userId;
-  const { nickname, phone, avatarUrl, gender } = req.body;
+  const { nickname, phone, avatarUrl, avatar_url, gender } = req.body;
+  const avatar = avatarUrl || avatar_url || undefined;
 
   try {
     const updates: string[] = [];
@@ -465,9 +466,9 @@ router.post('/me/profile', authMiddleware, async (req: Request, res: Response) =
       updates.push(`phone = $${idx++}`);
       params.push(phone);
     }
-    if (avatarUrl !== undefined) {
+    if (avatar !== undefined) {
       updates.push(`avatar_url = $${idx++}`);
-      params.push(avatarUrl);
+      params.push(avatar);
     }
     if (gender !== undefined) {
       updates.push(`gender = $${idx++}`);
@@ -479,7 +480,7 @@ router.post('/me/profile', authMiddleware, async (req: Request, res: Response) =
       return;
     }
 
-    updates.push(`updated_at = datetime('now')`);
+    updates.push('updated_at = NOW()');
     params.push(userId);
 
     await query(
