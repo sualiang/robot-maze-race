@@ -1,0 +1,68 @@
+version: "3.8"
+
+# ============================================
+# SASDT 测试环境 — 铁甲快狗（robot-maze-race）
+# 使用方式：docker compose -f docker-compose.test.yml -p sasdt-test up -d
+# ============================================
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: sasdt-test-mysql
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: SasdtRoot2026!Safe
+      MYSQL_DATABASE: sasdt_test
+      MYSQL_USER: sasdt_test
+      MYSQL_PASSWORD: SasdtTest2026!Safe
+    volumes:
+      - sasdt-test-mysql-data:/var/lib/mysql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: sasdt-test-redis
+    ports:
+      - "6378:6379"
+    volumes:
+      - sasdt-test-redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sasdt-test-backend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=mysql://sasdt_test:SasdtTest2026!Safe@sasdt-test-mysql:3306/sasdt_test
+      - JWT_SECRET=robot-maze-race-test-jwt-secret-2026
+      - REDIS_HOST=sasdt-test-redis
+      - REDIS_PORT=6379
+      - UPLOAD_DIR=/app/uploads
+    volumes:
+      - sasdt-test-uploads:/app/uploads
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  sasdt-test-mysql-data:
+  sasdt-test-redis-data:
+  sasdt-test-uploads:

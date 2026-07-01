@@ -10,6 +10,8 @@ import {
   Referee,
   CreateRefereeParams,
   UpdateRefereeParams,
+  RefereeApplyRequest,
+  RefereeApplicationStatus,
 } from '@robot-race/shared';
 
 const router = Router();
@@ -286,78 +288,173 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response<ApiRespons
 
 /**
  * POST /api/v1/referees/apply
- * 申请成为裁判（玩家提交认证申请）
- * @header Authorization: Bearer <token>
- * @body venue_id - 希望绑定的赛场 UUID
- * @body phone - 裁判联系电话
- * @body id_number - 身份证号
- * @body cert_image - 裁判资格证书图片URL
- * @body id_card_front - 身份证人像面图片URL
- * @body id_card_back - 身份证国徽面图片URL
- * @returns Referee 记录
+ * 裁判自助申请（微信服务号登录用户）
+ * @header Authorization: Bearer <token>（需微信服务号登录，从 token 解析 openid）
+ * @body name - 姓名
+ * @body phone - 手机号
+ * @body remark - 申请备注（可选）
+ * @returns 申请结果
  */
-router.post('/apply', authMiddleware, async (req: Request, res: Response<ApiResponse<Referee>>) => {
+router.post('/apply', authMiddleware, async (req: Request, res: Response<ApiResponse<any>>) => {
   try {
     const userId = req.user!.userId;
-    const body = req.body as CreateRefereeParams & {
-      phone?: string;
-      id_number?: string;
-      id_card_front?: string;
-      id_card_back?: string;
-    };
+    const openid = req.user!.openid || '';
+    const body = req.body as RefereeApplyRequest;
 
-    if (!body.venue_id) {
-      return res.status(400).json({ code: 400, message: '请选择要绑定的赛场', data: null as any });
+    if (!body.name || !body.phone) {
+      return res.status(400).json({ code: 400, message: '请填写姓名和手机号', data: null });
     }
 
-    // 检查是否已存在裁判申请
-    const existingReferee = await queryOne<{ id: string }>(
-      'SELECT id FROM referees WHERE user_id = $1',
-      [userId]
+    // 1. 检查该 openid 是否已有申请（pending/approved/rejected）
+    const existingByOpenid = await queryOne<{ id: string; status: string; name: string }>(
+      `SELECT r.id, r.status, r.name FROM referees r
+       JOIN users u ON r.user_id = u.id
+       WHERE u.openid = $1 OR u.mp_openid = $2
+       LIMIT 1`,
+      [openid, openid]
     );
-
-    if (existingReferee) {
+    if (existingByOpenid) {
+      const statusLabel = existingByOpenid.status === 'approved' ? '已通过审核' :
+        existingByOpenid.status === 'pending' ? '正在审核中' : '已被驳回';
       return res.status(400).json({
         code: 400,
-        message: '您已是裁判，无需重复申请',
-        data: null as any,
+        message: `您已有裁判申请（${statusLabel}），请勿重复申请`,
+        data: null,
       });
     }
 
-    // 验证赛场是否存在
-    const venue = await queryOne<{ id: string }>(
-      'SELECT id FROM venues WHERE id = $1',
-      [body.venue_id]
+    // 也检查通过 user_id 关联的申请
+    const existingByUserId = await queryOne<{ id: string; status: string }>(
+      'SELECT id, status FROM referees WHERE user_id = $1 LIMIT 1',
+      [userId]
     );
-    if (!venue) {
-      return res.status(404).json({ code: 404, message: '赛场不存在', data: null as any });
+    if (existingByUserId) {
+      const statusLabel = existingByUserId.status === 'approved' ? '已通过审核' :
+        existingByUserId.status === 'pending' ? '正在审核中' : '已被驳回';
+      return res.status(400).json({
+        code: 400,
+        message: `您已有裁判申请（${statusLabel}），请勿重复申请`,
+        data: null,
+      });
     }
 
-    // 创建裁判记录
-    const id = uuidv4();
-    const referee = await queryOne<Referee>(
-      `INSERT INTO referees (id, user_id, venue_id, phone, id_number,
-               cert_image, id_card_front, id_card_back)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING id, user_id, venue_id,
-                 phone, id_number, cert_image, id_card_front, id_card_back,
-                 gps_lat, gps_lng, last_checkin_at, created_at, updated_at`,
-      [
-        id,
-        userId,
-        body.venue_id,
-        body.phone || null,
-        body.id_number || null,
-        body.cert_image_url || null,
-        body.id_card_front || null,
-        body.id_card_back || null,
-      ]
+    // 2. 检查手机号是否已被注册为裁判
+    const existingByPhone = await queryOne<{ id: string }>(
+      'SELECT id FROM referees WHERE phone = $1',
+      [body.phone]
+    );
+    if (existingByPhone) {
+      return res.status(400).json({ code: 400, message: '该手机号已被注册为裁判', data: null });
+    }
+
+    // 3. 在 users 表查找或创建用户（通过 openid 关联）
+    let userRecord = await queryOne<{ id: string; openid: string }>(
+      'SELECT id, openid FROM users WHERE id = $1',
+      [userId]
     );
 
-    return res.status(201).json({ code: 0, message: '认证申请已提交，等待审核', data: referee! });
+    if (!userRecord) {
+      // 用户不存在，创建一个新用户
+      const newUserId = uuidv4();
+      await execute(
+        `INSERT INTO users (id, openid, nickname, phone, role)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [newUserId, openid || ('ref_apply_' + body.phone), body.name, body.phone, 'referee']
+      );
+      userRecord = { id: newUserId, openid: openid || ('ref_apply_' + body.phone) };
+    } else {
+      // 已有用户，更新手机号和姓名
+      await execute(
+        'UPDATE users SET phone = COALESCE(NULLIF($1, \'\'), phone), nickname = COALESCE(NULLIF($2, \'\'), nickname) WHERE id = $3',
+        [body.phone, body.name, userId]
+      );
+    }
+
+    // 4. 创建 referees 记录，status='pending'
+    const refereeId = uuidv4();
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    await execute(
+      `INSERT INTO referees (id, user_id, name, phone, status, apply_remark, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [refereeId, userRecord.id, body.name, body.phone, 'pending', body.remark || '', now, now]
+    );
+
+    return res.status(201).json({
+      code: 0,
+      message: '裁判申请已提交，请等待审核',
+      data: {
+        id: refereeId,
+        name: body.name,
+        phone: body.phone,
+        status: 'pending',
+      },
+    });
   } catch (error: any) {
     console.error('[Referees] apply error:', error.message);
-    return res.status(500).json({ code: 500, message: '提交认证申请失败', data: null as any });
+    return res.status(500).json({ code: 500, message: '提交申请失败: ' + error.message, data: null });
+  }
+});
+
+/**
+ * GET /api/v1/referees/application-status
+ * 查看当前用户的裁判申请状态
+ * @header Authorization: Bearer <token>
+ * @returns RefereeApplicationStatus
+ */
+router.get('/application-status', authMiddleware, async (req: Request, res: Response<ApiResponse<RefereeApplicationStatus>>) => {
+  try {
+    const userId = req.user!.userId;
+    const openid = req.user!.openid || '';
+
+    // 先通过 user_id 查找
+    let application = await queryOne<any>(
+      `SELECT id, name, phone, status, apply_remark, review_remark, reviewed_at, created_at
+       FROM referees WHERE user_id = $1
+       ORDER BY created_at DESC LIMIT 1`,
+      [userId]
+    );
+
+    // 如果没找到，通过 openid 关联查找
+    if (!application && openid) {
+      application = await queryOne<any>(
+        `SELECT r.id, r.name, r.phone, r.status, r.apply_remark, r.review_remark,
+                r.reviewed_at, r.created_at
+         FROM referees r
+         JOIN users u ON r.user_id = u.id
+         WHERE u.openid = $1 OR u.mp_openid = $2
+         ORDER BY r.created_at DESC LIMIT 1`,
+        [openid, openid]
+      );
+    }
+
+    if (!application) {
+      return res.json({
+        code: 0,
+        message: 'ok',
+        data: { has_application: false, application: null },
+      });
+    }
+
+    return res.json({
+      code: 0,
+      message: 'ok',
+      data: {
+        has_application: true,
+        application: {
+          id: application.id,
+          name: application.name,
+          phone: application.phone,
+          status: application.status,
+          apply_remark: application.apply_remark || '',
+          review_remark: application.review_remark || '',
+          reviewed_at: application.reviewed_at,
+          created_at: application.created_at,
+        },
+      },
+    });
+  } catch (error: any) {
+    console.error('[Referees] application-status error:', error.message);
+    return res.status(500).json({ code: 500, message: '查询申请状态失败', data: null as any });
   }
 });
 

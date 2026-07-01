@@ -201,6 +201,8 @@ export enum NotificationScene {
   REWARD_ARRIVED = 'reward_arrived',
   /** 系统公告 */
   SYSTEM_NOTICE = 'system_notice',
+  /** 裁判审核结果通知 */
+  REFEREE_REVIEW = 'referee_review',
 }
 
 /** 通知模板配置 */

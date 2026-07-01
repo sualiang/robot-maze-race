@@ -6,6 +6,20 @@ export interface Referee {
   user_id: string;
   venue_id: string;
   cert_status: RefereeCertStatus;
+  /** 审核状态: pending | approved | rejected */
+  status?: string;
+  /** 申请备注 */
+  apply_remark?: string;
+  /** 审核备注 */
+  review_remark?: string;
+  /** 审核时间 */
+  reviewed_at?: string;
+  /** 审核人 */
+  reviewed_by?: string;
+  /** 手机号 */
+  phone?: string;
+  /** 姓名 */
+  name?: string;
   cert_image_url?: string;
   gps_latitude?: number;
   gps_longitude?: number;
@@ -25,4 +39,32 @@ export interface UpdateRefereeParams {
   cert_status?: RefereeCertStatus;
   gps_latitude?: number;
   gps_longitude?: number;
+}
+
+/** 裁判自助申请请求 */
+export interface RefereeApplyRequest {
+  name: string;
+  phone: string;
+  remark?: string;
+}
+
+/** 裁判审核请求 */
+export interface RefereeReviewRequest {
+  action: 'approve' | 'reject';
+  remark?: string;
+}
+
+/** 裁判申请状态响应 */
+export interface RefereeApplicationStatus {
+  has_application: boolean;
+  application?: {
+    id: string;
+    name: string;
+    phone: string;
+    status: string;
+    apply_remark: string;
+    review_remark: string;
+    reviewed_at: string | null;
+    created_at: string;
+  } | null;
 }

@@ -106,6 +106,7 @@ const DEFAULT_TEMPLATES: Record<string, string> = {
   [NotificationScene.RACE_RESULT]: process.env.WX_TEMPLATE_RACE_RESULT || 'TEMPLATE_RACE_RESULT_ID',
   [NotificationScene.REWARD_ARRIVED]: process.env.WX_TEMPLATE_REWARD_ARRIVED || 'TEMPLATE_REWARD_ARRIVED_ID',
   [NotificationScene.SYSTEM_NOTICE]: process.env.WX_TEMPLATE_SYSTEM_NOTICE || 'TEMPLATE_SYSTEM_NOTICE_ID',
+  [NotificationScene.REFEREE_REVIEW]: process.env.WX_TEMPLATE_REFEREE_REVIEW || 'TEMPLATE_REFEREE_REVIEW_ID',
 };
 
 function getTemplateId(scene: NotificationScene): string {
@@ -522,9 +523,101 @@ router.get('/templates', authMiddleware, async (req: Request, res: Response) => 
       name: '系统公告',
       enabled: true,
     },
+    {
+      scene: NotificationScene.REFEREE_REVIEW,
+      template_id: getTemplateId(NotificationScene.REFEREE_REVIEW),
+      name: '裁判审核通知',
+      enabled: true,
+    },
   ];
 
   return res.json({ code: 0, data: templates });
 });
+
+// ============================================================
+// 裁判审核结果通知
+// ============================================================
+
+/**
+ * 发送裁判审核结果通知（通过微信服务号模板消息）
+ * @param params.userId - 裁判关联的 user_id
+ * @param params.refereeName - 裁判姓名
+ * @param params.status - approved | rejected
+ * @param params.remark - 审核备注（驳回时填写原因）
+ */
+export async function sendRefereeReviewNotification(params: {
+  userId: string;
+  refereeName: string;
+  status: string;
+  remark: string;
+}): Promise<void> {
+  const { userId, refereeName, status, remark } = params;
+
+  try {
+    // 查找用户的 openid（优先 mp_openid，再回退 openid）
+    const user = await queryOne<{ openid: string; mp_openid: string }>(
+      'SELECT openid, mp_openid FROM users WHERE id = $1',
+      [userId]
+    );
+
+    const targetOpenid = user?.mp_openid || user?.openid || '';
+
+    const isApproved = status === 'approved';
+    const title = isApproved
+      ? '恭喜您，您的裁判申请已通过审核！现在可以登录使用裁判功能。'
+      : `抱歉，您的裁判申请未通过审核。${remark ? '原因：' + remark : ''}如有疑问请联系客服。`;
+
+    console.log('[WxNotify] 裁判审核通知:', {
+      userId,
+      refereeName,
+      status,
+      isApproved,
+      title,
+    });
+
+    // 如果有 openid，尝试发送模板消息
+    if (targetOpenid && !targetOpenid.startsWith('mock_') && !targetOpenid.startsWith('dev_') && !targetOpenid.startsWith('ref_') && !targetOpenid.startsWith('plr_')) {
+      try {
+        const templateId = getTemplateId(NotificationScene.REFEREE_REVIEW);
+
+        // 检查是否是占位模板ID（未配置真实模板ID）
+        if (templateId.startsWith('TEMPLATE_')) {
+          console.log('[WxNotify] 裁判审核模板消息尚未配置真实模板ID，跳过发送');
+          return;
+        }
+
+        const data = {
+          first: { value: isApproved ? '审核结果通知' : '审核结果通知', color: '#173177' },
+          keyword1: { value: refereeName, color: '#173177' },
+          keyword2: { value: isApproved ? '已通过' : '未通过', color: isApproved ? '#07C160' : '#FA5151' },
+          keyword3: { value: new Date().toLocaleString('zh-CN'), color: '#173177' },
+          remark: {
+            value: isApproved
+              ? '您现在可以登录并使用裁判功能了，祝您工作愉快！'
+              : (remark ? `驳回原因：${remark}。如有疑问请联系客服。` : '如有疑问请联系客服。'),
+            color: '#888888',
+          },
+        };
+
+        await sendTemplateMessage(targetOpenid, templateId, data);
+        await logNotification({
+          scene: NotificationScene.REFEREE_REVIEW,
+          userId,
+          openid: targetOpenid,
+          templateId,
+          content: JSON.stringify(data),
+          status: 'success',
+        });
+      } catch (sendErr: any) {
+        console.warn('[WxNotify] 裁判审核模板消息发送失败:', sendErr.message);
+      }
+    } else {
+      console.log('[WxNotify] 用户无有效 openid，跳过模板消息发送。通知内容:', title);
+    }
+  } catch (err: any) {
+    // 通知失败不应阻断业务流程
+    console.warn('[WxNotify] sendRefereeReviewNotification error:', err.message);
+  }
+}
 
 export default router;

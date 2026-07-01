@@ -3,8 +3,9 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config';
-import { query, queryOne, generateSecurePassword } from '../config/database';
+import { query, queryOne, execute, generateSecurePassword } from '../config/database';
 import { authMiddleware, AuthPayload } from '../middleware/auth';
+import { RefereeReviewRequest } from '@robot-race/shared';
 
 const router = Router();
 
@@ -1134,5 +1135,170 @@ async function initOperatorRoles() {
   }
 }
 initOperatorRoles();
+
+// ============================================================
+// 运营商 — 裁判申请审核
+// ============================================================
+
+/**
+ * GET /api/v1/operator/referee-applications
+ * 获取裁判申请列表（待审核/已审核）
+ * @header Authorization: Bearer <token>（需 operator/admin 权限）
+ * @query status - 筛选状态: pending | approved | rejected
+ * @query page - 页码
+ * @query pageSize - 每页数量
+ */
+router.get('/referee-applications', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
+  try {
+    const {
+      status: statusFilter,
+      page: pageStr = '1',
+      pageSize: pageSizeStr = '20',
+    } = req.query;
+
+    const page = Math.max(1, parseInt(pageStr as string, 10) || 1);
+    const pageSize = Math.min(100, Math.max(1, parseInt(pageSizeStr as string, 10) || 20));
+    const offset = (page - 1) * pageSize;
+
+    const conditions: string[] = [];
+    const params: any[] = [];
+    let paramIdx = 1;
+
+    if (statusFilter && ['pending', 'approved', 'rejected'].includes(statusFilter as string)) {
+      conditions.push(`r.status = $${paramIdx}`);
+      params.push(statusFilter);
+      paramIdx++;
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    // 总数
+    const countResult = await queryOne<{ cnt: number }>(
+      `SELECT COUNT(*) as cnt FROM referees r ${whereClause}`,
+      params
+    );
+    const total = countResult?.cnt || 0;
+
+    // 列表
+    const list = await query<any>(
+      `SELECT r.id, r.name, r.phone, r.status, r.apply_remark as remark,
+              r.review_remark, r.reviewed_at, r.reviewed_by,
+              v.name as venue_name, r.created_at
+       FROM referees r
+       LEFT JOIN venues v ON r.venue_id = v.id
+       ${whereClause}
+       ORDER BY r.created_at DESC
+       LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
+      [...params, pageSize, offset]
+    );
+
+    return res.json({
+      code: 0,
+      message: 'ok',
+      data: {
+        list,
+        total,
+        page,
+        pageSize,
+      },
+    });
+  } catch (error: any) {
+    console.error('[Operator] referee-applications error:', error.message);
+    return res.status(500).json({ code: 500, message: '获取裁判申请列表失败', data: null });
+  }
+});
+
+/**
+ * POST /api/v1/operator/referee-applications/:id/review
+ * 审核裁判申请（通过/驳回）
+ * @header Authorization: Bearer <token>（需 operator/admin 权限）
+ * @param id - 裁判记录 ID
+ * @body action - approve | reject
+ * @body remark - 审核备注（驳回时建议填写原因）
+ */
+router.post('/referee-applications/:id/review', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { action, remark } = req.body as RefereeReviewRequest;
+    const reviewerId = req.user!.userId;
+    const reviewerName = (req.user as any).nickname || (req.user as any).operator_name || reviewerId;
+
+    if (!action || !['approve', 'reject'].includes(action)) {
+      return res.status(400).json({ code: 400, message: '请指定审核操作: approve 或 reject', data: null });
+    }
+
+    // 1. 查 referees 表确认记录存在且 status='pending'
+    const referee = await queryOne<{
+      id: string;
+      user_id: string;
+      name: string;
+      phone: string;
+      status: string;
+    }>(
+      `SELECT r.id, r.user_id, r.name, r.phone, r.status
+       FROM referees r WHERE r.id = $1`,
+      [id]
+    );
+
+    if (!referee) {
+      return res.status(404).json({ code: 404, message: '裁判申请不存在', data: null });
+    }
+
+    if (referee.status !== 'pending') {
+      return res.status(400).json({
+        code: 400,
+        message: `该申请已${referee.status === 'approved' ? '通过' : '驳回'}，无法重复审核`,
+        data: null,
+      });
+    }
+
+    // 2. 更新状态
+    const newStatus = action === 'approve' ? 'approved' : 'rejected';
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+
+    await execute(
+      `UPDATE referees SET status = $1, review_remark = $2, reviewed_at = $3, reviewed_by = $4, updated_at = $5 WHERE id = $6`,
+      [newStatus, remark || '', now, reviewerName, now, id]
+    );
+
+    // 3. 如果审核通过，更新 users 表 role 为 referee
+    if (action === 'approve' && referee.user_id) {
+      await execute(
+        'UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2',
+        ['referee', referee.user_id]
+      );
+    }
+
+    // 4. 发送微信服务号模板消息通知
+    try {
+      const { sendRefereeReviewNotification } = await import('./wx-notify');
+      await sendRefereeReviewNotification({
+        userId: referee.user_id,
+        refereeName: referee.name,
+        status: newStatus,
+        remark: remark || '',
+      });
+    } catch (notifyErr: any) {
+      console.warn('[Operator] referee review notification failed:', notifyErr.message);
+      // 通知失败不影响审核结果
+    }
+
+    const statusLabel = action === 'approve' ? '已通过' : '已驳回';
+
+    return res.json({
+      code: 0,
+      message: `审核${statusLabel}`,
+      data: {
+        id: referee.id,
+        name: referee.name,
+        status: newStatus,
+        reviewed_at: now,
+      },
+    });
+  } catch (error: any) {
+    console.error('[Operator] referee-applications review error:', error.message);
+    return res.status(500).json({ code: 500, message: '审核操作失败: ' + error.message, data: null });
+  }
+});
 
 export default router;

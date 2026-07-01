@@ -206,10 +206,12 @@ export async function transaction<T>(
  */
 export async function initSchema(): Promise<void> {
   const schemaPath = path.join(__dirname, '../db/schema.mysql.sql');
+  const conn = getPool();
+
   if (!fs.existsSync(schemaPath)) {
     console.warn('[MySQL] schema.mysql.sql not found at', schemaPath);
-    return;
-  }
+    // Continue with migrations even if schema file is missing
+  } else {
 
   const raw = fs.readFileSync(schemaPath, 'utf-8');
 
@@ -223,7 +225,6 @@ export async function initSchema(): Promise<void> {
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
 
-  const conn = getPool();
   for (const stmt of statements) {
     if (stmt.startsWith('/*') || stmt === '') continue;
     try {
@@ -239,6 +240,7 @@ export async function initSchema(): Promise<void> {
   }
 
   console.log('[MySQL] Schema initialized from', schemaPath);
+  } // end if schema file exists
 
   // 插入默认系统配置（仅在首次运行时生效）
   const defaults: [string, string, string][] = [
@@ -299,6 +301,26 @@ export async function initSchema(): Promise<void> {
       await conn.execute('ALTER TABLE referees ADD COLUMN name VARCHAR(100)');
     }
   } catch { /* ignore */ }
+
+  // referees 表新增 status / apply_remark / review_remark / reviewed_at / reviewed_by 字段
+  const refereeReviewCols: [string, string][] = [
+    ['status', "VARCHAR(16) DEFAULT 'approved'"],
+    ['apply_remark', "VARCHAR(255) DEFAULT ''"],
+    ['review_remark', "VARCHAR(255) DEFAULT ''"],
+    ['reviewed_at', 'DATETIME DEFAULT NULL'],
+    ['reviewed_by', "VARCHAR(64) DEFAULT ''"],
+  ];
+  for (const [colName, colDef] of refereeReviewCols) {
+    try {
+      const [cols] = await conn.execute<any>(
+        `SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'referees' AND COLUMN_NAME = ?`,
+        [getPoolOptions().database, colName]
+      );
+      if ((cols as any[]).length === 0) {
+        await conn.execute(`ALTER TABLE referees ADD COLUMN \`${colName}\` ${colDef}`);
+      }
+    } catch { /* ignore */ }
+  }
 
   // admin_users 表新增 first_login 字段
   try {

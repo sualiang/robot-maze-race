@@ -91,7 +91,7 @@ async function findUserByOpenid(openid: string): Promise<User | null> {
   return queryOne<User>(
     `SELECT id, openid, unionid, nickname, avatar_url, phone, gender, role, race_count,
             total_race_time_ms, best_score_ms, created_at, updated_at
-     FROM users WHERE openid = ?`,
+     FROM users WHERE openid = $1`,
     [openid]
   );
 }
@@ -107,7 +107,7 @@ async function createUserFromWx(params: {
   const id = uuidv4();
   await execute(
     `INSERT INTO users (id, openid, unionid, nickname, avatar_url, phone, gender, role)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
     [
       id,
       params.openid,
@@ -211,20 +211,20 @@ router.post('/wx-mp-login', async (req: Request, res: Response<ApiResponse<WxMpL
         user = await queryOne<User>(
           `SELECT id, openid, unionid, nickname, avatar_url, phone, gender, role, race_count,
                   total_race_time_ms, best_score_ms, created_at, updated_at
-           FROM users WHERE phone = ? AND role = 'player'`,
+           FROM users WHERE phone = $1 AND role = 'player'`,
           [reqPhone]
         );
         if (user) {
           // 绑定 openid，不覆盖原有 openid（保留小程序登录）
           await execute(
-            `UPDATE users SET unionid = COALESCE(NULLIF(?, ''), unionid), mp_openid = ?, updated_at = NOW() WHERE id = ?`,
+            `UPDATE users SET unionid = COALESCE(NULLIF($1, ''), unionid), mp_openid = $2, updated_at = NOW() WHERE id = $3`,
             [unionid || null, openid, user.id]
           );
           console.log('[WxMpLogin] 服务号 openid 已绑定到手机号账户:', reqPhone, 'userId:', user.id);
 
           // 更新头像昵称（如果微信拉到了更新）
           if (wxNickname && (!user.nickname || user.nickname.startsWith('玩家'))) {
-            await execute('UPDATE users SET nickname = ?, avatar_url = ? WHERE id = ?', [wxNickname, wxAvatarUrl, user.id]);
+            await execute('UPDATE users SET nickname = $1, avatar_url = $2 WHERE id = $3', [wxNickname, wxAvatarUrl, user.id]);
             user.nickname = wxNickname;
             user.avatar_url = wxAvatarUrl;
           }
@@ -251,7 +251,7 @@ router.post('/wx-mp-login', async (req: Request, res: Response<ApiResponse<WxMpL
       if (wxNickname && wxNickname !== user.nickname && !user.nickname.startsWith('玩家')) {
         // 只在用户没有自定义昵称时更新
       } else if (wxNickname && (!user.nickname || user.nickname.startsWith('玩家'))) {
-        await execute('UPDATE users SET nickname = ?, avatar_url = ?, updated_at = NOW() WHERE id = ?', [wxNickname, wxAvatarUrl || user.avatar_url, user.id]);
+        await execute('UPDATE users SET nickname = $1, avatar_url = $2, updated_at = NOW() WHERE id = $3', [wxNickname, wxAvatarUrl || user.avatar_url, user.id]);
         user.nickname = wxNickname;
         user.avatar_url = wxAvatarUrl || user.avatar_url;
       }
@@ -322,7 +322,7 @@ router.post('/wx-mp-bind', async (req: Request, res: Response) => {
 
     // 检查 openid 是否已被其他用户绑定
     const existing = await queryOne<{ id: string }>(
-      'SELECT id FROM users WHERE mp_openid = ? AND id != ?',
+      'SELECT id FROM users WHERE mp_openid = $1 AND id != $2',
       [openid, payload.userId]
     );
     if (existing) {
@@ -330,7 +330,7 @@ router.post('/wx-mp-bind', async (req: Request, res: Response) => {
     }
 
     await execute(
-      'UPDATE users SET mp_openid = ?, unionid = COALESCE(NULLIF(?, \'\'), unionid), updated_at = NOW() WHERE id = ?',
+      'UPDATE users SET mp_openid = $1, unionid = COALESCE(NULLIF($2, \'\'), unionid), updated_at = NOW() WHERE id = $3',
       [openid, unionid || null, payload.userId]
     );
 
@@ -348,7 +348,8 @@ router.post('/wx-mp-bind', async (req: Request, res: Response) => {
 async function grantFreeEntryDeduction(userId: string): Promise<void> {
   try {
     const cfgRow = await queryOne<{ value: string }>(
-      `SELECT value FROM system_config WHERE \`key\` = 'register_deduction_cents'`
+      `SELECT value FROM system_config WHERE \`key\` = $1`,
+      ['register_deduction_cents']
     );
     let deductionCents = 1000;
     if (cfgRow && cfgRow.value) {
@@ -364,7 +365,7 @@ async function grantFreeEntryDeduction(userId: string): Promise<void> {
     const deductionId = uuidv4();
     await execute(
       `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, expires_at, created_at)
-       VALUES (?, ?, ?, 'register_reward', 'available', DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
+       VALUES ($1, $2, $3, 'register_reward', 'available', DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
       [deductionId, userId, deductionCents]
     );
     console.log('[WxMpLogin] 注册赠送参赛抵扣金:', userId, 'amount:', deductionCents / 100, '元');
