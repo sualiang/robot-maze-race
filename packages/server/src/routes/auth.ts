@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config';
 import { query, queryOne, execute } from '../config/database';
 import { authMiddleware, optionalAuth, AuthPayload } from '../middleware/auth';
+import { getAccessToken } from '../services/wechat-token';
 import {
   ApiResponse,
   WxLoginRequest,
@@ -990,8 +991,7 @@ router.post('/register', async (req: Request, res: Response) => {
     }
 
     const userId = uuidv4();
-    const pwd = password || 'admin123';
-    const hash = bcrypt.hashSync(pwd, 10);
+    const hash = password ? bcrypt.hashSync(password, 10) : '';
     const displayName = nickname || '玩家_' + phone.slice(-4);
 
     await query(
@@ -1071,5 +1071,69 @@ async function grantFreeEntryDeduction(userId: string): Promise<void> {
     console.error('[Auth] 注册赠送参赛抵扣金失败:', err?.message || err);
   }
 }
+
+/**
+ * POST /api/v1/auth/decrypt-phone
+ * 微信手机号解密 — 用 code 换取手机号
+ * Auth: Bearer Token
+ * Body: { code: string }  // 来自 <button open-type="getPhoneNumber">
+ * Response: { phone: string }
+ *
+ * 流程：
+ * 1. 用 getAccessToken() 获取服务号 access_token
+ * 2. 调用微信 getuserphonenumber 接口换取手机号
+ * 3. 解析 phone_info.purePhoneNumber（不带区号）
+ * 4. 更新当前登录用户的 phone 字段
+ */
+router.post('/decrypt-phone', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { code } = req.body;
+
+    if (!code) {
+      return res.status(400).json({ code: 400, message: '缺少 code 参数', data: null });
+    }
+
+    // 1. 获取 access_token
+    const accessToken = await getAccessToken();
+
+    // 2. 调用微信接口换取手机号
+    const url = `https://api.weixin.qq.com/wxa/business/getuserphonenumber?access_token=${accessToken}`;
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
+    });
+    const data = (await resp.json()) as any;
+
+    if (data.errcode !== 0) {
+      throw new Error(
+        `获取手机号失败: ${data.errmsg || '未知错误'} (errcode=${data.errcode})`
+      );
+    }
+
+    const phoneInfo = data.phone_info;
+    const phone = phoneInfo.purePhoneNumber || phoneInfo.phoneNumber || '';
+
+    if (!phone) {
+      return res.status(400).json({ code: 400, message: '未能解析手机号', data: null });
+    }
+
+    // 3. 更新当前用户的手机号
+    const userId = req.user!.userId;
+    await execute(
+      `UPDATE users SET phone = $1, updated_at = $2 WHERE id = $3`,
+      [phone, new Date().toISOString(), userId]
+    );
+
+    return res.json({ code: 0, message: '手机号解密成功', data: { phone } });
+  } catch (error: any) {
+    console.error('[Auth] decrypt-phone error:', error.message);
+    return res.status(500).json({
+      code: 500,
+      message: error.message || '手机号解密失败',
+      data: null,
+    });
+  }
+});
 
 export default router;
