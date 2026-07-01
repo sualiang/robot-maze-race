@@ -140,6 +140,21 @@ app.use('/api/v1', pointsShopRoutes);
 // 上传（商家 Logo 等）
 app.use('/api/v1/upload', uploadRoutes);
 
+// ============================================================
+// 微信体系路由
+// ============================================================
+// 微信服务号 OAuth 登录
+import wxMpLoginRoutes from './routes/wx-mp-login';
+app.use('/api/v1/auth', wxMpLoginRoutes);
+
+// 微信支付
+import wxPayRoutes from './routes/wx-pay';
+app.use('/api/v1/pay', wxPayRoutes);
+
+// 微信服务号消息通知
+import wxNotifyRoutes from './routes/wx-notify';
+app.use('/api/v1/notify', wxNotifyRoutes);
+
 // 静态文件（上传目录）
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 

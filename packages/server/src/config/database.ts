@@ -532,6 +532,71 @@ export async function initSchema(): Promise<void> {
     }
   } catch { /* ignore */ }
 
+  // 微信服务号登录迁移：users 表新增 mp_openid 字段
+  try {
+    const [cols] = await conn.execute<any>(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users' AND COLUMN_NAME = 'mp_openid'`,
+      [getPoolOptions().database]
+    );
+    if ((cols as any[]).length === 0) {
+      await conn.execute("ALTER TABLE users ADD COLUMN mp_openid VARCHAR(128) DEFAULT ''");
+    }
+  } catch { /* ignore */ }
+
+  // orders 表新增支付相关字段
+  const orderPayCols: [string, string][] = [
+    ['prepay_id', 'VARCHAR(64)'],
+    ['transaction_id', 'VARCHAR(64)'],
+    ['refund_id', 'VARCHAR(64)'],
+    ['refund_amount', 'INT DEFAULT 0'],
+    ['payment_remark', 'VARCHAR(512)'],
+  ];
+  for (const [colName, colDef] of orderPayCols) {
+    try {
+      const [cols] = await conn.execute<any>(
+        `SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'orders' AND COLUMN_NAME = ?`,
+        [getPoolOptions().database, colName]
+      );
+      if ((cols as any[]).length === 0) {
+        await conn.execute(`ALTER TABLE orders ADD COLUMN \`${colName}\` ${colDef}`);
+      }
+    } catch { /* ignore */ }
+  }
+
+  // 支付流水表
+  try {
+    await conn.execute(`CREATE TABLE IF NOT EXISTS payment_transactions (
+      id VARCHAR(36) PRIMARY KEY,
+      order_id VARCHAR(36) NOT NULL,
+      user_id VARCHAR(36) NOT NULL,
+      amount INT NOT NULL,
+      transaction_id VARCHAR(64),
+      payment_method VARCHAR(32) DEFAULT 'wechat_pay',
+      status VARCHAR(16) DEFAULT 'pending',
+      refund_id VARCHAR(64),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )`);
+  } catch { /* ignore */ }
+
+  // 通知发送日志表
+  try {
+    await conn.execute(`CREATE TABLE IF NOT EXISTS notification_logs (
+      id VARCHAR(36) PRIMARY KEY,
+      scene VARCHAR(64) NOT NULL,
+      user_id VARCHAR(36) NOT NULL,
+      openid VARCHAR(128) NOT NULL,
+      template_id VARCHAR(64),
+      content TEXT,
+      status VARCHAR(16) DEFAULT 'success',
+      error_msg TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+    await conn.execute('CREATE INDEX IF NOT EXISTS idx_notification_logs_scene ON notification_logs(scene)');
+    await conn.execute('CREATE INDEX IF NOT EXISTS idx_notification_logs_user ON notification_logs(user_id)');
+    await conn.execute('CREATE INDEX IF NOT EXISTS idx_notification_logs_created ON notification_logs(created_at)');
+  } catch { /* ignore */ }
+
   // V2.3 迁移：orders 表新增字段
   try {
     const [cols] = await conn.execute<any>(

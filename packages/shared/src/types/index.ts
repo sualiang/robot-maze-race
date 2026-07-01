@@ -6,3 +6,4 @@ export * from './order';
 export * from './race';
 export * from './help';
 export * from './attendance';
+export * from './wechat';

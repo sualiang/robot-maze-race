@@ -42,6 +42,32 @@ export const config = {
     appSecret: process.env.WECHAT_APP_SECRET || '',
   },
 
+  // 微信服务号（公众号）
+  wechatMp: {
+    appId: process.env.WECHAT_MP_APP_ID || '',
+    appSecret: process.env.WECHAT_MP_APP_SECRET || '',
+    /** 服务号 token（用于验证消息来自微信服务器） */
+    token: process.env.WECHAT_MP_TOKEN || '',
+    /** 消息加解密 key（安全模式时使用） */
+    encodingAESKey: process.env.WECHAT_MP_ENCODING_AES_KEY || '',
+  },
+
+  // 微信支付（JSAPI 支付）
+  wechatPay: {
+    /** 商户号 */
+    mchId: process.env.WECHAT_PAY_MCH_ID || '',
+    /** API v3 key */
+    apiV3Key: process.env.WECHAT_PAY_API_V3_KEY || '',
+    /** 商户 API 证书序列号 */
+    merchantSerialNumber: process.env.WECHAT_PAY_MERCHANT_SERIAL_NO || '',
+    /** 商户 API 私钥路径（PEM格式） */
+    privateKeyPath: process.env.WECHAT_PAY_PRIVATE_KEY_PATH || '',
+    /** 支付回调地址 */
+    notifyUrl: process.env.WECHAT_PAY_NOTIFY_URL || '',
+    /** 退款回调地址 */
+    refundNotifyUrl: process.env.WECHAT_PAY_REFUND_NOTIFY_URL || '',
+  },
+
   // 是否开发模式
   get isDev(): boolean {
     return this.nodeEnv === 'development';
