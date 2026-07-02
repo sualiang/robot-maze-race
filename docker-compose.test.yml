@@ -53,6 +53,10 @@ services:
       - REDIS_HOST=sasdt-test-redis
       - REDIS_PORT=6379
       - UPLOAD_DIR=/app/uploads
+      - WECHAT_APP_ID=wx619c9f373868ab63
+      - WECHAT_APP_SECRET=WECHAT_APP_SECRET_PLACEHOLDER
+      - WECHAT_MP_APP_ID=wx22a4891531ce5fe7
+      - WECHAT_MP_APP_SECRET=WECHAT_MP_APP_SECRET_PLACEHOLDER
     volumes:
       - sasdt-test-uploads:/app/uploads
     depends_on:

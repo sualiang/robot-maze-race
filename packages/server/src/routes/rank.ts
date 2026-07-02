@@ -197,7 +197,7 @@ router.get('/:type', authMiddleware, async (req: Request, res: Response) => {
       timeWhere = `rr.finished_at >= CURDATE()`;
     } else if (type === 'weekly') {
       // 本周成绩（周一起）
-      timeWhere = `rr.finished_at >= date('now', 'weekday 1', '-7 days')`;
+      timeWhere = `rr.finished_at >= DATE_SUB(CURDATE(), INTERVAL (DAYOFWEEK(CURDATE()) + 5) % 7 DAY)`;
     } else {
       // total — 整个赛季
       timeWhere = `rr.finished_at >= $2`;
@@ -289,7 +289,7 @@ router.get('/:type', authMiddleware, async (req: Request, res: Response) => {
            ${type === 'daily'
              ? `AND rr.finished_at >= CURDATE()`
              : type === 'weekly'
-               ? `AND rr.finished_at >= date('now', 'weekday 1', '-7 days')`
+               ? `AND rr.finished_at >= DATE_SUB(CURDATE(), INTERVAL (DAYOFWEEK(CURDATE()) + 5) % 7 DAY)`
                : `AND rr.finished_at >= $2`
            }`,
         type === 'total' ? [userId, season.startTime] : [userId]
@@ -307,7 +307,7 @@ router.get('/:type', authMiddleware, async (req: Request, res: Response) => {
              ${type === 'daily'
                ? `AND rr.finished_at >= CURDATE()`
                : type === 'weekly'
-                 ? `AND rr.finished_at >= date('now', 'weekday 1', '-7 days')`
+                 ? `AND rr.finished_at >= DATE_SUB(CURDATE(), INTERVAL (DAYOFWEEK(CURDATE()) + 5) % 7 DAY)`
                  : `AND rr.finished_at >= $2`
              }`,
           type === 'total'

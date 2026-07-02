@@ -47,7 +47,7 @@
     "disableSWC": true
   },
   "compileType": "miniprogram",
-  "libVersion": "3.16.1",
+  "libVersion": "2.32.3",
   "appid": "wx619c9f373868ab63",
   "projectname": "robot-maze-race-player",
   "condition": {},

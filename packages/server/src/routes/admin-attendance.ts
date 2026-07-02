@@ -85,7 +85,7 @@ router.get('/', authMiddleware, adminOnly, async (req: Request, res: Response) =
          a.checkout_at,
          CASE
            WHEN a.checkout_at IS NOT NULL
-             THEN CAST((julianday(a.checkout_at) - julianday(a.checkin_at)) * 1440 AS INTEGER)
+             THEN TIMESTAMPDIFF(MINUTE, a.checkin_at, a.checkout_at)
            ELSE 0
          END as duration_minutes,
          a.gps_lat as gps_latitude,
@@ -159,7 +159,7 @@ router.get('/export', authMiddleware, adminOnly, async (req: Request, res: Respo
          a.checkout_at,
          CASE
            WHEN a.checkout_at IS NOT NULL
-             THEN CAST((julianday(a.checkout_at) - julianday(a.checkin_at)) * 1440 AS INTEGER)
+             THEN TIMESTAMPDIFF(MINUTE, a.checkin_at, a.checkout_at)
            ELSE 0
          END as duration_minutes,
          a.gps_lat,

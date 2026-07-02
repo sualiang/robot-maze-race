@@ -1,3 +1,4 @@
+// pages/edit-profile/edit-profile.js - 编辑个人信息（微信原生组件）
 var request = require('../../utils/request');
 var storage = require('../../utils/storage');
 var app = getApp();
@@ -10,8 +11,7 @@ Page({
     gender: '',
     genderOptions: ['男', '女', '不显示'],
     genderIndex: 2,
-    phone: '',
-    phoneDisabled: false
+    phone: ''
   },
 
   onLoad: function () {
@@ -23,65 +23,87 @@ Page({
       nickname: user.nickname || '',
       gender: g,
       genderIndex: idx,
-      phone: user.phone || '',
-      phoneDisabled: !!user.phone
+      phone: user.phone || ''
     });
   },
 
-  onAvatarTap: function () {
+  // ===== 微信原生 chooseAvatar 回调 =====
+  onChooseAvatar: function (e) {
     var that = this;
-    wx.chooseImage({
-      count: 1,
-      sizeType: ['compressed'],
-      sourceType: ['album', 'camera'],
-      success: function (res) {
-        var tempPath = res.tempFilePaths[0];
-        that.setData({ avatar: tempPath });
-        wx.showToast({ title: '头像已选择', icon: 'success', duration: 1000 });
+    var avatarUrl = e.detail.avatarUrl;
+    if (!avatarUrl) return;
 
-        // 压缩后读取 base64 用于上传
-        wx.compressImage({
-          src: tempPath,
-          quality: 20,
-          success: function (comp) {
-            wx.getFileSystemManager().readFile({
-              filePath: comp.tempFilePath,
-              encoding: 'base64',
-              success: function (fsRes) {
-                that.setData({ avatarBase64: 'data:image/jpeg;base64,' + fsRes.data });
-              },
-              fail: function () { that.setData({ avatar: tempPath }); }
-            });
-          },
-          fail: function () {
-            // 压缩失败时降级：直接用原图转 base64
-            wx.getFileSystemManager().readFile({
-              filePath: tempPath,
-              encoding: 'base64',
-              success: function (fsRes) {
-                that.setData({ avatarBase64: 'data:image/png;base64,' + fsRes.data });
-              }
-            });
-          }
+    that.setData({
+      avatar: avatarUrl
+    });
+
+    // 读取 base64 用于上传
+    wx.getFileSystemManager().readFile({
+      filePath: avatarUrl,
+      encoding: 'base64',
+      success: function (fsRes) {
+        that.setData({
+          avatarBase64: 'data:image/jpeg;base64,' + fsRes.data
         });
+      },
+      fail: function () {
+        // 读取失败时保留原路径
+        that.setData({ avatar: avatarUrl });
       }
     });
+
+    wx.showToast({ title: '头像已选择', icon: 'success', duration: 1000 });
   },
 
+  // ===== 微信原生 getPhoneNumber 回调 =====
+  onGetPhoneNumber: function (e) {
+    var that = this;
+    var detail = e.detail;
+
+    // 用户拒绝授权
+    if (detail.errMsg && detail.errMsg.indexOf('deny') !== -1) {
+      return;
+    }
+
+    if (!detail.encryptedData || !detail.iv) {
+      wx.showToast({ title: '获取手机号失败', icon: 'none' });
+      return;
+    }
+
+    // 调用后端解密手机号
+    wx.showLoading({ title: '获取中...', mask: true });
+    request.post('/auth/decrypt-phone', {
+      encryptedData: detail.encryptedData,
+      iv: detail.iv
+    }).then(function (d) {
+      wx.hideLoading();
+      var phone = (d && d.phoneNumber) || '';
+      if (phone) {
+        that.setData({ phone: phone });
+        wx.showToast({ title: '手机号已获取', icon: 'success', duration: 1000 });
+      } else {
+        wx.showToast({ title: '解密手机号失败', icon: 'none' });
+      }
+    }).catch(function (err) {
+      wx.hideLoading();
+      var msg = (err && err.message) || '获取手机号失败';
+      wx.showToast({ title: msg, icon: 'none' });
+    });
+  },
+
+  // ===== 昵称输入 =====
   onNicknameInput: function (e) {
     this.setData({ nickname: e.detail.value });
   },
 
-  onPhoneInput: function (e) {
-    this.setData({ phone: e.detail.value });
-  },
-
+  // ===== 性别选择 =====
   onGenderChange: function (e) {
     var idx = parseInt(e.detail.value, 10);
     var vals = ['male', 'female', ''];
     this.setData({ gender: vals[idx], genderIndex: idx });
   },
 
+  // ===== 保存资料 =====
   onSave: function () {
     var that = this;
     var data = {};
@@ -95,6 +117,8 @@ Page({
 
     request.post('/player/me/profile', data).then(function () {
       wx.hideLoading();
+
+      // 更新本地缓存
       var user = storage.getSync(storage.STORAGE_KEYS.USER, {});
       var merged = Object.assign({}, user, data);
       // 前端显示用本地路径（临时），不存 base64 到缓存
@@ -103,10 +127,14 @@ Page({
       app.globalData.userInfo = merged;
 
       wx.showToast({ title: '保存成功', icon: 'success', duration: 1500 });
-      setTimeout(function () { wx.navigateBack(); }, 1500);
+      setTimeout(function () {
+        // 保存后跳首页
+        wx.switchTab({ url: '/pages/index/index' });
+      }, 1500);
     }).catch(function (err) {
       wx.hideLoading();
-      wx.showToast({ title: (err && err.message) || '保存失败', icon: 'none', duration: 2000 });
+      var msg = (err && err.message) || '保存失败';
+      wx.showToast({ title: msg, icon: 'none', duration: 2000 });
     });
   }
 });

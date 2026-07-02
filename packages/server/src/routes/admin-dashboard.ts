@@ -352,15 +352,15 @@ router.get('/region-revenue', authMiddleware, checkPermission('dashboard:read'),
            COALESCE(SUM(o.total_revenue), 0) as total_revenue_cents,
            COALESCE((SELECT SUM(ord.amount_cents) FROM orders ord
                       JOIN venues vv ON vv.operator_id = o.id
-                      WHERE o.province IS NOT NULL AND o.province != '' AND DATE(ord.paid_at) = DATE('now','localtime')), 0) as today_revenue_cents,
+                      WHERE o.province IS NOT NULL AND o.province != '' AND DATE(ord.paid_at) = CURDATE()), 0) as today_revenue_cents,
            COALESCE((SELECT SUM(ord.amount_cents) FROM orders ord
                       JOIN venues vv ON vv.operator_id = o.id
                       WHERE o.province IS NOT NULL AND o.province != ''
-                        AND strftime('%Y-%m', ord.paid_at) = strftime('%Y-%m', 'now','localtime')), 0) as month_revenue_cents,
+                        AND DATE_FORMAT(ord.paid_at, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')), 0) as month_revenue_cents,
            COALESCE((SELECT SUM(ord.amount_cents) FROM orders ord
                       JOIN venues vv ON vv.operator_id = o.id
                       WHERE o.province IS NOT NULL AND o.province != ''
-                        AND strftime('%Y-%m', ord.paid_at) = strftime('%Y-%m', 'now','localtime','-1 month')), 0) as prev_month_revenue_cents
+                        AND DATE_FORMAT(ord.paid_at, '%Y-%m') = DATE_FORMAT(DATE_SUB(NOW(), INTERVAL 1 MONTH), '%Y-%m')), 0) as prev_month_revenue_cents
          FROM operators o
          WHERE o.province IS NOT NULL AND o.province != ''
          GROUP BY o.province
@@ -380,15 +380,15 @@ router.get('/region-revenue', authMiddleware, checkPermission('dashboard:read'),
            COALESCE(SUM(o.total_revenue), 0) as total_revenue_cents,
            COALESCE((SELECT SUM(ord.amount_cents) FROM orders ord
                       JOIN venues vv ON vv.operator_id = o.id
-                      WHERE o.city IS NOT NULL AND o.city != '' AND DATE(ord.paid_at) = DATE('now','localtime')), 0) as today_revenue_cents,
+                      WHERE o.city IS NOT NULL AND o.city != '' AND DATE(ord.paid_at) = CURDATE()), 0) as today_revenue_cents,
            COALESCE((SELECT SUM(ord.amount_cents) FROM orders ord
                       JOIN venues vv ON vv.operator_id = o.id
                       WHERE o.city IS NOT NULL AND o.city != ''
-                        AND strftime('%Y-%m', ord.paid_at) = strftime('%Y-%m', 'now','localtime')), 0) as month_revenue_cents,
+                        AND DATE_FORMAT(ord.paid_at, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')), 0) as month_revenue_cents,
            COALESCE((SELECT SUM(ord.amount_cents) FROM orders ord
                       JOIN venues vv ON vv.operator_id = o.id
                       WHERE o.city IS NOT NULL AND o.city != ''
-                        AND strftime('%Y-%m', ord.paid_at) = strftime('%Y-%m', 'now','localtime','-1 month')), 0) as prev_month_revenue_cents
+                        AND DATE_FORMAT(ord.paid_at, '%Y-%m') = DATE_FORMAT(DATE_SUB(NOW(), INTERVAL 1 MONTH), '%Y-%m')), 0) as prev_month_revenue_cents
          FROM operators o
          WHERE o.province = ? AND o.city IS NOT NULL AND o.city != ''
          GROUP BY o.city
@@ -409,15 +409,15 @@ router.get('/region-revenue', authMiddleware, checkPermission('dashboard:read'),
            COALESCE(SUM(o.total_revenue), 0) as total_revenue_cents,
            COALESCE((SELECT SUM(ord.amount_cents) FROM orders ord
                       JOIN venues vv ON vv.operator_id = o.id
-                      WHERE o.district IS NOT NULL AND o.district != '' AND DATE(ord.paid_at) = DATE('now','localtime')), 0) as today_revenue_cents,
+                      WHERE o.district IS NOT NULL AND o.district != '' AND DATE(ord.paid_at) = CURDATE()), 0) as today_revenue_cents,
            COALESCE((SELECT SUM(ord.amount_cents) FROM orders ord
                       JOIN venues vv ON vv.operator_id = o.id
                       WHERE o.district IS NOT NULL AND o.district != ''
-                        AND strftime('%Y-%m', ord.paid_at) = strftime('%Y-%m', 'now','localtime')), 0) as month_revenue_cents,
+                        AND DATE_FORMAT(ord.paid_at, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')), 0) as month_revenue_cents,
            COALESCE((SELECT SUM(ord.amount_cents) FROM orders ord
                       JOIN venues vv ON vv.operator_id = o.id
                       WHERE o.district IS NOT NULL AND o.district != ''
-                        AND strftime('%Y-%m', ord.paid_at) = strftime('%Y-%m', 'now','localtime','-1 month')), 0) as prev_month_revenue_cents
+                        AND DATE_FORMAT(ord.paid_at, '%Y-%m') = DATE_FORMAT(DATE_SUB(NOW(), INTERVAL 1 MONTH), '%Y-%m')), 0) as prev_month_revenue_cents
          FROM operators o
          WHERE o.city = ? AND o.district IS NOT NULL AND o.district != ''
          GROUP BY o.district

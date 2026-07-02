@@ -34,8 +34,8 @@ router.get('/user/info', authMiddleware, async (req: Request, res: Response) => 
     );
 
     // 计算排名（按 exp 降序）
-    const rankRow = await queryOne<{ rank: number }>(
-      `SELECT COUNT(*) + 1 as rank FROM users WHERE exp > (SELECT COALESCE(exp,0) FROM users WHERE id = $1)`,
+    const rankRow = await queryOne<{ user_rank: number }>(
+      `SELECT COUNT(*) + 1 as user_rank FROM users WHERE exp > (SELECT COALESCE(exp,0) FROM users WHERE id = $1)`,
       [userId]
     );
 
@@ -99,7 +99,7 @@ router.get('/user/info', authMiddleware, async (req: Request, res: Response) => 
         exp: exp,
         totalPower: combat?.total_power || 0,
         points: user.points || 0,
-        rank: rankRow?.rank || 0,
+        rank: rankRow?.user_rank || 0,
         nextLevelExp,
         currentLevelExp,
         expProgress: nextLevelExp > currentLevelExp

@@ -49,6 +49,10 @@
   color: #e0e0e0;
 }
 
+.field-placeholder {
+  color: #666;
+}
+
 .arrow-icon {
   font-size: 32rpx;
   color: #666;
@@ -61,6 +65,24 @@
   border: 2rpx solid rgba(255,255,255,0.1);
 }
 
+/* ===== 原生按钮去样式 ===== */
+.native-btn {
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  line-height: inherit;
+  font-size: inherit;
+  text-align: left;
+  border-radius: 0;
+}
+
+.native-btn::after {
+  border: none;
+}
+
+/* ===== 保存按钮 ===== */
 .save-section {
   margin-top: 60rpx;
   padding: 0 20rpx;
@@ -71,8 +93,6 @@
   height: 88rpx;
   line-height: 88rpx;
   text-align: center;
-  background: #e94560;
-  color: #fff;
   font-size: 30rpx;
   font-weight: 700;
   border-radius: 44rpx;

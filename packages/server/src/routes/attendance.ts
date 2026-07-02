@@ -98,7 +98,7 @@ router.get('/stats', authMiddleware, async (req: Request, res: Response) => {
 
     // 今日签到人次
     const todayRecords = await queryOne<{ count: string }>(
-      "SELECT COUNT(*) as count FROM attendance WHERE date(checkin_at) = date('now')"
+      "SELECT COUNT(*) as count FROM attendance WHERE date(checkin_at) = CURDATE()"
     );
 
     // 各赛场分布

@@ -1031,7 +1031,7 @@ router.get('/attendance/status', authMiddleware, async (req: Request, res: Respo
     // 查询今日签到
     const todayCheckin = await queryOne<any>(
       `SELECT id, checkin_at, checkout_at, venue_id FROM attendance
-       WHERE referee_id = $1 AND date(checkin_at) = date('now') ORDER BY checkin_at DESC LIMIT 1`,
+       WHERE referee_id = $1 AND date(checkin_at) = CURDATE() ORDER BY checkin_at DESC LIMIT 1`,
       [refereeId]
     );
 
@@ -1099,7 +1099,7 @@ router.post('/attendance/check-in', authMiddleware, async (req: Request, res: Re
     // 检查今日是否已签到
     const existing = await queryOne<any>(
       `SELECT id, checkout_at FROM attendance
-       WHERE referee_id = $1 AND date(checkin_at) = date('now')`,
+       WHERE referee_id = $1 AND date(checkin_at) = CURDATE()`,
       [refereeId]
     );
 
@@ -1174,7 +1174,7 @@ router.post('/attendance/check-out', authMiddleware, async (req: Request, res: R
     const now = new Date().toISOString();
 
     await execute(
-      `UPDATE attendance SET checkout_at = $1, gps_lat = COALESCE($2, gps_lat), gps_lng = COALESCE($3, gps_lng) WHERE referee_id = $4 AND date(checkin_at) = date('now') AND checkout_at IS NULL`,
+      `UPDATE attendance SET checkout_at = $1, gps_lat = COALESCE($2, gps_lat), gps_lng = COALESCE($3, gps_lng) WHERE referee_id = $4 AND date(checkin_at) = CURDATE() AND checkout_at IS NULL`,
       [now, finalLat, finalLng, refereeId]
     );
 
