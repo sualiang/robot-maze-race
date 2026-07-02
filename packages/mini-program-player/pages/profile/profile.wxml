@@ -43,14 +43,14 @@
   </view>
 
   <!-- ========== 模块3: 福利资产卡片 ========== -->
-  <view class="assets-card" bindtap="onAssetsTap">
-    <view class="assets-col">
+  <view class="assets-card">
+    <view class="assets-col" bindtap="onDeductTap">
       <text class="assets-number assets-number-red">¥{{assets.deductible}}</text>
       <text class="assets-label">参赛抵扣卡</text>
       <text class="assets-subtext">买参赛包直接抵扣</text>
     </view>
     <view class="assets-divider"></view>
-    <view class="assets-col">
+    <view class="assets-col" bindtap="onCouponTap">
       <text class="assets-number assets-number-gold">¥{{assets.couponTotal}}</text>
       <text class="assets-label">消费券</text>
       <text class="assets-subtext">满减/兑换通用</text>

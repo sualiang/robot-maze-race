@@ -170,12 +170,12 @@ Page({
   // ========== 参赛抵扣卡（Tab 0）点击 ==========
   onCardTap: function (e) {
     var item = e.currentTarget.dataset.item;
-    if (!item) return;
+    if (!item || !item.isDeduction) return;
+    wx.navigateTo({ url: "/pages/packages/packages" });
+  },
 
-    if (item.isDeduction) {
-      wx.switchTab({ url: '/pages/index/index' });
-    }
-    // 消费券不再走 actionSheet — 改为使用按钮触发
+  onUseDeduct: function () {
+    wx.navigateTo({ url: "/pages/packages/packages" });
   },
 
   // ========== 消费券「立即使用」按钮 ==========

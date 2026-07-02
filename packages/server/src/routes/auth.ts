@@ -143,28 +143,6 @@ router.post('/wx-login', async (req: Request, res: Response<ApiResponse<WxLoginR
 
     // 2. 查询或创建用户
     let user = await findUserByOpenid(openid);
-    let isNewUser = false;
-
-    if (!user) {
-      // 2a. 尝试用手机号查已有用户（绑定微信时用到）
-      const reqPhone = (req.body as any).phone || '';
-      if (reqPhone) {
-        user = await queryOne<User>(
-          `SELECT id, openid, unionid, nickname, avatar_url, phone, gender, role, race_count,
-                  total_race_time_ms, best_score_ms, created_at, updated_at
-           FROM users WHERE phone = $1 AND role = 'player'`,
-          [reqPhone]
-        );
-        if (user) {
-          // 已有账户，绑定新 openid 但不覆盖原 openid
-          await execute(
-            'UPDATE users SET unionid = COALESCE(NULLIF($1, \'\'), unionid), updated_at = datetime(\'now\') WHERE id = $2',
-            [unionid || null, user.id]
-          );
-          console.log('[Auth] wx-login bound openid to existing phone account:', reqPhone, 'userId:', user.id);
-        }
-      }
-    }
 
     if (!user) {
       const nickname = req.body.nickname || `玩家${Date.now().toString(36).slice(-6)}`;
@@ -176,11 +154,13 @@ router.post('/wx-login', async (req: Request, res: Response<ApiResponse<WxLoginR
         avatar_url: avatarUrl,
         role: UserRole.PLAYER,
       });
-      isNewUser = true;
 
       // 新用户注册赠送参赛抵扣金（通过 system_config 控制开关和金额，默认 1000分=10元）
       await grantFreeEntryDeduction(user.id);
     }
+
+    // 2a. is_new_user 依据 phone 是否有值判断（手机号是否已绑定）
+    const isNewUser = !user.phone || user.phone.trim() === '';
 
     // 3. 生成 JWT token
     const token = generateToken(user);
@@ -1093,8 +1073,14 @@ router.post('/decrypt-phone', authMiddleware, async (req: Request, res: Response
       return res.status(400).json({ code: 400, message: '缺少 code 参数', data: null });
     }
 
-    // 1. 获取 access_token
-    const accessToken = await getAccessToken();
+    // 1. 获取小程序 access_token（小程序的 getPhoneNumber 需要小程序 token）
+    const mpTokenUrl = `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${config.wechat.appId}&secret=${config.wechat.appSecret}`;
+    const mpTokenResp = await fetch(mpTokenUrl);
+    const mpTokenData = await mpTokenResp.json() as any;
+    if (mpTokenData.errcode) {
+      throw new Error(`获取小程序 access_token 失败: ${mpTokenData.errmsg} (errcode=${mpTokenData.errcode})`);
+    }
+    const accessToken = mpTokenData.access_token;
 
     // 2. 调用微信接口换取手机号
     const url = `https://api.weixin.qq.com/wxa/business/getuserphonenumber?access_token=${accessToken}`;
@@ -1121,8 +1107,8 @@ router.post('/decrypt-phone', authMiddleware, async (req: Request, res: Response
     // 3. 更新当前用户的手机号
     const userId = req.user!.userId;
     await execute(
-      `UPDATE users SET phone = $1, updated_at = $2 WHERE id = $3`,
-      [phone, new Date().toISOString(), userId]
+      `UPDATE users SET phone = $1, updated_at = NOW() WHERE id = $2`,
+      [phone, userId]
     );
 
     return res.json({ code: 0, message: '手机号解密成功', data: { phone } });
@@ -1133,6 +1119,141 @@ router.post('/decrypt-phone', authMiddleware, async (req: Request, res: Response
       message: error.message || '手机号解密失败',
       data: null,
     });
+  }
+});
+
+/**
+ * POST /api/v1/auth/upload-avatar
+ * 上传头像（base64），返回图片 URL
+ */
+router.post('/upload-avatar', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const { image } = req.body;
+
+    if (!image) {
+      return res.status(400).json({ code: 400, message: '缺少图片数据', data: null });
+    }
+
+    const matches = String(image).match(/^data:image\/(png|jpeg|jpg|gif|webp);base64,(.+)$/);
+    if (!matches) {
+      return res.status(400).json({ code: 400, message: '图片格式不合法', data: null });
+    }
+
+    const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1];
+    const buffer = Buffer.from(matches[2], 'base64');
+    const filename = `avatar_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+    const uploadsDir = path.resolve(process.cwd(), 'uploads');
+    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+    fs.writeFileSync(path.join(uploadsDir, filename), buffer);
+
+    const url = `/uploads/${filename}`;
+    return res.json({ code: 0, message: '上传成功', data: { url } });
+  } catch (error: any) {
+    console.error('[Auth] upload-avatar error:', error.message);
+    return res.status(500).json({ code: 500, message: '头像上传失败', data: null });
+  }
+});
+
+/**
+ * GET /api/v1/auth/mp-oauth/authorize
+ * 微信服务号 OAuth 授权入口 — 302 跳转到微信授权页面
+ * 前端点击"微信授权登录"按钮后跳转至此，由后端拼接完整授权 URL 并重定向
+ */
+router.get('/mp-oauth/authorize', (_req: Request, res: Response) => {
+  const { appId } = config.wechatMp;
+
+  if (!appId) {
+    return res.status(500).json({ code: 500, message: '微信服务号未配置', data: null });
+  }
+
+  // 回调地址：前端裁判登录页
+  const redirectUri = encodeURIComponent(
+    `${_req.protocol}://${_req.get('host')}/referee/login`
+  );
+
+  const wxAuthUrl =
+    `https://open.weixin.qq.com/connect/oauth2/authorize?` +
+    `appid=${appId}&` +
+    `redirect_uri=${redirectUri}&` +
+    `response_type=code&` +
+    `scope=snsapi_userinfo&` +
+    `state=referee_login#wechat_redirect`;
+
+  res.redirect(wxAuthUrl);
+});
+
+/**
+ * GET /api/v1/auth/mp-oauth
+ * 微信服务号 OAuth 回调 — 用 code 换 openid，查/建用户，返回 JWT
+ * @query code - 微信 OAuth 授权回调携带的 code
+ * @returns { token, user }
+ */
+router.get('/mp-oauth', async (req: Request, res: Response) => {
+  try {
+    const { code } = req.query;
+
+    if (!code || typeof code !== 'string') {
+      return res.status(400).json({ code: 400, message: '缺少授权码 code', data: null });
+    }
+
+    // 1. 用 code 换取 access_token 和 openid
+    let openid: string;
+    let unionid: string | undefined;
+
+    // 模拟模式
+    if (code === 'dev-test-code' || !config.wechatMp.appId) {
+      openid = `mp_dev_openid_${Date.now()}`;
+      unionid = undefined;
+    } else {
+      const { appId, appSecret } = config.wechatMp;
+      const wxUrl = `https://api.weixin.qq.com/sns/oauth2/access_token?appid=${appId}&secret=${appSecret}&code=${code}&grant_type=authorization_code`;
+
+      const wxResp = await fetch(wxUrl);
+      const wxData = (await wxResp.json()) as any;
+
+      if (wxData.errcode) {
+        console.error('[Auth] mp-oauth 微信返回错误:', wxData);
+        return res.status(400).json({
+          code: 400,
+          message: `微信授权失败: ${wxData.errmsg || '未知错误'}`,
+          data: null,
+        });
+      }
+
+      openid = wxData.openid;
+      unionid = wxData.unionid;
+    }
+
+    if (!openid) {
+      return res.status(400).json({ code: 400, message: '未能获取 openid', data: null });
+    }
+
+    // 2. 查找或创建用户
+    let user = await findUserByOpenid(openid);
+
+    if (!user) {
+      const nickname = `裁判${Date.now().toString(36).slice(-6)}`;
+      user = await createUser({
+        openid,
+        unionid,
+        nickname,
+        role: UserRole.REFEREE,
+      });
+    }
+
+    // 3. 生成 JWT
+    const token = generateToken(user);
+
+    return res.json({
+      code: 0,
+      message: '登录成功',
+      data: { token, user },
+    });
+  } catch (error: any) {
+    console.error('[Auth] mp-oauth error:', error.message);
+    return res.status(500).json({ code: 500, message: error.message || '登录失败', data: null });
   }
 });
 

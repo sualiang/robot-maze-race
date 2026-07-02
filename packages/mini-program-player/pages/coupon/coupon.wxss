@@ -219,15 +219,34 @@
   margin-top: 14rpx;
   display: flex;
   justify-content: flex-end;
+  position: relative;
+  z-index: 10;
 }
 .cc-action-btn-text {
   font-size: 24rpx;
-  padding: 8rpx 24rpx;
+  padding: 16rpx 32rpx;
   border-radius: 24rpx;
 }
 .cc-action-deduct {
   background: rgba(245, 158, 11, 0.15);
   color: #F59E0B;
+}
+/* button 覆盖样式 */
+.cc-action-deduct-btn {
+  font-size: 24rpx !important;
+  padding: 8rpx 24rpx !important;
+  background: rgba(245, 158, 11, 0.15) !important;
+  color: #F59E0B !important;
+  border: none !important;
+  border-radius: 24rpx !important;
+  line-height: 1.4 !important;
+  margin: 0 !important;
+  text-align: center !important;
+  display: inline-block !important;
+  width: auto !important;
+}
+.cc-action-deduct-btn::after {
+  border: none !important;
 }
 
 /* ============================================================== */

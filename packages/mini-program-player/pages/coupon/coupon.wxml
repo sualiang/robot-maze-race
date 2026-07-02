@@ -36,7 +36,7 @@
       <view wx:if="{{item.isDeduction}}"
         class="cc-card {{item.status === 0 ? 'cc-card-inactive' : ''}}"
         data-item="{{item}}"
-        bindtap="onCardTap"
+        bind:tap="onCardTap"
       >
         <view class="cc-card-accent {{item.status === 0 ? 'cc-accent-inactive' : 'cc-accent-gold'}}"></view>
         <view class="cc-card-body">
@@ -63,7 +63,7 @@
               <text class="cc-info-value">{{item.expiresAt || '长期有效'}}</text>
             </view>
           </view>
-          <view class="cc-card-action" wx:if="{{item.status === 1}}">
+          <view class="cc-card-action" wx:if="{{item.status === 1}}" bindtap="onUseDeduct">
             <text class="cc-action-btn-text cc-action-deduct">立即使用 ›</text>
           </view>
         </view>

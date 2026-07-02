@@ -1,5 +1,5 @@
 // 玩家端 - API请求封装
-const BASE_URL = 'http://175.24.200.63/api/v1';
+const BASE_URL = 'https://amberrobot.com.cn/api/v1';
 
 var loadingCount = 0;
 

@@ -211,7 +211,7 @@ router.get('/:type', authMiddleware, async (req: Request, res: Response) => {
     let params: any[];
 
     if (type === 'total') {
-      params = [userId, season.startTime];
+      params = [season.startTime];
       rows = await query<any>(
         `SELECT
            u.id as user_id,
@@ -224,10 +224,11 @@ router.get('/:type', authMiddleware, async (req: Request, res: Response) => {
          WHERE rr.status = 'completed'
            AND rr.score_ms IS NOT NULL
            AND rr.score_ms > 0
-           AND rr.finished_at >= $2
+           AND rr.finished_at >= $1
          GROUP BY rr.user_id
          ORDER BY best_score ASC
-         LIMIT 100`
+         LIMIT 100`,
+        [season.startTime]
       );
     } else {
       params = [userId];

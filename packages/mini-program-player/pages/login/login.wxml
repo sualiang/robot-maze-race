@@ -15,15 +15,9 @@
         disabled="{{loading}}"
         bindtap="doWxLogin"
       >
-        <text class="wx-login-icon">🔐</text>
+        <image class="wx-login-icon" src="/assets/images/wechat-icon.svg" mode="aspectFit" />
         <text>{{loading ? '登录中...' : '微信一键登录'}}</text>
       </button>
-
-      <!-- 注册链接 -->
-      <view class="register-area">
-        <text class="register-text">新用户？</text>
-        <text class="register-link" bindtap="doRegister">完善资料</text>
-      </view>
     </view>
   </view>
 </view>

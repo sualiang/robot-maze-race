@@ -83,15 +83,12 @@ Page({
 
           wx.showToast({ title: '登录成功', icon: 'success', duration: 1500 });
 
-          // 判断是否已完善个人信息：有 nickname 表示已完善
-          var hasProfile = d.user && d.user.nickname && d.user.nickname.trim() !== '';
-
           setTimeout(function () {
-            if (!hasProfile) {
-              // 新用户 → 跳编辑个人信息页
+            if (d.is_new_user === true) {
+              // 新用户（未绑定手机号）→ 编辑资料页
               wx.redirectTo({ url: '/pages/edit-profile/edit-profile' });
             } else {
-              // 老用户 → 直接跳首页
+              // 老用户（已绑定手机号）→ 首页
               that.handleRedirect();
             }
           }, 1500);

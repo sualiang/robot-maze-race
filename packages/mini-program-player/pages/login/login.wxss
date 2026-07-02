@@ -93,11 +93,12 @@
   border-radius: 48rpx;
   font-size: var(--font-xl);
   font-weight: 600;
-  letter-spacing: 4rpx;
+  letter-spacing: 2rpx;
   border: none;
   margin-top: var(--space-lg);
   box-shadow: 0 4rpx 20rpx rgba(7, 193, 96, 0.35);
   transition: opacity 0.2s, transform 0.15s;
+  white-space: nowrap;
 }
 
 .wx-login-btn:active {
@@ -113,30 +114,9 @@
 }
 
 .wx-login-icon {
-  font-size: 36rpx;
-  margin-right: 12rpx;
-}
-
-/* ===== 注册链接 ===== */
-.register-area {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin-top: var(--space-xl);
-  padding-bottom: 20rpx;
-}
-
-.register-text {
-  font-size: var(--font-base);
-  color: var(--color-text-secondary);
-}
-
-.register-link {
-  font-size: var(--font-base);
-  color: #07C160;
-  margin-left: 6rpx;
-  font-weight: 500;
-  padding: 4rpx 8rpx;
+  width: 40rpx;
+  height: 40rpx;
+  margin-right: 16rpx;
 }
 
 /* ===== 辅助类 ===== */

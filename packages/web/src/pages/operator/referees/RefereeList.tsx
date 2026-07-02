@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Card, Table, Button, Space, Tag, Modal, Select, Popconfirm,
-  message, Input, Descriptions, Badge, Form,
+  message, Input, Descriptions, Badge,
 } from 'antd';
 import {
   CheckOutlined, CloseOutlined, EyeOutlined, KeyOutlined, ReloadOutlined,
@@ -55,13 +55,12 @@ export default function RefereeList() {
   const [bindVenueOpen, setBindVenueOpen] = useState(false);
   const [bindTarget, setBindTarget] = useState<RefereeItem | null>(null);
   const [bindVenueId, setBindVenueId] = useState<string>('');
-  const [createdResult, setCreatedResult] = useState<any>(null);
+
   const [searchName, setSearchName] = useState('');
 
-  // 新建裁判弹窗
-  const [createOpen, setCreateOpen] = useState(false);
-  const [createForm, setCreateForm] = useState({ name: '', phone: '', venue_id: '' });
-  const [creating, setCreating] = useState(false);
+  // 邀请裁判弹窗
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [accountInfo, setAccountInfo] = useState<{ account: string; password: string } | null>(null);
 
   const fetchList = useCallback(async () => {
@@ -86,27 +85,16 @@ export default function RefereeList() {
 
   useEffect(() => { fetchList(); fetchVenues(); }, [fetchList, fetchVenues]);
 
-  const handleCreate = async () => {
-    if (!createForm.name || !createForm.phone) {
-      message.warning('请填写裁判姓名和手机号');
-      return;
-    }
-    setCreating(true);
+  const refereeApplyUrl = 'https://robotmaze.cn/referee/apply';
+
+  const handleCopyLink = async () => {
     try {
-      const res: any = await api.post('/referees/create-by-operator', {
-        name: createForm.name,
-        phone: createForm.phone,
-        venue_id: createForm.venue_id || undefined,
-      });
-      setCreateOpen(false);
-      setAccountInfo({ account: res.phone, password: res.init_password });
-      message.success(`裁判 ${res.name} 创建成功`);
-      setCreateForm({ name: '', phone: '', venue_id: '' });
-      fetchList();
-    } catch (e: any) {
-      message.error(e.message || '创建失败');
-    } finally {
-      setCreating(false);
+      await navigator.clipboard.writeText(refereeApplyUrl);
+      setCopied(true);
+      message.success('链接已复制');
+      setTimeout(() => setCopied(false), 3000);
+    } catch {
+      message.error('复制失败，请手动复制');
     }
   };
 
@@ -236,8 +224,8 @@ export default function RefereeList() {
               allowClear
             />
 
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => { setCreateOpen(true); setCreatedResult(null); }}>
-              新建裁判
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setInviteOpen(true)}>
+              邀请裁判
             </Button>
             <Button icon={<ReloadOutlined />} onClick={fetchList}>刷新</Button>
           </Space>
@@ -253,55 +241,33 @@ export default function RefereeList() {
         />
       </Card>
 
-      {/* 新建裁判弹窗 */}
+      {/* 邀请裁判弹窗 */}
       <Modal
-        title="新建裁判"
-        open={createOpen}
-        onCancel={() => { setCreateOpen(false); }}
+        title="邀请裁判注册"
+        open={inviteOpen}
+        onCancel={() => { setInviteOpen(false); setCopied(false); }}
         footer={
-          <Space>
-            <Button onClick={() => { setCreateOpen(false); }}>取消</Button>
-            <Button type="primary" loading={creating} onClick={handleCreate}>
-              创建裁判
-            </Button>
-          </Space>
+          <Button onClick={() => { setInviteOpen(false); setCopied(false); }}>关闭</Button>
         }
       >
-        <Space direction="vertical" style={{ width: '100%' }}>
-          <Form.Item label="说明">
-            <span style={{ color: '#888', fontSize: 13 }}>创建后系统将自动生成随机密码，裁判首次登录时可设置用户名和修改密码</span>
-          </Form.Item>
-          <div>
-            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>裁判姓名 *</label>
-            <Input
-              placeholder="请输入裁判姓名"
-              value={createForm.name}
-              onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
-            />
-          </div>
-          <div>
-            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>登录账号 *</label>
-            <Input
-              placeholder="请用手机号码注册"
-              value={createForm.phone}
-              onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value })}
-            />
-          </div>
-          <div>
-            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>绑定赛场（可选）</label>
-            <Select
-              showSearch
-              placeholder="选择赛场"
-              style={{ width: '100%' }}
-              value={createForm.venue_id || undefined}
-              onChange={(v) => setCreateForm({ ...createForm, venue_id: v })}
-              options={venues.map((v) => ({ value: v.id, label: v.name }))}
-              filterOption={(input, option) =>
-                (option?.label as string)?.includes(input) ?? false
-              }
-              allowClear
-            />
-          </div>
+        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+          <p style={{ color: '#666', fontSize: 14, lineHeight: 1.8, margin: 0 }}>
+            请将下方链接发送给需要注册的裁判，对方打开链接后可微信快捷登录并提交注册申请。
+          </p>
+          <Input
+            value={refereeApplyUrl}
+            readOnly
+            style={{ background: '#f5f5f5' }}
+            suffix={
+              <Button
+                type="link"
+                icon={<CopyOutlined />}
+                onClick={handleCopyLink}
+              >
+                {copied ? '已复制' : '复制链接'}
+              </Button>
+            }
+          />
         </Space>
       </Modal>
 

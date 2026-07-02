@@ -65,19 +65,18 @@ Page({
       return;
     }
 
-    if (!detail.encryptedData || !detail.iv) {
+    // 新版获取手机号：直接拿 code，后端用 code 换手机号
+    if (!detail.code) {
       wx.showToast({ title: '获取手机号失败', icon: 'none' });
       return;
     }
 
-    // 调用后端解密手机号
     wx.showLoading({ title: '获取中...', mask: true });
     request.post('/auth/decrypt-phone', {
-      encryptedData: detail.encryptedData,
-      iv: detail.iv
+      code: detail.code
     }).then(function (d) {
       wx.hideLoading();
-      var phone = (d && d.phoneNumber) || '';
+      var phone = (d && d.phone) || '';
       if (phone) {
         that.setData({ phone: phone });
         wx.showToast({ title: '手机号已获取', icon: 'success', duration: 1000 });
@@ -111,30 +110,43 @@ Page({
     if (this.data.nickname) data.nickname = this.data.nickname;
     data.gender = this.data.gender || '';
     if (this.data.phone) data.phone = this.data.phone;
-    if (this.data.avatarBase64) data.avatarUrl = this.data.avatarBase64;
 
     wx.showLoading({ title: '保存中...', mask: true });
 
-    request.post('/player/me/profile', data).then(function () {
-      wx.hideLoading();
+    function doSave() {
+      request.post('/player/me/profile', data).then(function () {
+        wx.hideLoading();
 
-      // 更新本地缓存
-      var user = storage.getSync(storage.STORAGE_KEYS.USER, {});
-      var merged = Object.assign({}, user, data);
-      // 前端显示用本地路径（临时），不存 base64 到缓存
-      if (that.data.avatar) merged.avatar_url = that.data.avatar;
-      storage.setSync(storage.STORAGE_KEYS.USER, merged);
-      app.globalData.userInfo = merged;
+        var user = storage.getSync(storage.STORAGE_KEYS.USER, {});
+        var merged = Object.assign({}, user, data);
+        if (that.data.avatar) merged.avatar_url = that.data.avatar;
+        storage.setSync(storage.STORAGE_KEYS.USER, merged);
+        app.globalData.userInfo = merged;
 
-      wx.showToast({ title: '保存成功', icon: 'success', duration: 1500 });
-      setTimeout(function () {
-        // 保存后跳首页
-        wx.switchTab({ url: '/pages/index/index' });
-      }, 1500);
-    }).catch(function (err) {
-      wx.hideLoading();
-      var msg = (err && err.message) || '保存失败';
-      wx.showToast({ title: msg, icon: 'none', duration: 2000 });
-    });
+        wx.showToast({ title: '保存成功', icon: 'success', duration: 1500 });
+        setTimeout(function () {
+          wx.navigateBack();
+        }, 1500);
+      }).catch(function (err) {
+        wx.hideLoading();
+        var msg = (err && err.message) || '保存失败';
+        wx.showToast({ title: msg, icon: 'none', duration: 2000 });
+      });
+    }
+
+    // 有头像 base64 数据，先上传
+    if (this.data.avatarBase64) {
+      request.post('/auth/upload-avatar', { image: this.data.avatarBase64 }).then(function (res) {
+        if (res && res.url) {
+          // 后端返回相对路径 /uploads/xxx.jpg，拼完整 URL 存库
+          data.avatarUrl = 'https://amberrobot.com.cn' + res.url;
+        }
+        doSave();
+      }).catch(function () {
+        doSave();
+      });
+    } else {
+      doSave();
+    }
   }
 });

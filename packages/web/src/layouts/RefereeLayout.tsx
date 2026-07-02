@@ -13,9 +13,10 @@ export default function RefereeLayout() {
   const location = useLocation();
   const [showTabs, setShowTabs] = useState(true);
 
-  // 登录页不显示底部Tab
+  // 登录页和注册申请页不显示底部Tab
   useEffect(() => {
-    setShowTabs(location.pathname !== '/referee/login');
+    const noTabPaths = ['/referee/login', '/referee/apply'];
+    setShowTabs(!noTabPaths.includes(location.pathname));
   }, [location.pathname]);
 
   return (

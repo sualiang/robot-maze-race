@@ -49,6 +49,7 @@ import OperatorMerchantList from '../pages/operator/merchant/MerchantList';
 
 // 裁判端页面
 const RefereeLoginPage = React.lazy(() => import('../pages/referee/LoginPage'));
+const RefereeApplyPage = React.lazy(() => import('../pages/referee/ApplyPage'));
 const RefereeMatchPage = React.lazy(() => import('../pages/referee/MatchPage'));
 const RefereeAttendancePage = React.lazy(() => import('../pages/referee/AttendancePage'));
 const RefereeHistoryPage = React.lazy(() => import('../pages/referee/HistoryPage'));
@@ -118,6 +119,7 @@ export default function AppRouter() {
       <Route path="/referee" element={<RefereeLayout />}>
         <Route index element={<Navigate to="/referee/match" replace />} />
         <Route path="login" element={<Suspended><RefereeLoginPage /></Suspended>} />
+        <Route path="apply" element={<Suspended><RefereeApplyPage /></Suspended>} />
         <Route path="match" element={<Suspended><RefereeMatchPage /></Suspended>} />
         <Route path="attendance" element={<RefereeAttendancePage />} />
         <Route path="history" element={<RefereeHistoryPage />} />

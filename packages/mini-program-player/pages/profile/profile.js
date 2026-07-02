@@ -44,6 +44,10 @@ Page({
   },
 
   onShow: function () {
+    if (!app.globalData.isLoggedIn) {
+      wx.redirectTo({ url: '/pages/login/login' });
+      return;
+    }
     this.loadData();
   },
 
@@ -130,8 +134,13 @@ Page({
     wx.switchTab({ url: '/pages/index/index' });
   },
 
-  // 跳转卡券页（消费券 → Tab 1 立减券）
-  onAssetsTap: function () {
+  // 跳转卡券页 — 参赛抵扣卡 → Tab 0
+  onDeductTap: function () {
+    wx.navigateTo({ url: '/pages/coupon/coupon?tab=0' });
+  },
+
+  // 跳转卡券页 — 消费券 → Tab 1 立减券
+  onCouponTap: function () {
     wx.navigateTo({ url: '/pages/coupon/coupon?tab=1' });
   },
 
