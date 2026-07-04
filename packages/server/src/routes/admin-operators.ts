@@ -159,13 +159,18 @@ router.post('/', authMiddleware, checkPermission('operators:create'), async (req
     }
 
     // 读取系统默认分润比例（兼容 setting_key/setting_value 和 key/value 两种列名）
-    let defaultProfitSetting = await queryOne<any>(
-      `SELECT \`value\` FROM settings WHERE \`key\` = 'default_profit_share_rate'`
-    );
-    if (!defaultProfitSetting) {
+    let defaultProfitSetting = null;
+    try {
       defaultProfitSetting = await queryOne<any>(
-        `SELECT setting_value AS \`value\` FROM settings WHERE setting_key = 'default_profit_share_rate'`
+        `SELECT \`value\` FROM settings WHERE \`key\` = 'default_profit_share_rate'`
       );
+    } catch { /* fallthrough */ }
+    if (!defaultProfitSetting) {
+      try {
+        defaultProfitSetting = await queryOne<any>(
+          `SELECT setting_value AS \`value\` FROM settings WHERE setting_key = 'default_profit_share_rate'`
+        );
+      } catch { /* fallthrough */ }
     }
     const defaultProfitRate = defaultProfitSetting ? parseInt(defaultProfitSetting.value, 10) : 80;
 
@@ -286,13 +291,18 @@ router.put('/:id', authMiddleware, checkPermission('operators:edit'), async (req
     }
 
     // 读取系统默认分润比例（兼容两种列名）
-    let defProfitSetting = await queryOne<any>(
-      `SELECT \`value\` FROM settings WHERE \`key\` = 'default_profit_share_rate'`
-    );
-    if (!defProfitSetting) {
+    let defProfitSetting = null;
+    try {
       defProfitSetting = await queryOne<any>(
-        `SELECT setting_value AS \`value\` FROM settings WHERE setting_key = 'default_profit_share_rate'`
+        `SELECT \`value\` FROM settings WHERE \`key\` = 'default_profit_share_rate'`
       );
+    } catch { /* fallthrough */ }
+    if (!defProfitSetting) {
+      try {
+        defProfitSetting = await queryOne<any>(
+          `SELECT setting_value AS \`value\` FROM settings WHERE setting_key = 'default_profit_share_rate'`
+        );
+      } catch { /* fallthrough */ }
     }
     const defaultProfitRate = defProfitSetting ? parseInt(defProfitSetting.value, 10) : 80;
 
@@ -446,8 +456,9 @@ router.delete('/:id', authMiddleware, checkPermission('operators:delete'), async
       // 删除关联的管理员账号
       await tx.query('DELETE FROM admin_users WHERE operator_id = $1', [id]);
 
-      // 删除会话和日志（auth_sessions 表可能不存在，用 try-catch 包裹）
+      // 删除会话和日志（auth_sessions / client_logs 表可能不存在或缺少 operator_id 列）
       try { await tx.query('DELETE FROM auth_sessions WHERE operator_id = $1', [id]); } catch { /* ignore if table not exists */ }
+      try { await tx.query('DELETE FROM client_logs WHERE operator_id = $1', [id]); } catch { /* ignore if column not exists */ }
       await tx.query('DELETE FROM operator_members WHERE operator_id = $1', [id]);
       await tx.query('DELETE FROM operator_sessions WHERE operator_id = $1', [id]);
       await tx.query('DELETE FROM client_logs WHERE operator_id = $1', [id]);
