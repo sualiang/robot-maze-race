@@ -461,7 +461,6 @@ router.delete('/:id', authMiddleware, checkPermission('operators:delete'), async
       try { await tx.query('DELETE FROM client_logs WHERE operator_id = $1', [id]); } catch { /* ignore if column not exists */ }
       await tx.query('DELETE FROM operator_members WHERE operator_id = $1', [id]);
       await tx.query('DELETE FROM operator_sessions WHERE operator_id = $1', [id]);
-      await tx.query('DELETE FROM client_logs WHERE operator_id = $1', [id]);
 
       // 删除场馆及相关数据
       const venuesRs = await tx.query('SELECT id FROM venues WHERE operator_id = $1', [id]);
