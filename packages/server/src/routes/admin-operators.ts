@@ -158,10 +158,15 @@ router.post('/', authMiddleware, checkPermission('operators:create'), async (req
       return res.status(400).json({ code: 400, message: '该手机号已被使用', data: null });
     }
 
-    // 读取系统默认分润比例
-    const defaultProfitSetting = await queryOne<{ value: string }>(
-      `SELECT value FROM settings WHERE \`key\` = 'default_profit_share_rate'`
+    // 读取系统默认分润比例（兼容 setting_key/setting_value 和 key/value 两种列名）
+    let defaultProfitSetting = await queryOne<any>(
+      `SELECT \`value\` FROM settings WHERE \`key\` = 'default_profit_share_rate'`
     );
+    if (!defaultProfitSetting) {
+      defaultProfitSetting = await queryOne<any>(
+        `SELECT setting_value AS \`value\` FROM settings WHERE setting_key = 'default_profit_share_rate'`
+      );
+    }
     const defaultProfitRate = defaultProfitSetting ? parseInt(defaultProfitSetting.value, 10) : 80;
 
     // 生成随机密码 8位
@@ -280,21 +285,26 @@ router.put('/:id', authMiddleware, checkPermission('operators:edit'), async (req
       return res.status(404).json({ code: 404, message: '运营商不存在', data: null });
     }
 
-    // 读取系统默认分润比例
-    const defProfitSetting = await queryOne<{ value: string }>(
-      `SELECT value FROM settings WHERE \`key\` = 'default_profit_share_rate'`
+    // 读取系统默认分润比例（兼容两种列名）
+    let defProfitSetting = await queryOne<any>(
+      `SELECT \`value\` FROM settings WHERE \`key\` = 'default_profit_share_rate'`
     );
+    if (!defProfitSetting) {
+      defProfitSetting = await queryOne<any>(
+        `SELECT setting_value AS \`value\` FROM settings WHERE setting_key = 'default_profit_share_rate'`
+      );
+    }
     const defaultProfitRate = defProfitSetting ? parseInt(defProfitSetting.value, 10) : 80;
 
-    const operator = await queryOne<Operator>(
+    // MySQL 不支持 RETURNING，先 UPDATE 再 SELECT
+    await query(
       `UPDATE operators
        SET name = $1, phone = $2, contact_phone = $3, email = $4, company_name = $5,
            profit_share_rate = $6, bank_account = $7, bank_name = $8,
            contact_person = $9, status = $10,
            province = $11, city = $12, district = $13, company_address = $14,
            updated_at = NOW()
-       WHERE id = $15
-       RETURNING ${SELECT_FIELDS}`,
+       WHERE id = $15`,
       [
         name,
         phone || null,
@@ -314,9 +324,13 @@ router.put('/:id', authMiddleware, checkPermission('operators:edit'), async (req
       ]
     );
 
-    // 注意：PUT 编辑时不会覆盖 operator_username / operator_password_hash
-
-    return res.json({ code: 0, message: '运营商更新成功', data: operator! });
+    // MySQL 不支持 RETURNING，手动 SELECT 返回更新后的数据
+    const updated = await queryOne<Operator>(
+      `SELECT ${SELECT_FIELDS} FROM operators WHERE id = $1`,
+      [id]
+    );
+    
+    return res.json({ code: 0, message: '运营商更新成功', data: updated! });
   } catch (error: any) {
     console.error('[AdminOperators] update error:', error.message);
     return res.status(500).json({ code: 500, message: '更新运营商失败', data: null });
@@ -345,11 +359,15 @@ router.patch('/:id', authMiddleware, checkPermission('operators:edit'), async (r
       return res.status(404).json({ code: 404, message: '运营商不存在', data: null });
     }
 
-    const operator = await queryOne<Operator>(
+    // MySQL 不支持 RETURNING，先 UPDATE 再 SELECT
+    await query(
       `UPDATE operators SET status = $1, updated_at = NOW()
-       WHERE id = $2
-       RETURNING ${SELECT_FIELDS}`,
+       WHERE id = $2`,
       [status, id]
+    );
+    const operator = await queryOne<Operator>(
+      `SELECT ${SELECT_FIELDS} FROM operators WHERE id = $1`,
+      [id]
     );
 
     return res.json({ code: 0, message: '运营商状态已更新', data: operator! });
@@ -369,24 +387,31 @@ router.post('/:id/reset-password', authMiddleware, async (req: Request, res: Res
   try {
     const { id } = req.params;
 
-    // 查找该运营商的 admin_users
-    const adminUser = await queryOne<{ id: string; username: string }>(
-      'SELECT id, username FROM admin_users WHERE operator_id = $1 ORDER BY created_at ASC LIMIT 1',
+    // 先确认运营商存在
+    const operator = await queryOne<{ id: string; operator_username: string }>(
+      'SELECT id, operator_username FROM operators WHERE id = $1',
       [id]
     );
-    if (!adminUser) {
-      return res.status(404).json({ code: 404, message: '未找到该运营商的账号', data: null });
+    if (!operator) {
+      return res.status(404).json({ code: 404, message: '运营商不存在', data: null });
     }
 
     const plainPassword = generateSecurePassword();
     const hashedPassword = bcrypt.hashSync(plainPassword, 10);
 
-    await query(
-      'UPDATE admin_users SET password = $1, first_login = 1 WHERE id = $2',
-      [hashedPassword, adminUser.id]
+    // 尝试更新 admin_users（可能没有 operator_id 关联，改用 operator_username 匹配）
+    const adminUser = await queryOne<{ id: string }>(
+      'SELECT id FROM admin_users WHERE operator_id = $1 OR username = $2 ORDER BY created_at ASC LIMIT 1',
+      [id, operator.operator_username]
     );
+    if (adminUser) {
+      await query(
+        'UPDATE admin_users SET password = $1, first_login = 1 WHERE id = $2',
+        [hashedPassword, adminUser.id]
+      );
+    }
 
-    // 同时更新 operators 表的密码（operator login 使用此表的密码）
+    // 更新 operators 表的密码
     await query(
       'UPDATE operators SET operator_password_hash = $1, password_change_required = 1 WHERE id = $2',
       [hashedPassword, id]
@@ -395,7 +420,7 @@ router.post('/:id/reset-password', authMiddleware, async (req: Request, res: Res
     return res.json({
       code: 0,
       message: '密码重置成功',
-      data: { account: adminUser.username, password: plainPassword }
+      data: { account: operator.operator_username, password: plainPassword }
     });
 
   } catch (error: any) {
@@ -421,8 +446,8 @@ router.delete('/:id', authMiddleware, checkPermission('operators:delete'), async
       // 删除关联的管理员账号
       await tx.query('DELETE FROM admin_users WHERE operator_id = $1', [id]);
 
-      // 删除会话和日志
-      await tx.query('DELETE FROM auth_sessions WHERE operator_id = $1', [id]);
+      // 删除会话和日志（auth_sessions 表可能不存在，用 try-catch 包裹）
+      try { await tx.query('DELETE FROM auth_sessions WHERE operator_id = $1', [id]); } catch { /* ignore if table not exists */ }
       await tx.query('DELETE FROM operator_members WHERE operator_id = $1', [id]);
       await tx.query('DELETE FROM operator_sessions WHERE operator_id = $1', [id]);
       await tx.query('DELETE FROM client_logs WHERE operator_id = $1', [id]);
