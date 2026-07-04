@@ -218,18 +218,18 @@ export default function OperatorManage() {
   } : () => {};
 
   const handleSave = async () => {
-    const values = await form.validateFields();
-    // 从 Cascader 数组拆出省/市/区
-    const provPath = values.province_path || [];
-    const payload = {
-      ...values,
-      province: provPath[0] || '',
-      city: provPath[1] || '',
-      district: provPath[2] || '',
-    };
-    delete payload.province_path;
-
     try {
+      const values = await form.validateFields();
+      // 从 Cascader 数组拆出省/市/区
+      const provPath = values.province_path || [];
+      const payload = {
+        ...values,
+        province: provPath[0] || '',
+        city: provPath[1] || '',
+        district: provPath[2] || '',
+      };
+      delete payload.province_path;
+
       if (editingId) {
         await api.put(`/admin/operators/${editingId}`, payload);
         message.success('更新成功');
@@ -241,7 +241,16 @@ export default function OperatorManage() {
       }
       setModalOpen(false);
       fetchList();
-    } catch { message.error('操作失败'); }
+    } catch (err: any) {
+      if (err && typeof err === 'object' && Object.keys(err).length === 0) {
+        // Ant Design form.validateFields() 校验失败抛出空对象 {}
+        console.warn('[OperatorManage] 表单校验未通过，请检查必填项');
+        message.warning('请检查表单填写内容');
+      } else {
+        const msg = err?.message || (typeof err === 'string' ? err : '操作失败');
+        message.error(msg);
+      }
+    }
   };
 
   const handleToggleStatus = canOperate ? async (record: OperatorItem) => {
@@ -317,7 +326,10 @@ export default function OperatorManage() {
                   await api.delete(`/admin/operators/${record.id}`);
                   message.success('已删除');
                   fetchList();
-                } catch { message.error('删除失败'); }
+                } catch (err: any) {
+                  const msg = err?.message || err?.response?.data?.message || '删除失败';
+                  message.error(msg);
+                }
               }}
             >
               <Button type="link" size="small" danger icon={<DeleteOutlined />}>
@@ -329,7 +341,10 @@ export default function OperatorManage() {
             try {
               const res: any = await api.post(`/admin/operators/${record.id}/reset-password`);
               setAccountInfo({ account: res.account, password: res.password });
-            } catch { message.error('密码重置失败'); }
+            } catch (err: any) {
+              const msg = err?.message || '密码重置失败';
+              message.error(msg);
+            }
           }}>
             重置密码
           </Button>

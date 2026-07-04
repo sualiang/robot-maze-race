@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
-import { query, queryOne, generateSecurePassword } from '../config/database';
+import { query, queryOne, transaction, generateSecurePassword } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import { checkPermission } from '../middleware/rbac';
 
@@ -386,6 +386,12 @@ router.post('/:id/reset-password', authMiddleware, async (req: Request, res: Res
       [hashedPassword, adminUser.id]
     );
 
+    // 同时更新 operators 表的密码（operator login 使用此表的密码）
+    await query(
+      'UPDATE operators SET operator_password_hash = $1, password_change_required = 1 WHERE id = $2',
+      [hashedPassword, id]
+    );
+
     return res.json({
       code: 0,
       message: '密码重置成功',
@@ -410,44 +416,54 @@ router.delete('/:id', authMiddleware, checkPermission('operators:delete'), async
       return res.status(404).json({ code: 404, message: '运营商不存在', data: null });
     }
 
-    // 级联删除运营商关联的所有数据
-    await query('DELETE FROM admin_users WHERE operator_id = $1', [id]);
-    await query('DELETE FROM auth_sessions WHERE operator_id = $1', [id]);
-    await query('DELETE FROM operator_members WHERE operator_id = $1', [id]);
-    await query('DELETE FROM operator_sessions WHERE operator_id = $1', [id]);
-    await query('DELETE FROM client_logs WHERE operator_id = $1', [id]);
+    // 使用事务包裹级联删除，确保原子性
+    await transaction(async (tx: any) => {
+      // 删除关联的管理员账号
+      await tx.query('DELETE FROM admin_users WHERE operator_id = $1', [id]);
 
-    // 删除场馆及相关数据
-    const venuesRs = await query<{ id: string }>('SELECT id FROM venues WHERE operator_id = $1', [id]);
-    const venueIds = (venuesRs || []).map((r: any) => r.id);
-    for (const vid of venueIds) {
-      await query('UPDATE referees SET venue_id = NULL WHERE venue_id = $1', [vid]);
-      await query('DELETE FROM races WHERE venue_id = $1', [vid]);
-      await query('DELETE FROM race_records WHERE venue_id = $1', [vid]);
-      await query('DELETE FROM race_attendance WHERE venue_id = $1', [vid]);
-    }
-    await query('DELETE FROM venues WHERE operator_id = $1', [id]);
+      // 删除会话和日志
+      await tx.query('DELETE FROM auth_sessions WHERE operator_id = $1', [id]);
+      await tx.query('DELETE FROM operator_members WHERE operator_id = $1', [id]);
+      await tx.query('DELETE FROM operator_sessions WHERE operator_id = $1', [id]);
+      await tx.query('DELETE FROM client_logs WHERE operator_id = $1', [id]);
 
-    // 删除裁判（保留 users 记录但置空 role）
-    const refRs = await query<{ user_id: string }>('SELECT user_id FROM referees WHERE operator_id = $1', [id]);
-    const refereeUserIds = (refRs || []).map((r: any) => r.user_id);
-    await query('DELETE FROM referees WHERE operator_id = $1', [id]);
-    for (const uid of refereeUserIds) {
-      await query('UPDATE users SET role = NULL WHERE id = $1', [uid]);
-    }
+      // 删除场馆及相关数据
+      const venuesRs = await tx.query('SELECT id FROM venues WHERE operator_id = $1', [id]);
+      const venueIds = (venuesRs || []).map((r: any) => r.id);
+      for (const vid of venueIds) {
+        await tx.query('UPDATE referees SET venue_id = NULL WHERE venue_id = $1', [vid]);
+        await tx.query('DELETE FROM races WHERE venue_id = $1', [vid]);
+        await tx.query('DELETE FROM race_records WHERE venue_id = $1', [vid]);
+        await tx.query('DELETE FROM race_attendance WHERE venue_id = $1', [vid]);
+      }
+      await tx.query('DELETE FROM venues WHERE operator_id = $1', [id]);
 
-    // 删除参赛包、票务
-    await query('DELETE FROM race_packages WHERE operator_id = $1', [id]);
-    await query('DELETE FROM user_tickets WHERE operator_id = $1', [id]);
-    await query('DELETE FROM ticket_redemptions WHERE operator_id = $1', [id]);
+      // 删除裁判关联（保留 users 记录但置空 role）
+      const refRs = await tx.query('SELECT user_id FROM referees WHERE operator_id = $1', [id]);
+      const refereeUserIds = (refRs || []).map((r: any) => r.user_id);
+      await tx.query('DELETE FROM referees WHERE operator_id = $1', [id]);
+      for (const uid of refereeUserIds) {
+        await tx.query('UPDATE users SET role = NULL WHERE id = $1', [uid]);
+      }
 
-    // 最后删除运营商本身
-    await query('DELETE FROM operators WHERE id = $1', [id]);
+      // 删除参赛包、票务
+      await tx.query('DELETE FROM race_packages WHERE operator_id = $1', [id]);
+      await tx.query('DELETE FROM user_tickets WHERE operator_id = $1', [id]);
+      await tx.query('DELETE FROM ticket_redemptions WHERE operator_id = $1', [id]);
+
+      // 最后删除运营商本身
+      const result = await tx.query('DELETE FROM operators WHERE id = $1', [id]);
+
+      return result;
+    });
 
     return res.json({ code: 0, message: '删除成功', data: null });
   } catch (error: any) {
     console.error('[AdminOperators] delete error:', error.message);
-    return res.status(500).json({ code: 500, message: '删除运营商失败', data: null });
+    if (error.message) {
+      console.error('[AdminOperators] delete detail:', error.message.substring(0, 500));
+    }
+    return res.status(500).json({ code: 500, message: '删除运营商失败: ' + (error.message || '数据库执行异常'), data: null });
   }
 });
 
