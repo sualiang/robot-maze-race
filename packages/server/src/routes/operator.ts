@@ -79,7 +79,7 @@ router.post('/login', async (req: Request, res: Response) => {
         [member.role]
       );
       if (roleRec) {
-        permissions = JSON.parse(roleRec.permissions);
+        permissions = typeof roleRec.permissions === 'object' ? roleRec.permissions : JSON.parse(roleRec.permissions);
         roleName = roleRec.role_name;
       }
     }
@@ -145,7 +145,7 @@ router.get('/rbac/roles', authMiddleware, operatorOnly, async (req: Request, res
     );
     const result = roles.map((r: any) => {
       let perms: string[] = [];
-      try { perms = JSON.parse(r.permissions); } catch(e) { perms = []; }
+      try { perms = typeof r.permissions === 'object' ? r.permissions : JSON.parse(r.permissions); } catch(e) { perms = []; }
       return { ...r, permissions: perms };
     });
     return res.json({ code: 0, message: 'ok', data: result });
@@ -1126,7 +1126,7 @@ async function initOperatorRoles() {
     );
     OPERATOR_ROLES = roles.map((r: any) => ({
       ...r,
-      permissions: (() => { try { return JSON.parse(r.permissions); } catch(e) { return []; } })(),
+      permissions: (() => { try { return typeof r.permissions === 'object' ? r.permissions : JSON.parse(r.permissions); } catch(e) { return []; } })()
     }));
     console.log('[Operator] 已加载', OPERATOR_ROLES.length, '个运营商角色');
   } catch (e: any) {

@@ -232,10 +232,14 @@ router.post('/admin-login', async (req: Request, res: Response) => {
       return res.status(401).json({ code: 401, message: '用户名或密码错误', data: null });
     }
 
-    // 解析权限数组
+    // 解析权限数组（兼容 mysql2 JSON 自动解析导致的 object 类型）
     let permissions: string[] = [];
     try {
-      permissions = JSON.parse(user.permissions || '[]');
+      if (typeof user.permissions === 'object' && user.permissions !== null) {
+        permissions = Array.isArray(user.permissions) ? user.permissions : [];
+      } else {
+        permissions = JSON.parse(user.permissions || '[]');
+      }
     } catch {
       permissions = [];
     }
@@ -336,10 +340,14 @@ router.post('/operator-member-login', async (req: Request, res: Response) => {
       return res.status(401).json({ code: 401, message: '手机号或密码错误', data: null });
     }
 
-    // 解析权限数组
+    // 解析权限数组（兼容 mysql2 JSON 自动解析导致的 object 类型）
     let permissions: string[] = [];
     try {
-      permissions = JSON.parse(user.permissions || '[]');
+      if (typeof user.permissions === 'object' && user.permissions !== null) {
+        permissions = Array.isArray(user.permissions) ? user.permissions : [];
+      } else {
+        permissions = JSON.parse(user.permissions || '[]');
+      }
     } catch {
       permissions = [];
     }
@@ -616,7 +624,7 @@ router.get('/me', authMiddleware, async (req: Request, res: Response<ApiResponse
         return res.status(404).json({ code: 404, message: '管理员不存在', data: null as any });
       }
       let permissions: string[] = [];
-      try { permissions = JSON.parse(admin.permissions || '[]'); } catch { permissions = []; }
+      try { permissions = typeof admin.permissions === 'object' ? admin.permissions : JSON.parse(admin.permissions || '[]'); } catch { permissions = []; }
       if (admin.username === 'admin' || permissions.includes('*')) {
         permissions = ['*'];
       }
@@ -706,7 +714,7 @@ router.post('/refresh', authMiddleware, async (req: Request, res: Response<ApiRe
         return res.status(404).json({ code: 404, message: '管理员不存在', data: null as any });
       }
       let permissions: string[] = [];
-      try { permissions = JSON.parse(admin.permissions || '[]'); } catch { permissions = []; }
+      try { permissions = typeof admin.permissions === 'object' ? admin.permissions : JSON.parse(admin.permissions || '[]'); } catch { permissions = []; }
       if (admin.username === 'admin' || permissions.includes('*')) {
         permissions = ['*'];
       }
@@ -743,7 +751,7 @@ router.post('/refresh', authMiddleware, async (req: Request, res: Response<ApiRe
       );
       if (member) {
         let permissions: string[] = [];
-        try { permissions = JSON.parse(member.permissions || '[]'); } catch { permissions = []; }
+        try { permissions = typeof member.permissions === 'object' ? member.permissions : JSON.parse(member.permissions || '[]'); } catch { permissions = []; }
         const passwordChangeRequired = member.first_login === 1;
         const newToken = jwt.sign(
           {
@@ -947,7 +955,7 @@ router.post('/admin/change-password', authMiddleware, async (req: Request, res: 
           phone: adminUserInfo.phone,
           role_name: adminUserInfo.role_name || '超级管理员',
           role: 'admin',
-          permissions: adminUserInfo.permissions ? JSON.parse(adminUserInfo.permissions) : ['*'],
+          permissions: adminUserInfo.permissions ? (typeof adminUserInfo.permissions === 'object' ? adminUserInfo.permissions : JSON.parse(adminUserInfo.permissions)) : ['*'],
           first_login: false,
         } : null,
       },
@@ -1130,7 +1138,7 @@ router.post('/member/change-password', authMiddleware, async (req: Request, res:
           nickname: m.nickname,
           role_name: m.role_name,
           role: 'operator',
-          permissions: m.permissions ? JSON.parse(m.permissions) : [],
+          permissions: m.permissions ? (typeof m.permissions === 'object' ? m.permissions : JSON.parse(m.permissions)) : [],
         };
       }
     }
