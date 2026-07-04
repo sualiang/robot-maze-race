@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
+import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config';
 import { query, queryOne, execute } from '../config/database';
@@ -26,10 +26,14 @@ declare global {
 }
 
 /**
- * SHA-256 简单密码哈希（与现有 auth.ts 风格一致，不使用 bcrypt）
+ * bcrypt 密码哈希 — 与 auth.ts / operator.ts 保持一致
  */
 function hashPassword(password: string): string {
-  return crypto.createHash('sha256').update(password).digest('hex');
+  return bcrypt.hashSync(password, 10);
+}
+
+function verifyPassword(password: string, hash: string): boolean {
+  return bcrypt.compareSync(password, hash);
 }
 
 /**
@@ -177,8 +181,7 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     // 验证密码
-    const inputHash = hashPassword(password);
-    if (inputHash !== admin.password_hash) {
+    if (!verifyPassword(password, admin.password_hash)) {
       res.json({ code: 401, message: '用户名或密码错误', data: null });
       return;
     }
@@ -250,8 +253,7 @@ router.post('/change-password', merchantAuthMiddleware, async (req: Request, res
       return;
     }
 
-    const oldHash = hashPassword(oldPassword);
-    if (oldHash !== admin.password_hash) {
+    if (!verifyPassword(oldPassword, admin.password_hash)) {
       res.json({ code: 401, message: '旧密码错误', data: null });
       return;
     }

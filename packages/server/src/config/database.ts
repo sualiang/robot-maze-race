@@ -333,6 +333,18 @@ export async function initSchema(): Promise<void> {
     }
   } catch { /* ignore */ }
 
+  // admin_roles 表新增 scope 字段（缺列修复）
+  try {
+    const [cols] = await conn.execute<any>(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'admin_roles' AND COLUMN_NAME = 'scope'`,
+      [getPoolOptions().database]
+    );
+    if ((cols as any[]).length === 0) {
+      await conn.execute("ALTER TABLE admin_roles ADD COLUMN scope VARCHAR(32) NOT NULL DEFAULT 'admin'");
+      console.log('[MySQL] admin_roles.scope column added');
+    }
+  } catch { /* ignore */ }
+
   // users 表新增字段
   const userNewCols = [
     ['gender', "VARCHAR(10) DEFAULT ''"],
@@ -369,8 +381,8 @@ export async function initSchema(): Promise<void> {
       FOREIGN KEY (help_id) REFERENCES helps(id),
       FOREIGN KEY (user_id) REFERENCES users(id)
     )`);
-    await conn.execute('CREATE INDEX IF NOT EXISTS idx_help_helpers_help ON help_helpers(help_id)');
-    await conn.execute('CREATE INDEX IF NOT EXISTS idx_help_helpers_user ON help_helpers(user_id)');
+    await conn.execute('CREATE INDEX idx_help_helpers_help ON help_helpers(help_id)');
+    await conn.execute('CREATE INDEX idx_help_helpers_user ON help_helpers(user_id)');
   } catch { /* ignore */ }
 
   // ============================================
@@ -614,9 +626,26 @@ export async function initSchema(): Promise<void> {
       error_msg TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
-    await conn.execute('CREATE INDEX IF NOT EXISTS idx_notification_logs_scene ON notification_logs(scene)');
-    await conn.execute('CREATE INDEX IF NOT EXISTS idx_notification_logs_user ON notification_logs(user_id)');
-    await conn.execute('CREATE INDEX IF NOT EXISTS idx_notification_logs_created ON notification_logs(created_at)');
+    await conn.execute('CREATE INDEX idx_notification_logs_scene ON notification_logs(scene)');
+    await conn.execute('CREATE INDEX idx_notification_logs_user ON notification_logs(user_id)');
+    await conn.execute('CREATE INDEX idx_notification_logs_created ON notification_logs(created_at)');
+  } catch { /* ignore */ }
+
+  // 核销记录表
+  try {
+    await conn.execute(`CREATE TABLE IF NOT EXISTS coupon_verify_log (
+      id VARCHAR(36) PRIMARY KEY,
+      merchant_id VARCHAR(36) NOT NULL,
+      user_coupon_id VARCHAR(36),
+      user_id VARCHAR(36),
+      coupon_name VARCHAR(128) DEFAULT '',
+      denomination_cents INT DEFAULT 0,
+      verify_type VARCHAR(32),
+      verifier_name VARCHAR(64) DEFAULT '',
+      verify_time DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+    await conn.execute('CREATE INDEX idx_coupon_verify_log_merchant ON coupon_verify_log(merchant_id)');
   } catch { /* ignore */ }
 
   // V2.3 迁移：orders 表新增字段

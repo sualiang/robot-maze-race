@@ -599,7 +599,68 @@ router.post('/login', async (req: Request, res: Response) => {
 router.get('/me', authMiddleware, async (req: Request, res: Response<ApiResponse<User>>) => {
   try {
     const userId = req.user!.userId;
-    
+    const userRole = req.user!.role;
+
+    // 管理员用户：从 admin_users 表查询
+    if (userRole === 'admin') {
+      const admin = await queryOne<any>(
+        `SELECT au.id, au.username, au.nickname, au.email, au.phone,
+                au.role_id, au.status, ar.label as role_name, ar.name as admin_role_name, ar.permissions,
+                au.first_login
+         FROM admin_users au
+         LEFT JOIN admin_roles ar ON ar.id = au.role_id
+         WHERE au.id = $1`,
+        [userId]
+      );
+      if (!admin) {
+        return res.status(404).json({ code: 404, message: '管理员不存在', data: null as any });
+      }
+      let permissions: string[] = [];
+      try { permissions = JSON.parse(admin.permissions || '[]'); } catch { permissions = []; }
+      if (admin.username === 'admin' || permissions.includes('*')) {
+        permissions = ['*'];
+      }
+      return res.json({
+        code: 0, message: 'ok',
+        data: {
+          id: admin.id,
+          username: admin.username,
+          nickname: admin.nickname || admin.username,
+          email: admin.email,
+          phone: admin.phone,
+          role_id: admin.role_id,
+          role_name: admin.role_name || admin.label,
+          permissions,
+          first_login: admin.first_login == 1,
+        } as any,
+      });
+    }
+
+    // 运营商超管：从 operators 表查询
+    if (userRole === 'operator' && (req.user as any).operatorId) {
+      const op = await queryOne<any>(
+        `SELECT id, name, operator_username, phone, status, password_change_required
+         FROM operators WHERE id = $1`,
+        [userId]
+      );
+      if (op) {
+        return res.json({
+          code: 0, message: 'ok',
+          data: {
+            id: op.id,
+            operatorId: op.id,
+            username: op.operator_username,
+            nickname: op.name,
+            phone: op.phone || op.operator_username,
+            role_name: '运营商超管',
+            role: 'operator',
+            permissions: ['*'],
+          } as any,
+        });
+      }
+    }
+
+    // 普通用户 / 裁判：从 users 表查询
     const user = await queryOne<User>(
       `SELECT id, openid, unionid, nickname, avatar_url, phone, role, race_count,
               total_race_time_ms, best_score_ms, created_at, updated_at
@@ -627,9 +688,131 @@ router.get('/me', authMiddleware, async (req: Request, res: Response<ApiResponse
 router.post('/refresh', authMiddleware, async (req: Request, res: Response<ApiResponse<{ token: string }>>) => {
   try {
     const payload = req.user!;
+    const userId = payload.userId;
+    const userRole = payload.role;
+
+    // 管理员用户：从 admin_users 表查询，重新生成完整 admin JWT
+    if (userRole === 'admin') {
+      const admin = await queryOne<any>(
+        `SELECT au.id, au.username, au.nickname, au.email, au.phone,
+                au.role_id, au.status, ar.label as role_name, ar.name as admin_role_name, ar.permissions,
+                au.first_login
+         FROM admin_users au
+         LEFT JOIN admin_roles ar ON ar.id = au.role_id
+         WHERE au.id = $1`,
+        [userId]
+      );
+      if (!admin) {
+        return res.status(404).json({ code: 404, message: '管理员不存在', data: null as any });
+      }
+      let permissions: string[] = [];
+      try { permissions = JSON.parse(admin.permissions || '[]'); } catch { permissions = []; }
+      if (admin.username === 'admin' || permissions.includes('*')) {
+        permissions = ['*'];
+      }
+      let operatorId: string | undefined;
+      if ((payload as any).operatorId) {
+        operatorId = (payload as any).operatorId;
+      }
+      const newToken = jwt.sign(
+        {
+          userId: admin.id,
+          openid: '',
+          role: 'admin',
+          admin_role_id: admin.role_id,
+          admin_role_name: admin.admin_role_name,
+          permissions,
+          ...(operatorId ? { operatorId } : {}),
+        },
+        config.jwt.secret,
+        { expiresIn: config.jwt.expiresIn as any }
+      );
+      return res.json({ code: 0, message: 'token 已刷新', data: { token: newToken } });
+    }
+
+    // 运营商成员：从 operator_members 表查询
+    if (userRole === 'operator' && (payload as any).operatorId) {
+      const member = await queryOne<any>(
+        `SELECT m.id, m.phone, m.name, m.role, m.status, m.operator_id,
+                ar.label as role_name, ar.name as admin_role_name, ar.permissions,
+                m.first_login
+         FROM operator_members m
+         LEFT JOIN admin_roles ar ON ar.name = m.role
+         WHERE m.id = $1`,
+        [userId]
+      );
+      if (member) {
+        let permissions: string[] = [];
+        try { permissions = JSON.parse(member.permissions || '[]'); } catch { permissions = []; }
+        const passwordChangeRequired = member.first_login === 1;
+        const newToken = jwt.sign(
+          {
+            userId: member.id,
+            openid: '',
+            role: 'operator',
+            operatorId: member.operator_id,
+            admin_role_id: member.role,
+            admin_role_name: member.admin_role_name || member.role_name,
+            permissions,
+            passwordChangeRequired,
+          },
+          config.jwt.secret,
+          { expiresIn: config.jwt.expiresIn as any }
+        );
+        return res.json({ code: 0, message: 'token 已刷新', data: { token: newToken } });
+      }
+    }
+
+    // 运营商超管（operator 角色但无 operatorId，或通过 operator 表查询）
+    if (userRole === 'operator') {
+      const op = await queryOne<any>(
+        `SELECT id, name, operator_username, phone, status
+         FROM operators WHERE id = $1`,
+        [userId]
+      );
+      if (op) {
+        const newToken = jwt.sign(
+          {
+            userId: op.id,
+            openid: '',
+            role: 'operator',
+            operatorId: op.id,
+            permissions: ['*'],
+          },
+          config.jwt.secret,
+          { expiresIn: config.jwt.expiresIn as any }
+        );
+        return res.json({ code: 0, message: 'token 已刷新', data: { token: newToken } });
+      }
+    }
+
+    // 裁判：从 referees + users 表查询
+    if (userRole === 'referee') {
+      const referee = await queryOne<any>(
+        `SELECT r.id, r.user_id, u.id as uid, u.openid, u.role
+         FROM referees r
+         LEFT JOIN users u ON u.id = r.user_id
+         WHERE r.user_id = $1 OR r.id = $1`,
+        [userId]
+      );
+      if (referee) {
+        const newToken = jwt.sign(
+          {
+            userId: referee.user_id || userId,
+            openid: referee.openid || '',
+            role: 'referee',
+          },
+          config.jwt.secret,
+          { expiresIn: config.jwt.expiresIn as any }
+        );
+        return res.json({ code: 0, message: 'token 已刷新', data: { token: newToken } });
+      }
+    }
+
+    // 普通用户/玩家：从 users 表查询
     const user = await queryOne<User>(
       `SELECT id, openid, role FROM users WHERE id = $1`,
-      [payload.userId]
+      [userId]
     );
 
     if (!user) {
@@ -693,9 +876,16 @@ router.post('/admin/change-password', authMiddleware, async (req: Request, res: 
 
       // 更新密码，清除首次登录标记
       const hashedPassword = bcrypt.hashSync(newPassword, 10);
+      const now2 = new Date();
+      const mysqlDt2 = now2.getFullYear() + '-' +
+        String(now2.getMonth() + 1).padStart(2, '0') + '-' +
+        String(now2.getDate()).padStart(2, '0') + ' ' +
+        String(now2.getHours()).padStart(2, '0') + ':' +
+        String(now2.getMinutes()).padStart(2, '0') + ':' +
+        String(now2.getSeconds()).padStart(2, '0');
       await query(
         'UPDATE users SET password = $1, first_login = 0, updated_at = $2 WHERE id = $3',
-        [hashedPassword, new Date().toISOString(), referee.user_id]
+        [hashedPassword, mysqlDt2, referee.user_id]
       );
 
       return res.json({ code: 0, message: '密码修改成功', data: { token: null } });
@@ -718,9 +908,16 @@ router.post('/admin/change-password', authMiddleware, async (req: Request, res: 
 
     // 更新密码，并清除首次登录标记
     const hashedPassword = bcrypt.hashSync(newPassword, 10);
+    const now = new Date();
+    const mysqlDatetime = now.getFullYear() + '-' +
+      String(now.getMonth() + 1).padStart(2, '0') + '-' +
+      String(now.getDate()).padStart(2, '0') + ' ' +
+      String(now.getHours()).padStart(2, '0') + ':' +
+      String(now.getMinutes()).padStart(2, '0') + ':' +
+      String(now.getSeconds()).padStart(2, '0');
     await query(
       'UPDATE admin_users SET password = $1, first_login = 0, updated_at = $2 WHERE id = $3',
-      [hashedPassword, new Date().toISOString(), userId]
+      [hashedPassword, mysqlDatetime, userId]
     );
 
     // 生成新 token

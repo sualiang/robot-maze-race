@@ -390,7 +390,7 @@ router.get('/region-revenue', authMiddleware, checkPermission('dashboard:read'),
                       WHERE o.city IS NOT NULL AND o.city != ''
                         AND DATE_FORMAT(ord.paid_at, '%Y-%m') = DATE_FORMAT(DATE_SUB(NOW(), INTERVAL 1 MONTH), '%Y-%m')), 0) as prev_month_revenue_cents
          FROM operators o
-         WHERE o.province = ? AND o.city IS NOT NULL AND o.city != ''
+         WHERE o.province = $1 AND o.city IS NOT NULL AND o.city != ''
          GROUP BY o.city
          ORDER BY operator_count DESC`,
         [province]
@@ -419,7 +419,7 @@ router.get('/region-revenue', authMiddleware, checkPermission('dashboard:read'),
                       WHERE o.district IS NOT NULL AND o.district != ''
                         AND DATE_FORMAT(ord.paid_at, '%Y-%m') = DATE_FORMAT(DATE_SUB(NOW(), INTERVAL 1 MONTH), '%Y-%m')), 0) as prev_month_revenue_cents
          FROM operators o
-         WHERE o.city = ? AND o.district IS NOT NULL AND o.district != ''
+         WHERE o.city = $1 AND o.district IS NOT NULL AND o.district != ''
          GROUP BY o.district
          ORDER BY operator_count DESC`,
         [city]
@@ -434,7 +434,7 @@ router.get('/region-revenue', authMiddleware, checkPermission('dashboard:read'),
       const rows = await query(
         `SELECT o.id, o.name, o.province, o.city, o.district
          FROM operators o
-         WHERE o.district = ?
+         WHERE o.district = $1
          ORDER BY o.name`,
         [district]
       );
@@ -451,13 +451,13 @@ router.get('/region-revenue', authMiddleware, checkPermission('dashboard:read'),
         `SELECT DATE(o.used_at) as date, COUNT(*) as order_count,
                 COALESCE(SUM(o.amount_cents), 0) as revenue_cents
          FROM orders o
-         JOIN venues v ON v.id = ?
-         WHERE v.operator_id = ?
-           AND o.used_at >= ? AND o.used_at <= ?
+         JOIN venues v ON v.operator_id = o.venue_id
+         WHERE v.operator_id = $1
+           AND o.used_at >= $2 AND o.used_at <= $3
          GROUP BY DATE(o.used_at)
          ORDER BY date DESC
          LIMIT 100`,
-        ['', operator_id, date_start || '2024-01-01', date_end || '2099-12-31']
+        [operator_id, date_start || '2024-01-01', date_end || '2099-12-31']
       );
       return res.json({ code: 0, message: 'ok', data: rows || [] });
     }

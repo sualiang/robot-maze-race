@@ -53,7 +53,7 @@ router.get('/config', authMiddleware, checkPermission('marketing:read'), async (
     }
 
     const configs = await query<{ key: string; value: string }>(
-      `SELECT key, value FROM system_config WHERE key LIKE 'mkt_%' ORDER BY key ASC`
+      "SELECT `key`, value FROM system_config WHERE `key` LIKE 'mkt_%' ORDER BY `key` ASC"
     );
 
     const data = rowsToMap(configs);
@@ -119,8 +119,8 @@ router.get('/operators', authMiddleware, checkPermission('marketing:read'), asyn
         const venueIds = venues.map((v: any) => v.id);
         const placeholders = venueIds.map((_: any, i: number) => `$${i + 1}`).join(',');
         const mcRows = await query<{ key: string; value: string; updated_at: string }>(
-          `SELECT key, value, updated_at FROM marketing_config
-           WHERE venue_id IN (${placeholders}) AND key IN ('help_enabled', 'help_required_count', 'help_reward_count')`,
+          `SELECT \`key\`, value, updated_at FROM marketing_config
+           WHERE venue_id IN (${placeholders}) AND \`key\` IN ('help_enabled', 'help_required_count', 'help_reward_count')`,
           venueIds
         );
 
@@ -158,8 +158,8 @@ router.get('/', authMiddleware, checkPermission('marketing:read'), async (req: R
     const configs = await query<any>(
       `SELECT id, \`key\`, value, description, created_at, updated_at
        FROM system_config
-       WHERE key LIKE 'mkt_%'
-       ORDER BY key ASC`
+       WHERE \`key\` LIKE 'mkt_%'
+       ORDER BY \`key\` ASC`
     );
     return res.json({ code: 0, message: 'ok', data: configs });
   } catch (error: any) {

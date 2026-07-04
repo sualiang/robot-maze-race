@@ -72,7 +72,7 @@ router.get('/', authMiddleware, superAdminOnly, async (req: Request, res: Respon
     }
 
     const configs = await query<{ key: string; value: string }>(
-      `SELECT key, value FROM system_config WHERE key LIKE 'cfg_%' ORDER BY key ASC`
+      "SELECT `key`, value FROM system_config WHERE `key` LIKE 'cfg_%' ORDER BY `key` ASC"
     );
 
     const data = rowsToFlatObject(configs);

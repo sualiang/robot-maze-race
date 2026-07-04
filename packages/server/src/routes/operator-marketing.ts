@@ -49,7 +49,7 @@ router.get('/', authMiddleware, operatorOnly, async (req: Request, res: Response
       `SELECT id, venue_id, \`key\`, value, description, created_at, updated_at
        FROM marketing_config
        WHERE venue_id = $1
-       ORDER BY key ASC`,
+       ORDER BY \`key\` ASC`,
       [venue_id]
     );
 
@@ -126,7 +126,7 @@ router.put('/', authMiddleware, operatorOnly, async (req: Request, res: Response
 router.get('/range', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
     const configs = await query<{ key: string; value: string }>(
-      `SELECT key, value FROM system_config WHERE key LIKE 'mkt_%' ORDER BY key ASC`
+      "SELECT `key`, value FROM system_config WHERE `key` LIKE 'mkt_%' ORDER BY `key` ASC"
     );
 
     const obj: Record<string, any> = {};

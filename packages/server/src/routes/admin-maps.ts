@@ -13,14 +13,21 @@ function loadGeoJson(filename: string): any {
   if (geoCache.has(filename)) return geoCache.get(filename);
   const filePath = path.join(geojsonDir, filename);
   if (!fs.existsSync(filePath)) return null;
-  const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-  geoCache.set(filename, raw);
-  return raw;
+  try {
+    const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    geoCache.set(filename, raw);
+    return raw;
+  } catch {
+    return null;
+  }
 }
 
 // 获取省列表（如 [{adcode: "110000", name: "北京市"}, {adcode: "330000", name: "浙江省"}]）
 router.get('/provinces', authMiddleware, async (_req: Request, res: Response) => {
   try {
+    if (!fs.existsSync(geojsonDir)) {
+      return res.json({ code: 0, message: 'ok', data: [] });
+    }
     const files = fs.readdirSync(geojsonDir).filter(f => f.endsWith('.geoJson') && f.length === 14); // 6位.geoJson
     const provinces: { adcode: string; name: string }[] = [];
 

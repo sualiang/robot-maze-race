@@ -141,7 +141,7 @@ router.get('/rbac/roles', authMiddleware, operatorOnly, async (req: Request, res
   try {
     // 运营商后台看到其可分配的角色：scope='operator' 或 scope='admin' 中非 super_admin 的角色
     const roles = await query<any>(
-      `SELECT id AS key, name, label, permissions FROM admin_roles WHERE scope = 'operator' ORDER BY name ASC`
+      `SELECT id AS \`key\`, name, label, permissions FROM admin_roles WHERE scope = 'operator' ORDER BY name ASC`
     );
     const result = roles.map((r: any) => {
       let perms: string[] = [];
@@ -780,25 +780,23 @@ router.get('/finance/revenue', authMiddleware, operatorOnly, async (req: Request
     const operatorId = req.user!.operatorId;
     const { start_date, end_date } = req.query as { start_date?: string; end_date?: string };
 
-    // 查询该运营商下所有场馆的每日营收统计
+    // 查询该运营商下的每日营收统计
     const rows = await query<any>(
       `SELECT
-         DATE(rr.created_at) as date,
-         COUNT(DISTINCT rr.id) as order_count,
+         DATE(o.created_at) as date,
+         COUNT(DISTINCT o.id) as order_count,
          COALESCE(SUM(o.amount_cents), 0) as revenue,
-         COALESCE(SUM(o.settlement_cents), 0) as settlement,
+         COALESCE(SUM(s.commission_cents), 0) as settlement,
          CASE
            WHEN COALESCE(SUM(o.amount_cents), 0) = 0 THEN 'pending'
            ELSE 'settled'
          END as status
-       FROM venues v
-       LEFT JOIN races r ON r.venue_id = v.id
-       LEFT JOIN race_records rr ON rr.race_id = r.id
-       LEFT JOIN orders o ON o.record_id = rr.id
-       WHERE v.operator_id = $1
-         AND (($2) IS NULL OR rr.created_at >= $2)
-         AND (($3) IS NULL OR rr.created_at <= $3)
-       GROUP BY DATE(rr.created_at)
+       FROM orders o
+       LEFT JOIN settlements s ON s.order_id = o.id
+       WHERE o.operator_id = $1
+         AND (($2) IS NULL OR o.created_at >= $2)
+         AND (($3) IS NULL OR o.created_at <= $3)
+       GROUP BY DATE(o.created_at)
        ORDER BY date DESC`,
       [operatorId, start_date || null, end_date || null]
     );
@@ -823,7 +821,7 @@ router.get('/finance/settlements', authMiddleware, operatorOnly, async (req: Req
     const operatorId = req.user!.operatorId;
 
     const rows = await query<any>(
-      `SELECT id, period, amount_cents as amount, status, settled_at, created_at
+      `SELECT id, order_id, amount_cents as amount, commission_cents, status, settled_at, created_at
        FROM settlements WHERE operator_id = $1
        ORDER BY created_at DESC`,
       [operatorId]
@@ -831,8 +829,10 @@ router.get('/finance/settlements', authMiddleware, operatorOnly, async (req: Req
 
     const list = rows.map((r: any) => ({
       id: r.id,
-      period: r.period,
+      order_id: r.order_id,
+      period: r.created_at,
       amount: r.amount,
+      commission_cents: r.commission_cents,
       status: r.status,
       settled_at: r.settled_at,
       created_at: r.created_at,
@@ -859,10 +859,9 @@ router.get('/finance/payments', authMiddleware, operatorOnly, async (req: Reques
     const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string, 10) || 20));
 
     const rows = await query<any>(
-      `SELECT o.id, o.order_no, o.amount_cents as amount, o.channel, o.status, o.paid_at, o.created_at
+      `SELECT o.id, o.order_no, o.amount_cents as amount, o.payment_method, o.status, o.paid_at, o.created_at
        FROM orders o
-       JOIN venues v ON o.venue_id = v.id
-       WHERE v.operator_id = $1
+       WHERE o.operator_id = $1
        ORDER BY o.created_at DESC
        LIMIT $2`,
       [operatorId, pageSize]
@@ -872,7 +871,7 @@ router.get('/finance/payments', authMiddleware, operatorOnly, async (req: Reques
       id: r.id,
       order_no: r.order_no,
       amount: r.amount,
-      channel: r.channel || 'wechat_pay',
+      channel: r.payment_method || 'wechat_pay',
       status: r.status,
       paid_at: r.paid_at,
       created_at: r.created_at,
@@ -955,8 +954,8 @@ router.get('/finance/export', authMiddleware, operatorOnly, async (req: Request,
        FROM venues v
        JOIN races r ON r.venue_id = v.id
        JOIN race_records rr ON rr.race_id = r.id
-       JOIN users u ON rr.user_id = u.id
-       LEFT JOIN orders o ON o.record_id = rr.id
+       JOIN users u ON rr.player_id = u.id
+       LEFT JOIN orders o ON o.user_id = rr.player_id
        WHERE v.operator_id = $1
        ORDER BY rr.created_at DESC`,
       [operatorId]
@@ -1104,7 +1103,7 @@ router.get('/profit-share-rate', authMiddleware, async (_req: Request, res: Resp
 router.get('/settings', authMiddleware, async (req: Request, res: Response) => {
   try {
     const configs = await query<{ key: string; value: string }>(
-      `SELECT key, value FROM system_config WHERE key IN ('cfg_max_queue_size')`
+      "SELECT `key`, value FROM system_config WHERE `key` IN ('cfg_max_queue_size')"
     );
     const data: Record<string, any> = {};
     for (const c of configs) {
@@ -1123,7 +1122,7 @@ router.get('/settings', authMiddleware, async (req: Request, res: Response) => {
 async function initOperatorRoles() {
   try {
     const roles = await query<any>(
-      `SELECT id AS key, label AS name, label, permissions FROM admin_roles WHERE scope = 'operator' ORDER BY name ASC`
+      `SELECT id AS \`key\`, label AS name, label, permissions FROM admin_roles WHERE scope = 'operator' ORDER BY name ASC`
     );
     OPERATOR_ROLES = roles.map((r: any) => ({
       ...r,

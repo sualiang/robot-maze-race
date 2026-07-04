@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import bcrypt from 'bcryptjs';
 import { query, queryOne, execute, generateSecurePassword } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 
@@ -123,8 +124,7 @@ router.post('/', authMiddleware, anyPermissionMiddleware, async (req: Request, r
     console.log('[AdminMerchant] adminPhone:', adminPhone);
     if (adminPhone) {
       adminId = uuidv4();
-      const crypto = require('crypto');
-      const passwordHash = crypto.createHash('sha256').update(adminPassword).digest('hex');
+      const passwordHash = bcrypt.hashSync(adminPassword, 10);
       await execute(
         `INSERT INTO merchant_admin (id, merchant_id, username, password_hash, phone, real_name, status, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, '', 1, NOW(), NOW())`,
@@ -339,7 +339,7 @@ router.patch('/:id/status', authMiddleware, anyPermissionMiddleware, async (req:
  * POST /api/v1/admin/merchant/:id/reset-password
  * 运营商超管/运营重置商家管理员密码
  */
-router.post('/:id/reset-password', operatorMiddleware, async (req: Request, res: Response) => {
+router.post('/:id/reset-password', authMiddleware, operatorMiddleware, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -361,10 +361,8 @@ router.post('/:id/reset-password', operatorMiddleware, async (req: Request, res:
     }
 
     // 生成新密码
-    const { generateSecurePassword } = require('./utils');
     const newPassword = generateSecurePassword();
-    const { hashPassword } = require('../config/database');
-    const passwordHash = hashPassword(newPassword);
+    const passwordHash = bcrypt.hashSync(newPassword, 10);
 
     // 更新密码 + 标记首次登录
     await execute(
