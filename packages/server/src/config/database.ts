@@ -10,9 +10,12 @@ const DATABASE_URL = process.env.DATABASE_URL || 'mysql://root:root@localhost:33
 // 从 DATABASE_URL 解析连接信息
 function parseDatabaseUrl(url: string): mysql.PoolOptions {
   const parsed = new URL(url);
+  // 优先使用独立环境变量，再尝试 URL 解析的 port，回退 3306
+  //（URL 解析在密码含特殊字符时可能不准确）
+  const port = parseInt(process.env.DB_PORT || parsed.port || '3306', 10);
   return {
     host: parsed.hostname || 'localhost',
-    port: parseInt(parsed.port || '3306', 10),
+    port,
     user: parsed.username || 'root',
     password: parsed.password || '',
     database: parsed.pathname.replace(/^\//, '') || 'robot_maze_race',
