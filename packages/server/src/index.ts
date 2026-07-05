@@ -72,13 +72,15 @@ app.use(responseTime);
 // ============================================================
 // 健康检查
 // ============================================================
+const GIT_VERSION = process.env.GIT_VERSION || 'dev';
 app.get('/api/v1/health', (_req, res) => {
   res.json({
     code: 0,
     message: 'ok',
     data: {
       status: 'running',
-      version: '1.0.0',
+      version: GIT_VERSION,
+      git_version: GIT_VERSION,
       env: config.nodeEnv,
       timestamp: new Date().toISOString(),
     },
