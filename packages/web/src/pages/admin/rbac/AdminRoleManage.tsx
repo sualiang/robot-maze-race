@@ -88,7 +88,7 @@ export default function AdminRoleManage() {
       <Table
         columns={columns}
         dataSource={roles}
-        rowKey="key"
+        rowKey="id"
         loading={loading}
         pagination={false}
       />
