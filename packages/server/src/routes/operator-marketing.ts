@@ -200,8 +200,8 @@ router.get('/check-init', authMiddleware, operatorOnly, async (req: Request, res
     const venue_id = 'operator_' + operatorId;
 
     const pkgCount = await queryOne<{ cnt: number }>(
-      'SELECT COUNT(*) as cnt FROM race_packages WHERE venue_id = $1',
-      [venue_id]
+      'SELECT COUNT(*) as cnt FROM race_packages WHERE operator_id = $1',
+      [operatorId]
     );
     const mktCount = await queryOne<{ cnt: number }>(
       'SELECT COUNT(*) as cnt FROM marketing_config WHERE venue_id = $1',
@@ -232,8 +232,8 @@ router.post('/init-templates', authMiddleware, operatorOnly, async (req: Request
 
     // 防重复
     const pkgCount = await queryOne<{ cnt: number }>(
-      'SELECT COUNT(*) as cnt FROM race_packages WHERE venue_id = $1',
-      [venue_id]
+      'SELECT COUNT(*) as cnt FROM race_packages WHERE operator_id = $1',
+      [operatorId]
     );
     if ((pkgCount?.cnt ?? 0) > 0) {
       return res.status(400).json({ code: 400, message: '已有参赛包数据，不能重复初始化', data: null });
@@ -247,9 +247,9 @@ router.post('/init-templates', authMiddleware, operatorOnly, async (req: Request
     ];
     for (const pkg of packages) {
       await execute(
-        `INSERT INTO race_packages (id, venue_id, name, price_cents, description, status, created_at, updated_at)
+        `INSERT INTO race_packages (id, operator_id, name, price_cents, description, status, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, 1, NOW(), NOW())`,
-        [uuidv4(), venue_id, pkg.name, pkg.price, pkg.description]
+        [uuidv4(), operatorId, pkg.name, pkg.price, pkg.description]
       );
     }
 
