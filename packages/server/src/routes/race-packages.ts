@@ -212,21 +212,20 @@ router.post('/', authMiddleware, async (req: Request, res: Response<ApiResponse<
     const pointValue = b.pointValue || 0;
 
     const opId = req.user?.operatorId || '00000000-0000-0000-0000-000000000000';
-    const row = await queryOne<RacePackageRow>(
+    await execute(
       `INSERT INTO race_packages (id, operator_id, name, description, price_cents,
                standard_price_cents, discount_price_cents, tag, special_rights,
                growth_value, point_value,
                race_count, valid_days, status, sort_order,
                coupon_reward_min_cents, coupon_reward_max_cents, free_deduction_cents)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
-       RETURNING *`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
       [id, opId, body.name, body.description || null, priceCents,
        standardPriceCents, discountPriceCents, tag, specialRights,
        growthValue, pointValue,
        body.race_count, validDays, 'active', sortOrder,
        rewardMinCents, rewardMaxCents, freeDeductionCents]
     );
-
+    const row = await queryOne<RacePackageRow>('SELECT * FROM race_packages WHERE id = $1', [id]);
     const created = toRacePackage(row!);
 
     // 如果有礼券区间，自动匹配
@@ -360,10 +359,11 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response<ApiRespons
     values.push(new Date().toISOString());
     values.push(id);
 
-    const row = await queryOne<RacePackageRow>(
-      `UPDATE race_packages SET ${fields.join(', ')} WHERE id = $${paramIdx} RETURNING *`,
+    await execute(
+      `UPDATE race_packages SET ${fields.join(', ')} WHERE id = $${paramIdx}`,
       values
     );
+    const row = await queryOne<RacePackageRow>('SELECT * FROM race_packages WHERE id = $1', [id]);
 
     // 如果更新了礼券区间，重新匹配
     if (body.coupon_reward_min !== undefined || body.coupon_reward_max !== undefined) {

@@ -185,11 +185,13 @@ router.put('/', authMiddleware, checkPermission('marketing:edit'), async (req: R
     if (!existing) {
       return res.status(404).json({ code: 404, message: '配置项不存在', data: null });
     }
-    const updated = await queryOne<any>(
-      `UPDATE system_config SET value = $1, updated_at = NOW()
-       WHERE \`key\` = $2
-       RETURNING id, \`key\`, value, description, created_at, updated_at`,
+    await execute(
+      'UPDATE system_config SET value = $1, updated_at = NOW() WHERE `key` = $2',
       [value, key]
+    );
+    const updated = await queryOne<any>(
+      'SELECT id, `key`, value, description, created_at, updated_at FROM system_config WHERE `key` = $1',
+      [key]
     );
     return res.json({ code: 0, message: '营销配置已更新', data: updated! });
   } catch (error: any) {

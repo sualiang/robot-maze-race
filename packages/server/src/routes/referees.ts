@@ -491,14 +491,13 @@ router.put('/:id/bind-venue', authMiddleware, async (req: Request, res: Response
       return res.status(404).json({ code: 404, message: '赛场不存在', data: null as any });
     }
 
-    const referee = await queryOne<Referee>(
-      `UPDATE referees
-       SET venue_id = $1, updated_at = $2
-       WHERE id = $3
-       RETURNING id, user_id, venue_id,
-                 phone, id_number, cert_image, id_card_front, id_card_back,
-                 gps_lat, gps_lng, last_checkin_at, created_at, updated_at`,
+    await execute(
+      'UPDATE referees SET venue_id = $1, updated_at = $2 WHERE id = $3',
       [venue_id, new Date().toISOString(), id]
+    );
+    const referee = await queryOne<Referee>(
+      'SELECT id, user_id, venue_id, phone, id_number, cert_image, id_card_front, id_card_back, gps_lat, gps_lng, last_checkin_at, created_at, updated_at FROM referees WHERE id = $1',
+      [id]
     );
 
     if (!referee) {
@@ -527,12 +526,12 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response<ApiResp
       return res.status(403).json({ code: 403, message: '仅管理员或运营商可删除裁判记录', data: null });
     }
 
-    const result = await queryOne<{ id: string }>(
-      'DELETE FROM referees WHERE id = $1 RETURNING id',
+    const result = await execute(
+      'DELETE FROM referees WHERE id = $1',
       [id]
     );
 
-    if (!result) {
+    if (result.changes === 0) {
       return res.status(404).json({ code: 404, message: '裁判记录不存在', data: null });
     }
 

@@ -1068,7 +1068,7 @@ router.get('/regions', async (_req: Request, res: Response) => {
 router.get('/profit-share-rate', authMiddleware, async (_req: Request, res: Response) => {
   try {
     const row = await queryOne<{ value: string }>(
-      `SELECT value FROM settings WHERE \`key\` = 'default_profit_share_rate'`
+      `SELECT setting_value AS value FROM settings WHERE setting_key = 'default_profit_share_rate'`
     );
     return res.json({
       code: 0,

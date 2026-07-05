@@ -158,20 +158,10 @@ router.post('/', authMiddleware, checkPermission('operators:create'), async (req
       return res.status(400).json({ code: 400, message: '该手机号已被使用', data: null });
     }
 
-    // 读取系统默认分润比例（兼容 setting_key/setting_value 和 key/value 两种列名）
-    let defaultProfitSetting = null;
-    try {
-      defaultProfitSetting = await queryOne<any>(
-        `SELECT \`value\` FROM settings WHERE \`key\` = 'default_profit_share_rate'`
-      );
-    } catch { /* fallthrough */ }
-    if (!defaultProfitSetting) {
-      try {
-        defaultProfitSetting = await queryOne<any>(
-          `SELECT setting_value AS \`value\` FROM settings WHERE setting_key = 'default_profit_share_rate'`
-        );
-      } catch { /* fallthrough */ }
-    }
+    // 读取系统默认分润比例
+    const defaultProfitSetting = await queryOne<any>(
+      `SELECT setting_value AS \`value\` FROM settings WHERE setting_key = 'default_profit_share_rate'`
+    );
     const defaultProfitRate = defaultProfitSetting ? parseInt(defaultProfitSetting.value, 10) : 80;
 
     // 生成随机密码 8位
@@ -290,20 +280,10 @@ router.put('/:id', authMiddleware, checkPermission('operators:edit'), async (req
       return res.status(404).json({ code: 404, message: '运营商不存在', data: null });
     }
 
-    // 读取系统默认分润比例（兼容两种列名）
-    let defProfitSetting = null;
-    try {
-      defProfitSetting = await queryOne<any>(
-        `SELECT \`value\` FROM settings WHERE \`key\` = 'default_profit_share_rate'`
-      );
-    } catch { /* fallthrough */ }
-    if (!defProfitSetting) {
-      try {
-        defProfitSetting = await queryOne<any>(
-          `SELECT setting_value AS \`value\` FROM settings WHERE setting_key = 'default_profit_share_rate'`
-        );
-      } catch { /* fallthrough */ }
-    }
+    // 读取系统默认分润比例
+    const defProfitSetting = await queryOne<any>(
+      `SELECT setting_value AS \`value\` FROM settings WHERE setting_key = 'default_profit_share_rate'`
+    );
     const defaultProfitRate = defProfitSetting ? parseInt(defProfitSetting.value, 10) : 80;
 
     // MySQL 不支持 RETURNING，先 UPDATE 再 SELECT

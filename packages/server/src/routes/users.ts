@@ -157,12 +157,13 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response<ApiRespons
 
     values.push(id);
 
-    const user = await queryOne<User>(
-      `UPDATE users SET ${fields.join(', ')} WHERE id = $${paramIdx}
-       RETURNING id, openid, unionid, nickname, avatar_url, phone, role,
-                 race_count, total_race_time_ms, best_score_ms,
-                 created_at, updated_at`,
+    await execute(
+      `UPDATE users SET ${fields.join(', ')} WHERE id = $${paramIdx}`,
       values
+    );
+    const user = await queryOne<User>(
+      'SELECT id, openid, unionid, nickname, avatar_url, phone, role, race_count, total_race_time_ms, best_score_ms, created_at, updated_at FROM users WHERE id = $1',
+      [id]
     );
 
     return res.json({ code: 0, message: '更新成功', data: user! });
@@ -221,12 +222,13 @@ router.post('/:id/bind-phone', authMiddleware, async (req: Request, res: Respons
     }
 
     // 更新数据库
-    const user = await queryOne<User>(
-      `UPDATE users SET phone = $1, updated_at = $2 WHERE id = $3
-       RETURNING id, openid, unionid, nickname, avatar_url, phone, role,
-                 race_count, total_race_time_ms, best_score_ms,
-                 created_at, updated_at`,
+    await execute(
+      'UPDATE users SET phone = $1, updated_at = $2 WHERE id = $3',
       [phone, new Date().toISOString(), id]
+    );
+    const user = await queryOne<User>(
+      'SELECT id, openid, unionid, nickname, avatar_url, phone, role, race_count, total_race_time_ms, best_score_ms, created_at, updated_at FROM users WHERE id = $1',
+      [id]
     );
 
     if (!user) {

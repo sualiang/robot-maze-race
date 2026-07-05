@@ -80,18 +80,13 @@ router.put('/', authMiddleware, operatorOnly, async (req: Request, res: Response
 
     if (existing) {
       // 更新
-      const updated = await queryOne<{
-        id: string;
-        venue_id: string;
-        key: string;
-        value: string;
-        description: string | null;
-      }>(
-        `UPDATE marketing_config
-         SET value = $1, description = COALESCE($2, description), updated_at = NOW()
-         WHERE venue_id = $3 AND \`key\` = $4
-         RETURNING id, venue_id, \`key\`, value, description, created_at, updated_at`,
+      await execute(
+        'UPDATE marketing_config SET value = $1, description = COALESCE($2, description), updated_at = NOW() WHERE venue_id = $3 AND `key` = $4',
         [value, description || null, venue_id, key]
+      );
+      const updated = await queryOne<any>(
+        'SELECT id, venue_id, `key`, value, description, created_at, updated_at FROM marketing_config WHERE venue_id = $1 AND `key` = $2',
+        [venue_id, key]
       );
 
       return res.json({ code: 0, message: '营销配置已更新', data: updated! });
@@ -107,17 +102,13 @@ router.put('/', authMiddleware, operatorOnly, async (req: Request, res: Response
 
       // 插入
       const id = uuidv4();
-      const created = await queryOne<{
-        id: string;
-        venue_id: string;
-        key: string;
-        value: string;
-        description: string | null;
-      }>(
-        `INSERT INTO marketing_config (id, venue_id, \`key\`, value, description)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING id, venue_id, \`key\`, value, description, created_at, updated_at`,
+      await execute(
+        'INSERT INTO marketing_config (id, venue_id, `key`, value, description) VALUES ($1, $2, $3, $4, $5)',
         [id, venue_id, key, value, description || null]
+      );
+      const created = await queryOne<any>(
+        'SELECT id, venue_id, `key`, value, description, created_at, updated_at FROM marketing_config WHERE id = $1',
+        [id]
       );
 
       return res.status(201).json({ code: 0, message: '营销配置已创建', data: created! });

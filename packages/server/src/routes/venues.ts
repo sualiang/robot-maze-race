@@ -155,19 +155,15 @@ router.post('/', authMiddleware, async (req: Request, res: Response<ApiResponse<
 
     // 读取系统默认分润比例
     const rateRow = await queryOne<{ value: string }>(
-      `SELECT value FROM settings WHERE \`key\` = 'default_profit_share_rate'`
+      `SELECT setting_value AS value FROM settings WHERE setting_key = 'default_profit_share_rate'`
     );
     const defaultRate = parseInt(rateRow?.value || '80', 10);
 
-    const venue = await queryOne<Venue>(
+    await execute(
       `INSERT INTO venues (id, name, address, latitude, longitude, status,
         checkin_radius_meters, max_queue_size, timeout_seconds,
         open_time, close_time, city, district, description, operator_id, profit_share_rate)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-       RETURNING id, name, address, latitude, longitude, status,
-                 qrcode_url, checkin_radius_meters, max_queue_size,
-                 timeout_seconds, open_time, close_time, city, district,
-                 description, operator_id, profit_share_rate, created_at, updated_at`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
       [
         id,
         body.name,
@@ -186,6 +182,14 @@ router.post('/', authMiddleware, async (req: Request, res: Response<ApiResponse<
         operatorId,
         defaultRate,
       ]
+    );
+    const venue = await queryOne<Venue>(
+      `SELECT id, name, address, latitude, longitude, status,
+              qrcode_url, checkin_radius_meters, max_queue_size,
+              timeout_seconds, open_time, close_time, city, district,
+              description, operator_id, profit_share_rate, created_at, updated_at
+       FROM venues WHERE id = $1`,
+      [id]
     );
 
     return res.status(201).json({ code: 0, message: '赛场创建成功', data: venue! });
@@ -275,13 +279,17 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response<ApiRespons
 
     values.push(id);
 
-    const venue = await queryOne<Venue>(
-      `UPDATE venues SET ${fields.join(', ')} WHERE id = $${paramIdx}
-       RETURNING id, name, address, latitude, longitude, status,
-                 qrcode_url, checkin_radius_meters, max_queue_size,
-                 timeout_seconds, open_time, close_time, description,
-                 operator_id, created_at, updated_at`,
+    await execute(
+      `UPDATE venues SET ${fields.join(', ')} WHERE id = $${paramIdx}`,
       values
+    );
+    const venue = await queryOne<Venue>(
+      `SELECT id, name, address, latitude, longitude, status,
+              qrcode_url, checkin_radius_meters, max_queue_size,
+              timeout_seconds, open_time, close_time, description,
+              operator_id, created_at, updated_at
+       FROM venues WHERE id = $1`,
+      [id]
     );
 
     return res.json({ code: 0, message: '赛场更新成功', data: venue! });
@@ -342,10 +350,12 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response<ApiResp
       return res.status(403).json({ code: 403, message: '仅管理员或运营商可删除赛场', data: null });
     }
 
-    const result = await queryOne<{ id: string }>(
-      'DELETE FROM venues WHERE id = $1 RETURNING id',
+    const result = await execute(
+      'DELETE FROM venues WHERE id = $1',
       [id]
     );
+
+    if (result.changes === 0) {
 
     if (!result) {
       return res.status(404).json({ code: 404, message: '赛场不存在', data: null });
