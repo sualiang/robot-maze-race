@@ -498,11 +498,7 @@ export default function OperatorManage() {
                 disabled
               />
             </Form.Item>
-            <Form.Item name="status" label="状态">
-              <Select style={{ width: 120 }}
-                options={[{ value: 'active', label: '正常' }, { value: 'disabled', label: '禁用' }]}
-              />
-            </Form.Item>
+            {/* 状态字段已移除：新建时默认为 active */}
           </Space>
         </Form>
       </Modal>
