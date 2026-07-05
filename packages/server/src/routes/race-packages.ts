@@ -474,15 +474,33 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response<ApiResp
       return res.status(403).json({ code: 403, message: '无权限', data: null });
     }
 
-    // 先删除关联的 race_package_coupons
-    await execute(`DELETE FROM race_package_coupons WHERE package_id = $1`, [id]);
-    // 再删除参赛包本身
-    await execute(`DELETE FROM race_packages WHERE id = $1`, [id]);
+    console.log('[RacePackages] delete request:', id);
+
+    const existing = await queryOne<{ id: string; name: string }>(
+      'SELECT id, name FROM race_packages WHERE id = $1', [id]
+    );
+    if (!existing) {
+      console.log('[RacePackages] delete: not found');
+      return res.json({ code: 0, message: '参赛包不存在或已删除', data: null });
+    }
+    console.log('[RacePackages] deleting:', existing.name, id);
+
+    // 先删除关联表数据（容错处理）
+    try {
+      const r1 = await execute(`DELETE FROM race_package_coupons WHERE package_id = $1`, [id]);
+      console.log('[RacePackages] delete race_package_coupons:', r1.changes, 'rows');
+    } catch (e: any) {
+      console.log('[RacePackages] skip race_package_coupons:', e.message);
+    }
+
+    // 删除参赛包本身
+    const result = await execute(`DELETE FROM race_packages WHERE id = $1`, [id]);
+    console.log('[RacePackages] delete result:', result.changes, 'rows');
 
     return res.json({ code: 0, message: '已删除', data: null });
   } catch (error: any) {
-    console.error('[RacePackages] delete error:', error.message);
-    return res.status(500).json({ code: 500, message: '删除失败', data: null });
+    console.error('[RacePackages] delete error:', error.message, error.stack);
+    return res.status(500).json({ code: 500, message: '删除失败: ' + error.message, data: null });
   }
 });
 

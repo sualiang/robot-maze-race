@@ -574,18 +574,27 @@ router.patch('/:id/status', authMiddleware, async (req: Request, res: Response<A
     }
 
     // 更新裁判表
+    console.log('[Referees] status change:', { id, status, user_id: referee.user_id });
     await execute('UPDATE referees SET status = $1 WHERE id = $2', [status, id]);
+    console.log('[Referees] referees status updated');
 
     // 同步更新 users 表状态
     if (referee.user_id) {
-      await execute('UPDATE users SET status = $1 WHERE id = $2', [status, referee.user_id]);
+      try {
+        await execute('UPDATE users SET status = $1 WHERE id = $2', [status, referee.user_id]);
+        console.log('[Referees] users status synced');
+      } catch (e: any) {
+        // users 表可能缺少 status 列或其他问题，仅记录日志
+        console.error('[Referees] sync users status failed:', e.message, e.stack);
+        // 不阻塞主流程
+      }
     }
 
     const label = status === 'disabled' ? '已禁用' : '已启用';
     return res.json({ code: 0, message: '裁判' + label, data: null });
   } catch (error: any) {
-    console.error('[Referees] status change error:', error.message);
-    return res.status(500).json({ code: 500, message: '修改裁判状态失败', data: null });
+    console.error('[Referees] status change error:', error.message, error.stack);
+    return res.status(500).json({ code: 500, message: '修改裁判状态失败: ' + error.message, data: null });
   }
 });
 

@@ -281,15 +281,17 @@ router.post('/users/:id/reset-password', authMiddleware, async (req: Request, re
 
     const plainPassword = generateSecurePassword();
     const hashed = bcrypt.hashSync(plainPassword, 10);
+    console.log('[AdminRBAC] reset password:', { id, username: existing.username });
     await query(
       `UPDATE admin_users SET password = $1, first_login = 1, updated_at = NOW() WHERE id = $2`,
       [hashed, id]
     );
+    console.log('[AdminRBAC] reset password done');
 
     return res.json({ code: 0, message: '密码重置成功', data: { account: existing.username, password: plainPassword } });
   } catch (error: any) {
-    console.error('[AdminRBAC] reset password error:', error.message);
-    return res.status(500).json({ code: 500, message: '密码重置失败', data: null });
+    console.error('[AdminRBAC] reset password error:', error.message, error.stack);
+    return res.status(500).json({ code: 500, message: '密码重置失败: ' + error.message, data: null });
   }
 });
 
