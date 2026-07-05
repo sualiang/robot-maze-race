@@ -2,7 +2,7 @@
   "name": "robot-maze-race",
   "version": "1.0.0",
   "private": true,
-  "description": "\u673a\u5668\u72d7\u8ff7\u5bab\u7ade\u901f\u8d5b\u4e8b - \u5168\u5e73\u53f0\u7cfb\u7edf monorepo",
+  "description": "机器狗迷宫竞速赛事 - 全平台系统 monorepo",
   "scripts": {
     "dev:server": "cd packages/server && npm run dev",
     "dev:player": "cd packages/mini-program-player && npm run dev",
@@ -24,5 +24,8 @@
       "unrs-resolver",
       "esbuild"
     ]
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1"
   }
 }
