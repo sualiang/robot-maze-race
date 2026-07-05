@@ -352,9 +352,11 @@ export default function MerchantList() {
       render: (_: unknown, record: MerchantItem) => (
         <Space size="small" wrap>
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>编辑</Button>
-          <Button type="link" size="small" onClick={() => handleToggleStatus(record)}>
-            {record.status === 1 ? '禁用' : '启用'}
-          </Button>
+          {record.status === 1 ? (
+            <Button type="link" size="small" danger onClick={() => handleToggleStatus(record)}>禁用</Button>
+          ) : (
+            <Button type="link" size="small" onClick={() => handleToggleStatus(record)}>启用</Button>
+          )}
           <Button type="link" size="small" icon={<KeyOutlined />} onClick={() => handleResetPassword(record)}>重置密码</Button>
           {canDelete && (
             <Button type="link" size="small" danger onClick={() => handleDelete(record)}>删除</Button>
