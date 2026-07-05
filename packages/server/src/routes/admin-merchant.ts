@@ -132,7 +132,7 @@ router.post('/', authMiddleware, anyPermissionMiddleware, async (req: Request, r
       );
     }
 
-    const loginUrl = process.env.WEB_URL || 'http://175.24.200.63/merchant';
+    const loginUrl = process.env.WEB_URL || 'https://dog.amberrobot.com.cn/merchant';
     res.json({
       code: 0,
       data: {

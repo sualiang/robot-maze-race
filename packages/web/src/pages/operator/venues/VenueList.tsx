@@ -242,7 +242,7 @@ function VenueTab() {
   };
 
   const handleScreenUrl = (record: VenueItem) => {
-    const url = `http://175.24.200.63/screen/display?venueId=${record.id}`;
+    const url = `https://dog.amberrobot.com.cn/screen/display?venueId=${record.id}`;
     const modal = Modal.info({
       title: '现场大屏网址',
       content: (

@@ -85,7 +85,7 @@ export default function RefereeList() {
 
   useEffect(() => { fetchList(); fetchVenues(); }, [fetchList, fetchVenues]);
 
-  const refereeApplyUrl = 'https://robotmaze.cn/referee/apply';
+  const refereeApplyUrl = 'https://dog.amberrobot.com.cn/referee/apply';
 
   const handleCopyLink = async () => {
     try {

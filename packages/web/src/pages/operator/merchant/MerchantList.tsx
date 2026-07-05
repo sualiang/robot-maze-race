@@ -579,7 +579,7 @@ export default function MerchantList() {
         account={accountInfo?.account || ''}
         password={accountInfo?.password || ''}
         role="merchant"
-        loginUrl="http://175.24.200.63/merchant/login"
+        loginUrl="https://dog.amberrobot.com.cn/merchant/login"
         onClose={() => setAccountInfo(null)}
       />
     </>
