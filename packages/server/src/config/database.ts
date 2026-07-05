@@ -52,6 +52,17 @@ function convertSql(text: string): string {
 }
 
 /**
+ * 规范化参数值：转换 ISO 8601 日期字符串为 MySQL DATETIME 兼容格式。
+ * MySQL 不接受 '2026-07-05T12:09:27.292Z' 格式，需要 '2026-07-05 12:09:27'。
+ */
+function normalizeValue(v: any): any {
+  if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(v)) {
+    return v.replace('T', ' ').replace(/\.\d{1,3}Z?$/, '').substring(0, 19);
+  }
+  return v;
+}
+
+/**
  * 展开参数列表以匹配 convertSql 转换后的 ? 数量。
  */
 function expandParams(text: string, params: any[]): any[] {
@@ -69,14 +80,15 @@ function expandParams(text: string, params: any[]): any[] {
     const result: any[] = [];
     for (let i = 0; i < counts.length; i++) {
       const count = counts[i] || 0;
-      const val = i < params.length ? params[i] : undefined;
+      const val = i < params.length ? normalizeValue(params[i]) : undefined;
       for (let j = 0; j < count; j++) {
         result.push(val);
       }
     }
     return result;
   }
-  return params;
+  // 无 $N 参数时也要规范化
+  return params.map(normalizeValue);
 }
 
 /**
@@ -541,8 +553,36 @@ export async function initSchema(): Promise<void> {
     await conn.execute(`
       CREATE TABLE IF NOT EXISTS settings (
         id VARCHAR(36) PRIMARY KEY,
-        \`key\` VARCHAR(100) NOT NULL UNIQUE,
-        value TEXT,
+        setting_key VARCHAR(100) NOT NULL UNIQUE,
+        setting_value TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+  } catch { /* ignore */ }
+
+  // race_packages 表（参赛包）
+  try {
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS race_packages (
+        id VARCHAR(36) PRIMARY KEY,
+        operator_id VARCHAR(36),
+        name VARCHAR(128) NOT NULL,
+        description TEXT,
+        price_cents INT NOT NULL,
+        standard_price_cents INT DEFAULT NULL,
+        discount_price_cents INT DEFAULT NULL,
+        tag VARCHAR(50) DEFAULT NULL,
+        special_rights TEXT DEFAULT NULL,
+        race_count INT NOT NULL DEFAULT 1,
+        valid_days INT DEFAULT 365,
+        status VARCHAR(20) NOT NULL DEFAULT 'active',
+        is_active TINYINT DEFAULT 1,
+        sort_order INT DEFAULT 0,
+        coupon_reward_min_cents INT DEFAULT 0,
+        coupon_reward_max_cents INT DEFAULT 0,
+        free_deduction_cents INT NOT NULL DEFAULT 0,
+        season_id INT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4

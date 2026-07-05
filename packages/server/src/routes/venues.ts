@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { query, queryOne } from '../config/database';
+import { query, queryOne, execute } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import {
   ApiResponse,
@@ -355,9 +355,7 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response<ApiResp
       [id]
     );
 
-    if (result.changes === 0) {
-
-    if (!result) {
+    if (!result.changes || result.changes === 0) {
       return res.status(404).json({ code: 404, message: '赛场不存在', data: null });
     }
 

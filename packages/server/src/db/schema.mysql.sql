@@ -339,8 +339,10 @@ CREATE TABLE IF NOT EXISTS operators (
 
 -- ==================== 系统设置表 ====================
 CREATE TABLE IF NOT EXISTS settings (
-  `key` VARCHAR(64) PRIMARY KEY,
-  value TEXT NOT NULL,
+  id VARCHAR(36) PRIMARY KEY,
+  setting_key VARCHAR(100) NOT NULL UNIQUE,
+  setting_value TEXT NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 

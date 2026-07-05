@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { queryOne, query } from '../config/database';
+import { queryOne, query, execute } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import {
   ApiResponse,
