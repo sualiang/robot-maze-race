@@ -85,12 +85,10 @@ router.post('/login', async (req: Request, res: Response) => {
       }
     }
 
-    // 生成 JWT
-    const jwt = require('jsonwebtoken');
-    const { config } = require('../config');
+    // 生成 JWT（使用统一的 JWT secret，fallback 到 config.default）
     const token = jwt.sign(
       { userId: operator.id, role: 'operator', phone: operator.phone, operatorId: operator.id, permissions },
-      config.jwt.secret || 'robot-race-jwt-secret',
+      config.jwt.secret,
       { expiresIn: '7d' }
     );
 

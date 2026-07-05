@@ -185,6 +185,109 @@ router.post('/batch', authMiddleware, operatorOnly, async (req: Request, res: Re
 });
 
 // ============================================================
+// GET /api/v1/operator/marketing/check-init
+// 检查运营商是否可以初始化模板数据
+// ============================================================
+router.get('/check-init', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
+  try {
+    const roleMember = await queryOne<{ operator_id: string }>(
+      'SELECT operator_id FROM operator_members WHERE id = $1',
+      [req.user!.userId]
+    );
+    const operatorId = roleMember?.operator_id ||
+      (req.user as any).operatorId ||
+      req.user!.userId;
+    const venue_id = 'operator_' + operatorId;
+
+    const pkgCount = await queryOne<{ cnt: number }>(
+      'SELECT COUNT(*) as cnt FROM race_packages WHERE venue_id = $1',
+      [venue_id]
+    );
+    const mktCount = await queryOne<{ cnt: number }>(
+      'SELECT COUNT(*) as cnt FROM marketing_config WHERE venue_id = $1',
+      [venue_id]
+    );
+    const initialized = (pkgCount?.cnt ?? 0) > 0 || (mktCount?.cnt ?? 0) > 0;
+    return res.json({ code: 0, message: 'ok', data: { initialized } });
+  } catch (error: any) {
+    console.error('[OperatorMarketing] check-init error:', error.message);
+    return res.status(500).json({ code: 500, message: '检查初始化状态失败', data: null });
+  }
+});
+
+// ============================================================
+// POST /api/v1/operator/marketing/init-templates
+// 一键初始化基础数据
+// ============================================================
+router.post('/init-templates', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
+  try {
+    const roleMember = await queryOne<{ operator_id: string }>(
+      'SELECT operator_id FROM operator_members WHERE id = $1',
+      [req.user!.userId]
+    );
+    const operatorId = roleMember?.operator_id ||
+      (req.user as any).operatorId ||
+      req.user!.userId;
+    const venue_id = 'operator_' + operatorId;
+
+    // 防重复
+    const pkgCount = await queryOne<{ cnt: number }>(
+      'SELECT COUNT(*) as cnt FROM race_packages WHERE venue_id = $1',
+      [venue_id]
+    );
+    if ((pkgCount?.cnt ?? 0) > 0) {
+      return res.status(400).json({ code: 400, message: '已有参赛包数据，不能重复初始化', data: null });
+    }
+
+    // 3档参赛包模板
+    const packages = [
+      { name: '基础参赛包', price: 6800, description: '基础参赛体验' },
+      { name: '标准参赛包', price: 16800, description: '标准参赛体验' },
+      { name: '专业参赛包', price: 36800, description: '专业参赛体验，含更多权益' },
+    ];
+    for (const pkg of packages) {
+      await execute(
+        `INSERT INTO race_packages (id, venue_id, name, price_cents, description, status, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, 1, NOW(), NOW())`,
+        [uuidv4(), venue_id, pkg.name, pkg.price, pkg.description]
+      );
+    }
+
+    // 默认营销配置
+    const defaultMktConfigs = [
+      { key: 'home_announcement', value: '' },
+      { key: 'help_enabled', value: 'true' },
+      { key: 'help_required_count', value: '3' },
+      { key: 'help_reward_count', value: '1' },
+      { key: 'welcome_deduction_cents', value: '500' },
+    ];
+    for (const cfg of defaultMktConfigs) {
+      await execute(
+        `INSERT INTO marketing_config (id, venue_id, \`key\`, value) VALUES ($1, $2, $3, $4)`,
+        [uuidv4(), venue_id, cfg.key, cfg.value]
+      );
+    }
+
+    // 测试消费券
+    for (let i = 0; i < 3; i++) {
+      const amounts = [500, 1000, 1500];
+      await execute(
+        `INSERT INTO user_coupons (id, user_id, coupon_id, merchant_id, name, description,
+                denomination_cents, min_consume_cents, status, valid_start, valid_end,
+                coupon_type, extra_data, created_at, updated_at)
+         VALUES ($1, '', '', 'platform', $2, $3, $4, 0, 1, NOW(), '2070-01-01 00:00:00', 20, '{}', NOW(), NOW())`,
+        [uuidv4(), `测试消费券${i + 1}号`, `初始化模板·${amounts[i] / 100}元消费券`, amounts[i]]
+      );
+    }
+
+    return res.json({ code: 0, message: '初始化成功', data: { venue_id } });
+  } catch (error: any) {
+    console.error('[OperatorMarketing] init-templates error:', error.message, error.stack);
+    return res.status(500).json({ code: 500, message: '初始化失败: ' + error.message, data: null });
+  }
+});
+
+// ============================================================
 // POST /api/v1/operator/marketing/announcement
 // 设置首页公告（纯文字，最多30字）
 // body: { text: string }
