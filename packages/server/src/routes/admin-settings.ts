@@ -142,7 +142,7 @@ router.put('/profit-share-rate', authMiddleware, async (req: Request, res: Respo
     const rateStr = String(rate);
     await execute(
       `INSERT INTO settings (\`key\`, value) VALUES ('default_profit_share_rate', $1)
-       ON CONFLICT(\`key\`) DO UPDATE SET value = $2, updated_at = NOW()`,
+       ON DUPLICATE KEY UPDATE value = $2, updated_at = CURRENT_TIMESTAMP`,
       [rateStr, rateStr]
     );
 
