@@ -96,6 +96,15 @@ router.put('/', authMiddleware, operatorOnly, async (req: Request, res: Response
 
       return res.json({ code: 0, message: '营销配置已更新', data: updated! });
     } else {
+      // 插入前确保 venue 记录存在（满足 foreign key 约束）
+      const opId = String(venue_id).replace(/^operator_/, '');
+      if (opId && String(venue_id).startsWith('operator_')) {
+        await execute(
+          'INSERT IGNORE INTO venues (id, name, operator_id, status) VALUES ($1, $2, $3, \'active\')',
+          [String(venue_id), String(venue_id), opId]
+        );
+      }
+
       // 插入
       const id = uuidv4();
       const created = await queryOne<{
@@ -156,17 +165,29 @@ router.post('/batch', authMiddleware, operatorOnly, async (req: Request, res: Re
       return res.status(400).json({ code: 400, message: 'configs 不能为空', data: null });
     }
 
-    // 不传 venue_id 时，统一获取运营商ID
+    // 不传 venue_id 时，统一获取运营商ID；同时获取 operatorId 用于 venue 占位
+    let operatorId: string;
     if (!venue_id) {
       const roleMember = await queryOne<{ operator_id: string }>(
         'SELECT operator_id FROM operator_members WHERE id = $1',
         [req.user!.userId]
       );
-      const operatorId = roleMember?.operator_id || 
+      operatorId = roleMember?.operator_id || 
         ((req.user as any).operatorId) || 
         req.user!.userId;
       venue_id = 'operator_' + operatorId;
+    } else {
+      // 从 venue_id 提取 operatorId（格式：operator_xxx）
+      operatorId = venue_id.replace(/^operator_/, '') || 
+        ((req.user as any).operatorId) || 
+        req.user!.userId;
     }
+
+    // 确保 venue 记录存在（满足 foreign key 约束）
+    await execute(
+      'INSERT IGNORE INTO venues (id, name, operator_id, status) VALUES ($1, $2, $3, \'active\')',
+      [venue_id, venue_id, operatorId]
+    );
 
     for (const { key, value } of configs) {
       const existing = await queryOne<{ id: string }>('SELECT id FROM marketing_config WHERE venue_id = $1 AND `key` = $2', [venue_id, key]);
@@ -252,6 +273,14 @@ router.post('/init-templates', authMiddleware, operatorOnly, async (req: Request
         [uuidv4(), operatorId, pkg.name, pkg.price, pkg.description]
       );
     }
+
+    // 确保 venue 记录存在（满足 foreign key 约束）
+    await execute(
+      `INSERT INTO venues (id, name, operator_id, status)
+       VALUES ($1, $2, $3, 'active')
+       ON DUPLICATE KEY UPDATE name = VALUES(name)`,
+      [venue_id, venue_id, operatorId]
+    );
 
     // 默认营销配置
     const defaultMktConfigs = [

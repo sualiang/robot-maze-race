@@ -17,6 +17,7 @@ function parseDatabaseUrl(url: string): mysql.PoolOptions {
     user: parsed.username || 'root',
     password: parsed.password || '',
     database: parsed.pathname.replace(/^\//, '') || 'robot_maze_race',
+    charset: 'utf8mb4',
     waitForConnections: true,
     connectionLimit: parseInt(process.env.DB_POOL_MAX || '20', 10),
     queueLimit: 0,
