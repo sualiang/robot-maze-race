@@ -78,7 +78,7 @@ export default function OperatorDashboard() {
     setLoadingStats(true);
     try {
       const res: any = await api.get('/admin/dashboard/stats');
-      if (res?.data) setStats(res.data);
+      if (res) setStats(res);
     } catch {
       // fallback
       setStats({
@@ -104,7 +104,7 @@ export default function OperatorDashboard() {
         params.end_date = topOpsDateRange[1].format('YYYY-MM-DD');
       }
       const res: any = await api.get('/admin/dashboard/top-operators', { params });
-      setTopOps(res?.data?.list ?? []);
+      setTopOps(res?.list ?? []);
     } catch {
       setTopOps([]);
     } finally {
