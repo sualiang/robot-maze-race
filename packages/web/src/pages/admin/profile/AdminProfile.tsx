@@ -11,7 +11,7 @@ export default function AdminProfile() {
   // 从 localStorage 读取当前用户信息
   const adminUserRaw = localStorage.getItem('admin_user');
   const adminUser = adminUserRaw ? JSON.parse(adminUserRaw) : {};
-  const { nickname, username, phone } = adminUser;
+  const { username, phone } = adminUser;
 
   const handleChangePassword = async () => {
     try {
@@ -58,10 +58,10 @@ export default function AdminProfile() {
           <Descriptions.Item label="用户名">
             <Space>
               <UserOutlined />
-              {username || nickname || '-'}
+              {username || '-'}
             </Space>
           </Descriptions.Item>
-          <Descriptions.Item label="昵称">{nickname || '-'}</Descriptions.Item>
+          {/* 昵称字段已移除 */}
           {/* 邮箱字段已移除 */}
           <Descriptions.Item label="手机号">{phone || '-'}</Descriptions.Item>
         </Descriptions>
