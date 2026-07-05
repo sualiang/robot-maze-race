@@ -91,9 +91,6 @@ export default function RefereeList() {
   const [rejectReason, setRejectReason] = useState('');
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
 
-  // 运营商列表（用于展示推荐运营商名称）
-  const [operatorMap, setOperatorMap] = useState<Record<string, string>>({});
-
   const [activeTab, setActiveTab] = useState<string>('list');
 
   const fetchList = useCallback(async () => {
@@ -111,21 +108,15 @@ export default function RefereeList() {
   const fetchReviewList = useCallback(async () => {
     setReviewLoading(true);
     try {
-      // 拉取所有待审核 + 已审核的申请
+      // 拉取所有裁判申请（后端已 JOIN operators 返回 operator_name）
       const data: any = await api.get('/referees', { params: { pageSize: 1000 } });
-      const allList: RefereeReviewItem[] = data?.list ?? [];
-      // 补充 operator_name：从 operatorMap 查找
-      const enriched = allList.map((item) => ({
-        ...item,
-        operator_name: item.operator_id ? operatorMap[item.operator_id] || item.operator_id : '-',
-      }));
-      setReviewList(enriched);
+      setReviewList(data?.list ?? []);
     } catch {
       setReviewList([]);
     } finally {
       setReviewLoading(false);
     }
-  }, [operatorMap]);
+  }, []);
 
   const fetchVenues = useCallback(async () => {
     try {
@@ -135,27 +126,12 @@ export default function RefereeList() {
     } catch { /* ignore */ }
   }, []);
 
-  // 拉取所有运营商名称（用于审核心列表显示推荐运营商）
-  const fetchOperatorMap = useCallback(async () => {
-    try {
-      const data: any = await api.get('/operators', { params: { pageSize: 1000 } });
-      const ops = data?.list ?? [];
-      const map: Record<string, string> = {};
-      ops.forEach((o: any) => {
-        if (o.id && o.name) map[o.id] = o.name;
-      });
-      setOperatorMap(map);
-    } catch { /* ignore */ }
-  }, []);
+  useEffect(() => { fetchList(); fetchVenues(); }, [fetchList, fetchVenues]);
 
-  useEffect(() => { fetchList(); fetchVenues(); fetchOperatorMap(); }, [fetchList, fetchVenues, fetchOperatorMap]);
-
-  // 需要 operatorMap 加载完毕后再拉审核列表
+  // Tab 切换到审核时拉取审核列表
   useEffect(() => {
-    if (Object.keys(operatorMap).length > 0) {
-      fetchReviewList();
-    }
-  }, [operatorMap, fetchReviewList]);
+    fetchReviewList();
+  }, []);
 
   const refereeApplyUrl = `https://dog.amberrobot.com.cn/referee/apply?operatorId=${operatorId}`;
 
@@ -437,7 +413,7 @@ export default function RefereeList() {
                   columns={reviewColumns}
                   dataSource={reviewList}
                   rowKey="id"
-                  loading={reviewLoading || Object.keys(operatorMap).length === 0}
+                  loading={reviewLoading}
                   scroll={{ x: 800 }}
                   pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t: number) => `共 ${t} 条申请` }}
                 />
