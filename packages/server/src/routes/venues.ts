@@ -350,13 +350,21 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response<ApiResp
       return res.status(403).json({ code: 403, message: '仅管理员或运营商可删除赛场', data: null });
     }
 
-    const result = await execute(
-      'DELETE FROM venues WHERE id = $1',
-      [id]
-    );
+    const existing = await queryOne<{ id: string }>('SELECT id FROM venues WHERE id = $1', [id]);
+    if (!existing) {
+      return res.json({ code: 404, message: '赛场不存在', data: null });
+    }
+
+    // 先删除关联数据，避免外键约束导致 DELETE 失败
+    await execute('DELETE FROM marketing_config WHERE venue_id = $1', [id]);
+    await execute('DELETE FROM race_records WHERE venue_id = $1', [id]);
+    // 更新绑定的裁判解绑
+    await execute('UPDATE referees SET venue_id = NULL WHERE venue_id = $1', [id]);
+
+    const result = await execute('DELETE FROM venues WHERE id = $1', [id]);
 
     if (!result.changes || result.changes === 0) {
-      return res.status(404).json({ code: 404, message: '赛场不存在', data: null });
+      return res.json({ code: 404, message: '赛场不存在', data: null });
     }
 
     return res.json({ code: 0, message: '赛场已删除', data: null });

@@ -96,6 +96,8 @@ CREATE TABLE IF NOT EXISTS race_packages (
   name VARCHAR(128) NOT NULL,
   description TEXT,
   price_cents INT NOT NULL,
+  standard_price_cents INT DEFAULT 0,
+  discount_price_cents INT DEFAULT 0,
   race_count INT NOT NULL DEFAULT 1,
   valid_days INT DEFAULT 365,
   status VARCHAR(20) NOT NULL DEFAULT 'active',
@@ -104,6 +106,9 @@ CREATE TABLE IF NOT EXISTS race_packages (
   coupon_reward_max_cents INT DEFAULT 0,
   free_deduction_cents INT NOT NULL DEFAULT 0,
   season_id INT,
+  tag VARCHAR(64) DEFAULT '',
+  special_rights TEXT DEFAULT '',
+  is_active INT DEFAULT 1,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
