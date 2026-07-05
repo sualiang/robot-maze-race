@@ -11,8 +11,7 @@ export default function AdminProfile() {
   // 从 localStorage 读取当前用户信息
   const adminUserRaw = localStorage.getItem('admin_user');
   const adminUser = adminUserRaw ? JSON.parse(adminUserRaw) : {};
-  const { nickname, username, role_name, email, phone } = adminUser;
-  const roleLabel = role_name === 'super_admin' ? '超级管理员' : role_name || '-';
+  const { nickname, username, phone } = adminUser;
 
   const handleChangePassword = async () => {
     try {
@@ -63,10 +62,7 @@ export default function AdminProfile() {
             </Space>
           </Descriptions.Item>
           <Descriptions.Item label="昵称">{nickname || '-'}</Descriptions.Item>
-          <Descriptions.Item label="角色权限">
-            {roleLabel}
-          </Descriptions.Item>
-          <Descriptions.Item label="邮箱">{email || '-'}</Descriptions.Item>
+          {/* 邮箱字段已移除 */}
           <Descriptions.Item label="手机号">{phone || '-'}</Descriptions.Item>
         </Descriptions>
       </Card>
