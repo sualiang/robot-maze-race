@@ -116,13 +116,13 @@ router.put('/', authMiddleware, superAdminOnly, async (req: Request, res: Respon
  */
 router.get('/profit-share-rate', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const row = await queryOne<{ value: string }>(
-      `SELECT value FROM settings WHERE \`key\` = 'default_profit_share_rate'`
+    const row = await queryOne<{ setting_value: string }>(
+      `SELECT setting_value FROM settings WHERE setting_key = 'default_profit_share_rate'`
     );
     return res.json({
       code: 0,
       message: 'ok',
-      data: { rate: parseInt(row?.value || '80', 10) },
+      data: { rate: parseInt(row?.setting_value || '80', 10) },
     });
   } catch (error: any) {
     return res.status(500).json({ code: 500, message: '获取分润比例失败', data: null });
@@ -141,8 +141,8 @@ router.put('/profit-share-rate', authMiddleware, async (req: Request, res: Respo
     }
     const rateStr = String(rate);
     await execute(
-      `INSERT INTO settings (\`key\`, value) VALUES ('default_profit_share_rate', $1)
-       ON DUPLICATE KEY UPDATE value = $2, updated_at = CURRENT_TIMESTAMP`,
+      `INSERT INTO settings (setting_key, setting_value) VALUES ('default_profit_share_rate', $1)
+       ON DUPLICATE KEY UPDATE setting_value = $2, updated_at = CURRENT_TIMESTAMP`,
       [rateStr, rateStr]
     );
 
