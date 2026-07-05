@@ -40,6 +40,7 @@ const operatorUserInfo = (() => {
     return JSON.parse(localStorage.getItem('operator_user_info') || '{}');
   } catch { return {}; }
 })();
+const operatorId: string = operatorUserInfo.operatorId || operatorUserInfo.id || '';
 const operatorRoleName: string = operatorUserInfo.role_name || '';
 const operatorRoleId: string = operatorUserInfo.role_id || '';
 const operatorPermissions: string[] = operatorUserInfo.permissions || [];
@@ -85,7 +86,7 @@ export default function RefereeList() {
 
   useEffect(() => { fetchList(); fetchVenues(); }, [fetchList, fetchVenues]);
 
-  const refereeApplyUrl = 'https://dog.amberrobot.com.cn/referee/apply';
+  const refereeApplyUrl = `https://dog.amberrobot.com.cn/referee/apply?operatorId=${operatorId}`;
 
   const handleCopyLink = async () => {
     try {

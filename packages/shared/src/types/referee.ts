@@ -46,6 +46,7 @@ export interface RefereeApplyRequest {
   name: string;
   phone: string;
   remark?: string;
+  operator_id?: string;
 }
 
 /** 裁判审核请求 */

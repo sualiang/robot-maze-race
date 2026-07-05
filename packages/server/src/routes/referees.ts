@@ -436,10 +436,12 @@ router.post('/apply', authMiddleware, async (req: Request, res: Response<ApiResp
     // 4. 创建 referees 记录，status='pending'
     const refereeId = uuidv4();
     const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    const opId = body.operator_id || null;
+    console.log('[Referees] apply:', { refereeId, name: body.name, phone: body.phone, operator_id: opId });
     await execute(
-      `INSERT INTO referees (id, user_id, name, phone, status, apply_remark, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [refereeId, userRecord.id, body.name, body.phone, 'pending', body.remark || '', now, now]
+      `INSERT INTO referees (id, user_id, name, phone, status, apply_remark, operator_id, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [refereeId, userRecord.id, body.name, body.phone, 'pending', body.remark || '', opId, now, now]
     );
 
     return res.status(201).json({

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../../utils/api';
 
 type ApplicationStatus = 'none' | 'pending' | 'approved' | 'rejected';
@@ -13,6 +13,8 @@ const STATUS_LABELS: Record<ApplicationStatus, string> = {
 
 export default function ApplyPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const operatorId = searchParams.get('operatorId') || '';
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
@@ -74,6 +76,7 @@ export default function ApplyPage() {
       await api.post('/referees/apply', {
         name: name.trim(),
         phone: phone.trim(),
+        operator_id: operatorId || undefined,
       });
       setSuccess('申请已提交，请等待审核');
       setAppStatus('pending');
