@@ -87,8 +87,8 @@ function expandParams(text: string, params: any[]): any[] {
  * 返回 { mainSql, returningColumns } 或 null（无 RETURNING 子句）
  */
 function parseReturning(text: string): { mainSql: string; returningColumns: string } | null {
-  // 匹配 RETURNING 子句（不区分大小写）
-  const returningRegex = /\bRETURNING\s+(.+)$/i;
+  // 匹配 RETURNING 子句（不区分大小写，支持跨行）
+  const returningRegex = /\bRETURNING\s+([\s\S]+)$/i;
   const match = text.match(returningRegex);
   if (!match) return null;
 
