@@ -326,7 +326,7 @@ router.patch('/:id/status', authMiddleware, anyPermissionMiddleware, async (req:
       return;
     }
 
-    await execute('UPDATE merchants SET status = $1, updated_at = datetime(\'now\') WHERE id = $2', [status, id]);
+    await execute('UPDATE merchants SET status = $1, updated_at = NOW() WHERE id = $2', [status, id]);
 
     res.json({ code: 0, message: status === 1 ? '商家已启用' : '商家已禁用' });
   } catch (e: any) {
