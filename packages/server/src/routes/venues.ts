@@ -345,23 +345,48 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response<ApiResp
   try {
     const { id } = req.params;
     const role = req.user!.role;
+    console.log('[Venues] delete request:', { id, role });
 
     if (role !== 'admin' && role !== 'operator') {
       return res.status(403).json({ code: 403, message: '仅管理员或运营商可删除赛场', data: null });
     }
 
-    const existing = await queryOne<{ id: string }>('SELECT id FROM venues WHERE id = $1', [id]);
+    const existing = await queryOne<{ id: string; name: string }>('SELECT id, name FROM venues WHERE id = $1', [id]);
     if (!existing) {
+      console.log('[Venues] delete: venue not found:', id);
       return res.json({ code: 404, message: '赛场不存在', data: null });
     }
+    console.log('[Venues] deleting venue:', existing.name, id);
 
-    // 先删除关联数据，避免外键约束导致 DELETE 失败
-    await execute('DELETE FROM marketing_config WHERE venue_id = $1', [id]);
-    await execute('DELETE FROM race_records WHERE venue_id = $1', [id]);
-    // 更新绑定的裁判解绑
-    await execute('UPDATE referees SET venue_id = NULL WHERE venue_id = $1', [id]);
+    // 先删除（或尝试删除）所有引用该 venue 的数据
+    const tables = [
+      'marketing_config',
+      'race_records',
+      'checkins',
+      'race_results',
+      'races',
+    ];
+    for (const table of tables) {
+      try {
+        const r = await execute(`DELETE FROM ${table} WHERE venue_id = $1`, [id]);
+        console.log(`[Venues] delete from ${table}:`, r.changes, 'rows');
+      } catch (e: any) {
+        // 表可能不存在或列名不对，忽略
+        console.log(`[Venues] skip ${table}:`, e.message);
+      }
+    }
 
+    // 解绑裁判
+    try {
+      const r2 = await execute('UPDATE referees SET venue_id = NULL WHERE venue_id = $1', [id]);
+      console.log('[Venues] unbind referees:', r2.changes, 'rows');
+    } catch (e: any) {
+      console.log('[Venues] skip unbind referees:', e.message);
+    }
+
+    // 最后删除赛场本身
     const result = await execute('DELETE FROM venues WHERE id = $1', [id]);
+    console.log('[Venues] delete result:', result);
 
     if (!result.changes || result.changes === 0) {
       return res.json({ code: 404, message: '赛场不存在', data: null });
@@ -369,7 +394,7 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response<ApiResp
 
     return res.json({ code: 0, message: '赛场已删除', data: null });
   } catch (error: any) {
-    console.error('[Venues] delete error:', error.message);
+    console.error('[Venues] delete error:', error.message, error.stack);
     return res.status(500).json({ code: 500, message: '删除赛场失败', data: null });
   }
 });
