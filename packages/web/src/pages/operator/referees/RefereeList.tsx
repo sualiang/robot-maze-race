@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Card, Table, Button, Space, Tag, Modal, Select, Popconfirm,
-  message, Input, Descriptions, Badge,
+  Card, Table, Button, Space, Tag, Modal, Select, Popconfirm, Input,
+  message, Descriptions, Badge, Tabs,
 } from 'antd';
 import {
   CheckOutlined, CloseOutlined, EyeOutlined, KeyOutlined, ReloadOutlined,
-  SwapOutlined, SearchOutlined, PlusOutlined, CopyOutlined,
+  SwapOutlined, SearchOutlined, PlusOutlined, CopyOutlined, ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import AccountInfoModal from '../../../components/AccountInfoModal';
 import type { ColumnsType } from 'antd/es/table';
@@ -26,6 +26,24 @@ interface RefereeItem {
   check_out_at?: string;
   total_hours?: number;
   last_active_at?: string;
+  created_at: string;
+  apply_remark?: string;
+  review_remark?: string;
+  reviewed_at?: string;
+  operator_id?: string;
+}
+
+interface RefereeReviewItem {
+  id: string;
+  user_id: string;
+  name: string;
+  phone: string;
+  status: string;
+  apply_remark?: string;
+  review_remark?: string;
+  reviewed_at?: string;
+  operator_id?: string;
+  operator_name?: string;
   created_at: string;
 }
 
@@ -48,6 +66,7 @@ const operatorPermissions: string[] = operatorUserInfo.permissions || [];
 const isOperatorManager = operatorRoleId === 'op_super_admin' || operatorPermissions.includes('*');
 
 export default function RefereeList() {
+  // 裁判列表
   const [list, setList] = useState<RefereeItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [venues, setVenues] = useState<VenueOption[]>([]);
@@ -64,6 +83,19 @@ export default function RefereeList() {
   const [copied, setCopied] = useState(false);
   const [accountInfo, setAccountInfo] = useState<{ account: string; password: string } | null>(null);
 
+  // 申请审核 Tab
+  const [reviewList, setReviewList] = useState<RefereeReviewItem[]>([]);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [rejectTarget, setRejectTarget] = useState<RefereeReviewItem | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+
+  // 运营商列表（用于展示推荐运营商名称）
+  const [operatorMap, setOperatorMap] = useState<Record<string, string>>({});
+
+  const [activeTab, setActiveTab] = useState<string>('list');
+
   const fetchList = useCallback(async () => {
     setLoading(true);
     try {
@@ -76,6 +108,25 @@ export default function RefereeList() {
     }
   }, [searchName]);
 
+  const fetchReviewList = useCallback(async () => {
+    setReviewLoading(true);
+    try {
+      // 拉取所有待审核 + 已审核的申请
+      const data: any = await api.get('/referees', { params: { pageSize: 1000 } });
+      const allList: RefereeReviewItem[] = data?.list ?? [];
+      // 补充 operator_name：从 operatorMap 查找
+      const enriched = allList.map((item) => ({
+        ...item,
+        operator_name: item.operator_id ? operatorMap[item.operator_id] || item.operator_id : '-',
+      }));
+      setReviewList(enriched);
+    } catch {
+      setReviewList([]);
+    } finally {
+      setReviewLoading(false);
+    }
+  }, [operatorMap]);
+
   const fetchVenues = useCallback(async () => {
     try {
       const data: any = await api.get('/venues', { params: { pageSize: 1000 } });
@@ -84,7 +135,27 @@ export default function RefereeList() {
     } catch { /* ignore */ }
   }, []);
 
-  useEffect(() => { fetchList(); fetchVenues(); }, [fetchList, fetchVenues]);
+  // 拉取所有运营商名称（用于审核心列表显示推荐运营商）
+  const fetchOperatorMap = useCallback(async () => {
+    try {
+      const data: any = await api.get('/operators', { params: { pageSize: 1000 } });
+      const ops = data?.list ?? [];
+      const map: Record<string, string> = {};
+      ops.forEach((o: any) => {
+        if (o.id && o.name) map[o.id] = o.name;
+      });
+      setOperatorMap(map);
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => { fetchList(); fetchVenues(); fetchOperatorMap(); }, [fetchList, fetchVenues, fetchOperatorMap]);
+
+  // 需要 operatorMap 加载完毕后再拉审核列表
+  useEffect(() => {
+    if (Object.keys(operatorMap).length > 0) {
+      fetchReviewList();
+    }
+  }, [operatorMap, fetchReviewList]);
 
   const refereeApplyUrl = `https://dog.amberrobot.com.cn/referee/apply?operatorId=${operatorId}`;
 
@@ -154,6 +225,49 @@ export default function RefereeList() {
     setDetailOpen(true);
   };
 
+  // 审核操作
+  const handleApprove = async (record: RefereeReviewItem) => {
+    setReviewSubmitting(true);
+    try {
+      await api.patch(`/referees/${record.id}/review`, { action: 'approve' });
+      message.success(`裁判「${record.name}」已通过审核`);
+      fetchReviewList();
+      fetchList();
+    } catch (err: any) {
+      message.error(err?.response?.data?.message || '审核失败');
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
+  const handleRejectClick = (record: RefereeReviewItem) => {
+    setRejectTarget(record);
+    setRejectReason('');
+    setRejectModalOpen(true);
+  };
+
+  const handleRejectConfirm = async () => {
+    if (!rejectTarget) return;
+    setReviewSubmitting(true);
+    try {
+      await api.patch(`/referees/${rejectTarget.id}/review`, {
+        action: 'reject',
+        reason: rejectReason || undefined,
+      });
+      message.success(`裁判「${rejectTarget.name}」已驳回`);
+      setRejectModalOpen(false);
+      setRejectTarget(null);
+      setRejectReason('');
+      fetchReviewList();
+      fetchList();
+    } catch (err: any) {
+      message.error(err?.response?.data?.message || '审核失败');
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
+  // 裁判列表列（保持原有不变，仅增加 status 展示）
   const columns: ColumnsType<RefereeItem> = [
     { title: '姓名', dataIndex: 'name', key: 'name', width: 100 },
     { title: '手机号', dataIndex: 'phone', key: 'phone', width: 130 },
@@ -209,6 +323,59 @@ export default function RefereeList() {
     },
   ];
 
+  // 审核列表列
+  const reviewColumns: ColumnsType<RefereeReviewItem> = [
+    { title: '姓名', dataIndex: 'name', key: 'name', width: 100 },
+    { title: '手机号', dataIndex: 'phone', key: 'phone', width: 130 },
+    {
+      title: '推荐运营商', dataIndex: 'operator_name', key: 'operator_name', width: 160,
+      render: (v: string) => v || <Tag color="default">未关联</Tag>,
+    },
+    {
+      title: '申请时间', dataIndex: 'created_at', key: 'created_at', width: 160,
+      render: (v: string) => v ? new Date(v).toLocaleString('zh-CN') : '-',
+    },
+    {
+      title: '状态', dataIndex: 'status', key: 'status', width: 100,
+      render: (s: string) => {
+        if (s === 'pending') return <Tag color="processing">待审核</Tag>;
+        if (s === 'approved') return <Tag color="success">已通过</Tag>;
+        if (s === 'rejected') return <Tag color="error">已拒绝</Tag>;
+        return <Tag>{s || '-'}</Tag>;
+      },
+    },
+    {
+      title: '操作', key: 'action', width: 160, fixed: 'right',
+      render: (_: unknown, record: RefereeReviewItem) => {
+        if (record.status !== 'pending') return null;
+        return (
+          <Space size="small">
+            <Button
+              type="link"
+              size="small"
+              icon={<CheckOutlined />}
+              style={{ color: '#52c41a' }}
+              loading={reviewSubmitting}
+              onClick={() => handleApprove(record)}
+            >
+              通过
+            </Button>
+            <Button
+              type="link"
+              size="small"
+              danger
+              icon={<CloseOutlined />}
+              loading={reviewSubmitting}
+              onClick={() => handleRejectClick(record)}
+            >
+              拒绝
+            </Button>
+          </Space>
+        );
+      },
+    },
+  ];
+
   return (
     <>
       <Card
@@ -228,19 +395,87 @@ export default function RefereeList() {
             <Button type="primary" icon={<PlusOutlined />} onClick={() => setInviteOpen(true)}>
               邀请裁判
             </Button>
-            <Button icon={<ReloadOutlined />} onClick={fetchList}>刷新</Button>
+            <Button icon={<ReloadOutlined />} onClick={() => { fetchList(); fetchReviewList(); }}>刷新</Button>
           </Space>
         }
       >
-        <Table
-          columns={columns}
-          dataSource={list}
-          rowKey="id"
-          loading={loading}
-          scroll={{ x: 1000 }}
-          pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t: number) => `共 ${t} 名裁判` }}
+        <Tabs
+          activeKey={activeTab}
+          onChange={(key) => {
+            setActiveTab(key);
+            if (key === 'review') fetchReviewList();
+          }}
+          items={[
+            {
+              key: 'list',
+              label: '裁判列表',
+              children: (
+                <Table
+                  columns={columns}
+                  dataSource={list}
+                  rowKey="id"
+                  loading={loading}
+                  scroll={{ x: 1000 }}
+                  pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t: number) => `共 ${t} 名裁判` }}
+                />
+              ),
+            },
+            {
+              key: 'review',
+              label: (
+                <span>
+                  申请审核
+                  {reviewList.filter((r) => r.status === 'pending').length > 0 && (
+                    <Tag color="red" style={{ marginLeft: 6 }}>
+                      {reviewList.filter((r) => r.status === 'pending').length}
+                    </Tag>
+                  )}
+                </span>
+              ),
+              children: (
+                <Table
+                  columns={reviewColumns}
+                  dataSource={reviewList}
+                  rowKey="id"
+                  loading={reviewLoading || Object.keys(operatorMap).length === 0}
+                  scroll={{ x: 800 }}
+                  pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t: number) => `共 ${t} 条申请` }}
+                />
+              ),
+            },
+          ]}
         />
       </Card>
+
+      {/* 驳回原因弹窗 */}
+      <Modal
+        title={
+          <Space>
+            <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />
+            驳回裁判申请
+          </Space>
+        }
+        open={rejectModalOpen}
+        onOk={handleRejectConfirm}
+        onCancel={() => { setRejectModalOpen(false); setRejectTarget(null); setRejectReason(''); }}
+        confirmLoading={reviewSubmitting}
+        okText="确认驳回"
+        okButtonProps={{ danger: true }}
+      >
+        <div style={{ padding: '8px 0' }}>
+          <p style={{ marginBottom: 12 }}>
+            驳回裁判申请：<strong>{rejectTarget?.name}</strong>（{rejectTarget?.phone}）
+          </p>
+          <Input.TextArea
+            placeholder="驳回原因（选填）"
+            rows={3}
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            maxLength={200}
+            showCount
+          />
+        </div>
+      </Modal>
 
       {/* 邀请裁判弹窗 */}
       <Modal

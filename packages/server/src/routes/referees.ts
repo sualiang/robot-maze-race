@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { query, queryOne, execute, generateSecurePassword } from '../config/database';
 import * as bcrypt from 'bcryptjs';
 import { authMiddleware } from '../middleware/auth';
+import { sendRefereeReviewNotification } from './wx-notify';
 import {
   ApiResponse,
   PaginatedResult,
@@ -111,6 +112,7 @@ interface RefereeWithUser extends Referee {
   nickname?: string;
   avatar_url?: string;
   venue_name?: string;
+  operator_name?: string;
 }
 
 /**
@@ -127,6 +129,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response<ApiResponse<P
   try {
     const {
       venue_id,
+      status,
       page: pageStr = '1',
       pageSize: pageSizeStr = '20',
     } = req.query;
@@ -143,6 +146,24 @@ router.get('/', authMiddleware, async (req: Request, res: Response<ApiResponse<P
       conditions.push(`r.venue_id = $${paramIdx}`);
       params.push(venue_id);
       paramIdx++;
+    }
+
+    // 按审核状态筛选
+    if (status && (status as string) !== '') {
+      if ((status as string) === 'pending') {
+        conditions.push(`r.status = $${paramIdx}`);
+        params.push('pending');
+        paramIdx++;
+      } else if ((status as string) === 'approved') {
+        conditions.push(`r.status = $${paramIdx}`);
+        params.push('approved');
+        paramIdx++;
+      } else if ((status as string) === 'rejected') {
+        conditions.push(`r.status = $${paramIdx}`);
+        params.push('rejected');
+        paramIdx++;
+      }
+      // 不支持其他 status 值，忽略
     }
 
     // operator 可看自己管理的赛场下的裁判 + 未绑定赛场的裁判（自己创建的）
@@ -189,12 +210,14 @@ router.get('/', authMiddleware, async (req: Request, res: Response<ApiResponse<P
               r.name,
               r.phone, r.id_number, r.cert_image, r.gps_lat, r.gps_lng,
               r.last_checkin_at, r.created_at, r.updated_at,
-              r.name,
+              r.apply_remark, r.review_remark, r.reviewed_at, r.operator_id,
               u.nickname, u.avatar_url,
-              v.name as venue_name
+              v.name as venue_name,
+              o.name as operator_name
        FROM referees r
        JOIN users u ON r.user_id = u.id
        LEFT JOIN venues v ON r.venue_id = v.id
+       LEFT JOIN operators o ON r.operator_id = o.id
        ${whereClause}
        ORDER BY r.created_at DESC
        LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
@@ -597,6 +620,98 @@ router.patch('/:id/status', authMiddleware, async (req: Request, res: Response<A
   } catch (error: any) {
     console.error('[Referees] status change error:', error.message, error.stack);
     return res.status(500).json({ code: 500, message: '修改裁判状态失败: ' + error.message, data: null });
+  }
+});
+
+// ============================================================
+// 裁判审核路由
+// ============================================================
+
+/**
+ * PATCH /api/v1/referees/:id/review
+ * 审核裁判申请（operator/admin 专用）
+ * @param id - 裁判记录 UUID
+ * @body action - 'approve' | 'reject'
+ * @body reason - 拒绝原因（reject 时可选）
+ * @header Authorization: Bearer <token>
+ */
+router.patch('/:id/review', authMiddleware, async (req: Request, res: Response<ApiResponse<null>>) => {
+  try {
+    const { id } = req.params;
+    const { action, reason } = req.body;
+    const role = req.user!.role;
+    const reviewer = req.user!.userId;
+
+    if (role !== 'admin' && role !== 'operator') {
+      return res.status(403).json({ code: 403, message: '仅管理员或运营商可审核裁判申请', data: null });
+    }
+
+    if (action !== 'approve' && action !== 'reject') {
+      return res.status(400).json({ code: 400, message: 'action 无效，允许值: approve, reject', data: null });
+    }
+
+    // 查找裁判记录
+    const referee = await queryOne<{
+      id: string; user_id: string; name: string; phone: string;
+      status: string; operator_id: string;
+    }>(
+      'SELECT id, user_id, name, phone, status, operator_id FROM referees WHERE id = $1',
+      [id]
+    );
+
+    if (!referee) {
+      return res.status(404).json({ code: 404, message: '裁判申请不存在', data: null });
+    }
+
+    if (referee.status !== 'pending') {
+      const label = referee.status === 'approved' ? '已通过' : referee.status === 'rejected' ? '已拒绝' : referee.status;
+      return res.status(400).json({ code: 400, message: `该申请已处理（${label}），不可重复审核`, data: null });
+    }
+
+    const isApproved = action === 'approve';
+    const newStatus = isApproved ? 'approved' : 'rejected';
+    const reviewRemark = isApproved ? '' : (reason || '');
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+
+    console.log('[Referees] review:', { id, action, newStatus, reviewer });
+
+    // 更新 referees 表
+    await execute(
+      `UPDATE referees
+       SET status = $1, review_remark = $2, reviewed_at = $3, reviewed_by = $4, updated_at = $5
+       WHERE id = $6`,
+      [newStatus, reviewRemark, now, reviewer, now, id]
+    );
+
+    // 如果通过，同步更新 users 表角色为 referee
+    if (isApproved && referee.user_id) {
+      try {
+        await execute(
+          'UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2',
+          ['referee', referee.user_id]
+        );
+      } catch (e: any) {
+        console.error('[Referees] review sync users role failed:', e.message);
+      }
+    }
+
+    // 发送微信模板消息通知
+    try {
+      await sendRefereeReviewNotification({
+        userId: referee.user_id,
+        refereeName: referee.name || referee.phone || '裁判',
+        status: newStatus,
+        remark: reviewRemark,
+      });
+    } catch (e: any) {
+      console.warn('[Referees] review notification failed:', e.message);
+    }
+
+    const label = isApproved ? '已通过' : '已驳回';
+    return res.json({ code: 0, message: '裁判申请' + label, data: null });
+  } catch (error: any) {
+    console.error('[Referees] review error:', error.message, error.stack);
+    return res.status(500).json({ code: 500, message: '审核失败: ' + error.message, data: null });
   }
 });
 
