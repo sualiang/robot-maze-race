@@ -56,7 +56,9 @@ router.get('/users', authMiddleware, async (req: Request, res: Response) => {
     const params: any[] = [];
 
     // 总部管理员角色管理只显示 operator_id 为 null 的用户
-    conditions.push('au.operator_id IS NULL');
+    // 或 role_id 为 'role-admin'（总管理员，类似 13800000001 这种账号）
+    conditions.push('(au.operator_id IS NULL OR au.role_id = $' + (params.length + 1) + ')');
+    params.push('role-admin');
 
     if (search) {
       conditions.push(`(au.username LIKE $${params.length + 1} OR au.nickname LIKE $${params.length + 1})`);
