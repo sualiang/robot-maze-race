@@ -25,13 +25,13 @@ interface PlatformStats {
 
 interface TopOperator {
   rank: number;
-  operator_name: string;
+  name: string;
   province: string;
   city: string;
   district: string;
-  current_month_revenue: number;
-  last_month_revenue: number;
-  growth_trend: 'up' | 'down' | 'flat';
+  total_revenue: number;
+  total_platform_profit: number;
+  order_count: number;
 }
 
 
@@ -78,7 +78,7 @@ export default function OperatorDashboard() {
     setLoadingStats(true);
     try {
       const res: any = await api.get('/admin/dashboard/stats');
-      if (res) setStats(res);
+      if (res?.data) setStats(res.data);
     } catch {
       // fallback
       setStats({
@@ -104,7 +104,7 @@ export default function OperatorDashboard() {
         params.end_date = topOpsDateRange[1].format('YYYY-MM-DD');
       }
       const res: any = await api.get('/admin/dashboard/top-operators', { params });
-      setTopOps(res?.list ?? res ?? []);
+      setTopOps(res?.data?.list ?? []);
     } catch {
       setTopOps([]);
     } finally {
@@ -140,25 +140,20 @@ export default function OperatorDashboard() {
   /* ── Columns: Top Operators ── */
   const topOpColumns: ColumnsType<TopOperator> = [
     { title: '排名', dataIndex: 'rank', key: 'rank', width: 60, align: 'center' },
-    { title: '运营商名称', dataIndex: 'operator_name', key: 'operator_name', width: 180 },
+    { title: '运营商名称', dataIndex: 'name', key: 'name', width: 180 },
     { title: '省', dataIndex: 'province', key: 'province', width: 80 },
     { title: '市', dataIndex: 'city', key: 'city', width: 80 },
     { title: '区', dataIndex: 'district', key: 'district', width: 80 },
     {
-      title: '本月营收', dataIndex: 'current_month_revenue', key: 'current_month_revenue', width: 130,
+      title: '营收', dataIndex: 'total_revenue', key: 'total_revenue', width: 130,
       render: (v: number) => `¥${(v / 100).toFixed(2)}`,
     },
     {
-      title: '上月营收', dataIndex: 'last_month_revenue', key: 'last_month_revenue', width: 130,
+      title: '平台利润', dataIndex: 'total_platform_profit', key: 'total_platform_profit', width: 130,
       render: (v: number) => `¥${(v / 100).toFixed(2)}`,
     },
     {
-      title: '增长趋势', key: 'growth', width: 100,
-      render: (_: unknown, record: TopOperator) => {
-        if (record.growth_trend === 'up') return <Tag color="green"><ArrowUpOutlined /> 上升</Tag>;
-        if (record.growth_trend === 'down') return <Tag color="red"><ArrowDownOutlined /> 下降</Tag>;
-        return <Tag color="default">平稳</Tag>;
-      },
+      title: '订单数', dataIndex: 'order_count', key: 'order_count', width: 80,
     },
   ];
 

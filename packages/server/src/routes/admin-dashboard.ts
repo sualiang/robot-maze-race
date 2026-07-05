@@ -313,7 +313,10 @@ router.get('/top-operators', authMiddleware, checkPermission('dashboard:list'), 
       [dateStart, dateEnd]
     );
 
-    const pagedList = operators.slice(offset, offset + pageSize);
+    const pagedList = operators.slice(offset, offset + pageSize).map((row: any, i: number) => ({
+      ...row,
+      rank: offset + i + 1,
+    }));
 
     return res.json({
       code: 0,

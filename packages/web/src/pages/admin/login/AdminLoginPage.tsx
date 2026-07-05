@@ -95,7 +95,7 @@ export default function AdminLoginPage() {
     }}>
       <div style={{ textAlign: 'center', width: '100%', position: 'absolute', top: '8%', left: 0 }}>
         <img
-          src="/logo.png"
+          src="/logo-operator.png"
           alt="铁甲快狗"
           style={{ width: 400, height: 'auto' }}
           onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}

@@ -6,6 +6,7 @@ import { config } from '../config';
 import { query, queryOne, execute, generateSecurePassword } from '../config/database';
 import { authMiddleware, AuthPayload } from '../middleware/auth';
 import { RefereeReviewRequest } from '@robot-race/shared';
+import pcaCodeData from '../../../shared/src/pca-code.json';
 
 const router = Router();
 
@@ -1053,27 +1054,9 @@ router.post('/change-password', authMiddleware, async (req: Request, res: Respon
  * GET /api/v1/operator/regions
  * 返回全国省市区 JSON 数据（供前端 Cascader 使用）
  */
-router.get('/regions', async (req: Request, res: Response) => {
+router.get('/regions', async (_req: Request, res: Response) => {
   try {
-    const fs = require('fs');
-    const path = require('path');
-    let data: any;
-    // 从 monorepo 结构查找 pca-code.json
-    const candidates = [
-      path.resolve(__dirname, '../../../shared/src/pca-code.json'),
-      path.resolve(process.cwd(), 'packages/shared/src/pca-code.json'),
-      path.resolve(process.cwd(), 'pca-code.json'),
-    ];
-    for (const p of candidates) {
-      if (fs.existsSync(p)) {
-        data = JSON.parse(fs.readFileSync(p, 'utf-8'));
-        break;
-      }
-    }
-    if (!data) {
-      return res.status(500).json({ code: 500, message: '地区数据文件未找到', data: null });
-    }
-    return res.json({ code: 0, message: 'ok', data });
+    return res.json({ code: 0, message: 'ok', data: pcaCodeData });
   } catch (error: any) {
     console.error('[Operator] regions error:', error.message);
     return res.status(500).json({ code: 500, message: '获取地区数据失败', data: null });
