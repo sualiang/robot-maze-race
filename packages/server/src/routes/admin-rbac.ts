@@ -294,7 +294,12 @@ router.post('/users/:id/reset-password', authMiddleware, async (req: Request, re
 /**
  * 安全解析 JSON 字符串，解析失败返回 fallback
  */
-function safeJsonParse(str: string | undefined | null, fallback: any): any {
+/**
+ * 安全解析 JSON 字符串。
+ * mysql2 解析 JSON 列时已自动返回 JS 对象，此时直接返回即可。
+ */
+function safeJsonParse(str: string | undefined | null | any[], fallback: any): any {
+  if (Array.isArray(str)) return str;
   if (!str) return fallback;
   try {
     return JSON.parse(str);
