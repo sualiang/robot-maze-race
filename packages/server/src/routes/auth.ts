@@ -357,6 +357,11 @@ router.post('/operator-member-login', async (req: Request, res: Response) => {
       permissions = [];
     }
 
+    // 运营商超管（op_super_admin）自动给全权限
+    if (user.role === 'op_super_admin') {
+      permissions = ['*'];
+    }
+
     // 判断是否需要修改密码（first_login == 1 或 password_change_required != 0）
     const passwordChangeRequired = user.first_login === 1 || user.password_change_required === 1;
 
