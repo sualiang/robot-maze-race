@@ -8,6 +8,36 @@ import { authMiddleware, AuthPayload } from '../middleware/auth';
 import { RefereeReviewRequest } from '@robot-race/shared';
 import pcaCodeData from '../../../shared/src/pca-code.json';
 
+/**
+ * 尝试修复 UTF-8 双重编码乱码
+ * 当 name 被以 latin1 编码写入时，UTF-8 字节被当作 ISO-8859-1 字符存储
+ */
+function fixDoubleEncodedName(name: string): string {
+  if (!name) return name;
+  let highCount = 0;
+  for (let i = 0; i < name.length; i++) {
+    if (name.charCodeAt(i) > 127) highCount++;
+  }
+  if (highCount > 0 && highCount / name.length > 0.3) {
+    try {
+      const bytes = new Uint8Array(name.length);
+      for (let i = 0; i < name.length; i++) {
+        bytes[i] = name.charCodeAt(i) & 0xFF;
+      }
+      const decoded = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+      let decodedHighCount = 0;
+      for (let i = 0; i < decoded.length; i++) {
+        if (decoded.charCodeAt(i) > 127) decodedHighCount++;
+      }
+      if (decodedHighCount / decoded.length < 0.3) {
+        return decoded;
+      }
+    } catch {}
+  }
+  return name;
+}
+
+
 const router = Router();
 
 // ============================================================
@@ -208,6 +238,8 @@ router.get('/rbac/users', authMiddleware, operatorOnly, async (req: Request, res
 
     const list = users.map((u: any) => ({
       ...u,
+      username: fixDoubleEncodedName(u.username),
+      nickname: fixDoubleEncodedName(u.nickname),
       role_name: roleMap[u.role_key] || u.role_key,
     }));
 
@@ -348,7 +380,11 @@ router.put('/rbac/users/:id', authMiddleware, operatorOnly, async (req: Request,
     for (const r of OPERATOR_ROLES) {
       roleMap[r.key] = r.name;
     }
-    if (updated) updated.role_name = roleMap[updated.role_key] || updated.role_key;
+    if (updated) {
+      updated.username = fixDoubleEncodedName(updated.username);
+      updated.nickname = fixDoubleEncodedName(updated.nickname);
+      updated.role_name = roleMap[updated.role_key] || updated.role_key;
+    }
 
     return res.json({ code: 0, message: '成员更新成功', data: updated });
   } catch (error: any) {
