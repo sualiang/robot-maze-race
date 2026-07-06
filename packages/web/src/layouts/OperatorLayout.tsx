@@ -1,5 +1,5 @@
 import { Outlet } from 'react-router-dom';
-import { Layout, Menu, Modal, Form, Input, Button, Space, message } from 'antd';
+import { Layout, Menu, Button, Space } from 'antd';
 import { LogoutOutlined } from '@ant-design/icons';
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -25,55 +25,39 @@ export default function OperatorLayout() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // 获取用户权限（优先从 localStorage，同时保底从后端获取）
-  const [permissions, setPermissions] = useState<string[]>(() => {
-    const raw = localStorage.getItem('operator_user_info');
-    console.log('[D] raw operator_user_info:', raw);
-    if (raw) {
-      try {
-        const info = JSON.parse(raw);
-        return info.permissions || [];
-      } catch {}
-    }
-    return [];
-  });
-  const [userInfoLoaded, setUserInfoLoaded] = useState(() => !!localStorage.getItem('operator_user_info'));
+  // 获取用户权限（先从 localStorage 取初值，然后每次挂载从后端拉最新）
   const rawUserInfo = localStorage.getItem('operator_user_info');
-  const userInfo: any = (() => {
+  const [userInfo, setUserInfo] = useState<any>(() => {
     try { return JSON.parse(rawUserInfo || '{}'); } catch { return {}; }
-  })();
+  });
+  const [permissions, setPermissions] = useState<string[]>(() => userInfo.permissions || []);
 
-  // 如果 localStorage 没有用户信息但 token 存在，从后端拉取
+  // 每次挂载都从后端拉取最新权限和用户信息，覆盖 localStorage 旧缓存
   const token = localStorage.getItem('token');
   useEffect(() => {
-    if (userInfoLoaded || !token) return;
+    if (!token) return;
     (async () => {
       try {
         const res: any = await api.get('/auth/me');
         if (res?.data) {
-          localStorage.setItem('operator_user_info', JSON.stringify(res.data));
-          setPermissions(res.data.permissions || []);
-          setUserInfoLoaded(true);
+          const info = res.data;
+          localStorage.setItem('operator_user_info', JSON.stringify(info));
+          setPermissions(info.permissions || []);
+          setUserInfo(info);
         }
       } catch (e) {
         console.error('[OperatorLayout] 获取用户信息失败:', e);
       }
     })();
-  }, [token, userInfoLoaded]);
-
-  console.log('[D] permissions:', permissions);
-  console.log('[D] includes *:', permissions.includes('*'));
+  }, [token]);
 
   // 根据权限过滤菜单
   const menuItems = React.useMemo(() => {
-    const result = allMenuItems.filter(item => {
+    return allMenuItems.filter(item => {
       if (!item.perms || item.perms.length === 0) return true;
       if (permissions.includes('*')) return true;
       return item.perms.some(perm => permissions.includes(perm));
     });
-    console.log('[D] allMenuItems keys:', allMenuItems.map(i => i.key));
-    console.log('[D] filtered menuItems keys:', result.map(i => i.key));
-    return result;
   }, [permissions]);
 
   // 路由守卫
@@ -91,7 +75,6 @@ export default function OperatorLayout() {
   }, [hasAccess, location.pathname]);
 
   // 登录拦截：没有 token 则重定向到登录页
-  // 注意：只在首次加载时检测，避免登录成功后的 navigate 被拦截
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token && location.pathname !== '/operator/login') {
