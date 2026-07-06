@@ -664,7 +664,7 @@ router.get('/me', authMiddleware, async (req: Request, res: Response<ApiResponse
          WHERE om.id = $1`,
         [userId]
       );
-      if (member && member.status === 1) {
+      if (member && (member.status === 1 || member.status === 'active')) {
         // 超管自动给全权限，普通成员从 admin_roles 查
         let permissions: string[] = [];
         if (member.role === 'op_super_admin') {
