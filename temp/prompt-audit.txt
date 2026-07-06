@@ -1,0 +1,32 @@
+# 任务：数据库多租户代码审计
+
+代码位于 /Users/longshe/.openclaw/workspace/projects/robot-maze-race/packages/server/src
+
+## 背景
+Database-per-Tenant 架构，每个运营商独立 database。当前阶段：不改物理数据库，只做代码层隔离预埋。
+
+## 拆分边界
+
+**主库（不拆分）的表**：
+operators, operator_members, admin_users, admin_roles, settings, banks, seasons, regions, payments, settlement_records
+
+**跟运营商走的表（需要 operator_id 过滤）**：
+venues, races, race_rooms, referees, referee_invites, users, user_profiles, merchants, race_packages, orders, points_transactions, points_exchange_log, user_coupons, merchant_coupons, expand_coupons, help_requests, help_helpers
+
+## 审计要求
+扫描 packages/server/src 下所有 .ts 文件中的 SQL 查询语句（queryOne、queryMany、query、execute、pool.query、pool.execute、SELECT FROM、INSERT INTO、UPDATE、DELETE FROM、CREATE TABLE），找出：
+
+1. **哪些文件访问了"跟运营商走"列表里的表？**
+2. **这些访问中，哪些已经带了 operator_id 过滤？**（WHERE operator_id = ? 或 AND operator_id = ?）
+3. **哪些缺少 operator_id 过滤？**——标出文件名、行号、缺失的 SQL 语句
+
+**扫描范围**：routes/*.ts, services/*.ts, models/*.ts, db/*.ts, middleware/*.ts, utils/*.ts
+
+**跳过已知的主库表**（operators, operator_members, admin_users, admin_roles, settings, banks, seasons, regions, payments, settlement_records）——这些不需要 operator_id。
+
+## 输出
+输出一个 Markdown 审计报告到 /Users/longshe/.openclaw/workspace/projects/robot-maze-race/docs/audit-tenant-sql-v2.md
+
+先列出汇总（已扫描文件数、已有过滤处数、缺少过滤处数），再列出所有缺口（文件名+行号+缺失SQL）。
+
+完成后 commit 并 push 到 main 分支。
