@@ -54,6 +54,9 @@ const RefereeMatchPage = React.lazy(() => import('../pages/referee/MatchPage'));
 const RefereeAttendancePage = React.lazy(() => import('../pages/referee/AttendancePage'));
 const RefereeHistoryPage = React.lazy(() => import('../pages/referee/HistoryPage'));
 const RefereeProfilePage = React.lazy(() => import('../pages/referee/ProfilePage'));
+const RefereeInvitePage = React.lazy(() => import('../pages/referee/InviteRegisterPage'));
+const RefereeRegisterPage = React.lazy(() => import('../pages/referee/RegisterFormPage'));
+const RefereeRegisterSuccessPage = React.lazy(() => import('../pages/referee/RegisterSuccessPage'));
 
 // 商家端页面（H5 移动端）
 import MerchantLoginPage from '../pages/merchant/login/LoginPage';
@@ -116,6 +119,11 @@ export default function AppRouter() {
       </Route>
 
       {/* 裁判端（移动端 H5） */}
+      {/* 邀请注册页面（独立页面，无底部Tab） */}
+      <Route path="/referee/invite" element={<Suspended><RefereeInvitePage /></Suspended>} />
+      <Route path="/referee/register" element={<Suspended><RefereeRegisterPage /></Suspended>} />
+      <Route path="/referee/register-success" element={<Suspended><RefereeRegisterSuccessPage /></Suspended>} />
+
       <Route path="/referee" element={<RefereeLayout />}>
         <Route index element={<Navigate to="/referee/match" replace />} />
         <Route path="login" element={<Suspended><RefereeLoginPage /></Suspended>} />

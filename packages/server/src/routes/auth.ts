@@ -1376,17 +1376,22 @@ router.post('/upload-avatar', authMiddleware, async (req: Request, res: Response
  * 微信服务号 OAuth 授权入口 — 302 跳转到微信授权页面
  * 前端点击"微信授权登录"按钮后跳转至此，由后端拼接完整授权 URL 并重定向
  */
-router.get('/mp-oauth/authorize', (_req: Request, res: Response) => {
+router.get('/mp-oauth/authorize', (req: Request, res: Response) => {
   const { appId } = config.wechatMp;
 
   if (!appId) {
     return res.status(500).json({ code: 500, message: '微信服务号未配置', data: null });
   }
 
-  // 回调地址：前端裁判登录页
-  const redirectUri = encodeURIComponent(
-    `${_req.protocol}://${_req.get('host')}/referee/login`
-  );
+  // 支持自定义回调地址（通过 redirect 参数）
+  const customRedirect = req.query.redirect as string | undefined;
+  const defaultRedirect = `${req.protocol}://${req.get('host')}/referee/login`;
+  const redirectUri = encodeURIComponent(customRedirect || defaultRedirect);
+
+  // state 传递回调地址，OAuth 回调后前端可以根据 state 决定跳转路径
+  const stateParam = customRedirect
+    ? `referee_invite_${encodeURIComponent(customRedirect)}`
+    : 'referee_login';
 
   const wxAuthUrl =
     `https://open.weixin.qq.com/connect/oauth2/authorize?` +
@@ -1394,7 +1399,7 @@ router.get('/mp-oauth/authorize', (_req: Request, res: Response) => {
     `redirect_uri=${redirectUri}&` +
     `response_type=code&` +
     `scope=snsapi_userinfo&` +
-    `state=referee_login#wechat_redirect`;
+    `state=${stateParam}#wechat_redirect`;
 
   res.redirect(wxAuthUrl);
 });
@@ -1469,6 +1474,35 @@ router.get('/mp-oauth', async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('[Auth] mp-oauth error:', error.message);
     return res.status(500).json({ code: 500, message: error.message || '登录失败', data: null });
+  }
+});
+
+/**
+ * GET /api/v1/auth/mp-oauth/subscribe-status
+ * 检查当前用户是否已关注微信服务号
+ * @header Authorization: Bearer <token>
+ * @returns { subscribed: boolean }
+ */
+router.get('/mp-oauth/subscribe-status', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+
+    const user = await queryOne<{ mp_openid: string; openid: string }>(
+      'SELECT mp_openid, openid FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (!user) {
+      return res.json({ code: 0, message: 'ok', data: { subscribed: false } });
+    }
+
+    // 如果 mp_openid 有值，说明已关注服务号
+    const subscribed = !!(user.mp_openid && user.mp_openid.trim() !== '');
+
+    return res.json({ code: 0, message: 'ok', data: { subscribed } });
+  } catch (error: any) {
+    console.error('[Auth] subscribe-status error:', error.message);
+    return res.status(500).json({ code: 500, message: '查询失败', data: null });
   }
 });
 

@@ -80,6 +80,10 @@ export default function RefereeList() {
 
   // 邀请裁判弹窗
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [invitePhone, setInvitePhone] = useState('');
+  const [inviteNote, setInviteNote] = useState('');
+  const [inviteGenerating, setInviteGenerating] = useState(false);
+  const [inviteResult, setInviteResult] = useState<{ token: string; invite_url: string; expires_at: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [accountInfo, setAccountInfo] = useState<{ account: string; password: string } | null>(null);
 
@@ -133,17 +137,44 @@ export default function RefereeList() {
     fetchReviewList();
   }, []);
 
-  const refereeApplyUrl = `https://dog.amberrobot.com.cn/referee/apply?operatorId=${operatorId}`;
+  const handleGenerateInvite = async () => {
+    if (!invitePhone || !/^\d{11}$/.test(invitePhone)) {
+      message.warning('请输入正确的11位手机号');
+      return;
+    }
+    setInviteGenerating(true);
+    try {
+      const data: any = await api.post('/referee/invite', {
+        phone: invitePhone,
+        note: inviteNote || undefined,
+      });
+      setInviteResult(data);
+      message.success('邀请生成成功');
+    } catch (err: any) {
+      message.error(err?.response?.data?.message || '生成邀请失败');
+    } finally {
+      setInviteGenerating(false);
+    }
+  };
 
   const handleCopyLink = async () => {
+    if (!inviteResult) return;
     try {
-      await navigator.clipboard.writeText(refereeApplyUrl);
+      await navigator.clipboard.writeText(inviteResult.invite_url);
       setCopied(true);
-      message.success('链接已复制');
+      message.success('邀请链接已复制');
       setTimeout(() => setCopied(false), 3000);
     } catch {
       message.error('复制失败，请手动复制');
     }
+  };
+
+  const handleCloseInvite = () => {
+    setInviteOpen(false);
+    setInvitePhone('');
+    setInviteNote('');
+    setInviteResult(null);
+    setCopied(false);
   };
 
   const handleCopyPassword = () => {
@@ -457,30 +488,78 @@ export default function RefereeList() {
       <Modal
         title="邀请裁判注册"
         open={inviteOpen}
-        onCancel={() => { setInviteOpen(false); setCopied(false); }}
+        onCancel={handleCloseInvite}
         footer={
-          <Button onClick={() => { setInviteOpen(false); setCopied(false); }}>关闭</Button>
-        }
-      >
-        <Space direction="vertical" style={{ width: '100%' }} size="middle">
-          <p style={{ color: '#666', fontSize: 14, lineHeight: 1.8, margin: 0 }}>
-            请将下方链接发送给需要注册的裁判，对方打开链接后可微信快捷登录并提交注册申请。
-          </p>
-          <Input
-            value={refereeApplyUrl}
-            readOnly
-            style={{ background: '#f5f5f5' }}
-            suffix={
-              <Button
-                type="link"
-                icon={<CopyOutlined />}
-                onClick={handleCopyLink}
-              >
+          inviteResult ? (
+            <Space>
+              <Button icon={<CopyOutlined />} type="primary" onClick={handleCopyLink}>
                 {copied ? '已复制' : '复制链接'}
               </Button>
-            }
-          />
-        </Space>
+              <Button onClick={handleCloseInvite}>关闭</Button>
+            </Space>
+          ) : (
+            <Space>
+              <Button onClick={handleCloseInvite}>取消</Button>
+              <Button type="primary" icon={<PlusOutlined />} loading={inviteGenerating} onClick={handleGenerateInvite}>
+                生成邀请
+              </Button>
+            </Space>
+          )
+        }
+      >
+        {inviteResult ? (
+          <Space direction="vertical" style={{ width: '100%' }} size="middle">
+            <div style={{
+              background: '#f6ffed',
+              border: '1px solid #b7eb8f',
+              borderRadius: 8,
+              padding: '12px 16px',
+            }}>
+              <p style={{ color: '#52c41a', margin: 0, fontWeight: 600, fontSize: 14 }}>
+                ✅ 邀请链接已生成
+              </p>
+              <p style={{ color: '#999', margin: '4px 0 0', fontSize: 12 }}>
+                有效期至 {inviteResult.expires_at ? new Date(inviteResult.expires_at).toLocaleString('zh-CN') : '-'}
+              </p>
+            </div>
+            <Input.TextArea
+              value={inviteResult.invite_url}
+              readOnly
+              rows={3}
+              style={{ background: '#f5f5f5' }}
+            />
+            <p style={{ color: '#999', fontSize: 12, margin: 0 }}>
+              请将上方链接通过微信发送给受邀裁判，对方在微信内打开链接后可完成授权登录并提交注册信息。
+            </p>
+          </Space>
+        ) : (
+          <Space direction="vertical" style={{ width: '100%' }} size="middle">
+            <p style={{ color: '#666', fontSize: 14, lineHeight: 1.8, margin: 0 }}>
+              生成一个专属邀请链接，裁判点击链接后可通过微信授权登录并提交注册申请。
+              <br />
+              <span style={{ color: '#999', fontSize: 12 }}>邀请链接有效期为24小时</span>
+            </p>
+            <div>
+              <label style={{ display: 'block', marginBottom: 6, color: '#333', fontWeight: 500 }}>裁判手机号 *</label>
+              <Input
+                placeholder="请输入裁判手机号"
+                value={invitePhone}
+                onChange={(e) => setInvitePhone(e.target.value.replace(/\D/g, ''))}
+                maxLength={11}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: 6, color: '#333', fontWeight: 500 }}>备注（选填）</label>
+              <Input.TextArea
+                placeholder="邀请备注，裁判可见"
+                value={inviteNote}
+                onChange={(e) => setInviteNote(e.target.value)}
+                maxLength={200}
+                rows={2}
+              />
+            </div>
+          </Space>
+        )}
       </Modal>
 
       {/* 裁判详情弹窗 */}

@@ -729,6 +729,22 @@ CREATE INDEX IF NOT EXISTS idx_notification_logs_scene ON notification_logs(scen
 CREATE INDEX IF NOT EXISTS idx_notification_logs_user ON notification_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_notification_logs_created ON notification_logs(created_at);
 
+-- ==================== 裁判邀请表 ====================
+CREATE TABLE IF NOT EXISTS referee_invites (
+  id VARCHAR(36) PRIMARY KEY,
+  operator_id VARCHAR(36) NOT NULL,
+  phone VARCHAR(20),
+  venue_id VARCHAR(36),
+  token VARCHAR(64) UNIQUE NOT NULL,
+  note TEXT,
+  status ENUM('active','used','expired') DEFAULT 'active',
+  expires_at DATETIME NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_token (token),
+  KEY idx_operator (operator_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ==================== 帮助助力记录表 ====================
 CREATE TABLE IF NOT EXISTS help_helpers (
   id VARCHAR(36) PRIMARY KEY,
