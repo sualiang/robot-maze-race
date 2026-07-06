@@ -199,9 +199,11 @@ router.post('/admin-login', async (req: Request, res: Response) => {
     let user = await queryOne<any>(
       `SELECT au.id, au.username, au.password, au.nickname, au.email, au.phone,
               au.role_id, au.status, ar.label as role_name, ar.name as admin_role_name, ar.permissions,
-              au.first_login
+              au.first_login,
+              o.name as operator_name
        FROM admin_users au
        LEFT JOIN admin_roles ar ON ar.id = au.role_id
+       LEFT JOIN operators o ON o.operator_username = au.username
        WHERE au.username = $1`,
       [username]
     );
@@ -210,9 +212,11 @@ router.post('/admin-login', async (req: Request, res: Response) => {
       user = await queryOne<any>(
         `SELECT au.id, au.username, au.password, au.nickname, au.email, au.phone,
                 au.role_id, au.status, ar.label as role_name, ar.name as admin_role_name, ar.permissions,
-                au.first_login
+                au.first_login,
+                o.name as operator_name
          FROM admin_users au
          LEFT JOIN admin_roles ar ON ar.id = au.role_id
+         LEFT JOIN operators o ON o.operator_username = au.username
          WHERE au.phone = $1`,
         [username]
       );
@@ -290,6 +294,7 @@ router.post('/admin-login', async (req: Request, res: Response) => {
           role_name: user.role_name,
           permissions,
           first_login: user.first_login == 1,
+          operator_name: user.operator_name || user.nickname || user.username || '',
         },
       },
     });

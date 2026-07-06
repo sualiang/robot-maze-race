@@ -111,10 +111,10 @@ export default function OperatorLayout() {
       <Layout style={{ minHeight: '100vh' }}>
       <Sider>
         <div style={{ color: 'white', padding: '16px 16px 8px', textAlign: 'center' }}>
-          {userInfo.operator_name ? (
+          {userInfo.operator_name || userInfo.nickname || userInfo.username ? (
             <>
               <div style={{ fontSize: 15, fontWeight: 600, lineHeight: '22px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {userInfo.operator_name}
+                {userInfo.operator_name || userInfo.nickname || userInfo.username}
               </div>
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', marginTop: 2 }}>运营商后台</div>
             </>

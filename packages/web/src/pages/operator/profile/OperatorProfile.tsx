@@ -134,7 +134,7 @@ function ProfileInfoTab() {
   let info: Record<string, any> = {};
   try { info = JSON.parse(raw || '{}'); } catch {}
 
-  const displayName = info.operator_name || '-';
+  const displayName = info.operator_name || info.nickname || info.username || '-';
   const phone = info.phone || '-';
   const roleName = info.role_name || info.admin_role_name || '-';
 
