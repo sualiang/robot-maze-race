@@ -654,28 +654,75 @@ router.get('/me', authMiddleware, async (req: Request, res: Response<ApiResponse
       });
     }
 
-    // 运营商超管：从 operators 表查询
-    if (userRole === 'operator' && (req.user as any).operatorId) {
-      const op = await queryOne<any>(
-        `SELECT id, name, operator_username, phone, status, password_change_required
-         FROM operators WHERE id = $1`,
+    // 运营商成员：从 operator_members 表查询
+    if (userRole === 'operator') {
+      const member = await queryOne<any>(
+        `SELECT om.id, om.operator_id, om.phone, om.name, om.role, om.status,
+                o.name as operator_name
+         FROM operator_members om
+         LEFT JOIN operators o ON o.id = om.operator_id
+         WHERE om.id = $1`,
         [userId]
       );
-      if (op) {
+      if (member && member.status === 1) {
+        // 超管自动给全权限，普通成员从 admin_roles 查
+        let permissions: string[] = [];
+        if (member.role === 'op_super_admin') {
+          permissions = ['*'];
+        } else {
+          try {
+            const roleResult = await queryOne<any>(
+              `SELECT permissions FROM admin_roles WHERE name = $1`,
+              [member.role]
+            );
+            if (roleResult?.permissions) {
+              permissions = typeof roleResult.permissions === 'object'
+                ? roleResult.permissions
+                : JSON.parse(roleResult.permissions || '[]');
+            }
+          } catch {}
+        }
         return res.json({
           code: 0, message: 'ok',
           data: {
-            id: op.id,
-            operatorId: op.id,
-            username: op.operator_username,
-            nickname: op.name,
-            phone: op.phone || op.operator_username,
-            role_name: '运营商超管',
+            id: member.id,
+            operatorId: member.operator_id,
+            username: member.name,
+            nickname: member.name,
+            phone: member.phone,
+            role_name: member.role === 'op_super_admin' ? '运营商超管' : (member.role || '成员'),
+            admin_role_name: member.role,
+            operator_name: member.operator_name || '',
             role: 'operator',
-            permissions: ['*'],
+            permissions,
           } as any,
         });
       }
+
+      // 运营商超管：从 operators 表查询（兼容旧的 operator 直接登录）
+      if ((req.user as any).operatorId && !member) {
+        const op = await queryOne<any>(
+          `SELECT id, name, operator_username, phone, status, password_change_required
+           FROM operators WHERE id = $1`,
+          [(req.user as any).operatorId]
+        );
+        if (op) {
+          return res.json({
+            code: 0, message: 'ok',
+            data: {
+              id: op.id,
+              operatorId: op.id,
+              username: op.operator_username,
+              nickname: op.name,
+              phone: op.phone || op.operator_username,
+              role_name: '运营商超管',
+              role: 'operator',
+              permissions: ['*'],
+            } as any,
+          });
+        }
+      }
+      // member 查不到且 operator 也查不到 → 继续往下走 404
     }
 
     // 普通用户 / 裁判：从 users 表查询
