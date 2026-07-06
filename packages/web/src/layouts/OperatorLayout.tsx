@@ -110,8 +110,17 @@ export default function OperatorLayout() {
     <>
       <Layout style={{ minHeight: '100vh' }}>
       <Sider>
-        <div style={{ color: 'white', padding: 16, textAlign: 'center', fontSize: 18, fontWeight: 700 }}>
-          🏟️ 运营商后台
+        <div style={{ color: 'white', padding: '16px 16px 8px', textAlign: 'center' }}>
+          {userInfo.operator_name ? (
+            <>
+              <div style={{ fontSize: 15, fontWeight: 600, lineHeight: '22px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {userInfo.operator_name}
+              </div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', marginTop: 2 }}>运营商后台</div>
+            </>
+          ) : (
+            <div style={{ fontSize: 18, fontWeight: 700 }}>🏟️ 运营商后台</div>
+          )}
         </div>
         <Menu
           theme="dark"
@@ -130,7 +139,7 @@ export default function OperatorLayout() {
           <span style={{ fontSize: 16 }}>机器狗迷宫竞速赛事</span>
           <Space size="middle">
             <span style={{ color: '#666', fontSize: 13 }}>{userInfo.phone || userInfo.nickname || ''}</span>
-            <span style={{ color: '#888', fontSize: 12 }}>{userInfo.role_name || ''}</span>
+            <span style={{ color: '#888', fontSize: 12 }}>{userInfo.role_name || userInfo.admin_role_name || ''}</span>
             <Button type="text" icon={<LogoutOutlined />} onClick={handleLogout}>
               退出登录
             </Button>

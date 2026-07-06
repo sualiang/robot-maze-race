@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Card, Typography, Input, Button, message, Row, Col, Tabs, Modal } from 'antd';
-import { KeyOutlined, LogoutOutlined } from '@ant-design/icons';
+import { Card, Typography, Input, Button, message, Row, Col, Tabs, Modal, Descriptions, Space } from 'antd';
+import { KeyOutlined, LogoutOutlined, UserOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import api from '../../../utils/api';
 
@@ -128,9 +128,40 @@ function LogoutTab() {
   );
 }
 
+/* ── Tab0: 个人信息 ── */
+function ProfileInfoTab() {
+  const raw = localStorage.getItem('operator_user_info');
+  let info: Record<string, any> = {};
+  try { info = JSON.parse(raw || '{}'); } catch {}
+
+  const displayName = info.operator_name || '-';
+  const phone = info.phone || '-';
+  const roleName = info.role_name || info.admin_role_name || '-';
+
+  return (
+    <Card title={<span><InfoCircleOutlined /> 个人信息</span>} style={{ maxWidth: 600, margin: '0 auto' }}>
+      <Descriptions column={1} size="middle">
+        <Descriptions.Item label="运营商名称">
+          <Space>
+            <UserOutlined />
+            {displayName}
+          </Space>
+        </Descriptions.Item>
+        <Descriptions.Item label="登录账号">{phone}</Descriptions.Item>
+        <Descriptions.Item label="当前角色">{roleName}</Descriptions.Item>
+      </Descriptions>
+    </Card>
+  );
+}
+
 /* ── 主组件 ── */
 export default function OperatorProfile() {
   const tabItems = [
+    {
+      key: 'info',
+      label: <span><InfoCircleOutlined /> 个人信息</span>,
+      children: <ProfileInfoTab />,
+    },
     {
       key: 'password',
       label: <span><KeyOutlined /> 修改登录密码</span>,

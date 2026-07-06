@@ -105,6 +105,8 @@ CREATE TABLE IF NOT EXISTS race_packages (
   coupon_reward_min_cents INT DEFAULT 0,
   coupon_reward_max_cents INT DEFAULT 0,
   free_deduction_cents INT NOT NULL DEFAULT 0,
+  growth_value INT DEFAULT 0,
+  point_value INT DEFAULT 0,
   season_id INT,
   tag VARCHAR(64) DEFAULT '',
   special_rights TEXT DEFAULT '',
