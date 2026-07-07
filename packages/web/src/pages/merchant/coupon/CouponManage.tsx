@@ -141,7 +141,10 @@ export default function CouponManage() {
     }
   }, []);
 
-  useEffect(() => { fetchList(); }, [fetchList]);
+  useEffect(() => {
+    message.config({ top: 80, maxCount: 1, duration: 3 });
+    fetchList();
+  }, [fetchList]);
 
   // 筛选
   const filteredList = list.filter((item) => {
@@ -311,8 +314,10 @@ export default function CouponManage() {
       }
       setModalOpen(false);
       fetchList();
-    } catch {
-      message.error('操作失败');
+    } catch (e: any) {
+      console.error('[创建/编辑优惠券] 失败:', e);
+      const serverMsg = e?.response?.data?.message || e?.message || '操作失败';
+      message.error(serverMsg, 5); // 5秒显示时长
     } finally {
       setSaving(false);
     }

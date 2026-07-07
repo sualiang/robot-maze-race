@@ -476,3 +476,8 @@
   color: rgba(255, 255, 255, 0.25);
   font-size: 14px;
 }
+
+/* 确保 antd message/toast 高于弹窗遮罩层 (.mch-modal-overlay z-index=9999) */
+.ant-message {
+  z-index: 10001 !important;
+}
