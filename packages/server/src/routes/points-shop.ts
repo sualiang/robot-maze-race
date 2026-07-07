@@ -105,6 +105,10 @@ router.post('/points-shop/items', authMiddleware, operatorOnly, async (req: Requ
     if (!name || !itemType || !needPoints) {
       return res.status(400).json({ code: 400, message: 'name, itemType, needPoints 不能为空', data: null });
     }
+    // 禁止创建商家消费券类型
+    if (itemType === 'merchant_coupon') {
+      return res.status(400).json({ code: 400, message: '不支持创建商家消费券类型', data: null });
+    }
     const id = uuidv4();
     await execute(
       `INSERT INTO point_shop (id, item_type, item_id, name, description, need_points, sort_weight, stock)
@@ -132,7 +136,12 @@ router.put('/points-shop/items/:id', authMiddleware, operatorOnly, async (req: R
     let idx = 1;
 
     if (name !== undefined) { updates.push(`name = $${idx++}`); params.push(name); }
-    if (itemType !== undefined) { updates.push(`item_type = $${idx++}`); params.push(itemType); }
+    if (itemType !== undefined) {
+      if (itemType === 'merchant_coupon') {
+        return res.status(400).json({ code: 400, message: '不支持设置为商家消费券类型', data: null });
+      }
+      updates.push(`item_type = $${idx++}`); params.push(itemType);
+    }
     if (itemId !== undefined) { updates.push(`item_id = $${idx++}`); params.push(String(itemId)); }
     if (description !== undefined) { updates.push(`description = $${idx++}`); params.push(description); }
     if (needPoints !== undefined) { updates.push(`need_points = $${idx++}`); params.push(needPoints); }

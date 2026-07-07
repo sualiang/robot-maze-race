@@ -196,3 +196,70 @@
   margin-top: 24px;
   line-height: 1.6;
 }
+
+/* ==================== 首次登录改密弹窗 ==================== */
+.merchant-pwd-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.merchant-pwd-modal {
+  width: 100%;
+  max-width: 400px;
+  background: rgba(20, 24, 40, 0.95);
+  border: 1px solid rgba(0, 212, 255, 0.15);
+  border-radius: 20px;
+  padding: 32px 24px;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.merchant-pwd-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--mch-text);
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.merchant-pwd-field {
+  margin-bottom: 16px;
+}
+
+.merchant-pwd-field .merchant-login-label {
+  display: block;
+  font-size: 13px;
+  color: var(--mch-text-dim);
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.merchant-pwd-field .merchant-login-input {
+  width: 100%;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  font-size: 16px;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  color: var(--mch-text);
+  letter-spacing: 1px;
+}
+
+.merchant-pwd-field .merchant-login-input:focus {
+  border-color: var(--mch-accent);
+  box-shadow: 0 0 16px rgba(0, 212, 255, 0.12);
+}

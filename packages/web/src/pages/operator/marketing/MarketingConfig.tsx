@@ -269,7 +269,6 @@ export default function MarketingConfig() {
       render: (t: string) => {
         const map: Record<string, string> = {
           entry_deduction: '参赛抵扣卡',
-          merchant_coupon: '商家消费券',
           physical_gift: '实物礼品',
         };
         return <Tag>{map[t] || t}</Tag>;
