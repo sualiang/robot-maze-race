@@ -1,0 +1,47 @@
+## 任务：为积分商城增加库存功能
+
+仓库：/Users/longshe/.openclaw/workspace/projects/robot-maze-race
+分支：基于 main 新建 feature/points-stock
+
+### 需求概述
+运营商后台积分商城增加库存管理功能，用户兑换时校验库存。
+
+### 具体改动
+
+#### 1. 数据库
+- `point_shop` 表新增 `stock` 字段（INT NOT NULL DEFAULT 0）
+- 写 migration SQL 到 `packages/server/src/db/migrations/XXX_add_stock.sql`
+- 在 `packages/server/src/config/database.ts` 的 `initSchema` 中添加 ALTER TABLE migration
+
+#### 2. 后端 API（`packages/server/src/routes/points-shop.ts`）
+- **POST `/points-shop/items`** — 创建商品时支持 `stock` 字段
+- **PUT `/points-shop/items/:id`** — 更新商品时支持 `stock` 字段
+- **GET `/points-shop/items`** — 返回商品时包含 `stock` 字段
+- **GET `/points-shop/items/all`** — 返回商品时包含 `stock` 字段
+- **POST `/points-shop/exchange`** — 兑换前校验库存：
+  - 如果 `stock === 0`，返回错误 "库存不足"
+  - 如果 `stock > 0`，扣减库存（`stock = stock - 1`），使用原子操作
+  - 扣减库存和扣减积分应在同一事务中进行，或确保原子性
+- 注意：SQL 使用 `$1, $2` 占位符（项目使用 pg→mysql 转换层）
+
+#### 3. 运营商后台（`packages/web/src/pages/operator/marketing/MarketingConfig.tsx`）
+- 表格 `shopColumns` 中新增「库存」列，显示 `stock` 值
+- 新建/编辑商品弹窗中增加「库存数量」表单字段（InputNumber，必填，min=1）
+- `handleEditItem` 中回填 `stock` 值
+- `handleAddItem` 中设置默认 `stock: 999`
+- `handleCreateItem` 和 `handleSaveItem` 提交时包含 `stock`
+
+#### 4. 玩家端（如果有前端兑换页面）
+- 搜索 `packages/web/src` 下是否有积分商城兑换的前端页面，如果有：
+  - 兑换按钮在 `stock === 0` 时禁用，提示「库存不足」
+  - 兑换成功后前端更新库存显示（stock -= 1）
+- 如果没有单独的兑换页面（兑换由小程序端处理），则无需修改前端
+
+### 验证要求
+- TypeScript 编译通过（`cd packages/server && npx tsc --noEmit` 和 `cd packages/web && npx tsc --noEmit`）
+- 所有改动互不冲突
+
+### 完成后
+1. `git add . && git commit -m "feat: 积分商城增加库存功能" && git push origin feature/points-stock`
+2. 如果 push 成功，在 GitHub 创建 PR 从 feature/points-stock → main
+3. 返回简要总结

@@ -200,7 +200,7 @@ router.post('/admin-login', async (req: Request, res: Response) => {
       `SELECT au.id, au.username, au.password, au.nickname, au.email, au.phone,
               au.role_id, au.status, ar.label as role_name, ar.name as admin_role_name, ar.permissions,
               au.first_login,
-              o.name as operator_name
+              o.name as operator_name, o.company_name
        FROM admin_users au
        LEFT JOIN admin_roles ar ON ar.id = au.role_id
        LEFT JOIN operators o ON o.operator_username = au.username
@@ -213,7 +213,7 @@ router.post('/admin-login', async (req: Request, res: Response) => {
         `SELECT au.id, au.username, au.password, au.nickname, au.email, au.phone,
                 au.role_id, au.status, ar.label as role_name, ar.name as admin_role_name, ar.permissions,
                 au.first_login,
-                o.name as operator_name
+                o.name as operator_name, o.company_name
          FROM admin_users au
          LEFT JOIN admin_roles ar ON ar.id = au.role_id
          LEFT JOIN operators o ON o.operator_username = au.username
@@ -324,7 +324,7 @@ router.post('/operator-member-login', async (req: Request, res: Response) => {
       `SELECT m.id, m.password_hash as password, m.name as nickname, m.phone,
               m.role, m.status, ar.label as role_name, ar.name as admin_role_name, ar.permissions,
               m.operator_id,
-              o.name as operator_name,
+              o.name as operator_name, o.company_name,
               m.first_login
        FROM operator_members m
        LEFT JOIN admin_roles ar ON ar.name = m.role
@@ -392,6 +392,7 @@ router.post('/operator-member-login', async (req: Request, res: Response) => {
           permissions,
           operator_id: user.operator_id,
           operator_name: user.operator_name,
+          company_name: user.company_name || null,
           firstLogin: passwordChangeRequired,
         },
       },
@@ -658,7 +659,7 @@ router.get('/me', authMiddleware, async (req: Request, res: Response<ApiResponse
     if (userRole === 'operator') {
       const member = await queryOne<any>(
         `SELECT om.id, om.operator_id, om.phone, om.name, om.role, om.status,
-                o.name as operator_name
+                o.name as operator_name, o.company_name
          FROM operator_members om
          LEFT JOIN operators o ON o.id = om.operator_id
          WHERE om.id = $1`,
@@ -693,6 +694,7 @@ router.get('/me', authMiddleware, async (req: Request, res: Response<ApiResponse
             role_name: member.role === 'op_super_admin' ? '运营商超管' : (member.role || '成员'),
             admin_role_name: member.role,
             operator_name: member.operator_name || '',
+            company_name: member.company_name || null,
             role: 'operator',
             permissions,
           } as any,

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Card, Typography, Input, Button, message, Row, Col, Tabs, Modal, Descriptions, Space } from 'antd';
-import { KeyOutlined, LogoutOutlined, UserOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { KeyOutlined, LogoutOutlined, UserOutlined, InfoCircleOutlined, ShopOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import api from '../../../utils/api';
 
@@ -134,7 +134,8 @@ function ProfileInfoTab() {
   let info: Record<string, any> = {};
   try { info = JSON.parse(raw || '{}'); } catch {}
 
-  const displayName = info.operator_name || info.nickname || info.username || '-';
+  const operatorName = info.operator_name || info.nickname || info.username || '-';
+  const companyName = info.company_name || '-';
   const phone = info.phone || '-';
   const roleName = info.role_name || info.admin_role_name || '-';
 
@@ -144,7 +145,13 @@ function ProfileInfoTab() {
         <Descriptions.Item label="运营商名称">
           <Space>
             <UserOutlined />
-            {displayName}
+            {operatorName}
+          </Space>
+        </Descriptions.Item>
+        <Descriptions.Item label="运营商公司">
+          <Space>
+            <ShopOutlined />
+            {companyName}
           </Space>
         </Descriptions.Item>
         <Descriptions.Item label="登录账号">{phone}</Descriptions.Item>

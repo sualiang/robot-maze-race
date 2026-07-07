@@ -1,0 +1,29 @@
+积分商城增加库存功能。
+
+仓库路径: /Users/longshe/.openclaw/workspace/projects/robot-maze-race
+基于 main 分支新建 feature/points-stock 分支进行开发。
+
+具体改动:
+
+1. 数据库: point_shop 表新增 stock 字段(INT NOT NULL DEFAULT 0)。在 database.ts 的 initSchema 中添加 migration。在 packages/server/src/db/ 下创建 migration SQL 文件。
+
+2. 后端 API (packages/server/src/routes/points-shop.ts):
+- POST /points-shop/items: 创建商品支持 stock 参数
+- PUT /points-shop/items/:id: 更新商品支持 stock 参数
+- GET /points-shop/items 和 /items/all: 返回时包含 stock
+- POST /points-shop/exchange: 兑换前检查 stock。stock=0 返回错误"库存不足"。stock>0 时扣减库存 stock=stock-1，使用原子操作 UPDATE point_shop SET stock = stock - 1 WHERE id = ? AND stock > 0。检查 affectedRows 是否为 0 来判断是否扣减成功。
+- SQL 使用 $1 $2 占位符(项目有 pg-to-mysql 转换层)
+
+3. 运营商后台 (packages/web/src/pages/operator/marketing/MarketingConfig.tsx):
+- shopColumns 表格加"库存"列
+- 新建/编辑弹窗加"库存数量"InputNumber字段(必填 min=1)
+- handleEditItem 回填 stock
+- handleAddItem 默认 stock=999
+
+4. 搜索 packages/web/src 下是否有积分商城兑换页。如果有就加 stock=0 时按钮禁用逻辑。大概率没有(兑换在小程序端)。
+
+TypeScript 编译验证: cd packages/server && npx tsc --noEmit; cd packages/web && npx tsc --noEmit
+
+完成后: git add . && git commit -m "feat: 积分商城增加库存功能" && git push origin feature/points-stock
+
+简要告诉我改了什么。
