@@ -9,31 +9,48 @@ import { RefereeReviewRequest } from '@robot-race/shared';
 import pcaCodeData from '../../../shared/src/pca-code.json';
 
 /**
- * 尝试修复 UTF-8 双重编码乱码
- * 当 name 被以 latin1 编码写入时，UTF-8 字节被当作 ISO-8859-1 字符存储
+ * 修复双重编码的 UTF-8 中文名。
+ *
+ * 当数据库表/列的编码设置不正确时，原本的 UTF-8 中文字节可能被
+ * 当作 latin1 存储，导致读出后变成乱码（常表现为 Ã¤Â¸Â 等形式）。
+ *
+ * 正确做法是：先通过 Buffer.from(name, 'latin1') 还原原始 UTF-8
+ * 字节，再以 utf8 解码。如果解码后的字符串包含可识别中文，则返回
+ * 修复后的值；否则返回原始值。
+ *
+ * 数据库连接已配置 utf8mb4，正常写入的情况下不需要此函数。
  */
 function fixDoubleEncodedName(name: string): string {
-  if (!name) return name;
-  let highCount = 0;
+  if (!name || name.length === 0) return name;
+
+  // 纯 ASCII 无需修复
+  let hasNonAscii = false;
   for (let i = 0; i < name.length; i++) {
-    if (name.charCodeAt(i) > 127) highCount++;
+    if (name.charCodeAt(i) > 127) {
+      hasNonAscii = true;
+      break;
+    }
   }
-  if (highCount > 0 && highCount / name.length > 0.3) {
-    try {
-      const bytes = new Uint8Array(name.length);
-      for (let i = 0; i < name.length; i++) {
-        bytes[i] = name.charCodeAt(i) & 0xFF;
-      }
-      const decoded = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
-      let decodedHighCount = 0;
-      for (let i = 0; i < decoded.length; i++) {
-        if (decoded.charCodeAt(i) > 127) decodedHighCount++;
-      }
-      if (decodedHighCount / decoded.length < 0.3) {
-        return decoded;
-      }
-    } catch {}
-  }
+  if (!hasNonAscii) return name;
+
+  try {
+    // 将字符串按 latin1 解释，得到原始 UTF-8 字节
+    const bytes = Buffer.from(name, 'latin1');
+    // 以 UTF-8 解码
+    const decoded = bytes.toString('utf8');
+
+    // 如果解码后包含正常 CJK 字符（0x4E00-0x9FFF），说明修复有效
+    let cjkCount = 0;
+    for (let i = 0; i < decoded.length; i++) {
+      const code = decoded.charCodeAt(i);
+      if (code >= 0x4E00 && code <= 0x9FFF) cjkCount++;
+    }
+
+    if (cjkCount > 0 && cjkCount / decoded.length >= 0.3) {
+      return decoded;
+    }
+  } catch {}
+
   return name;
 }
 
