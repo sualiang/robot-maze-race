@@ -75,10 +75,16 @@ export default function InviteGuidePage() {
       // Remove code from URL (visually)
       const newUrl = window.location.href.split('?')[0] + '?token=' + token;
       window.history.replaceState({}, '', newUrl);
+
+      // 微信内：bind 成功后直接跳转服务号主页
+      if (/MicroMessenger/i.test(navigator.userAgent)) {
+        window.location.replace(
+          'https://mp.weixin.qq.com/mp/profile_ext?action=home&__biz=__PLACEHOLDER__'
+        );
+      }
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.message || '绑定失败';
       console.error('[InviteGuide] bind-openid error:', msg);
-      // Even on error, show the guide page — user can still follow the service account
       setBindDone(true);
     }
   };
@@ -124,7 +130,25 @@ export default function InviteGuidePage() {
 
   const isInWechat = /MicroMessenger/i.test(navigator.userAgent);
 
-  // Guide page — show after openid binding
+  // 微信内：bind-openid 成功后自动跳服务号主页，不会渲染到这里
+  // 如果到达这里说明还在 bind 中，显示 loading
+  if (isInWechat) {
+    return (
+      <div className="referee-login-page">
+        <div className="referee-login-glow-1" />
+        <div className="referee-login-glow-2" />
+        <div className="referee-login-box">
+          <div className="referee-login-card" style={{ textAlign: 'center' }}>
+            <p style={{ color: 'rgba(255,255,255,0.6)', margin: 0 }}>
+              {bindDone ? '已完成身份校验...' : '正在校验身份...'}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 微信外：Guide page — show after openid binding
   return (
     <div className="referee-login-page">
       <div className="referee-login-glow-1" />
@@ -186,38 +210,13 @@ export default function InviteGuidePage() {
           <h3 style={{ color: '#fff', margin: '0 0 8px', fontSize: 17, fontWeight: 600 }}>
             请关注「安博天智」服务号完成注册
           </h3>
-
-          {isInWechat ? (
-            <>
-              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, lineHeight: 1.6, margin: '0 0 20px' }}>
-                关注后将收到注册邀请链接
-              </p>
-              {/* 微信内：去公众号主页关注 */}
-              <button
-                className="referee-login-btn"
-                onClick={() => {
-                  // Placeholder: 服务号主页链接待填入
-                  window.open('https://mp.weixin.qq.com/mp/profile_ext?action=home&__biz=__PLACEHOLDER__', '_blank');
-                }}
-                style={{
-                  background: 'linear-gradient(135deg, #07c160, #06ad56)',
-                  boxShadow: '0 4px 20px rgba(7, 193, 96, 0.3)',
-                  letterSpacing: 2,
-                  marginBottom: 16,
-                }}
-              >
-                前往关注
-              </button>
-            </>
-          ) : (
-            <>
-              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, lineHeight: 1.6, margin: '0 0 20px' }}>
-                请使用微信扫一扫关注服务号
-                <br />
-                关注后将收到注册邀请链接
-              </p>
-              {/* Service account QR code (微信外) */}
-              <div
+          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, lineHeight: 1.6, margin: '0 0 20px' }}>
+            请使用微信扫一扫关注服务号
+            <br />
+            关注后将收到注册邀请链接
+          </p>
+          {/* Service account QR code */}
+          <div
                 style={{
                   background: '#fff',
                   padding: 16,
@@ -254,8 +253,8 @@ export default function InviteGuidePage() {
                   </div>
                 </div>
               </div>
-            </>
-          )}
+            </div>
+          </div>
 
           <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginBottom: 16 }}>
             {bindDone ? '已绑定，关注服务号后即可注册' : '正在绑定...'}
