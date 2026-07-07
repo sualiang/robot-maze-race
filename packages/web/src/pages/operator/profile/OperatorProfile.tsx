@@ -107,7 +107,7 @@ function LogoutTab() {
         localStorage.removeItem('venueId');
         localStorage.removeItem('venueName');
         message.success('已退出');
-        navigate('/operator/dashboard');
+        navigate('/operator/venues');
         window.location.reload();
       },
     });
