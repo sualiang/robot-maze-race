@@ -120,7 +120,7 @@ export default function OperatorLayout() {
       <Layout>
         <Header style={{ background: '#fff', padding: '0 24px', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
           <Space size="middle">
-            <span style={{ color: '#333', fontWeight: 500, fontSize: 13 }}>{userInfo.operator_name || ''}</span>
+            <span style={{ color: '#333', fontWeight: 500, fontSize: 13 }}>{userInfo.operator_name || userInfo.nickname || ''}</span>
             <span style={{ color: '#666', fontSize: 13 }}>{userInfo.phone || ''}</span>
             <span style={{ color: '#888', fontSize: 12 }}>{userInfo.role_name || userInfo.admin_role_name || ''}</span>
             <Button type="text" icon={<LogoutOutlined />} onClick={handleLogout}>
