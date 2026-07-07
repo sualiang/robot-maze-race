@@ -459,11 +459,14 @@
 
 /* --- 移动端 (≤480px) --- */
 @media (max-width: 480px) {
-  /* 根容器 — 全宽、取消两侧留白 */
+  /* 根容器 — 全宽、取消两侧留白、允许滚动 */
   .referee-layout {
     max-width: 100%;
     border-left: none;
     border-right: none;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   /* 页面通用 padding — 减小到安全区 */
@@ -519,14 +522,21 @@
     padding: 20px 16px 28px 16px;
     max-height: 85vh;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
-  /* 登录页 — 去掉固定定位，改用 min-height */
+  /* 登录页 — 去掉固定定位，允许滚动 */
   .referee-login-page {
     position: relative;
-    padding: 24px 16px;
+    top: auto;
+    left: auto;
+    width: 100%;
     min-height: 100vh;
     min-height: 100dvh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding: 24px 16px;
   }
 
   .referee-login-box {
@@ -536,6 +546,8 @@
   .referee-login-card {
     padding: 24px 16px;
     border-radius: 16px;
+    width: 100%;
+    max-width: 100%;
   }
 
   .referee-login-title {
@@ -555,6 +567,9 @@
     padding: 14px;
     font-size: 16px;
     letter-spacing: 3px;
+    max-width: calc(100vw - 32px);
+    width: 100%;
+    box-sizing: border-box;
   }
 
   /* 光晕 — 在小屏上缩小 */
@@ -572,6 +587,35 @@
     right: -80px;
   }
 
+  /* 按钮 — 移动端触控友好 + 限制最大宽度 */
+  .referee-btn,
+  .referee-btn-primary,
+  .referee-btn-success,
+  .referee-btn-danger,
+  .referee-btn-warning,
+  .referee-btn-outline,
+  .referee-btn-ghost {
+    min-height: 44px;
+    font-size: 14px;
+    padding: 12px 16px;
+    max-width: calc(100vw - 32px);
+    box-sizing: border-box;
+  }
+
+  .referee-btn-sm {
+    min-height: 36px;
+    padding: 6px 14px;
+    font-size: 12px;
+    max-width: calc(100vw - 32px);
+  }
+
+  .referee-btn-lg {
+    min-height: 48px;
+    padding: 14px 20px;
+    font-size: 15px;
+    max-width: calc(100vw - 32px);
+  }
+
   /* 按钮行 — 移动端允许换行 */
   .referee-btn-row {
     gap: 8px;
@@ -581,25 +625,6 @@
   .referee-btn-row .referee-btn {
     min-width: 100px;
     flex: 1 1 auto;
-  }
-
-  /* 按钮 — 移动端触控友好 */
-  .referee-btn {
-    min-height: 44px;
-    font-size: 14px;
-    padding: 12px 16px;
-  }
-
-  .referee-btn-sm {
-    min-height: 36px;
-    padding: 6px 14px;
-    font-size: 12px;
-  }
-
-  .referee-btn-lg {
-    min-height: 48px;
-    padding: 14px 20px;
-    font-size: 15px;
   }
 
   /* 计时器 — 缩小字号防止溢出 */
