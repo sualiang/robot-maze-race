@@ -350,25 +350,31 @@ router.post('/:id/reset-password', authMiddleware, operatorMiddleware, async (re
       return;
     }
 
-    // 查商家管理员账号
-    const admin = await queryOne<{ id: string }>(
-      'SELECT id FROM merchant_admin WHERE merchant_id = $1 LIMIT 1',
+    // 查商家管理员账号（可能不存在）
+    let admin = await queryOne<{ id: string; username: string }>(
+      'SELECT id, username FROM merchant_admin WHERE merchant_id = $1 LIMIT 1',
       [id]
     );
-    if (!admin) {
-      res.json({ code: 404, message: '商家管理员账号不存在', data: null });
-      return;
-    }
 
     // 生成新密码
     const newPassword = generateSecurePassword();
     const passwordHash = bcrypt.hashSync(newPassword, 10);
 
-    // 更新密码 + 标记首次登录
-    await execute(
-      `UPDATE merchant_admin SET password_hash = $1, first_login = 1, updated_at = NOW() WHERE id = $2`,
-      [passwordHash, admin.id]
-    );
+    if (!admin) {
+      // 没有管理员：自动创建
+      const adminId = uuidv4();
+      await execute(
+        `INSERT INTO merchant_admin (id, merchant_id, username, password_hash, phone, first_login, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, 1, NOW(), NOW())`,
+        [adminId, id, 'admin', passwordHash, '']
+      );
+    } else {
+      // 有管理员：重置密码 + 标记首次登录
+      await execute(
+        `UPDATE merchant_admin SET password_hash = $1, first_login = 1, updated_at = NOW() WHERE id = $2`,
+        [passwordHash, admin.id]
+      );
+    }
 
     res.json({
       code: 0,
