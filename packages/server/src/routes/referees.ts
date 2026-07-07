@@ -11,8 +11,6 @@ import {
   Referee,
   CreateRefereeParams,
   UpdateRefereeParams,
-  RefereeApplyRequest,
-  RefereeApplicationStatus,
 } from '@robot-race/shared';
 
 const router = Router();
@@ -275,68 +273,6 @@ router.get('/my', authMiddleware, async (req: Request, res: Response<ApiResponse
 
 
 /**
- * GET /api/v1/referees/application-status
- * 查看当前用户的裁判申请状态
- * @header Authorization: Bearer <token>
- * @returns RefereeApplicationStatus
- */
-router.get('/application-status', authMiddleware, async (req: Request, res: Response<ApiResponse<RefereeApplicationStatus>>) => {
-  try {
-    const userId = req.user!.userId;
-    const openid = req.user!.openid || '';
-
-    // 先通过 user_id 查找
-    let application = await queryOne<any>(
-      `SELECT id, name, phone, status, apply_remark, review_remark, reviewed_at, created_at
-       FROM referees WHERE user_id = $1
-       ORDER BY created_at DESC LIMIT 1`,
-      [userId]
-    );
-
-    // 如果没找到，通过 openid 关联查找
-    if (!application && openid) {
-      application = await queryOne<any>(
-        `SELECT r.id, r.name, r.phone, r.status, r.apply_remark, r.review_remark,
-                r.reviewed_at, r.created_at
-         FROM referees r
-         JOIN users u ON r.user_id = u.id
-         WHERE u.openid = $1 OR u.mp_openid = $2
-         ORDER BY r.created_at DESC LIMIT 1`,
-        [openid, openid]
-      );
-    }
-
-    if (!application) {
-      return res.json({
-        code: 0,
-        message: 'ok',
-        data: { has_application: false, application: null },
-      });
-    }
-
-    return res.json({
-      code: 0,
-      message: 'ok',
-      data: {
-        has_application: true,
-        application: {
-          id: application.id,
-          name: application.name,
-          phone: application.phone,
-          status: application.status,
-          apply_remark: application.apply_remark || '',
-          review_remark: application.review_remark || '',
-          reviewed_at: application.reviewed_at,
-          created_at: application.created_at,
-        },
-      },
-    });
-  } catch (error: any) {
-    console.error('[Referees] application-status error:', error.message);
-    return res.status(500).json({ code: 500, message: '查询申请状态失败', data: null as any });
-  }
-});
-/**
  * GET /api/v1/referees/:id
  * 获取裁判详情
  * @param id - 裁判记录 UUID
@@ -381,54 +317,7 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response<ApiRespons
  * @body remark - 申请备注（可选）
  * @returns 申请结果
  */
-router.post('/apply', async (req: Request, res: Response<ApiResponse<any>>) => {
-  try {
-    const body = req.body as RefereeApplyRequest;
 
-    if (!body.name || !body.phone) {
-      return res.status(400).json({ code: 400, message: '请填写姓名和手机号', data: null });
-    }
-
-    // 检查手机号是否已有 pending/approved 的申请记录
-    const existingByPhone = await queryOne<{ id: string; status: string }>(
-      `SELECT id, status FROM referees WHERE phone = $1 AND status IN ('pending', 'approved') LIMIT 1`,
-      [body.phone]
-    );
-    if (existingByPhone) {
-      const statusLabel = existingByPhone.status === 'approved' ? '已通过审核' : '正在审核中';
-      return res.status(400).json({
-        code: 400,
-        message: `该手机号已有裁判申请（${statusLabel}），请勿重复申请`,
-        data: null,
-      });
-    }
-
-    // 创建 referees 记录（user_id 暂为空，审核通过后再关联）
-    const refereeId = uuidv4();
-    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
-    const opId = body.operator_id || null;
-    console.log('[Referees] apply:', { refereeId, name: body.name, phone: body.phone, operator_id: opId });
-    await execute(
-      `INSERT INTO referees (id, user_id, name, phone, status, apply_remark, operator_id, created_at, updated_at)
-       VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8)`,
-      [refereeId, body.name, body.phone, 'pending', body.remark || '', opId, now, now]
-    );
-
-    return res.status(201).json({
-      code: 0,
-      message: '裁判申请已提交，请等待审核',
-      data: {
-        id: refereeId,
-        name: body.name,
-        phone: body.phone,
-        status: 'pending',
-      },
-    });
-  } catch (error: any) {
-    console.error('[Referees] apply error:', error.message);
-    return res.status(500).json({ code: 500, message: '提交申请失败: ' + error.message, data: null });
-  }
-});
 
 // 裁判审核路由已移除（cert_status 不再使用）
 
@@ -620,7 +509,7 @@ router.patch('/:id/review', authMiddleware, async (req: Request, res: Response<A
     const reviewRemark = isApproved ? '' : (reason || '');
     const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
 
-    console.log('[Referees] review:', { id, action, newStatus, reviewer });
+    console.log('[Referees] review:', { id, action, newStatus, reviewer, refereeUserId: referee.user_id });
 
     // 更新 referees 表
     await execute(
@@ -630,15 +519,38 @@ router.patch('/:id/review', authMiddleware, async (req: Request, res: Response<A
       [newStatus, reviewRemark, now, reviewer, now, id]
     );
 
-    // 如果通过，同步更新 users 表角色为 referee
-    if (isApproved && referee.user_id) {
-      try {
-        await execute(
-          'UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2',
-          ['referee', referee.user_id]
-        );
-      } catch (e: any) {
-        console.error('[Referees] review sync users role failed:', e.message);
+    // 审核通过 → 创建/关联 users 记录（裁判通过微信OAuth登录）
+    if (isApproved) {
+      if (referee.user_id) {
+        // 已有 user_id：只更新 role
+        try {
+          await execute(
+            'UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2',
+            ['referee', referee.user_id]
+          );
+        } catch (e: any) {
+          console.error('[Referees] review sync users role failed:', e.message);
+        }
+      } else {
+        // 无 user_id：创建 users 记录
+        const newUserId = uuidv4();
+        const rawPassword = generateSecurePassword(8);
+        const passwordHash = bcrypt.hashSync(rawPassword, 10);
+        try {
+          await execute(
+            `INSERT INTO users (id, phone, nickname, role, password_hash, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
+            [newUserId, referee.phone, referee.name, 'referee', passwordHash]
+          );
+          // 关联 referees.user_id
+          await execute(
+            'UPDATE referees SET user_id = $1, updated_at = NOW() WHERE id = $2',
+            [newUserId, id]
+          );
+          console.log('[Referees] review: created user for referee', { newUserId, refereeName: referee.name, password: rawPassword });
+        } catch (e: any) {
+          console.error('[Referees] review create user failed:', e.message);
+        }
       }
     }
 
