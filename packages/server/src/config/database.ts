@@ -624,6 +624,17 @@ export async function initSchema(): Promise<void> {
     `);
   } catch { /* ignore */ }
 
+  // point_shop 表新增 stock 字段
+  try {
+    const [cols] = await conn.execute<any>(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'point_shop' AND COLUMN_NAME = 'stock'`,
+      [getPoolOptions().database]
+    );
+    if ((cols as any[]).length === 0) {
+      await conn.execute('ALTER TABLE point_shop ADD COLUMN stock INT NOT NULL DEFAULT 0');
+    }
+  } catch { /* ignore */ }
+
   // points_exchange_log 表
   try {
     await conn.execute(`

@@ -23,7 +23,7 @@ function operatorOnly(req: Request, res: Response, next: Function): void {
 router.get('/points-shop/items', authMiddleware, async (req: Request, res: Response) => {
   try {
     const items = await query<any>(
-      `SELECT id, item_type, item_id, name, description, need_points, exchange_limit,
+      `SELECT id, item_type, item_id, name, description, need_points, stock, exchange_limit,
               sort_weight, status, created_at
        FROM point_shop
        WHERE status = 1
@@ -50,6 +50,7 @@ router.get('/points-shop/items', authMiddleware, async (req: Request, res: Respo
           exchangeLimit: item.exchange_limit || 0,
           sortWeight: item.sort_weight || 0,
           status: item.status,
+          stock: item.stock || 0,
         })),
         userPoints: userPoints?.points || 0,
       },
@@ -68,7 +69,7 @@ router.get('/points-shop/items', authMiddleware, async (req: Request, res: Respo
 router.get('/points-shop/items/all', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
     const items = await query<any>(
-      `SELECT id, item_type, item_id, name, description, need_points, sort_weight, status, created_at, updated_at
+      `SELECT id, item_type, item_id, name, description, need_points, stock, sort_weight, status, created_at, updated_at
        FROM point_shop
        ORDER BY sort_weight ASC, created_at ASC`
     );
@@ -83,6 +84,7 @@ router.get('/points-shop/items/all', authMiddleware, operatorOnly, async (req: R
         needPoints: item.need_points,
         sortWeight: item.sort_weight || 0,
         status: item.status,
+        stock: item.stock || 0,
         createdAt: item.created_at,
         updatedAt: item.updated_at,
       }))
@@ -99,15 +101,15 @@ router.get('/points-shop/items/all', authMiddleware, operatorOnly, async (req: R
  */
 router.post('/points-shop/items', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
-    const { name, itemType, itemId, description, needPoints, sortWeight } = req.body;
+    const { name, itemType, itemId, description, needPoints, sortWeight, stock } = req.body;
     if (!name || !itemType || !needPoints) {
       return res.status(400).json({ code: 400, message: 'name, itemType, needPoints 不能为空', data: null });
     }
     const id = uuidv4();
     await execute(
-      `INSERT INTO point_shop (id, item_type, item_id, name, description, need_points, sort_weight)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [id, itemType, itemId || '', name, description || '', needPoints, sortWeight || 0]
+      `INSERT INTO point_shop (id, item_type, item_id, name, description, need_points, sort_weight, stock)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [id, itemType, itemId || '', name, description || '', needPoints, sortWeight || 0, stock ?? 0]
     );
     res.status(201).json({ code: 0, message: '商品已创建', data: { id } });
   } catch (error: any) {
@@ -123,7 +125,7 @@ router.post('/points-shop/items', authMiddleware, operatorOnly, async (req: Requ
 router.put('/points-shop/items/:id', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, itemType, itemId, description, needPoints, sortWeight, status } = req.body;
+    const { name, itemType, itemId, description, needPoints, sortWeight, status, stock } = req.body;
 
     const updates: string[] = [];
     const params: any[] = [];
@@ -136,6 +138,7 @@ router.put('/points-shop/items/:id', authMiddleware, operatorOnly, async (req: R
     if (needPoints !== undefined) { updates.push(`need_points = $${idx++}`); params.push(needPoints); }
     if (sortWeight !== undefined) { updates.push(`sort_weight = $${idx++}`); params.push(sortWeight); }
     if (status !== undefined) { updates.push(`status = $${idx++}`); params.push(status); }
+    if (stock !== undefined) { updates.push(`stock = $${idx++}`); params.push(stock); }
 
     if (updates.length === 0) {
       return res.status(400).json({ code: 400, message: '没有要更新的字段', data: null });
@@ -214,6 +217,22 @@ router.post('/points-shop/exchange', authMiddleware, async (req: Request, res: R
       );
       if (exchangeCount && exchangeCount.cnt >= item.exchange_limit) {
         res.json({ code: 400, message: `已达兑换上限（${item.exchange_limit}次）`, data: null });
+        return;
+      }
+    }
+
+    // 3b. 校验库存并原子扣减
+    if (item.stock !== undefined) {
+      if (item.stock === 0) {
+        res.json({ code: 400, message: '库存不足', data: null });
+        return;
+      }
+      const stockResult = await execute(
+        `UPDATE point_shop SET stock = stock - 1 WHERE id = $1 AND stock > 0`,
+        [itemId]
+      );
+      if (stockResult.changes === 0) {
+        res.json({ code: 400, message: '库存不足', data: null });
         return;
       }
     }
@@ -322,12 +341,14 @@ router.post('/points-shop/exchange', authMiddleware, async (req: Request, res: R
     });
   } catch (e: any) {
     console.error('[PointsShop] exchange error:', e?.message || e);
-    // 尝试回滚积分
+    // 尝试回滚积分和库存
     try {
-      const item = await queryOne<any>(`SELECT need_points FROM point_shop WHERE id = $1`, [req.body.itemId]);
+      const item = await queryOne<any>(`SELECT need_points FROM point_shop WHERE id = $1`, [itemId]);
       if (item) {
-        await execute(`UPDATE users SET points = points + $1 WHERE id = $2`, [item.need_points, req.body.userId]);
+        await execute(`UPDATE users SET points = points + $1 WHERE id = $2`, [item.need_points, userId]);
       }
+      // 回滚库存（+1）
+      await execute(`UPDATE point_shop SET stock = stock + 1 WHERE id = $1`, [itemId]);
     } catch { /* ignore rollback failure */ }
     res.json({ code: 500, message: '兑换失败，积分已返还', data: null });
   }

@@ -90,6 +90,7 @@ export default function MarketingConfig() {
       needPoints: item.needPoints,
       sortWeight: item.sortWeight,
       status: item.status,
+      stock: item.stock || 0,
     });
     setEditModalOpen(true);
   };
@@ -136,6 +137,7 @@ export default function MarketingConfig() {
       needPoints: 100,
       sortWeight: 0,
       status: 1,
+      stock: 999,
     });
     setEditModalOpen(true);
   };
@@ -275,6 +277,7 @@ export default function MarketingConfig() {
     },
     { title: '面额', dataIndex: 'itemId', key: 'itemId', width: 80, render: (v: string) => v ? (parseFloat(v) / 100).toFixed(2) + '元' : '-' },
     { title: '积分', dataIndex: 'needPoints', key: 'needPoints', width: 80 },
+    { title: '库存', dataIndex: 'stock', key: 'stock', width: 60 },
     { title: '排序', dataIndex: 'sortWeight', key: 'sortWeight', width: 60 },
     {
       title: '状态',
@@ -440,6 +443,9 @@ export default function MarketingConfig() {
             <Input maxLength={60} />
           </Form.Item>
           <Form.Item name="needPoints" label="所需积分" rules={[{ required: true, message: '请输入积分' }]}>
+            <InputNumber min={1} max={999999} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="stock" label="库存数量" rules={[{ required: true, message: '请输入库存数量' }]}>
             <InputNumber min={1} max={999999} style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="sortWeight" label="排序权重（越小越靠前）">
