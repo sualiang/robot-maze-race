@@ -48,14 +48,6 @@ export default function RegisterFormPage() {
     if (oauthCode) handleMpOAuth(oauthCode);
   }, [oauthCode]);
 
-  // 有 token 无 code：静默授权已在 InviteGuidePage 完成，自动发起 userinfo 授权
-  useEffect(() => {
-    if (token && !oauthCode && !oauthDone && !oauthLoading) {
-      handleWechatLogin();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
-
   useEffect(() => { fetchRegions(); }, []);
 
   const fetchRegions = async () => {
