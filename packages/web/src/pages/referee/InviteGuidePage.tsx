@@ -33,18 +33,12 @@ export default function InviteGuidePage() {
   }, [token]);
 
   // Step 2: Handle OAuth callback (snsapi_base silent auth)
+  // 微信内第一步由 nginx 直接 302 到微信 OAuth，回调后带 code 参数
   useEffect(() => {
     if (code && token && inviteInfo) {
       handleBindOpenid(code);
     }
   }, [code, token, inviteInfo]);
-
-  // Step 3: If no code yet, redirect via server-side OAuth entrypoint
-  useEffect(() => {
-    if (inviteInfo && !code && !error) {
-      window.location.href = `https://amberrobot.com.cn/api/v1/referee/invite/${token}/oauth`;
-    }
-  }, [inviteInfo, code, error, token]);
 
   const fetchInviteInfo = async () => {
     try {
