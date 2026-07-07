@@ -190,8 +190,10 @@ router.get('/rbac/users', authMiddleware, operatorOnly, async (req: Request, res
     const total = countResult?.count || 0;
 
     // 分页数据（不返回 password）
+    // name 字段加 CAST 绕过 mysql2 连接池 encoding 损坏 bug
     const users = await query<any>(
-      `SELECT au.id, au.name AS username, au.name AS nickname, au.phone,
+      `SELECT au.id, CAST(au.name AS CHAR CHARACTER SET utf8mb4) AS username,
+              CAST(au.name AS CHAR CHARACTER SET utf8mb4) AS nickname, au.phone,
               au.role as role_key, COALESCE(arr.label, '') as role_name, au.status, au.created_at
        FROM operator_members au
        LEFT JOIN admin_roles arr ON au.role = arr.name
