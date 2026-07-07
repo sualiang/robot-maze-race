@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../../utils/api';
 
@@ -18,44 +18,10 @@ export default function ApplyPage() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
-  const [checking, setChecking] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [appStatus, setAppStatus] = useState<ApplicationStatus>('none');
   const [statusMsg, setStatusMsg] = useState('');
-
-  // 检查是否已登录
-  const token = localStorage.getItem('token');
-  const isLoggedIn = !!token;
-
-  // 页面加载时检查申请状态
-  useEffect(() => {
-    if (!isLoggedIn) return;
-    checkApplicationStatus();
-  }, [isLoggedIn]);
-
-  /** 查询已有申请状态 */
-  const checkApplicationStatus = async () => {
-    try {
-      const res: any = await api.get('/referees/application-status');
-      // 返回结构：{ has_application, application: { status, review_remark, ... } }
-      if (res && res.has_application && res.application) {
-        setAppStatus(res.application.status as ApplicationStatus);
-        if (res.application.status === 'pending') {
-          setStatusMsg('您的申请正在审核中，请耐心等待');
-        } else if (res.application.status === 'approved') {
-          setStatusMsg('您的申请已通过审核，可前往比赛页面');
-        } else if (res.application.status === 'rejected') {
-          setStatusMsg(res.application.review_remark || '您的申请未通过审核，请重新提交');
-        }
-      }
-    } catch {
-      // 没有申请记录或接口报错，允许提交
-      setAppStatus('none');
-    } finally {
-      setChecking(false);
-    }
-  };
 
   /** 提交注册申请 */
   const handleSubmit = async () => {
@@ -79,6 +45,7 @@ export default function ApplyPage() {
         operator_id: operatorId || undefined,
       });
       setSuccess('申请已提交，请等待审核');
+      setStatusMsg('您的申请正在审核中，请耐心等待');
       setAppStatus('pending');
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.message || '提交失败';
@@ -87,36 +54,6 @@ export default function ApplyPage() {
       setLoading(false);
     }
   };
-
-  // 未登录状态
-  if (!isLoggedIn) {
-    return (
-      <div className="referee-page">
-        <div className="referee-empty">
-          <span className="referee-empty-icon">🔒</span>
-          <span className="referee-empty-text">请先登录后再申请</span>
-          <button
-            className="referee-btn referee-btn-primary"
-            style={{ marginTop: 20, width: 'auto', padding: '12px 32px' }}
-            onClick={() => navigate('/referee/login', { replace: true })}
-          >
-            去登录
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // 加载中
-  if (checking) {
-    return (
-      <div className="referee-page">
-        <div className="referee-loading-mask" style={{ position: 'relative' }}>
-          <span className="referee-loading-spinner">加载中...</span>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="referee-page">
