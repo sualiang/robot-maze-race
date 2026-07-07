@@ -124,6 +124,8 @@ export default function InviteGuidePage() {
     );
   }
 
+  const isInWechat = /MicroMessenger/i.test(navigator.userAgent);
+
   // Guide page — show after openid binding
   return (
     <div className="referee-login-page">
@@ -184,52 +186,78 @@ export default function InviteGuidePage() {
           {/* Guide: Follow service account */}
           <div style={{ fontSize: 36, marginBottom: 12 }}>📱</div>
           <h3 style={{ color: '#fff', margin: '0 0 8px', fontSize: 17, fontWeight: 600 }}>
-            请关注安博天智服务号完成注册
+            请关注「安博天智」服务号完成注册
           </h3>
-          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, lineHeight: 1.6, margin: '0 0 20px' }}>
-            请使用微信扫一扫关注服务号
-            <br />
-            关注后将收到注册邀请链接
-          </p>
 
-          {/* Service account QR code */}
-          <div
-            style={{
-              background: '#fff',
-              padding: 16,
-              borderRadius: 12,
-              display: 'inline-block',
-              marginBottom: 16,
-            }}
-          >
-            <img
-              src="/wechat-mp-qrcode.png"
-              alt="服务号二维码"
-              style={{ width: 180, height: 180, display: 'block' }}
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
-            <div
-              style={{
-                width: 180,
-                height: 180,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#999',
-                fontSize: 13,
-              }}
-            >
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 36, marginBottom: 8 }}>📷</div>
-                <div>服务号二维码</div>
-                <div style={{ fontSize: 11, color: '#bbb', marginTop: 4 }}>
-                  请将 qrcode.png 放入 public 目录
+          {isInWechat ? (
+            <>
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, lineHeight: 1.6, margin: '0 0 20px' }}>
+                关注后将收到注册邀请链接
+              </p>
+              {/* 微信内：去公众号主页关注 */}
+              <button
+                className="referee-login-btn"
+                onClick={() => {
+                  // Placeholder: 服务号主页链接待填入
+                  window.open('https://mp.weixin.qq.com/mp/profile_ext?action=home&__biz=__PLACEHOLDER__', '_blank');
+                }}
+                style={{
+                  background: 'linear-gradient(135deg, #07c160, #06ad56)',
+                  boxShadow: '0 4px 20px rgba(7, 193, 96, 0.3)',
+                  letterSpacing: 2,
+                  marginBottom: 16,
+                }}
+              >
+                前往关注
+              </button>
+            </>
+          ) : (
+            <>
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, lineHeight: 1.6, margin: '0 0 20px' }}>
+                请使用微信扫一扫关注服务号
+                <br />
+                关注后将收到注册邀请链接
+              </p>
+              {/* Service account QR code (微信外) */}
+              <div
+                style={{
+                  background: '#fff',
+                  padding: 16,
+                  borderRadius: 12,
+                  display: 'inline-block',
+                  marginBottom: 16,
+                }}
+              >
+                <img
+                  src="/wechat-mp-qrcode.png"
+                  alt="服务号二维码"
+                  style={{ width: 180, height: 180, display: 'block' }}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+                <div
+                  style={{
+                    width: 180,
+                    height: 180,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#999',
+                    fontSize: 13,
+                  }}
+                >
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 36, marginBottom: 8 }}>📷</div>
+                    <div>服务号二维码</div>
+                    <div style={{ fontSize: 11, color: '#bbb', marginTop: 4 }}>
+                      请将 qrcode.png 放入 public 目录
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
+            </>
+          )}
 
           <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginBottom: 16 }}>
             {bindDone ? '已绑定，关注服务号后即可注册' : '正在绑定...'}
