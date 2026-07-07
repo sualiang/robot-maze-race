@@ -1432,9 +1432,10 @@ router.get('/mp-oauth/authorize', (req: Request, res: Response) => {
     return res.status(500).json({ code: 500, message: '微信服务号未配置', data: null });
   }
 
-  // 支持自定义回调地址（通过 redirect 参数）
+  // 支持自定义回调路径（通过 redirect 参数），写死为 amberrobot.com.cn
+  // 微信后台网页授权域名只配了 amberrobot.com.cn，子域名统一走此域名
   const customRedirect = req.query.redirect as string | undefined;
-  const defaultRedirect = `${req.protocol}://${req.get('host')}/referee/login`;
+  const defaultRedirect = `https://amberrobot.com.cn${customRedirect || '/referee/login'}`;
   const redirectUri = encodeURIComponent(customRedirect || defaultRedirect);
 
   // state 传递回调地址，OAuth 回调后前端可以根据 state 决定跳转路径
