@@ -374,97 +374,44 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response<ApiRespons
 
 /**
  * POST /api/v1/referees/apply
- * 裁判自助申请（微信服务号登录用户）
- * @header Authorization: Bearer <token>（需微信服务号登录，从 token 解析 openid）
+ * 裁判自助申请（无需登录，公开接口）
  * @body name - 姓名
  * @body phone - 手机号
+ * @body operator_id - 运营商 ID（可选，从邀请链接获取）
  * @body remark - 申请备注（可选）
  * @returns 申请结果
  */
-router.post('/apply', authMiddleware, async (req: Request, res: Response<ApiResponse<any>>) => {
+router.post('/apply', async (req: Request, res: Response<ApiResponse<any>>) => {
   try {
-    const userId = req.user!.userId;
-    const openid = req.user!.openid || '';
     const body = req.body as RefereeApplyRequest;
 
     if (!body.name || !body.phone) {
       return res.status(400).json({ code: 400, message: '请填写姓名和手机号', data: null });
     }
 
-    // 1. 检查该 openid 是否已有申请（pending/approved/rejected）
-    const existingByOpenid = await queryOne<{ id: string; status: string; name: string }>(
-      `SELECT r.id, r.status, r.name FROM referees r
-       JOIN users u ON r.user_id = u.id
-       WHERE u.openid = $1 OR u.mp_openid = $2
-       LIMIT 1`,
-      [openid, openid]
-    );
-    if (existingByOpenid) {
-      const statusLabel = existingByOpenid.status === 'approved' ? '已通过审核' :
-        existingByOpenid.status === 'pending' ? '正在审核中' : '已被驳回';
-      return res.status(400).json({
-        code: 400,
-        message: `您已有裁判申请（${statusLabel}），请勿重复申请`,
-        data: null,
-      });
-    }
-
-    // 也检查通过 user_id 关联的申请
-    const existingByUserId = await queryOne<{ id: string; status: string }>(
-      'SELECT id, status FROM referees WHERE user_id = $1 LIMIT 1',
-      [userId]
-    );
-    if (existingByUserId) {
-      const statusLabel = existingByUserId.status === 'approved' ? '已通过审核' :
-        existingByUserId.status === 'pending' ? '正在审核中' : '已被驳回';
-      return res.status(400).json({
-        code: 400,
-        message: `您已有裁判申请（${statusLabel}），请勿重复申请`,
-        data: null,
-      });
-    }
-
-    // 2. 检查手机号是否已被注册为裁判
-    const existingByPhone = await queryOne<{ id: string }>(
-      'SELECT id FROM referees WHERE phone = $1',
+    // 检查手机号是否已有 pending/approved 的申请记录
+    const existingByPhone = await queryOne<{ id: string; status: string }>(
+      `SELECT id, status FROM referees WHERE phone = $1 AND status IN ('pending', 'approved') LIMIT 1`,
       [body.phone]
     );
     if (existingByPhone) {
-      return res.status(400).json({ code: 400, message: '该手机号已被注册为裁判', data: null });
+      const statusLabel = existingByPhone.status === 'approved' ? '已通过审核' : '正在审核中';
+      return res.status(400).json({
+        code: 400,
+        message: `该手机号已有裁判申请（${statusLabel}），请勿重复申请`,
+        data: null,
+      });
     }
 
-    // 3. 在 users 表查找或创建用户（通过 openid 关联）
-    let userRecord = await queryOne<{ id: string; openid: string }>(
-      'SELECT id, openid FROM users WHERE id = $1',
-      [userId]
-    );
-
-    if (!userRecord) {
-      // 用户不存在，创建一个新用户
-      const newUserId = uuidv4();
-      await execute(
-        `INSERT INTO users (id, openid, nickname, phone, role)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [newUserId, openid || ('ref_apply_' + body.phone), body.name, body.phone, 'referee']
-      );
-      userRecord = { id: newUserId, openid: openid || ('ref_apply_' + body.phone) };
-    } else {
-      // 已有用户，更新手机号和姓名
-      await execute(
-        'UPDATE users SET phone = COALESCE(NULLIF($1, \'\'), phone), nickname = COALESCE(NULLIF($2, \'\'), nickname) WHERE id = $3',
-        [body.phone, body.name, userId]
-      );
-    }
-
-    // 4. 创建 referees 记录，status='pending'
+    // 创建 referees 记录（user_id 暂为空，审核通过后再关联）
     const refereeId = uuidv4();
     const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
     const opId = body.operator_id || null;
     console.log('[Referees] apply:', { refereeId, name: body.name, phone: body.phone, operator_id: opId });
     await execute(
       `INSERT INTO referees (id, user_id, name, phone, status, apply_remark, operator_id, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [refereeId, userRecord.id, body.name, body.phone, 'pending', body.remark || '', opId, now, now]
+       VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8)`,
+      [refereeId, body.name, body.phone, 'pending', body.remark || '', opId, now, now]
     );
 
     return res.status(201).json({
