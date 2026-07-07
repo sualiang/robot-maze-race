@@ -444,18 +444,248 @@
 }
 
 /* =======================================================================
-   响应式
+   响应式 — mobile-first
+   桌面端 (>480px): 居中 480px 宽度，两侧加边框
+   移动端 (≤480px): 全宽、紧凑间距、弹窗全屏、触控友好
    ======================================================================= */
-@media (min-width: 480px) {
+
+/* --- 桌面端 (>480px) --- */
+@media (min-width: 481px) {
   .referee-layout {
     border-left: 1px solid rgba(255, 255, 255, 0.04);
     border-right: 1px solid rgba(255, 255, 255, 0.04);
   }
 }
 
-@media (max-width: 380px) {
-  .referee-page { padding: 8px; }
-  .referee-card { margin: 8px; padding: 12px; }
+/* --- 移动端 (≤480px) --- */
+@media (max-width: 480px) {
+  /* 根容器 — 全宽、取消两侧留白 */
+  .referee-layout {
+    max-width: 100%;
+    border-left: none;
+    border-right: none;
+  }
+
+  /* 页面通用 padding — 减小到安全区 */
+  .referee-page {
+    padding: 10px 12px 80px 12px;
+  }
+
+  .referee-page-no-tab {
+    padding: 16px 12px;
+  }
+
+  /* 卡片 — 紧凑但保留可读性 */
+  .referee-card {
+    margin: 8px 0;
+    padding: 14px 12px;
+    border-radius: 14px;
+  }
+
+  /* TabBar — 撑满底栏，胶囊风格 */
+  .referee-tabbar {
+    left: 8px;
+    right: 8px;
+    max-width: 100%;
+    border-radius: 20px;
+    padding: 4px 4px;
+    bottom: 8px;
+  }
+
+  .tabbar-item {
+    padding: 8px 2px;
+    gap: 2px;
+  }
+
+  .tabbar-icon {
+    font-size: 22px;
+  }
+
+  .tabbar-label {
+    font-size: 10px;
+  }
+
+  /* 弹窗 — 全屏/接近全屏 */
+  .referee-overlay {
+    padding: 0;
+    align-items: flex-end;
+    background: rgba(0, 0, 0, 0.7);
+  }
+
+  .referee-detail-card {
+    max-width: 100%;
+    width: 100%;
+    border-radius: 20px 20px 0 0;
+    padding: 20px 16px 28px 16px;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+
+  /* 登录页 — 去掉固定定位，改用 min-height */
+  .referee-login-page {
+    position: relative;
+    padding: 24px 16px;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  .referee-login-box {
+    max-width: 100%;
+  }
+
+  .referee-login-card {
+    padding: 24px 16px;
+    border-radius: 16px;
+  }
+
+  .referee-login-title {
+    font-size: 26px;
+  }
+
+  .referee-login-subtitle {
+    font-size: 14px;
+  }
+
+  .referee-login-input {
+    padding: 12px 14px;
+    font-size: 15px;
+  }
+
+  .referee-login-btn {
+    padding: 14px;
+    font-size: 16px;
+    letter-spacing: 3px;
+  }
+
+  /* 光晕 — 在小屏上缩小 */
+  .referee-login-glow-1 {
+    width: min(280px, 60vw);
+    height: min(280px, 60vw);
+    top: -60px;
+    left: -60px;
+  }
+
+  .referee-login-glow-2 {
+    width: min(320px, 70vw);
+    height: min(320px, 70vw);
+    bottom: -80px;
+    right: -80px;
+  }
+
+  /* 按钮行 — 移动端允许换行 */
+  .referee-btn-row {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .referee-btn-row .referee-btn {
+    min-width: 100px;
+    flex: 1 1 auto;
+  }
+
+  /* 按钮 — 移动端触控友好 */
+  .referee-btn {
+    min-height: 44px;
+    font-size: 14px;
+    padding: 12px 16px;
+  }
+
+  .referee-btn-sm {
+    min-height: 36px;
+    padding: 6px 14px;
+    font-size: 12px;
+  }
+
+  .referee-btn-lg {
+    min-height: 48px;
+    padding: 14px 20px;
+    font-size: 15px;
+  }
+
+  /* 计时器 — 缩小字号防止溢出 */
+  .referee-timer-main {
+    font-size: 56px;
+  }
+
+  /* 选手信息 */
+  .referee-racer-info {
+    gap: 8px;
+  }
+
+  .referee-racer-avatar {
+    width: 36px;
+    height: 36px;
+    font-size: 20px;
+  }
+
+  .referee-racer-detail .text-one-line {
+    font-size: 15px;
+  }
+
+  /* 排队项 */
+  .referee-queue-item {
+    padding: 10px;
+  }
+
+  .referee-queue-index {
+    width: 30px;
+    height: 30px;
+    font-size: 12px;
+    margin-right: 8px;
+  }
+
+  .referee-queue-avatar {
+    width: 36px;
+    height: 36px;
+    font-size: 20px;
+    margin-right: 8px;
+  }
+
+  .referee-queue-name {
+    font-size: 14px;
+  }
+
+  /* Profile/History 行内标签 */
+  .referee-row-line {
+    padding: 10px 0;
+  }
+
+  .referee-row-label,
+  .referee-row-value {
+    font-size: 12px;
+  }
+
+  /* 表单输入 — 移动端全宽 */
+  .referee-input {
+    font-size: 14px;
+    padding: 12px;
+  }
+
+  /* 卡片标题 */
+  .referee-card-title {
+    font-size: 14px;
+    margin-bottom: 10px;
+  }
+
+  /* Section header */
+  .referee-section-header span:first-child {
+    font-size: 14px;
+  }
+
+  /* 空状态 */
+  .referee-empty {
+    padding: 32px 0;
+  }
+
+  .referee-empty-icon {
+    font-size: 36px;
+  }
+
+  /* 错误消息 — 允许换行 */
+  .referee-error-msg {
+    white-space: normal;
+    word-break: break-all;
+  }
 }
 
 /* =======================================================================
