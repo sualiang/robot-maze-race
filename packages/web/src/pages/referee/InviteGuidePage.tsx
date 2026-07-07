@@ -22,8 +22,17 @@ export default function InviteGuidePage() {
   const [error, setError] = useState('');
   const [bindDone, setBindDone] = useState(false);
 
+  console.log('[InviteGuide] mount', {
+    hasToken: !!token,
+    hasCode: !!code,
+    tokenLen: token.length,
+    codeLen: code.length,
+    href: window.location.href,
+  });
+
   // Step 1: Load invite info
   useEffect(() => {
+    console.log('[InviteGuide] Step1 useEffect fired', { hasToken: !!token });
     if (!token) {
       setError('缺少邀请令牌，请检查链接是否完整');
       setLoading(false);
@@ -35,14 +44,27 @@ export default function InviteGuidePage() {
   // Step 2: Handle OAuth callback (snsapi_base silent auth)
   // 微信内第一步由 nginx 直接 302 到微信 OAuth，回调后带 code 参数
   useEffect(() => {
+    console.log('[InviteGuide] Step2 useEffect fired', {
+      hasCode: !!code,
+      hasToken: !!token,
+      hasInviteInfo: !!inviteInfo,
+      codePresent: !!code,
+      tokenPresent: !!token,
+      inviteInfoPresent: !!inviteInfo,
+    });
     if (code && token && inviteInfo) {
+      console.log('[InviteGuide] Step2 → calling handleBindOpenid', { code, token });
       handleBindOpenid(code);
+    } else {
+      console.log('[InviteGuide] Step2 → skipping, conditions not met');
     }
   }, [code, token, inviteInfo]);
 
   const fetchInviteInfo = async () => {
     try {
+      console.log('[InviteGuide] fetchInviteInfo start', { token });
       const data: any = await api.get(`/referee/invite/${token}`);
+      console.log('[InviteGuide] fetchInviteInfo done', data);
       setInviteInfo(data);
       if (data.status === 'expired') {
         setError('该邀请链接已过期');
@@ -51,6 +73,7 @@ export default function InviteGuidePage() {
       }
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.message || '获取邀请信息失败';
+      console.error('[InviteGuide] fetchInviteInfo error:', msg);
       setError(msg);
     } finally {
       setLoading(false);
@@ -59,24 +82,27 @@ export default function InviteGuidePage() {
 
   // Bind openid to invite after silent OAuth
   const handleBindOpenid = async (oauthCode: string) => {
+    console.log('[InviteGuide] handleBindOpenid START', { token, oauthCode });
     try {
-      await api.post('/referee/bind-openid', {
+      const res = await api.post('/referee/bind-openid', {
         invite_token: token,
         code: oauthCode,
       });
+      console.log('[InviteGuide] bind-openid SUCCESS:', res);
       setBindDone(true);
       const newUrl = window.location.href.split('?')[0] + '?token=' + token;
       window.history.replaceState({}, '', newUrl);
 
       // 微信内：bind 成功后直接跳转服务号主页
       if (/MicroMessenger/i.test(navigator.userAgent)) {
+        console.log('[InviteGuide] WeChat detected, redirecting to MP profile');
         window.location.replace(
           'https://mp.weixin.qq.com/mp/profile_ext?action=home&__biz=__PLACEHOLDER__'
         );
       }
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.message || '绑定失败';
-      console.error('[InviteGuide] bind-openid error:', msg);
+      console.error('[InviteGuide] bind-openid FAILED:', msg, err);
       setBindDone(true);
     }
   };
