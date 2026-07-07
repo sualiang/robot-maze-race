@@ -118,15 +118,14 @@ export default function OperatorLayout() {
         />
       </Sider>
       <Layout>
-        <Header style={{ background: '#fff', padding: '0 24px', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 16 }}>机器狗迷宫竞速赛事</span>
+        <Header style={{ background: '#fff', padding: '0 24px', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
           <Space size="middle">
+            <span style={{ color: '#333', fontWeight: 500, fontSize: 13 }}>{userInfo.operator_name || ''}</span>
+            <span style={{ color: '#666', fontSize: 13 }}>{userInfo.phone || ''}</span>
+            <span style={{ color: '#888', fontSize: 12 }}>{userInfo.role_name || userInfo.admin_role_name || ''}</span>
             <Button type="text" icon={<LogoutOutlined />} onClick={handleLogout}>
               退出登录
             </Button>
-            <span style={{ color: '#888', fontSize: 12 }}>{userInfo.role_name || userInfo.admin_role_name || ''}</span>
-            <span style={{ color: '#666', fontSize: 13 }}>{userInfo.phone || ''}</span>
-            <span style={{ color: '#333', fontWeight: 500, fontSize: 13 }}>{userInfo.operator_name || ''}</span>
           </Space>
         </Header>
         <Content style={{ margin: 24 }}>
