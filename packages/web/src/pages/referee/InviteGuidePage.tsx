@@ -39,10 +39,9 @@ export default function InviteGuidePage() {
     }
   }, [code, token, inviteInfo]);
 
-  // Step 3: If no code yet, redirect via server-side OAuth entrypoint (avoid JS redirect white screen)
+  // Step 3: If no code yet, redirect via server-side OAuth entrypoint
   useEffect(() => {
     if (inviteInfo && !code && !error) {
-      // 服务端 302 跳转：后端检测 UA 决定是否发起微信 OAuth
       window.location.href = `https://amberrobot.com.cn/api/v1/referee/invite/${token}/oauth`;
     }
   }, [inviteInfo, code, error, token]);
@@ -72,7 +71,6 @@ export default function InviteGuidePage() {
         code: oauthCode,
       });
       setBindDone(true);
-      // Remove code from URL (visually)
       const newUrl = window.location.href.split('?')[0] + '?token=' + token;
       window.history.replaceState({}, '', newUrl);
 
@@ -128,11 +126,9 @@ export default function InviteGuidePage() {
     );
   }
 
-  const isInWechat = /MicroMessenger/i.test(navigator.userAgent);
-
   // 微信内：bind-openid 成功后自动跳服务号主页，不会渲染到这里
-  // 如果到达这里说明还在 bind 中，显示 loading
-  if (isInWechat) {
+  // 如果到达这里说明还在 bind 中
+  if (/MicroMessenger/i.test(navigator.userAgent)) {
     return (
       <div className="referee-login-page">
         <div className="referee-login-glow-1" />
@@ -148,7 +144,7 @@ export default function InviteGuidePage() {
     );
   }
 
-  // 微信外：Guide page — show after openid binding
+  // 微信外：Service account QR + follow button
   return (
     <div className="referee-login-page">
       <div className="referee-login-glow-1" />
@@ -215,42 +211,41 @@ export default function InviteGuidePage() {
             <br />
             关注后将收到注册邀请链接
           </p>
+
           {/* Service account QR code */}
           <div
-                style={{
-                  background: '#fff',
-                  padding: 16,
-                  borderRadius: 12,
-                  display: 'inline-block',
-                  marginBottom: 16,
-                }}
-              >
-                <img
-                  src="/wechat-mp-qrcode.png"
-                  alt="服务号二维码"
-                  style={{ width: 180, height: 180, display: 'block' }}
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
-                />
-                <div
-                  style={{
-                    width: 180,
-                    height: 180,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#999',
-                    fontSize: 13,
-                  }}
-                >
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: 36, marginBottom: 8 }}>📷</div>
-                    <div>服务号二维码</div>
-                    <div style={{ fontSize: 11, color: '#bbb', marginTop: 4 }}>
-                      请将 qrcode.png 放入 public 目录
-                    </div>
-                  </div>
+            style={{
+              background: '#fff',
+              padding: 16,
+              borderRadius: 12,
+              display: 'inline-block',
+              marginBottom: 16,
+            }}
+          >
+            <img
+              src="/wechat-mp-qrcode.png"
+              alt="服务号二维码"
+              style={{ width: 180, height: 180, display: 'block' }}
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
+            />
+            <div
+              style={{
+                width: 180,
+                height: 180,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#999',
+                fontSize: 13,
+              }}
+            >
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 36, marginBottom: 8 }}>📷</div>
+                <div>服务号二维码</div>
+                <div style={{ fontSize: 11, color: '#bbb', marginTop: 4 }}>
+                  请将 qrcode.png 放入 public 目录
                 </div>
               </div>
             </div>
