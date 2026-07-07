@@ -39,13 +39,11 @@ export default function InviteGuidePage() {
     }
   }, [code, token, inviteInfo]);
 
-  // Step 3: If no code yet, auto-redirect to WeChat silent OAuth
+  // Step 3: If no code yet, redirect via server-side OAuth entrypoint (avoid JS redirect white screen)
   useEffect(() => {
     if (inviteInfo && !code && !error) {
-      // Auto redirect to WeChat silent OAuth
-      const currentUrl = window.location.href.split('?')[0];
-      const redirectParam = encodeURIComponent(`${currentUrl}?token=${token}`);
-      window.location.href = `/api/v1/auth/mp-oauth/authorize?scope=snsapi_base&redirect=${redirectParam}`;
+      // 服务端 302 跳转：后端检测 UA 决定是否发起微信 OAuth
+      window.location.href = `https://amberrobot.com.cn/api/v1/referee/invite/${token}/oauth`;
     }
   }, [inviteInfo, code, error, token]);
 

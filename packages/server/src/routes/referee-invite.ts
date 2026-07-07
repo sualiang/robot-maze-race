@@ -72,6 +72,42 @@ router.post('/invite', authMiddleware, async (req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/v1/referee/invite/:token/oauth
+ * 页面入口：检测环境发起微信 OAuth（服务端 302，避免前端 JS 跳转白屏）
+ * - 微信内 → 302 到微信 snsapi_base 静默授权
+ * - 微信外 → 302 到 SPA 引导页
+ */
+router.get('/invite/:token/oauth', (req: Request, res: Response) => {
+  const { token } = req.params;
+  const isInWechat = /MicroMessenger/i.test(req.headers['user-agent'] || '');
+
+  if (!isInWechat) {
+    // 非微信浏览器，跳回前端 SPA 引导页
+    return res.redirect(`https://dog.amberrobot.com.cn/referee/invite?token=${token}`);
+  }
+
+  // 微信内 → 构建微信 OAuth URL（snsapi_base 静默授权）
+  const appId = config.wechatMp.appId;
+  if (!appId) {
+    return res.status(500).json({ code: 500, message: '微信服务号未配置', data: null });
+  }
+
+  const redirectUri = encodeURIComponent(
+    `https://amberrobot.com.cn/referee/invite?token=${token}`
+  );
+  const wxAuthUrl =
+    `https://open.weixin.qq.com/connect/oauth2/authorize?` +
+    `appid=${appId}&` +
+    `redirect_uri=${redirectUri}&` +
+    `response_type=code&` +
+    `scope=snsapi_base&` +
+    `state=${token}#wechat_redirect`;
+
+  console.log(`[RefereeInvite] 微信内 -> 302 OAuth, token=${token}`);
+  res.redirect(wxAuthUrl);
+});
+
+/**
  * GET /api/v1/referee/invite/:token
  * 获取邀请信息（无需鉴权，裁判点击链接时调用）
  * @param token - 邀请 token
