@@ -74,6 +74,11 @@ export default function InviteGuidePage() {
         code: oauthCode,
       });
       setBindDone(true);
+      // 微信环境内直接跳转注册页，不显示二维码引导
+      if (/MicroMessenger/i.test(navigator.userAgent)) {
+        navigate(`/referee/register?token=${token}`, { replace: true });
+        return;
+      }
       // Remove code from URL (visually)
       const newUrl = window.location.href.split('?')[0] + '?token=' + token;
       window.history.replaceState({}, '', newUrl);
