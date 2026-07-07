@@ -1424,6 +1424,8 @@ router.post('/upload-avatar', authMiddleware, async (req: Request, res: Response
  * GET /api/v1/auth/mp-oauth/authorize
  * 微信服务号 OAuth 授权入口 — 302 跳转到微信授权页面
  * 前端点击"微信授权登录"按钮后跳转至此，由后端拼接完整授权 URL 并重定向
+ * @query scope - snsapi_base（静默）| snsapi_userinfo（弹窗，默认）
+ * @query redirect - 回调路径
  */
 router.get('/mp-oauth/authorize', (req: Request, res: Response) => {
   const { appId } = config.wechatMp;
@@ -1431,6 +1433,9 @@ router.get('/mp-oauth/authorize', (req: Request, res: Response) => {
   if (!appId) {
     return res.status(500).json({ code: 500, message: '微信服务号未配置', data: null });
   }
+
+  // 支持 scope query 参数（snsapi_base / snsapi_userinfo）
+  const scope = (req.query.scope as string) || 'snsapi_userinfo';
 
   // 支持自定义回调路径（通过 redirect 参数），写死为 amberrobot.com.cn
   // 微信后台网页授权域名只配了 amberrobot.com.cn，子域名统一走此域名
@@ -1448,7 +1453,7 @@ router.get('/mp-oauth/authorize', (req: Request, res: Response) => {
     `appid=${appId}&` +
     `redirect_uri=${redirectUri}&` +
     `response_type=code&` +
-    `scope=snsapi_userinfo&` +
+    `scope=${scope}&` +
     `state=${stateParam}#wechat_redirect`;
 
   res.redirect(wxAuthUrl);
@@ -1502,6 +1507,8 @@ router.get('/mp-oauth', async (req: Request, res: Response) => {
 
     // 2. 查找或创建用户
     let user = await findUserByOpenid(openid);
+    let isNewUser = false;
+    let refereeId: string | null = null;
 
     if (!user) {
       const nickname = `裁判${Date.now().toString(36).slice(-6)}`;
@@ -1511,6 +1518,33 @@ router.get('/mp-oauth', async (req: Request, res: Response) => {
         nickname,
         role: UserRole.REFEREE,
       });
+      isNewUser = true;
+    } else {
+      // 判断 is_new_user：该 openid 是否已有关联的 referee 记录
+      const existingReferee = await queryOne<{ id: string }>(
+        'SELECT id FROM referees WHERE user_id = $1',
+        [user.id]
+      );
+      if (existingReferee) {
+        refereeId = existingReferee.id;
+      } else {
+        isNewUser = true;
+      }
+    }
+
+    // 如果是新裁判（is_new_user），创建 referees 记录
+    if (isNewUser && !refereeId) {
+      refereeId = uuidv4();
+      try {
+        await execute(
+          `INSERT INTO referees (id, user_id, name, phone, status, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, 'pending', NOW(), NOW())`,
+          [refereeId, user.id, user.nickname || '未设置', user.phone || '']
+        );
+      } catch (e: any) {
+        console.error('[Auth] mp-oauth create referee failed:', e.message);
+        refereeId = null;
+      }
     }
 
     // 3. 生成 JWT
@@ -1519,7 +1553,7 @@ router.get('/mp-oauth', async (req: Request, res: Response) => {
     return res.json({
       code: 0,
       message: '登录成功',
-      data: { token, user },
+      data: { token, user, is_new_user: isNewUser, referee_id: refereeId },
     });
   } catch (error: any) {
     console.error('[Auth] mp-oauth error:', error.message);

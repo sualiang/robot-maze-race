@@ -154,6 +154,11 @@ import refereeApplyRoutes from './routes/referee-apply';
 app.use('/api/v1/referee', refereeInviteRoutes);
 app.use('/api/v1/referee', refereeApplyRoutes);
 
+// 微信服务号事件回调
+import wechatCallbackRoutes from './routes/wechat-callback';
+app.use('/api/v1/wechat', wechatCallbackRoutes);
+app.use('/api/v1/referee', refereeApplyRoutes);
+
 // 微信服务号 OAuth 登录
 import wxMpLoginRoutes from './routes/wx-mp-login';
 app.use('/api/v1/auth', wxMpLoginRoutes);

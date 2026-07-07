@@ -1293,6 +1293,32 @@ export function getCurrentScreenData() {
   };
 }
 
+/**
+ * PATCH /api/v1/referees/:id/profile
+ * 裁判完善个人资料（路径 B 步骤 7）
+ */
+router.patch('/:id/profile', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { name, phone } = req.body;
+    if (!name || !phone) return res.status(400).json({ code: 400, message: '请填写姓名和手机号', data: null });
+    if (!/^\d{11}$/.test(phone)) return res.status(400).json({ code: 400, message: '手机号格式不正确', data: null });
+
+    const referee = await queryOne<{ id: string; user_id: string }>(
+      'SELECT id, user_id FROM referees WHERE id = $1', [id]);
+    if (!referee) return res.status(404).json({ code: 404, message: '裁判记录不存在', data: null });
+
+    await execute('UPDATE referees SET name = $1, phone = $2, updated_at = NOW() WHERE id = $3', [name, phone, id]);
+    if (referee.user_id) {
+      await execute('UPDATE users SET nickname = $1, phone = $2, updated_at = NOW() WHERE id = $3', [name, phone, referee.user_id]);
+    }
+    return res.json({ code: 0, message: '资料更新成功', data: { id, name, phone } });
+  } catch (error: any) {
+    console.error('[Referees] profile update error:', error.message);
+    return res.status(500).json({ code: 500, message: '更新资料失败', data: null });
+  }
+});
+
 // 裁判认证审核路由已移除（cert_status 不再使用）
 
 /**

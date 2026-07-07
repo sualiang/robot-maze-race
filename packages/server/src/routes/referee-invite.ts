@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { query, queryOne, execute } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
+import { config } from '../config';
 
 const router = Router();
 
@@ -296,6 +297,92 @@ router.post('/register', async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('[RefereeInvite] register error:', error.message);
     return res.status(500).json({ code: 500, message: '提交注册失败: ' + error.message, data: null });
+  }
+});
+
+/**
+ * POST /api/v1/referee/bind-openid
+ * 微信静默授权后绑定 openid 到邀请记录（路径 B 步骤 a-c）
+ */
+router.post('/bind-openid', async (req: Request, res: Response) => {
+  try {
+    const { invite_token, code } = req.body;
+    if (!invite_token || !code) {
+      return res.status(400).json({ code: 400, message: '缺少 invite_token 或 code', data: null });
+    }
+    const invite = await queryOne<{ id: string; status: string }>(
+      'SELECT id, status FROM referee_invites WHERE token = $1', [invite_token]);
+    if (!invite) return res.status(400).json({ code: 400, message: '邀请链接无效', data: null });
+    if (invite.status !== 'active') return res.status(400).json({ code: 400, message: `邀请已${invite.status === 'used' ? '被使用' : '过期'}`, data: null });
+
+    let openid: string;
+    if (code === 'dev-test-code' || !config.wechatMp.appId) {
+      openid = `mp_dev_openid_${Date.now()}`;
+    } else {
+      const { appId: mpAppId, appSecret: mpAppSecret } = config.wechatMp;
+      const wxUrl = `https://api.weixin.qq.com/sns/oauth2/access_token?appid=${mpAppId}&secret=${mpAppSecret}&code=${code}&grant_type=authorization_code`;
+      const wxResp = await fetch(wxUrl);
+      const wxData = (await wxResp.json()) as any;
+      if (wxData.errcode) {
+        return res.status(400).json({ code: 400, message: `微信授权失败: ${wxData.errmsg || '未知错误'}`, data: null });
+      }
+      openid = wxData.openid;
+    }
+    if (!openid) return res.status(400).json({ code: 400, message: '未能获取 openid', data: null });
+
+    await execute('UPDATE referee_invites SET openid = $1, updated_at = NOW() WHERE id = $2', [openid, invite.id]);
+    console.log(`[RefereeInvite] bind-openid: invite_id=${invite.id}, openid=${openid}`);
+    return res.json({ code: 0, message: 'ok', data: { success: true } });
+  } catch (error: any) {
+    console.error('[RefereeInvite] bind-openid error:', error.message);
+    return res.status(500).json({ code: 500, message: '绑定 openid 失败: ' + error.message, data: null });
+  }
+});
+
+/**
+ * GET /api/v1/referee/invitations
+ * 运营商查询邀请列表（分页）
+ */
+router.get('/invitations', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const role = req.user!.role;
+    if (role !== 'admin' && role !== 'operator') {
+      return res.status(403).json({ code: 403, message: '仅管理员或运营商可查看', data: null });
+    }
+    const { page: pageStr = '1', pageSize: pageSizeStr = '20' } = req.query;
+    const page = Math.max(1, parseInt(pageStr as string, 10) || 1);
+    const pageSize = Math.min(100, Math.max(1, parseInt(pageSizeStr as string, 10) || 20));
+    const offset = (page - 1) * pageSize;
+
+    const conditions: string[] = [];
+    const params: any[] = [];
+    if (role === 'operator') {
+      let operatorId = '';
+      const member = await queryOne<{ operator_id: string }>(
+        'SELECT operator_id FROM operator_members WHERE id = $1', [req.user!.userId]);
+      operatorId = member?.operator_id || (req.user as any).operatorId || req.user!.userId;
+      conditions.push('operator_id = $' + (params.length + 1));
+      params.push(operatorId);
+    }
+    const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
+
+    const countResult = await queryOne<{ count: number }>(
+      `SELECT COUNT(*) as count FROM referee_invites ${whereClause}`, params);
+    const total = countResult?.count || 0;
+
+    const list = await query<any>(
+      `SELECT id, operator_id, phone, venue_id, token, note, status, openid, expires_at, created_at, updated_at
+       FROM referee_invites ${whereClause} ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, pageSize, offset]);
+
+    const enriched = list.map((inv: any) => ({
+      ...inv,
+      invite_url: `https://dog.amberrobot.com.cn/referee/invite?token=${inv.token}`,
+    }));
+    return res.json({ code: 0, message: 'ok', data: { list: enriched, total, page, pageSize } });
+  } catch (error: any) {
+    console.error('[RefereeInvite] invitations error:', error.message);
+    return res.status(500).json({ code: 500, message: '获取邀请列表失败', data: null });
   }
 });
 
