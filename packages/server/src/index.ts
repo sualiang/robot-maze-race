@@ -150,7 +150,9 @@ app.use('/api/v1/upload', uploadRoutes);
 // ============================================================
 // 裁判邀请 & 注册
 import refereeInviteRoutes from './routes/referee-invite';
+import refereeApplyRoutes from './routes/referee-apply';
 app.use('/api/v1/referee', refereeInviteRoutes);
+app.use('/api/v1/referee', refereeApplyRoutes);
 
 // 微信服务号 OAuth 登录
 import wxMpLoginRoutes from './routes/wx-mp-login';

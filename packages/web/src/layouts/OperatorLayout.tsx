@@ -3,7 +3,7 @@ import { Layout, Menu, Button, Space } from 'antd';
 import { LogoutOutlined } from '@ant-design/icons';
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { HomeOutlined, TeamOutlined, ShopOutlined, GiftOutlined, DollarOutlined, UserOutlined, SafetyCertificateOutlined, UserSwitchOutlined, ShoppingOutlined } from '@ant-design/icons';
+import { HomeOutlined, TeamOutlined, ShopOutlined, GiftOutlined, DollarOutlined, UserOutlined, SafetyCertificateOutlined, UserSwitchOutlined, ShoppingOutlined, AuditOutlined } from '@ant-design/icons';
 import api from '../utils/api';
 
 const { Header, Sider, Content } = Layout;
@@ -11,6 +11,7 @@ const { Header, Sider, Content } = Layout;
 const allMenuItems: { key: string; icon: React.ReactNode; label: string; perms?: string[] }[] = [
   { key: '/operator/venues', icon: <HomeOutlined />, label: '赛场管理', perms: ['venues:read'] },
   { key: '/operator/referees', icon: <TeamOutlined />, label: '裁判管理', perms: ['referees:read'] },
+  { key: '/operator/referee-review', icon: <AuditOutlined />, label: '裁判审核', perms: ['referees:read'] },
   { key: '/operator/packages', icon: <ShopOutlined />, label: '参赛包管理', perms: ['packages:read'] },
   { key: '/operator/marketing', icon: <GiftOutlined />, label: '营销管理', perms: ['marketing:read'] },
   { key: '/operator/finance', icon: <DollarOutlined />, label: '财务中心', perms: ['finance:read'] },
