@@ -190,10 +190,9 @@ router.get('/rbac/users', authMiddleware, operatorOnly, async (req: Request, res
     const total = countResult?.count || 0;
 
     // 分页数据（不返回 password）
-    // name 字段加 CAST 绕过 mysql2 连接池 encoding 损坏 bug
+    // HEX(name) 绕过 mysql2 连接池 encoding 损坏 bug，JS 层 Buffer.from 解码
     const users = await query<any>(
-      `SELECT au.id, CAST(au.name AS CHAR CHARACTER SET utf8mb4) AS username,
-              CAST(au.name AS CHAR CHARACTER SET utf8mb4) AS nickname, au.phone,
+      `SELECT au.id, HEX(au.name) AS name_hex, au.phone,
               au.role as role_key, COALESCE(arr.label, '') as role_name, au.status, au.created_at
        FROM operator_members au
        LEFT JOIN admin_roles arr ON au.role = arr.name
@@ -209,10 +208,20 @@ router.get('/rbac/users', authMiddleware, operatorOnly, async (req: Request, res
       roleMap[r.key] = r.name;
     }
 
-    const list = users.map((u: any) => ({
-      ...u,
-      role_name: roleMap[u.role_key] || u.role_key,
-    }));
+    const list = users.map((u: any) => {
+      let nameStr = '';
+      try {
+        if (u.name_hex) {
+          nameStr = Buffer.from(u.name_hex, 'hex').toString('utf8');
+        }
+      } catch { nameStr = u.name_hex || ''; }
+      return {
+        ...u,
+        username: nameStr,
+        nickname: nameStr,
+        role_name: roleMap[u.role_key] || u.role_key,
+      };
+    });
 
     return res.json({ code: 0, message: 'ok', data: { list, total, page, pageSize } });
   } catch (error: any) {
