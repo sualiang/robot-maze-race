@@ -475,11 +475,11 @@ export default function CouponManage() {
         <div className="mch-form-group">
           <label className="mch-form-label">投放渠道</label>
           <div className="mch-form-checkbox-group">
-            {['lottery', 'package', 'checkin'].map((ch) => (
+            {['package', 'points_shop'].map((ch) => (
               <label key={ch} className="mch-form-checkbox">
                 <input type="checkbox" checked={formChannels.includes(ch)}
                   onChange={() => handleChannelToggle(ch)} />
-                {ch === 'lottery' ? '积分抽奖池' : ch === 'package' ? '参赛包赠送' : '签到赠送'}
+                {ch === 'package' ? '参赛包赠送' : '积分商城'}
               </label>
             ))}
           </div>
