@@ -8,44 +8,6 @@ import { authMiddleware, AuthPayload } from '../middleware/auth';
 import { RefereeReviewRequest } from '@robot-race/shared';
 import pcaCodeData from '../../../shared/src/pca-code.json';
 
-/**
- * 修复双重 UTF-8 编码的中文名（latin1→utf8 恢复）。
- *
- * 只有当 name 被确认为双重编码时才修复：
- * 1. 用 Buffer.from(name, 'latin1') + toString('utf8') 尝试解码
- * 2. 如果解码结果不包含 U+FFFD 替换字符，且含 CJK 字符，说明修复有效
- * 3. 否则返回原始值（name 本来就正常，或者损坏得无法恢复）
- */
-function fixDoubleEncodedName(name: string): string {
-  if (!name || name.length === 0) return name;
-
-  // 纯 ASCII 无需修复
-  if (!/[^\x00-\x7F]/.test(name)) return name;
-
-  try {
-    // 尝试 latin1→utf8 恢复
-    const bytes = Buffer.from(name, 'latin1');
-    const decoded = bytes.toString('utf8');
-
-    // 如果有 U+FFFD 替换字符，说明 name 本身不是合法的双重编码
-    // （正常中文 latin1→utf8 也会产生 U+FFFD），直接返回原值
-    if (decoded.includes('\uFFFD')) return name;
-
-    // 解码后无替换字符，检查是否含有 CJK 字符
-    let cjkCount = 0;
-    for (let i = 0; i < decoded.length; i++) {
-      const code = decoded.charCodeAt(i);
-      if (code >= 0x4E00 && code <= 0x9FFF) cjkCount++;
-    }
-
-    if (cjkCount > 0 && cjkCount / decoded.length >= 0.3) {
-      return decoded;
-    }
-  } catch {}
-
-  return name;
-}
-
 
 const router = Router();
 
@@ -247,8 +209,6 @@ router.get('/rbac/users', authMiddleware, operatorOnly, async (req: Request, res
 
     const list = users.map((u: any) => ({
       ...u,
-      username: fixDoubleEncodedName(u.username),
-      nickname: fixDoubleEncodedName(u.nickname),
       role_name: roleMap[u.role_key] || u.role_key,
     }));
 
@@ -390,8 +350,6 @@ router.put('/rbac/users/:id', authMiddleware, operatorOnly, async (req: Request,
       roleMap[r.key] = r.name;
     }
     if (updated) {
-      updated.username = fixDoubleEncodedName(updated.username);
-      updated.nickname = fixDoubleEncodedName(updated.nickname);
       updated.role_name = roleMap[updated.role_key] || updated.role_key;
     }
 
