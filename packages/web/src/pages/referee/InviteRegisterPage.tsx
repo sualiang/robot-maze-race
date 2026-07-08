@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import api from '../../utils/api';
 
@@ -21,9 +21,6 @@ export default function InviteRegisterPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [oauthLoading, setOauthLoading] = useState(false);
-  const [showQrGuide, setShowQrGuide] = useState(false);
-  const [subscribing, setSubscribing] = useState(false);
-  const [pollCount, setPollCount] = useState(0);
 
   // 第一步：获取邀请信息
   useEffect(() => {
@@ -60,6 +57,7 @@ export default function InviteRegisterPage() {
   };
 
   // OAuth 回调处理
+  // P0 修复：定向邀请链路跳过关注服务号校验，OAuth 后直接跳转注册页
   const handleOAuthCallback = async (oauthCode: string) => {
     setOauthLoading(true);
     setError('');
@@ -68,8 +66,8 @@ export default function InviteRegisterPage() {
       localStorage.setItem('token', res.token);
       localStorage.setItem('referee_user_info', JSON.stringify(res.user));
 
-      // 检查是否已关注服务号
-      await checkSubscribeStatus();
+      // 定向邀请跳过关注校验，直接跳转信息提交页
+      navigate(`/referee/register?invite_token=${token}`, { replace: true });
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.message || '微信授权登录失败';
       setError(msg);
@@ -77,67 +75,13 @@ export default function InviteRegisterPage() {
     }
   };
 
-  // 检查关注状态
-  const checkSubscribeStatus = useCallback(async () => {
-    try {
-      const data: any = await api.get('/auth/mp-oauth/subscribe-status');
-      if (data.subscribed) {
-        // 已关注，跳转信息提交页
-        navigate(`/referee/register?invite_token=${token}`, { replace: true });
-        return;
-      }
-      // 未关注，显示二维码引导
-      setShowQrGuide(true);
-      setOauthLoading(false);
-      // 开始轮询
-      startPolling();
-    } catch {
-      // 查询失败，默认跳转注册页
-      navigate(`/referee/register?invite_token=${token}`, { replace: true });
-    }
-  }, [token, navigate]);
 
-  // 轮询关注状态
-  const startPolling = useCallback(() => {
-    setSubscribing(true);
-    const interval = setInterval(async () => {
-      try {
-        const data: any = await api.get('/auth/mp-oauth/subscribe-status');
-        setPollCount((c) => c + 1);
-        if (data.subscribed) {
-          clearInterval(interval);
-          setSubscribing(false);
-          navigate(`/referee/register?invite_token=${token}`, { replace: true });
-        }
-        // 最多轮询 60 次（3 分钟），超时后停止
-        if (pollCount > 60) {
-          clearInterval(interval);
-          setSubscribing(false);
-        }
-      } catch {
-        // 忽略轮询错误
-      }
-    }, 3000);
-
-    // 5 分钟后自动停止轮询
-    setTimeout(() => {
-      clearInterval(interval);
-      setSubscribing(false);
-    }, 5 * 60 * 1000);
-
-    return () => clearInterval(interval);
-  }, [token, navigate, pollCount]);
 
   // 微信授权登录
   const handleWechatLogin = () => {
     const currentUrl = window.location.href.split('?')[0];
     const redirectParam = encodeURIComponent(`${currentUrl}?token=${token}`);
     window.location.href = `/api/v1/auth/mp-oauth/authorize?redirect=${redirectParam}`;
-  };
-
-  // 已关注，跳过引导
-  const handleAlreadyFollowed = () => {
-    navigate(`/referee/register?invite_token=${token}`, { replace: true });
   };
 
   // 加载中
@@ -193,88 +137,6 @@ export default function InviteRegisterPage() {
             <p style={{ color: 'rgba(255,255,255,0.6)', margin: 0, fontSize: 15 }}>
               正在验证微信授权...
             </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // 关注引导页面（微信授权后未关注）
-  if (showQrGuide) {
-    return (
-      <div className="referee-login-page">
-        <div className="referee-login-glow-1" />
-        <div className="referee-login-glow-2" />
-        <div className="referee-login-box">
-          <div className="referee-login-logo">
-            <img src="/logo-avatar.png" alt="铁甲快狗" style={{ width: 100, height: 100 }} />
-          </div>
-          <div className="referee-login-card" style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 36, marginBottom: 12 }}>📱</div>
-            <h3 style={{ color: '#fff', margin: '0 0 8px', fontSize: 17, fontWeight: 600 }}>
-              请关注微信服务号
-            </h3>
-            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, lineHeight: 1.6, margin: '0 0 20px' }}>
-              请使用微信扫一扫关注服务号完成认证
-              <br />
-              关注后将自动跳转注册信息填写页面
-            </p>
-
-            {/* 服务号二维码 */}
-            <div style={{
-              background: '#fff',
-              padding: 16,
-              borderRadius: 12,
-              display: 'inline-block',
-              marginBottom: 16,
-            }}>
-              <img
-                src="/wechat-mp-qrcode.png"
-                alt="服务号二维码"
-                style={{ width: 180, height: 180, display: 'block' }}
-                onError={(e) => {
-                  // 二维码图片加载失败时显示占位符
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-              />
-              <div style={{
-                width: 180,
-                height: 180,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#999',
-                fontSize: 13,
-              }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 36, marginBottom: 8 }}>📷</div>
-                  <div>服务号二维码</div>
-                  <div style={{ fontSize: 11, color: '#bbb', marginTop: 4 }}>
-                    请将 qrcode.png 放入 public 目录
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginBottom: 16 }}>
-              {subscribing ? (
-                <span>正在等待您关注服务号<span className="referee-login-dot-anim">...</span></span>
-              ) : (
-                <span>关注后自动跳转</span>
-              )}
-            </div>
-
-            <button
-              className="referee-login-btn"
-              onClick={handleAlreadyFollowed}
-              style={{
-                background: 'linear-gradient(135deg, #07c160, #06ad56)',
-                boxShadow: '0 4px 20px rgba(7, 193, 96, 0.3)',
-                letterSpacing: 2,
-              }}
-            >
-              我已关注，继续注册
-            </button>
           </div>
         </div>
       </div>
@@ -364,25 +226,8 @@ export default function InviteRegisterPage() {
             <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: 13 }}>——————</span>
           </div>
 
-          {/* 已关注，跳过引导 */}
-          <button
-            className="referee-login-btn"
-            onClick={handleAlreadyFollowed}
-            style={{
-              background: 'transparent',
-              border: '1px solid rgba(7, 193, 96, 0.3)',
-              color: '#07c160',
-              boxShadow: 'none',
-              letterSpacing: 2,
-            }}
-          >
-            我已关注服务号，直接注册
-          </button>
-
           <div className="referee-login-hint" style={{ marginTop: 20 }}>
             仅限已收到邀请的赛事裁判使用
-            <br />
-            未关注服务号需先微信扫码关注
           </div>
         </div>
       </div>
