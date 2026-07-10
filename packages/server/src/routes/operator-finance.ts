@@ -143,10 +143,9 @@ router.get('/export', authMiddleware, operatorOnly, async (req: Request, res: Re
   try {
     const operatorId = req.user!.userId;
     const rows = await query<any>(
-      `SELECT s.created_at, s.description, s.amount_cents, s.commission_cents,
-              s.status, s.settled_at, v.name as venue_name
+      `SELECT s.created_at, s.order_id, s.amount_cents, s.commission_cents,
+              s.status, s.settled_at
        FROM settlements s
-       LEFT JOIN venues v ON v.id = s.venue_id
        WHERE s.operator_id = $1
        ORDER BY s.created_at DESC`,
       [operatorId]
@@ -154,13 +153,13 @@ router.get('/export', authMiddleware, operatorOnly, async (req: Request, res: Re
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename=finance.csv');
     res.write('\uFEFF'); // BOM for Excel
-    res.write('日期,描述,金额（元）,佣金（元）,状态,结算时间,赛场\n');
+    res.write('日期,订单ID,金额（元）,佣金（元）,状态,结算时间\n');
     for (const r of rows) {
       const amount = ((r.amount_cents || 0) / 100).toFixed(2);
       const commission = ((r.commission_cents || 0) / 100).toFixed(2);
-      const desc = (r.description || '').replace(/,/g, '，');
-      const venue = (r.venue_name || '').replace(/,/g, '，');
-      res.write(`${r.created_at},${desc},${amount},${commission},${r.status},${r.settled_at || ''},${venue}\n`);
+      const status = r.status || '';
+      const settledAt = r.settled_at || '';
+      res.write(`${r.created_at},${r.order_id || ''},${amount},${commission},${status},${settledAt}\n`);
     }
     res.end();
   } catch (error: any) {
