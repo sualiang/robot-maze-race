@@ -140,13 +140,19 @@ let OPERATOR_ROLES: Array<{ key: string; name: string; permissions: string[] }> 
 router.get('/rbac/roles', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
     // 运营商后台看到其可分配的角色：scope='operator' 或 scope='admin' 中非 super_admin 的角色
-    const roles = await query<any>(
-      `SELECT id AS \`key\`, name, label, permissions FROM admin_roles WHERE scope = 'operator' ORDER BY name ASC`
+    // HEX(name/label) 绕过 mysql2 连接池 encoding 损坏 bug，JS 层 Buffer.from 解码
+    const rows = await query<any>(
+      `SELECT id AS \`key\`, HEX(name) AS name_hex, HEX(label) AS label_hex, permissions FROM admin_roles WHERE scope = 'operator' ORDER BY name ASC`
     );
-    const result = roles.map((r: any) => {
+    const result = rows.map((r: any) => {
       let perms: string[] = [];
       try { perms = typeof r.permissions === 'object' ? r.permissions : JSON.parse(r.permissions); } catch(e) { perms = []; }
-      return { ...r, permissions: perms };
+      return {
+        key: r.key,
+        name: r.name_hex ? Buffer.from(r.name_hex, 'hex').toString('utf8') : '',
+        label: r.label_hex ? Buffer.from(r.label_hex, 'hex').toString('utf8') : '',
+        permissions: perms,
+      };
     });
     return res.json({ code: 0, message: 'ok', data: result });
   } catch (error: any) {

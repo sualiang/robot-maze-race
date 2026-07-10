@@ -38,11 +38,12 @@ export default function OperatorLoginPage() {
       message.success('登录成功');
       navigate('/operator/venues', { replace: true });
     } catch (err: any) {
-      // 如果运营商原帐号登录失败（401），兜底尝试运营商角色成员登录
+      // 如果运营商超管登录失败（401），兜底尝试运营商角色成员登录
       try {
-        const res2: any = await api.post('/auth/operator-member-login', {
+        const res2: any = await api.post('/auth/login', {
           phone: values.phone,
           password: values.password,
+          role: 'operator_member',
         });
         localStorage.setItem('token', res2.token);
         if (res2.user) {
