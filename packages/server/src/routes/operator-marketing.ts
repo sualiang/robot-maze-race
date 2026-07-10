@@ -79,7 +79,6 @@ router.put('/', authMiddleware, operatorOnly, async (req: Request, res: Response
     );
 
     if (existing) {
-      // 更新
       await execute(
         'UPDATE marketing_config SET value = $1, description = COALESCE($2, description), updated_at = NOW() WHERE venue_id = $3 AND `key` = $4',
         [value, description || null, venue_id, key]
@@ -88,10 +87,8 @@ router.put('/', authMiddleware, operatorOnly, async (req: Request, res: Response
         'SELECT id, venue_id, `key`, value, description, created_at, updated_at FROM marketing_config WHERE venue_id = $1 AND `key` = $2',
         [venue_id, key]
       );
-
       return res.json({ code: 0, message: '营销配置已更新', data: updated! });
     } else {
-      // 插入前确保 venue 记录存在（满足 foreign key 约束）
       const opId = String(venue_id).replace(/^operator_/, '');
       if (opId && String(venue_id).startsWith('operator_')) {
         await execute(
@@ -100,7 +97,6 @@ router.put('/', authMiddleware, operatorOnly, async (req: Request, res: Response
         );
       }
 
-      // 插入
       const id = uuidv4();
       await execute(
         'INSERT INTO marketing_config (id, venue_id, `key`, value, description) VALUES ($1, $2, $3, $4, $5)',
@@ -110,13 +106,52 @@ router.put('/', authMiddleware, operatorOnly, async (req: Request, res: Response
         'SELECT id, venue_id, `key`, value, description, created_at, updated_at FROM marketing_config WHERE id = $1',
         [id]
       );
-
       return res.status(201).json({ code: 0, message: '营销配置已创建', data: created! });
     }
   } catch (error: any) {
     console.error('[OperatorMarketing] upsert error:', error.message);
     return res.status(500).json({ code: 500, message: '更新营销配置失败', data: null });
   }
+});
+
+// POST 别名，兼容前端调用 POST /operator/marketing
+router.post('/', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
+  const { venue_id, key, value, description } = req.body;
+  if (!venue_id || !key || value === undefined || value === null) {
+    return res.status(400).json({ code: 400, message: 'venue_id, key, value 不能为空', data: null });
+  }
+  const existing = await queryOne<{ id: string }>(
+    'SELECT id FROM marketing_config WHERE venue_id = $1 AND `key` = $2',
+    [venue_id, key]
+  );
+  if (existing) {
+    await execute(
+      'UPDATE marketing_config SET value = $1, description = COALESCE($2, description), updated_at = NOW() WHERE venue_id = $3 AND `key` = $4',
+      [value, description || null, venue_id, key]
+    );
+    const updated = await queryOne<any>(
+      'SELECT id, venue_id, `key`, value, description, created_at, updated_at FROM marketing_config WHERE venue_id = $1 AND `key` = $2',
+      [venue_id, key]
+    );
+    return res.json({ code: 0, message: '营销配置已更新', data: updated! });
+  }
+  const opId = String(venue_id).replace(/^operator_/, '');
+  if (opId && String(venue_id).startsWith('operator_')) {
+    await execute(
+      'INSERT IGNORE INTO venues (id, name, operator_id, status) VALUES ($1, $2, $3, \'active\')',
+      [String(venue_id), String(venue_id), opId]
+    );
+  }
+  const id = uuidv4();
+  await execute(
+    'INSERT INTO marketing_config (id, venue_id, `key`, value, description) VALUES ($1, $2, $3, $4, $5)',
+    [id, venue_id, key, value, description || null]
+  );
+  const created = await queryOne<any>(
+    'SELECT id, venue_id, `key`, value, description, created_at, updated_at FROM marketing_config WHERE id = $1',
+    [id]
+  );
+  return res.status(201).json({ code: 0, message: '营销配置已创建', data: created! });
 });
 
 // ============================================================

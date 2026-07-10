@@ -86,6 +86,46 @@ router.get('/', authMiddleware, anyPermissionMiddleware, async (req: Request, re
 });
 
 /**
+ * GET /api/v1/admin/merchant/:id
+ * 获取商家详情
+ */
+router.get('/:id', authMiddleware, anyPermissionMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const merchant = await queryOne<any>(
+      `SELECT m.*, (SELECT COUNT(*) FROM merchant_admin ma WHERE ma.merchant_id = m.id) as admin_count
+       FROM merchants m WHERE m.id = $1`,
+      [id]
+    );
+    if (!merchant) {
+      res.status(404).json({ code: 404, message: '商家不存在', data: null });
+      return;
+    }
+    res.json({
+      code: 0,
+      message: 'ok',
+      data: {
+        id: merchant.id,
+        merchantName: merchant.merchant_name,
+        merchantAddress: merchant.merchant_address || '',
+        longitude: merchant.longitude || 0,
+        latitude: merchant.latitude || 0,
+        contactName: merchant.contact_name || '',
+        contactPhone: merchant.contact_phone || '',
+        logoUrl: merchant.logo_url || '',
+        status: merchant.status != null ? merchant.status : 1,
+        adminCount: parseInt(merchant.admin_count, 10) || 0,
+        createdAt: merchant.created_at,
+        updatedAt: merchant.updated_at,
+      },
+    });
+  } catch (e: any) {
+    console.error('[AdminMerchant] detail error:', e?.message || e);
+    res.json({ code: 500, message: '查询失败', data: null });
+  }
+});
+
+/**
  * POST /api/v1/admin/merchant
  * 创建商家
  */
@@ -322,7 +362,7 @@ router.patch('/:id/status', authMiddleware, anyPermissionMiddleware, async (req:
 
     const existing = await queryOne<any>('SELECT id FROM merchants WHERE id = $1', [id]);
     if (!existing) {
-      res.json({ code: 404, message: '商家不存在', data: null });
+      res.status(404).json({ code: 404, message: '商家不存在', data: null });
       return;
     }
 
@@ -333,6 +373,27 @@ router.patch('/:id/status', authMiddleware, anyPermissionMiddleware, async (req:
     console.error('[AdminMerchant] toggle status error:', e?.message || e);
     res.json({ code: 500, message: '操作失败', data: null });
   }
+});
+
+// PUT 别名，兼容前端调用 PUT /admin/merchant/:id/status
+router.put('/:id/status', authMiddleware, anyPermissionMiddleware, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  if (status !== 0 && status !== 1) {
+    res.json({ code: 400, message: '状态值无效', data: null });
+    return;
+  }
+
+  const existing = await queryOne<any>('SELECT id FROM merchants WHERE id = $1', [id]);
+  if (!existing) {
+    res.status(404).json({ code: 404, message: '商家不存在', data: null });
+    return;
+  }
+
+  await execute('UPDATE merchants SET status = $1, updated_at = NOW() WHERE id = $2', [status, id]);
+
+  res.json({ code: 0, message: status === 1 ? '商家已启用' : '商家已禁用' });
 });
 
 /**
