@@ -93,7 +93,7 @@ router.get('/invite/:token/oauth', (req: Request, res: Response) => {
   }
 
   const redirectUri = encodeURIComponent(
-    `https://amberrobot.com.cn/referee/invite?token=${token}`
+    `https://dog.amberrobot.com.cn/referee/invite?token=${token}`
   );
   const wxAuthUrl =
     `https://open.weixin.qq.com/connect/oauth2/authorize?` +
