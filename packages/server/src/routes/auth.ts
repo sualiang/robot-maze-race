@@ -538,22 +538,12 @@ router.post('/login', async (req: Request, res: Response) => {
       });
     }
 
-    // ===== 原有 Mock 登录（回退/未注册手机号） =====
-    const userId = 'ref_' + Date.now();
-    const userRole = role || 'referee';
-    const user: User = {
-      id: userId,
-      openid: 'mock_openid_' + phone,
-      phone: phone,
-      nickname: '裁判_' + phone.slice(-4),
-      role: userRole as UserRole,
-      avatar_url: '',
-      race_count: 0,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    const token = generateToken(user);
-    return res.json({ code: 0, message: '登录成功', data: { token, user } });
+    // 所有合法角色分支均未匹配 → 返回 401
+    return res.status(401).json({
+      code: 401,
+      message: '手机号未注册，请联系运营商开通账号',
+      data: null
+    });
   } catch (error: any) {
     return res.status(500).json({ code: 500, message: '登录失败', data: null });
   }
