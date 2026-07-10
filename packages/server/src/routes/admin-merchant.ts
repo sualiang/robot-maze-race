@@ -291,7 +291,7 @@ router.delete('/:id', authMiddleware, adminMiddleware, async (req: Request, res:
 
     const existing = await queryOne<any>('SELECT id FROM merchants WHERE id = $1', [id]);
     if (!existing) {
-      res.json({ code: 404, message: '商家不存在', data: null });
+      res.status(404).json({ code: 404, message: '商家不存在', data: null });
       return;
     }
 

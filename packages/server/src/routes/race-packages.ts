@@ -481,7 +481,7 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response<ApiResp
     );
     if (!existing) {
       console.log('[RacePackages] delete: not found');
-      return res.json({ code: 0, message: '参赛包不存在或已删除', data: null });
+      return res.status(404).json({ code: 404, message: '参赛包不存在', data: null });
     }
     console.log('[RacePackages] deleting:', existing.name, id);
 

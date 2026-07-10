@@ -354,7 +354,7 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response<ApiResp
     const existing = await queryOne<{ id: string; name: string }>('SELECT id, name FROM venues WHERE id = $1', [id]);
     if (!existing) {
       console.log('[Venues] delete: venue not found:', id);
-      return res.json({ code: 404, message: '赛场不存在', data: null });
+      return res.status(404).json({ code: 404, message: '赛场不存在', data: null });
     }
     console.log('[Venues] deleting venue:', existing.name, id);
 
