@@ -475,56 +475,22 @@ router.post('/login', async (req: Request, res: Response) => {
       });
     }
 
-    // ===== 裁判/用户登录（referees 表） =====
+    // ===== 裁判登录（仅微信OAuth，不支持手机号+密码） =====
     if (!phone || !password) {
       return res.status(400).json({ code: 400, message: '缺少手机号或密码', data: null });
     }
 
-    // 先在 referees 表查，看是否有匹配的裁判
-    const referee = await queryOne<{
-      id: string;
-      phone: string;
-      user_id: string;
-      password: string;
-      name: string;
-      venue_id: string;
-      venue_name: string;
-      first_login: number;
-      role: string;
-    }>(
-      `SELECT r.id, r.phone, r.user_id, u.password, r.name, r.venue_id, v.name as venue_name, u.first_login, u.role
-       FROM referees r
-       LEFT JOIN users u ON u.id = r.user_id
-       LEFT JOIN venues v ON v.id = r.venue_id
-       WHERE r.phone = $1`,
+    // 检查是否是裁判手机号
+    const refereePhone = await queryOne<{ id: string; phone: string; name: string }>(
+      'SELECT id, phone, name FROM referees WHERE phone = $1',
       [phone]
     );
 
-    if (referee) {
-      if (!referee.password || !bcrypt.compareSync(password, referee.password)) {
-        return res.status(401).json({ code: 401, message: '手机号或密码错误', data: null });
-      }
-
-      const firstLogin = referee.first_login == 1;
-      const payload = {
-        userId: referee.user_id || referee.id,
-        openid: referee.user_id ? ('ref_' + referee.user_id) : '',
-        role: 'referee',
-        firstLogin
-      };
-      const token = jwt.sign(payload, config.jwt.secret, { expiresIn: config.jwt.expiresIn as any });
-      return res.json({
-        code: 0,
-        message: '登录成功',
-        data: {
-          token,
-          user: {
-            id: referee.id,
-            nickname: referee.name,
-            role: 'referee',
-            firstLogin
-          }
-        }
+    if (refereePhone) {
+      return res.status(400).json({
+        code: 400,
+        message: '裁判请使用微信授权登录，不支持手机号+密码登录',
+        data: null
       });
     }
 

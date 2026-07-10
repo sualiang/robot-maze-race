@@ -1,10 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { broadcastToScreen } from '../ws/handler';
 import { v4 as uuidv4 } from 'uuid';
-import { query, queryOne, execute, generateSecurePassword } from '../config/database';
-import * as bcrypt from 'bcryptjs';
+import { query, queryOne, execute } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
-import { sendRefereeReviewNotification } from './wx-notify';
 import {
   ApiResponse,
   PaginatedResult,
@@ -58,27 +56,17 @@ router.post('/create-by-operator', authMiddleware, async (req: Request, res: Res
     );
 
     let userId: string;
-    if (existingUser) {
-      userId = existingUser.id;
-    } else {
-      // 创建 users 记录
+    // 创建 users 记录（裁判仅微信OAuth登录，无需密码）
+    if (!existingUser) {
       userId = uuidv4();
       await execute(
         `INSERT INTO users (id, openid, nickname, phone, role)
          VALUES ($1, $2, $3, $4, $5)`,
         [userId, 'ref_' + phone, name, phone, 'referee']
       );
+    } else {
+      userId = existingUser.id;
     }
-
-    // 生成6位随机初始密码
-    const initPassword = generateSecurePassword();
-    const hashedPassword = bcrypt.hashSync(initPassword, 10);
-
-    // 保存密码哈希到 users 表，标记首次登录
-    await execute(
-      'UPDATE users SET password = $1, first_login = 1 WHERE id = $2',
-      [hashedPassword, userId]
-    );
 
     const refereeId = uuidv4();
     await execute(
@@ -96,7 +84,6 @@ router.post('/create-by-operator', authMiddleware, async (req: Request, res: Res
         name,
         phone,
         venue_id: venue_id || null,
-        init_password: initPassword,
       },
     });
   } catch (error: any) {
@@ -463,116 +450,6 @@ router.patch('/:id/status', authMiddleware, async (req: Request, res: Response<A
 // 裁判审核路由
 // ============================================================
 
-/**
- * PATCH /api/v1/referees/:id/review
- * 审核裁判申请（operator/admin 专用）
- * @param id - 裁判记录 UUID
- * @body action - 'approve' | 'reject'
- * @body reason - 拒绝原因（reject 时可选）
- * @header Authorization: Bearer <token>
- */
-router.patch('/:id/review', authMiddleware, async (req: Request, res: Response<ApiResponse<null>>) => {
-  try {
-    const { id } = req.params;
-    const { action, reason } = req.body;
-    const role = req.user!.role;
-    const reviewer = req.user!.userId;
-
-    if (role !== 'admin' && role !== 'operator') {
-      return res.status(403).json({ code: 403, message: '仅管理员或运营商可审核裁判申请', data: null });
-    }
-
-    if (action !== 'approve' && action !== 'reject') {
-      return res.status(400).json({ code: 400, message: 'action 无效，允许值: approve, reject', data: null });
-    }
-
-    // 查找裁判记录
-    const referee = await queryOne<{
-      id: string; user_id: string; name: string; phone: string;
-      status: string; operator_id: string;
-    }>(
-      'SELECT id, user_id, name, phone, status, operator_id FROM referees WHERE id = $1',
-      [id]
-    );
-
-    if (!referee) {
-      return res.status(404).json({ code: 404, message: '裁判申请不存在', data: null });
-    }
-
-    if (referee.status !== 'pending') {
-      const label = referee.status === 'approved' ? '已通过' : referee.status === 'rejected' ? '已拒绝' : referee.status;
-      return res.status(400).json({ code: 400, message: `该申请已处理（${label}），不可重复审核`, data: null });
-    }
-
-    const isApproved = action === 'approve';
-    const newStatus = isApproved ? 'approved' : 'rejected';
-    const reviewRemark = isApproved ? '' : (reason || '');
-    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
-
-    console.log('[Referees] review:', { id, action, newStatus, reviewer, refereeUserId: referee.user_id });
-
-    // 更新 referees 表
-    await execute(
-      `UPDATE referees
-       SET status = $1, review_remark = $2, reviewed_at = $3, reviewed_by = $4, updated_at = $5
-       WHERE id = $6`,
-      [newStatus, reviewRemark, now, reviewer, now, id]
-    );
-
-    // 审核通过 → 创建/关联 users 记录（裁判通过微信OAuth登录）
-    if (isApproved) {
-      if (referee.user_id) {
-        // 已有 user_id：只更新 role
-        try {
-          await execute(
-            'UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2',
-            ['referee', referee.user_id]
-          );
-        } catch (e: any) {
-          console.error('[Referees] review sync users role failed:', e.message);
-        }
-      } else {
-        // 无 user_id：创建 users 记录
-        const newUserId = uuidv4();
-        const rawPassword = generateSecurePassword(8);
-        const passwordHash = bcrypt.hashSync(rawPassword, 10);
-        try {
-          await execute(
-            `INSERT INTO users (id, phone, nickname, role, password_hash, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
-            [newUserId, referee.phone, referee.name, 'referee', passwordHash]
-          );
-          // 关联 referees.user_id
-          await execute(
-            'UPDATE referees SET user_id = $1, updated_at = NOW() WHERE id = $2',
-            [newUserId, id]
-          );
-          console.log('[Referees] review: created user for referee', { newUserId, refereeName: referee.name, password: rawPassword });
-        } catch (e: any) {
-          console.error('[Referees] review create user failed:', e.message);
-        }
-      }
-    }
-
-    // 发送微信模板消息通知
-    try {
-      await sendRefereeReviewNotification({
-        userId: referee.user_id,
-        refereeName: referee.name || referee.phone || '裁判',
-        status: newStatus,
-        remark: reviewRemark,
-      });
-    } catch (e: any) {
-      console.warn('[Referees] review notification failed:', e.message);
-    }
-
-    const label = isApproved ? '已通过' : '已驳回';
-    return res.json({ code: 0, message: '裁判申请' + label, data: null });
-  } catch (error: any) {
-    console.error('[Referees] review error:', error.message, error.stack);
-    return res.status(500).json({ code: 500, message: '审核失败: ' + error.message, data: null });
-  }
-});
 
 // ============================================================
 // Match 子路由 — 裁判比赛管理（Mock 数据）
@@ -1374,44 +1251,6 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response<ApiRespo
   } catch (error: any) {
     console.error('[Referees] update error:', error.message);
     return res.status(500).json({ code: 500, message: '更新裁判信息失败', data: null });
-  }
-});
-
-/**
- * POST /api/v1/referees/:id/reset-password
- * 运营商管理员/运营重置裁判密码
- */
-router.post('/:id/reset-password', authMiddleware, async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const bcrypt = require('bcryptjs');
-    const { v4: uuidv4 } = require('uuid');
-    const initPassword = uuidv4().slice(0, 8);
-    const passwordHash = bcrypt.hashSync(initPassword, 10);
-
-    // 先查裁判关联的 user_id
-    const referee = await queryOne<{ user_id: string }>(
-      'SELECT user_id FROM referees WHERE id = $1',
-      [id]
-    );
-    if (!referee) {
-      return res.status(404).json({ code: 404, message: '裁判不存在', data: null });
-    }
-
-    // 更新 users 表密码 + 标记首次登录
-    await query(
-      'UPDATE users SET password = $1, first_login = 1 WHERE id = $2',
-      [passwordHash, referee.user_id]
-    );
-
-    return res.json({
-      code: 0,
-      message: '密码已重置',
-      data: { init_password: initPassword }
-    });
-  } catch (error: any) {
-    console.error('[Referees] reset password error:', error.message);
-    return res.status(500).json({ code: 500, message: '重置密码失败', data: null });
   }
 });
 
