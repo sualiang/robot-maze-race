@@ -278,15 +278,15 @@ router.post('/rbac/users', authMiddleware, operatorOnly, async (req: Request, re
       [id, phone, hashedPassword, phone, role_key, operatorId]
     );
 
-    // 查角色名称和权限说明
+    // 查角色名称和权限说明（HEX 绕过 mysql2 encoding 损坏）
     let roleLabel = '';
     let rolePermissions: string[] = [];
     try {
-      const roleInfo = await queryOne('SELECT name, label, permissions FROM admin_roles WHERE id = $1', [role_key]);
+      const roleInfo = await queryOne<any>('SELECT name, HEX(label) AS label_hex, permissions FROM admin_roles WHERE id = $1', [role_key]);
       if (roleInfo) {
-        // 运营商后台角色名称简写
+        const label = roleInfo.label_hex ? Buffer.from(roleInfo.label_hex, 'hex').toString('utf8') : '';
         const labelShort: Record<string, string> = { ops_admin: '运营', finance_admin: '财务' };
-        roleLabel = labelShort[roleInfo.name] || roleInfo.label || '';
+        roleLabel = labelShort[roleInfo.name] || label || '';
         rolePermissions = roleInfo.permissions || [];
       }
     } catch {}
@@ -1122,11 +1122,14 @@ router.get('/settings', authMiddleware, async (req: Request, res: Response) => {
 // 初始化：从数据库加载运营商角色列表
 async function initOperatorRoles() {
   try {
-    const roles = await query<any>(
-      `SELECT id AS \`key\`, label AS name, label, permissions FROM admin_roles WHERE scope = 'operator' ORDER BY name ASC`
+    // HEX 绕过 mysql2 encoding 损坏 bug
+    const rows = await query<any>(
+      `SELECT id AS \`key\`, HEX(label) AS name_hex, HEX(label) AS label_hex, permissions FROM admin_roles WHERE scope = 'operator' ORDER BY name ASC`
     );
-    OPERATOR_ROLES = roles.map((r: any) => ({
-      ...r,
+    OPERATOR_ROLES = rows.map((r: any) => ({
+      key: r.key,
+      name: r.name_hex ? Buffer.from(r.name_hex, 'hex').toString('utf8') : '',
+      label: r.label_hex ? Buffer.from(r.label_hex, 'hex').toString('utf8') : '',
       permissions: (() => { try { return typeof r.permissions === 'object' ? r.permissions : JSON.parse(r.permissions); } catch(e) { return []; } })()
     }));
     console.log('[Operator] 已加载', OPERATOR_ROLES.length, '个运营商角色');

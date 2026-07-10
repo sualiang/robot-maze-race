@@ -16,17 +16,20 @@ const router = Router();
 // ============================================================
 router.get('/roles', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const roles = await query<any>(
-      `SELECT id, name, label, permissions, created_at
+    // HEX 绕过 mysql2 encoding 损坏 bug
+    const rows = await query<any>(
+      `SELECT id, name, HEX(label) AS label_hex, permissions, created_at
        FROM admin_roles
        WHERE scope = 'admin' AND id != 'role-super-admin'
        ORDER BY name ASC`
     );
 
-    // JSON.parse permissions
-    const result = roles.map((r: any) => ({
-      ...r,
+    const result = rows.map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      label: r.label_hex ? Buffer.from(r.label_hex, 'hex').toString('utf8') : '',
       permissions: safeJsonParse(r.permissions, []),
+      created_at: r.created_at,
     }));
 
     return res.json({ code: 0, message: 'ok', data: result });
@@ -75,9 +78,10 @@ router.get('/users', authMiddleware, async (req: Request, res: Response) => {
     const total = countResult?.count || 0;
 
     // 分页数据（JOIN admin_roles 获取角色名，不返回 password）
+    // HEX 绕过 mysql2 encoding 损坏 bug
     const users = await query<any>(
       `SELECT au.id, au.username, au.nickname, au.email, au.phone,
-              au.role_id, ar.label as role_name, ar.label as role_label,
+              au.role_id, HEX(ar.label) AS role_name_hex, HEX(ar.label) AS role_label_hex,
               au.status, au.created_at, au.updated_at
        FROM admin_users au
        LEFT JOIN admin_roles ar ON ar.id = au.role_id
@@ -87,7 +91,13 @@ router.get('/users', authMiddleware, async (req: Request, res: Response) => {
       [...params, pageSize, offset]
     );
 
-    return res.json({ code: 0, message: 'ok', data: { list: users, total, page, pageSize } });
+    const list = users.map((u: any) => ({
+      ...u,
+      role_name: u.role_name_hex ? Buffer.from(u.role_name_hex, 'hex').toString('utf8') : '',
+      role_label: u.role_label_hex ? Buffer.from(u.role_label_hex, 'hex').toString('utf8') : '',
+    }));
+
+    return res.json({ code: 0, message: 'ok', data: { list, total, page, pageSize } });
   } catch (error: any) {
     console.error('[AdminRBAC] users list error:', error.message);
     return res.status(500).json({ code: 500, message: '获取管理员列表失败', data: null });
@@ -208,13 +218,18 @@ router.put('/users/:id', authMiddleware, async (req: Request, res: Response) => 
 
     const updated = await queryOne<any>(
       `SELECT au.id, au.username, au.nickname, au.email, au.phone,
-              au.role_id, ar.label as role_name, ar.label as role_label,
+              au.role_id, HEX(ar.label) AS role_name_hex, HEX(ar.label) AS role_label_hex,
               au.status, au.created_at, au.updated_at
        FROM admin_users au
        LEFT JOIN admin_roles ar ON ar.id = au.role_id
        WHERE au.id = $1`,
       [id]
     );
+
+    if (updated) {
+      updated.role_name = updated.role_name_hex ? Buffer.from(updated.role_name_hex, 'hex').toString('utf8') : '';
+      updated.role_label = updated.role_label_hex ? Buffer.from(updated.role_label_hex, 'hex').toString('utf8') : '';
+    }
 
     return res.json({ code: 0, message: '管理员更新成功', data: updated });
   } catch (error: any) {

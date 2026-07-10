@@ -10,7 +10,6 @@ import MerchantLayout from '../layouts/MerchantLayout';
 import VenueList from '../pages/operator/venues/VenueList';
 import VenueEdit from '../pages/operator/venues/VenueEdit';
 import RefereeList from '../pages/operator/referees/RefereeList';
-import RefereeReview from '../pages/operator/referees/RefereeReview';
 import PackageList from '../pages/operator/packages/PackageList';
 import MarketingConfig from '../pages/operator/marketing/MarketingConfig';
 import FinanceCenter from '../pages/operator/finance/FinanceCenter';
@@ -84,7 +83,6 @@ export default function AppRouter() {
         <Route path="venues" element={<VenueList />} />
         <Route path="venues/:id" element={<VenueEdit />} />
         <Route path="referees" element={<RefereeList />} />
-        <Route path="referee-review" element={<RefereeReview />} />
         <Route path="packages" element={<PackageList />} />
         <Route path="merchant" element={<OperatorMerchantList />} />
         <Route path="marketing" element={<MarketingConfig />} />
