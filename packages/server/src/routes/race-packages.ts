@@ -189,7 +189,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response<ApiResponse<
     if (!body.price || body.price <= 0) {
       return res.status(400).json({ code: 400, message: '请填写有效的价格', data: null as any });
     }
-    const raceCount = body.race_count && body.race_count > 0 ? body.race_count : 1;
+    const raceCount = body.race_count && body.race_count > 0 ? body.race_count : 0;
 
     const id = uuidv4();
     const priceCents = Math.round(body.price * 100);

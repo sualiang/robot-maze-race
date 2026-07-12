@@ -995,6 +995,79 @@ router.get('/finance/export', authMiddleware, operatorOnly, async (req: Request,
 });
 
 /**
+ * POST /api/v1/operator/profile/change-password
+ * 运营商修改密码（前端兼容别名路由，与 /change-password 功能相同）
+ * @body oldPassword - 当前密码
+ * @body newPassword - 新密码
+ * @returns { token } 新的 JWT token
+ */
+router.post('/profile/change-password', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+    const userId = req.user!.userId;
+
+    if (!oldPassword || !newPassword) {
+      return res.status(400).json({ code: 400, message: '旧密码和新密码不能为空', data: null });
+    }
+
+    if (!newPassword || !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(newPassword)) {
+      return res.status(400).json({ code: 400, message: '密码需至少8位，包含大小写字母和数字', data: null });
+    }
+
+    if (newPassword === oldPassword) {
+      return res.status(400).json({ code: 400, message: '新密码不能与旧密码相同', data: null });
+    }
+
+    // 查出运营商账号
+    const operator = await queryOne<{
+      id: string;
+      operator_password_hash: string;
+      password_change_required: number;
+    }>(
+      'SELECT id, operator_password_hash, password_change_required FROM operators WHERE id = $1',
+      [userId]
+    );
+
+    if (!operator) {
+      return res.status(404).json({ code: 404, message: '运营商账号不存在', data: null });
+    }
+
+    // 验证旧密码
+    if (operator.operator_password_hash) {
+      if (!bcrypt.compareSync(oldPassword, operator.operator_password_hash)) {
+        return res.status(401).json({ code: 401, message: '旧密码错误', data: null });
+      }
+    }
+
+    // 更新密码
+    const newHash = bcrypt.hashSync(newPassword, 10);
+    await query(
+      `UPDATE operators SET operator_password_hash = $1, password_change_required = 0,
+       updated_at = NOW() WHERE id = $2`,
+      [newHash, userId]
+    );
+
+    // 重新签发 token（去掉 passwordChangeRequired 标记）
+    const payload: AuthPayload = {
+      userId: operator.id,
+      openid: '',
+      role: 'operator',
+      operatorId: operator.id,
+    };
+    const token = jwt.sign(payload, config.jwt.secret, { expiresIn: config.jwt.expiresIn as any });
+
+    return res.json({
+      code: 0,
+      message: '密码修改成功',
+      data: { token },
+    });
+  } catch (error: any) {
+    console.error('[Operator] profile/change-password error:', error.message);
+    return res.status(500).json({ code: 500, message: '密码修改失败', data: null });
+  }
+});
+
+/**
  * POST /api/v1/operator/change-password
  * 运营商修改密码（首次登录强制修改/主动修改）
  * @body oldPassword - 当前密码
