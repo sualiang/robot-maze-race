@@ -4,13 +4,14 @@ import { message } from 'antd';
 import api from '../../utils/api';
 
 /**
- * 裁判注册表单 v2
- * 只保留姓名+手机号
+ * 裁判注册表单 v3 — 扫码→客服消息推送→点链接到此页
+ * 参数: invite_id, operator_id
  */
 export default function RegisterFormPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const token = searchParams.get('token') || '';
+  const inviteId = searchParams.get('invite_id') || '';
+  const operatorId = searchParams.get('operator_id') || '';
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -19,8 +20,8 @@ export default function RegisterFormPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!token) { setError('缺少邀请令牌'); setLoading(false); return; }
-    api.get('/referee/invite/' + token)
+    if (!inviteId) { setError('缺少邀请信息'); setLoading(false); return; }
+    api.get('/referee/invite/' + inviteId)
       .then((data: any) => {
         setInviteInfo(data);
         if (data?.status === 'expired') setError('该邀请链接已过期');
@@ -28,14 +29,14 @@ export default function RegisterFormPage() {
       })
       .catch((err: any) => setError(err?.response?.data?.message || err?.message || '获取邀请信息失败'))
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [inviteId]);
 
   const handleSubmit = async () => {
     if (!name.trim()) { message.warning('请填写姓名'); return; }
     if (!/^\d{11}$/.test(phone)) { message.warning('请填写正确的11位手机号'); return; }
     setSubmitting(true);
     try {
-      await api.post('/referee/register', { invite_token: token, name: name.trim(), phone });
+      await api.post('/referee/register', { invite_id: inviteId, operator_id: operatorId, name: name.trim(), phone });
       navigate('/referee/register-success', { replace: true });
     } catch (err: any) {
       message.error(err?.response?.data?.message || err?.message || '提交失败');

@@ -47,7 +47,7 @@ export const config = {
     appId: process.env.WECHAT_MP_APP_ID || '',
     appSecret: process.env.WECHAT_MP_APP_SECRET || '',
     /** 服务号 token（用于验证消息来自微信服务器） */
-    token: process.env.WECHAT_MP_TOKEN || '',
+    token: process.env.WECHAT_MP_TOKEN || 'AmberRobot2026',
     /** 消息加解密 key（安全模式时使用） */
     encodingAESKey: process.env.WECHAT_MP_ENCODING_AES_KEY || '',
     /** 服务号 __biz（用于生成 mp.weixin.qq.com 链接） */

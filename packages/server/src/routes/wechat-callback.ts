@@ -319,8 +319,18 @@ router.get('/callback', async (req: Request, res: Response) => {
         return res.redirect('https://dog.amberrobot.com.cn/referee/register?token=' + token);
       }
 
-      // __login__ flow (service account menu): not a referee yet -> tell user
-      console.log('[WechatCallback] __login__: not registered');
+      // __login__ flow (service account menu silent OAuth)
+      console.log('[WechatCallback] __login__: openid=' + openid);
+      // Check if this openid is a referee
+      const ref = await queryOne<{ id: string }>(
+        'SELECT r.id FROM referees r INNER JOIN users u ON r.user_id = u.id WHERE u.openid = $1 LIMIT 1',
+        [openid]
+      );
+      if (ref) {
+        // Returning referee → redirect to login with openid_auth
+        return res.redirect('https://dog.amberrobot.com.cn/referee/login?openid_auth=' + openid);
+      }
+      // Not registered → redirect to login with not_registered flag
       return res.redirect('https://dog.amberrobot.com.cn/referee/login?openid_auth=' + openid + '&not_registered=1');
     } catch (err: any) {
       console.error('[WechatCallback] OAuth error:', err.message);
