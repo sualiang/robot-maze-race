@@ -171,6 +171,15 @@ router.put('/points-shop/items/:id', authMiddleware, operatorOnly, async (req: R
 router.delete('/points-shop/items/:id', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+
+    // Check record exists
+    const existing = await queryOne<{ id: string }>(
+      'SELECT id FROM point_shop WHERE id = $1', [id]
+    );
+    if (!existing) {
+      return res.status(404).json({ code: 404, message: '商品不存在', data: null });
+    }
+
     await execute('DELETE FROM point_shop WHERE id = $1', [id]);
     res.json({ code: 0, message: '商品已删除', data: null });
   } catch (error: any) {

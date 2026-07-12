@@ -88,7 +88,7 @@ router.post('/:id/submit-audit', async (req: Request, res: Response) => {
       `SELECT * FROM merchant_coupons WHERE id = $1 AND merchant_id = $2`,
       [id, merchantId]
     );
-    if (!existing) { res.json({ code: 404, message: '优惠券不存在', data: null }); return; }
+    if (!existing) { res.status(404).json({ code: 404, message: '优惠券不存在', data: null }); return; }
     if (existing.audit_status !== 0) {
       res.json({ code: 400, message: '仅草稿状态的优惠券可提交审核', data: null });
       return;
@@ -122,7 +122,7 @@ router.post('/:id/request-offline', async (req: Request, res: Response) => {
       `SELECT * FROM merchant_coupons WHERE id = $1 AND merchant_id = $2`,
       [id, merchantId]
     );
-    if (!existing) { res.json({ code: 404, message: '优惠券不存在', data: null }); return; }
+    if (!existing) { res.status(404).json({ code: 404, message: '优惠券不存在', data: null }); return; }
     if (existing.audit_status !== 2 || existing.status !== 1) {
       res.json({ code: 400, message: '仅已上架的优惠券可申请下架', data: null });
       return;
@@ -153,7 +153,7 @@ router.post('/:id/cancel-offline', async (req: Request, res: Response) => {
       `SELECT * FROM merchant_coupons WHERE id = $1 AND merchant_id = $2`,
       [id, merchantId]
     );
-    if (!existing) { res.json({ code: 404, message: '优惠券不存在', data: null }); return; }
+    if (!existing) { res.status(404).json({ code: 404, message: '优惠券不存在', data: null }); return; }
     if (existing.audit_status !== 4) {
       res.json({ code: 400, message: '仅待下架审核状态的优惠券可撤销下架申请', data: null });
       return;
@@ -186,7 +186,7 @@ router.post('/:id/online', async (req: Request, res: Response) => {
       `SELECT * FROM merchant_coupons WHERE id = $1 AND merchant_id = $2`,
       [id, merchantId]
     );
-    if (!existing) { res.json({ code: 404, message: '优惠券不存在', data: null }); return; }
+    if (!existing) { res.status(404).json({ code: 404, message: '优惠券不存在', data: null }); return; }
     if (existing.audit_status !== 2) {
       res.json({ code: 400, message: '仅审核通过的优惠券可上架', data: null });
       return;
@@ -225,7 +225,7 @@ router.put('/:id', async (req: Request, res: Response) => {
       `SELECT * FROM merchant_coupons WHERE id = $1 AND merchant_id = $2`,
       [id, merchantId]
     );
-    if (!existing) { res.json({ code: 404, message: '优惠券不存在', data: null }); return; }
+    if (!existing) { res.status(404).json({ code: 404, message: '优惠券不存在', data: null }); return; }
 
     // 检查是否可编辑
     if (existing.audit_status === 1) {
@@ -312,7 +312,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
       `SELECT * FROM merchant_coupons WHERE id = $1 AND merchant_id = $2`,
       [id, merchantId]
     );
-    if (!existing) { res.json({ code: 404, message: '优惠券不存在', data: null }); return; }
+    if (!existing) { res.status(404).json({ code: 404, message: '优惠券不存在', data: null }); return; }
 
     if (existing.audit_status === 1) {
       res.json({ code: 400, message: '待审核状态的优惠券不能删除，请等待审核结果', data: null });
@@ -398,7 +398,7 @@ router.get('/detail/:id', async (req: Request, res: Response) => {
       `SELECT * FROM merchant_coupons WHERE id = $1 AND merchant_id = $2`,
       [id, merchantId]
     );
-    if (!c) { res.json({ code: 404, message: '优惠券不存在', data: null }); return; }
+    if (!c) { res.status(404).json({ code: 404, message: '优惠券不存在', data: null }); return; }
 
     res.json({
       code: 0,
