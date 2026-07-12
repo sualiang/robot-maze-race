@@ -54,7 +54,7 @@ router.post('/invite', authMiddleware, async (req: Request, res: Response) => {
       [inviteId, operatorId, phone || null, venue_id || null, token, note || null, expiresAtStr, nowStr, nowStr]
     );
 
-    const inviteUrl = `https://dog.amberrobot.com.cn/referee/invite?token=${token}`;
+    const inviteUrl = `https://amberrobot.com.cn/referee/invite?token=${token}`;
 
     return res.json({
       code: 0,
@@ -74,7 +74,7 @@ router.post('/invite', authMiddleware, async (req: Request, res: Response) => {
 /**
  * GET /api/v1/referee/invite/:token/oauth
  * 页面入口：检测环境发起微信 OAuth（服务端 302，避免前端 JS 跳转白屏）
- * - 微信内 → 302 到微信 snsapi_base 静默授权
+ * - 微信内 → 302 到微信 snsapi_userinfo 静默授权
  * - 微信外 → 302 到 SPA 引导页
  */
 router.get('/invite/:token/oauth', (req: Request, res: Response) => {
@@ -83,24 +83,24 @@ router.get('/invite/:token/oauth', (req: Request, res: Response) => {
 
   if (!isInWechat) {
     // 非微信浏览器，跳回前端 SPA 引导页
-    return res.redirect(`https://dog.amberrobot.com.cn/referee/invite?token=${token}`);
+    return res.redirect(`https://amberrobot.com.cn/referee/invite?token=${token}`);
   }
 
-  // 微信内 → 构建微信 OAuth URL（snsapi_base 静默授权）
+  // 微信内 → 构建微信 OAuth URL（snsapi_userinfo 静默授权）
   const appId = config.wechatMp.appId;
   if (!appId) {
     return res.status(500).json({ code: 500, message: '微信服务号未配置', data: null });
   }
 
   const redirectUri = encodeURIComponent(
-    `https://dog.amberrobot.com.cn/referee/invite?token=${token}`
+    `https://amberrobot.com.cn/referee/invite?token=${token}`
   );
   const wxAuthUrl =
     `https://open.weixin.qq.com/connect/oauth2/authorize?` +
     `appid=${appId}&` +
     `redirect_uri=${redirectUri}&` +
     `response_type=code&` +
-    `scope=snsapi_base&` +
+    `scope=snsapi_userinfo&` +
     `state=${token}#wechat_redirect`;
 
   console.log(`[RefereeInvite] 微信内 -> 302 OAuth, token=${token}`);
@@ -413,7 +413,7 @@ router.get('/invitations', authMiddleware, async (req: Request, res: Response) =
 
     const enriched = list.map((inv: any) => ({
       ...inv,
-      invite_url: `https://dog.amberrobot.com.cn/referee/invite?token=${inv.token}`,
+      invite_url: `https://amberrobot.com.cn/referee/invite?token=${inv.token}`,
     }));
     return res.json({ code: 0, message: 'ok', data: { list: enriched, total, page, pageSize } });
   } catch (error: any) {
