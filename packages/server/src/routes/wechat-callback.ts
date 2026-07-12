@@ -256,74 +256,84 @@ router.post('/callback', async (req: Request, res: Response) => {
  *   1. OAuth 回调：微信授权后回调，带 code + state → 换 openid → 绑定 → 跳回前端
  *   2. 服务器配置验证：首次配置微信服务号时的 echostr 验证
  */
+/**
+ * GET /api/v1/wechat/callback
+ * 1. OAuth: code+state -> openid -> bind -> check user -> redirect
+ * 2. echostr: WeChat server verification
+ */
 router.get('/callback', async (req: Request, res: Response) => {
   const { code, state, signature, timestamp, nonce, echostr } = req.query;
 
-  // --- 用途 1: OAuth 回调 ---
+  // --- OAuth callback ---
   if (code && state) {
     try {
       const appId = config.wechatMp.appId;
       const appSecret = config.wechatMp.appSecret;
-      console.log(`[WechatCallback] OAuth回调: code=***, state=${state}`);
+      const token = String(state);
+      console.log('[WechatCallback] OAuth: token=' + token);
 
       if (!appId || !appSecret) {
-        return res.redirect(`https://dog.amberrobot.com.cn/referee/invite?token=${state}&error=wechat_not_configured`);
+        return res.redirect('https://dog.amberrobot.com.cn/referee/invite?token=' + token + '&error=wechat_not_configured');
       }
 
-      // 换 access_token + openid
-      const wxUrl = `https://api.weixin.qq.com/sns/oauth2/access_token?appid=${appId}&secret=${appSecret}&code=${code}&grant_type=authorization_code`;
+      const wxUrl = 'https://api.weixin.qq.com/sns/oauth2/access_token?appid=' + appId + '&secret=' + appSecret + '&code=' + code + '&grant_type=authorization_code';
       const tokenResp = await fetch(wxUrl);
       const tokenData: any = await tokenResp.json();
 
       if (tokenData.errcode) {
-        console.error(`[WechatCallback] access_token失败: ${tokenData.errcode} ${tokenData.errmsg}`);
-        return res.redirect(`https://dog.amberrobot.com.cn/referee/invite?token=${state}&error=wechat_token_failed`);
+        console.error('[WechatCallback] token failed: ' + tokenData.errcode);
+        return res.redirect('https://dog.amberrobot.com.cn/referee/invite?token=' + token + '&error=wechat_token_failed');
       }
 
       const openid = tokenData.openid;
       if (!openid) {
-        return res.redirect(`https://dog.amberrobot.com.cn/referee/invite?token=${state}&error=no_openid`);
+        return res.redirect('https://dog.amberrobot.com.cn/referee/invite?token=' + token + '&error=no_openid');
       }
-      console.log(`[WechatCallback] OAuth成功: openid=${openid}`);
+      console.log('[WechatCallback] openid=' + openid);
 
-      // 验证 token + 写入 openid
-      const invite = await queryOne<{ id: string }>(
-        `SELECT id FROM referee_invites WHERE token = $1`,
-        [String(state)]
+      // Check if this openid is already a referee
+      const existingReferee = await queryOne<{ id: string; name: string }>(
+        'SELECT r.id, r.name FROM referees r INNER JOIN users u ON r.user_id = u.id WHERE u.openid = $1 LIMIT 1',
+        [openid]
       );
-      if (!invite) {
-        return res.redirect(`https://dog.amberrobot.com.cn/referee/invite?token=${state}&error=invalid_token`);
+
+      if (existingReferee) {
+        console.log('[WechatCallback] returning user: ' + existingReferee.name);
+        return res.redirect('https://dog.amberrobot.com.cn/referee/login?openid_auth=' + openid);
       }
 
-      await query(
-        `UPDATE referee_invites SET openid = $1, updated_at = NOW() WHERE token = $2`,
-        [openid, String(state)]
-      );
-      console.log(`[WechatCallback] openid绑定: invite=${invite.id}`);
+      // Bind openid to invite if token is a real invite
+      if (token !== '__login__') {
+        const invite = await queryOne<{ id: string }>(
+          'SELECT id FROM referee_invites WHERE token = $1', [token]
+        );
+        if (!invite) {
+          return res.redirect('https://dog.amberrobot.com.cn/referee/invite?token=' + token + '&error=invalid_token');
+        }
+        await query(
+          'UPDATE referee_invites SET openid = $1, updated_at = NOW() WHERE token = $2',
+          [openid, token]
+        );
+        console.log('[WechatCallback] bound invite=' + invite.id);
+        console.log('[WechatCallback] new user -> register');
+        return res.redirect('https://dog.amberrobot.com.cn/referee/register?token=' + token);
+      }
 
-      // 跳回前端 SPA
-      return res.redirect(`https://dog.amberrobot.com.cn/referee/invite?token=${state}`);
+      // __login__ flow (service account menu): not a referee yet -> tell user
+      console.log('[WechatCallback] __login__: not registered');
+      return res.redirect('https://dog.amberrobot.com.cn/referee/login?openid_auth=' + openid + '&not_registered=1');
     } catch (err: any) {
-      console.error('[WechatCallback] OAuth异常:', err.message);
-      return res.redirect(`https://dog.amberrobot.com.cn/referee/invite?token=${state}&error=internal`);
+      console.error('[WechatCallback] OAuth error:', err.message);
+      return res.redirect('https://dog.amberrobot.com.cn/referee/invite?token=' + String(state) + '&error=internal');
     }
   }
 
-  // --- 用途 2: 服务器配置验证（echostr） ---
+  // --- echostr verification ---
   if (!signature || !timestamp || !nonce || !echostr) {
     return res.status(400).send('Missing parameters');
   }
-
-  const valid = checkSignature(
-    String(timestamp),
-    String(nonce),
-    String(signature)
-  );
-
-  if (valid) {
-    return res.send(String(echostr));
-  }
-
+  const valid = checkSignature(String(timestamp), String(nonce), String(signature));
+  if (valid) return res.send(String(echostr));
   return res.status(403).send('Invalid signature');
 });
 

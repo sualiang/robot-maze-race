@@ -2,122 +2,39 @@ import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import api from '../../utils/api';
 
-interface InviteInfo {
-  operator_name: string;
-  venue_name: string;
-  status: string;
-  expires_at: string;
-  note: string;
-}
-
+/**
+ * 邀请引导页 v2
+ * - 显示服务号二维码
+ * - "我已关注，继续注册" -> OAuth
+ */
 export default function InviteGuidePage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-
   const token = searchParams.get('token') || '';
-  const code = searchParams.get('code') || '';
-
-  const [inviteInfo, setInviteInfo] = useState<InviteInfo | null>(null);
+  const [inviteInfo, setInviteInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [bindDone, setBindDone] = useState(false);
 
-  console.log('[InviteGuide] mount', {
-    hasToken: !!token,
-    hasCode: !!code,
-    tokenLen: token.length,
-    codeLen: code.length,
-    href: window.location.href,
-  });
-
-  // Step 1: Load invite info
   useEffect(() => {
-    console.log('[InviteGuide] Step1 useEffect fired', { hasToken: !!token });
-    if (!token) {
-      setError('缺少邀请令牌，请检查链接是否完整');
-      setLoading(false);
-      return;
-    }
-    fetchInviteInfo();
+    if (!token) { setError('缺少邀请令牌'); setLoading(false); return; }
+    api.get('/referee/invite/' + token)
+      .then((data: any) => {
+        setInviteInfo(data);
+        if (data?.status === 'expired') setError('邀请已过期');
+        else if (data?.status === 'used') setError('邀请已被使用');
+      })
+      .catch((err: any) => setError(err?.response?.data?.message || err?.message || '获取邀请信息失败'))
+      .finally(() => setLoading(false));
   }, [token]);
 
-  // Step 2: Handle OAuth callback (snsapi_base silent auth)
-  // P0 fix: 微信内先主动跳转到后端 OAuth 路由获取 code，回调后才 bind
-  useEffect(() => {
-    console.log('[InviteGuide] Step2 useEffect fired', {
-      hasCode: !!code,
-      hasToken: !!token,
-      hasInviteInfo: !!inviteInfo,
-      isWeChat: /MicroMessenger/i.test(navigator.userAgent),
-    });
-    const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
-
-    if (code && token && inviteInfo) {
-      // 有 code → 微信 OAuth 回调回来了，执行 bind
-      console.log('[InviteGuide] Step2 → calling handleBindOpenid', { code, token });
-      handleBindOpenid(code);
-    } else if (isWeChat && token && inviteInfo && !code) {
-      // P0 fix: 微信内没有 code → 主动跳转后端 OAuth 路由发起静默授权
-      console.log('[InviteGuide] Step2 → no code in WeChat, redirecting to OAuth', { token });
-      window.location.replace(`/api/v1/referee/invite/${token}/oauth`);
-    } else {
-      console.log('[InviteGuide] Step2 → skipping, conditions not met');
-    }
-  }, [code, token, inviteInfo]);
-
-  const fetchInviteInfo = async () => {
-    try {
-      console.log('[InviteGuide] fetchInviteInfo start', { token });
-      const data: any = await api.get(`/referee/invite/${token}`);
-      console.log('[InviteGuide] fetchInviteInfo done', data);
-      setInviteInfo(data);
-      if (data.status === 'expired') {
-        setError('该邀请链接已过期');
-      } else if (data.status === 'used') {
-        setError('该邀请链接已被使用');
-      }
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || '获取邀请信息失败';
-      console.error('[InviteGuide] fetchInviteInfo error:', msg);
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
+  const handleFollowed = () => {
+    window.location.href = '/api/v1/referee/invite/' + token + '/oauth';
   };
 
-  // Bind openid to invite after silent OAuth
-  const handleBindOpenid = async (oauthCode: string) => {
-    console.log('[InviteGuide] handleBindOpenid START', { token, oauthCode });
-    try {
-      const res = await api.post('/referee/bind-openid', {
-        invite_token: token,
-        code: oauthCode,
-      });
-      console.log('[InviteGuide] bind-openid SUCCESS:', res);
-      setBindDone(true);
-      const newUrl = window.location.href.split('?')[0] + '?token=' + token;
-      window.history.replaceState({}, '', newUrl);
-
-      // 微信内：bind 成功后直接跳转服务号主页
-      if (/MicroMessenger/i.test(navigator.userAgent)) {
-        console.log('[InviteGuide] WeChat detected, redirecting to MP profile');
-        window.location.replace(
-          'https://mp.weixin.qq.com/mp/profile_ext?action=home&__biz=__PLACEHOLDER__'
-        );
-      }
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || '绑定失败';
-      console.error('[InviteGuide] bind-openid FAILED:', msg, err);
-      setBindDone(true);
-    }
-  };
-
-  // Loading state
   if (loading) {
     return (
       <div className="referee-login-page">
-        <div className="referee-login-glow-1" />
-        <div className="referee-login-glow-2" />
+        <div className="referee-login-glow-1" /><div className="referee-login-glow-2" />
         <div className="referee-login-box">
           <div className="referee-login-card" style={{ textAlign: 'center' }}>
             <p style={{ color: 'rgba(255,255,255,0.6)', margin: 0 }}>加载邀请信息...</p>
@@ -127,177 +44,48 @@ export default function InviteGuidePage() {
     );
   }
 
-  // Error page
-  if (error && !inviteInfo) {
+  if (error) {
     return (
       <div className="referee-login-page">
-        <div className="referee-login-glow-1" />
-        <div className="referee-login-glow-2" />
+        <div className="referee-login-glow-1" /><div className="referee-login-glow-2" />
         <div className="referee-login-box">
-          <div className="referee-login-logo">
-            <img src="/logo-avatar.png" alt="铁甲快狗" style={{ width: 120, height: 120 }} />
-          </div>
+          <div className="referee-login-logo"><img src="/logo-avatar.png" alt="logo" style={{ width: 120, height: 120 }} /></div>
           <div className="referee-login-card" style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>😔</div>
-            <h2 style={{ color: '#e94560', margin: '0 0 12px', fontSize: 18, fontWeight: 600 }}>
-              邀请链接无效
-            </h2>
-            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, lineHeight: 1.6, margin: 0 }}>
-              {error}
-            </p>
+            <h2 style={{ color: '#e94560', margin: '0 0 12px', fontSize: 18, fontWeight: 600 }}>邀请链接无效</h2>
+            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14 }}>{error}</p>
           </div>
         </div>
       </div>
     );
   }
 
-  // P0 fix: 微信内 — 有 code 才显示 bind 中，无 code 则 Step2 useEffect 已处理跳转
-  // 如果到达这里说明 bind-openid 正在执行中（有 code + inviteInfo）
-  if (/MicroMessenger/i.test(navigator.userAgent) && code) {
-    return (
-      <div className="referee-login-page">
-        <div className="referee-login-glow-1" />
-        <div className="referee-login-glow-2" />
-        <div className="referee-login-box">
-          <div className="referee-login-card" style={{ textAlign: 'center' }}>
-            <p style={{ color: 'rgba(255,255,255,0.6)', margin: 0, fontSize: 15 }}>
-              {bindDone ? '身份校验完成，自动跳转中...' : '正在校验身份...'}
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // 微信外：Service account QR + follow button
   return (
     <div className="referee-login-page">
-      <div className="referee-login-glow-1" />
-      <div className="referee-login-glow-2" />
-
+      <div className="referee-login-glow-1" /><div className="referee-login-glow-2" />
       <div className="referee-login-box">
-        {/* Logo */}
-        <div className="referee-login-logo">
-          <img src="/logo-avatar.png" alt="铁甲快狗" style={{ width: 100, height: 100 }} />
+        <div className="referee-login-logo"><img src="/logo-avatar.png" alt="logo" style={{ width: 100, height: 100 }} /></div>
+        <div className="referee-login-role" style={{ background: 'rgba(7,193,96,0.06)', border: '1px solid rgba(7,193,96,0.12)', color: '#07c160' }}>
+          <span className="referee-login-role-icon">📋</span> 裁判注册邀请
         </div>
-
-        {/* Title */}
-        <div
-          className="referee-login-role"
-          style={{
-            background: 'rgba(7, 193, 96, 0.06)',
-            border: '1px solid rgba(7, 193, 96, 0.12)',
-            color: '#07c160',
-          }}
-        >
-          <span className="referee-login-role-icon">📋</span>
-          裁判注册邀请
-        </div>
-
-        {/* Invite info card */}
         <div className="referee-login-card" style={{ textAlign: 'center' }}>
-          {/* Invite details */}
-          <div
-            style={{
-              background: 'rgba(7, 193, 96, 0.05)',
-              border: '1px solid rgba(7, 193, 96, 0.1)',
-              borderRadius: 10,
-              padding: '14px 16px',
-              marginBottom: 20,
-              textAlign: 'center',
-            }}
-          >
-            {inviteInfo?.operator_name && (
-              <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, margin: '0 0 4px' }}>
-                <span style={{ color: 'rgba(255,255,255,0.4)' }}>运营商：</span>
-                <strong style={{ color: '#fff' }}>{inviteInfo.operator_name}</strong>
-              </p>
-            )}
-            {inviteInfo?.venue_name && (
-              <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, margin: '0 0 4px' }}>
-                <span style={{ color: 'rgba(255,255,255,0.4)' }}>赛场：</span>
-                <strong style={{ color: '#fff' }}>{inviteInfo.venue_name}</strong>
-              </p>
-            )}
-            {inviteInfo?.note && (
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, margin: '8px 0 0', lineHeight: 1.6 }}>
-                💬 {inviteInfo.note}
-              </p>
-            )}
-          </div>
-
-          {/* Guide: Follow service account */}
-          <div style={{ fontSize: 36, marginBottom: 12 }}>📱</div>
-          <h3 style={{ color: '#fff', margin: '0 0 8px', fontSize: 17, fontWeight: 600 }}>
-            请关注「安博天智」服务号完成注册
-          </h3>
-          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, lineHeight: 1.6, margin: '0 0 20px' }}>
-            请使用微信扫一扫关注服务号
-            <br />
-            关注后将收到注册邀请链接
-          </p>
-
-          {/* Service account QR code */}
-          <div
-            style={{
-              background: '#fff',
-              padding: 16,
-              borderRadius: 12,
-              display: 'inline-block',
-              marginBottom: 16,
-            }}
-          >
-            <img
-              src="/wechat-mp-qrcode.png"
-              alt="服务号二维码"
-              style={{ width: 180, height: 180, display: 'block' }}
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
-            <div
-              style={{
-                width: 180,
-                height: 180,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#999',
-                fontSize: 13,
-              }}
-            >
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 36, marginBottom: 8 }}>📷</div>
-                <div>服务号二维码</div>
-                <div style={{ fontSize: 11, color: '#bbb', marginTop: 4 }}>
-                  请将 qrcode.png 放入 public 目录
-                </div>
-              </div>
+          {inviteInfo && (
+            <div style={{ background: 'rgba(7,193,96,0.05)', border: '1px solid rgba(7,193,96,0.1)', borderRadius: 10, padding: '14px 16px', marginBottom: 20 }}>
+              {inviteInfo.operator_name && <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, margin: '0 0 4px' }}><span style={{ color: 'rgba(255,255,255,0.4)' }}>运营商：</span><strong style={{ color: '#fff' }}>{inviteInfo.operator_name}</strong></p>}
+              {inviteInfo.venue_name && <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, margin: 0 }}><span style={{ color: 'rgba(255,255,255,0.4)' }}>赛场：</span><strong style={{ color: '#fff' }}>{inviteInfo.venue_name}</strong></p>}
             </div>
+          )}
+          <div style={{ fontSize: 36, marginBottom: 12 }}>📱</div>
+          <h3 style={{ color: '#fff', margin: '0 0 8px', fontSize: 17, fontWeight: 600 }}>关注「安博天智」服务号</h3>
+          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, lineHeight: 1.6, margin: '0 0 20px' }}>请使用微信扫一扫关注服务号<br />关注后将自动收到注册邀请</p>
+          <div style={{ background: '#fff', padding: 16, borderRadius: 12, display: 'inline-block', marginBottom: 16 }}>
+            <img src="/wechat-mp-qrcode.png" alt="服务号二维码" style={{ width: 180, height: 180, display: 'block' }} />
           </div>
-
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginBottom: 16 }}>
-            {bindDone ? '已绑定，关注服务号后即可注册' : '正在绑定...'}
-          </div>
-
-          {/* Button: Already followed */}
-          <button
-            className="referee-login-btn"
-            onClick={() => navigate(`/referee/register?token=${token}`, { replace: true })}
-            style={{
-              background: 'linear-gradient(135deg, #07c160, #06ad56)',
-              boxShadow: '0 4px 20px rgba(7, 193, 96, 0.3)',
-              letterSpacing: 2,
-            }}
-          >
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginBottom: 20 }}>长按识别二维码关注</div>
+          <button className="referee-login-btn" onClick={handleFollowed} style={{ background: 'linear-gradient(135deg, #07c160, #06ad56)', boxShadow: '0 4px 20px rgba(7,193,96,0.3)', letterSpacing: 2 }}>
             我已关注，继续注册
           </button>
-
-          <div className="referee-login-hint" style={{ marginTop: 20 }}>
-            关注安博天智服务号，获取赛事通知
-            <br />
-            仅限已收到邀请的赛事裁判使用
-          </div>
+          <div className="referee-login-hint" style={{ marginTop: 20 }}>关注安博天智服务号，获取赛事通知<br />仅限已收到邀请的赛事裁判使用</div>
         </div>
       </div>
     </div>

@@ -173,8 +173,15 @@ router.post('/wx-mp-login', async (req: Request, res: Response<ApiResponse<WxMpL
     let wxNickname = reqNickname || '';
     let wxAvatarUrl = reqAvatarUrl || '';
 
+    // ===== OAuth callback 免 code 登录（openid 已通过 callback 验证写入 DB） =====
+    if (typeof code === 'string' && code.startsWith('__oauth_')) {
+      openid = code.replace('__oauth_', '');
+      unionid = undefined;
+      if (!wxNickname) wxNickname = 'ref_' + openid.slice(-6);
+      console.log('[WxMpLogin] OAuth免code: openid=' + openid);
+
     // ===== 开发/测试模式 =====
-    if (code === 'dev-mp-test-code' || code === 'dev-test-code' || !config.wechatMp.appId) {
+    } else if (code === 'dev-mp-test-code' || code === 'dev-test-code' || !config.wechatMp.appId) {
       openid = `mp_dev_openid_${Date.now()}`;
       unionid = undefined;
       if (!wxNickname) wxNickname = `测试玩家${Date.now().toString(36).slice(-6)}`;

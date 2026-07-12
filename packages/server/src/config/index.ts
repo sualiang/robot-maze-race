@@ -50,6 +50,8 @@ export const config = {
     token: process.env.WECHAT_MP_TOKEN || '',
     /** 消息加解密 key（安全模式时使用） */
     encodingAESKey: process.env.WECHAT_MP_ENCODING_AES_KEY || '',
+    /** 服务号 __biz（用于生成 mp.weixin.qq.com 链接） */
+    biz: process.env.WECHAT_MP_BIZ || '',
   },
 
   // 微信支付（JSAPI 支付）
