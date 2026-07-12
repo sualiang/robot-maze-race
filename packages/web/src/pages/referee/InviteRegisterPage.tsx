@@ -62,7 +62,7 @@ export default function InviteRegisterPage() {
     setOauthLoading(true);
     setError('');
     try {
-      const res: any = await api.get('/auth/mp-oauth', { params: { code: oauthCode } });
+      const res: any = await api.post('/auth/wx-mp-login', { code: oauthCode });
       localStorage.setItem('token', res.token);
       localStorage.setItem('referee_user_info', JSON.stringify(res.user));
 
@@ -81,7 +81,7 @@ export default function InviteRegisterPage() {
   const handleWechatLogin = () => {
     const currentUrl = window.location.href.split('?')[0];
     const redirectParam = encodeURIComponent(`${currentUrl}?token=${token}`);
-    window.location.href = `/api/v1/auth/mp-oauth/authorize?redirect=${redirectParam}`;
+    window.location.href = `/api/v1/referee/invite/${token}/oauth`;
   };
 
   // 加载中

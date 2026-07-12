@@ -21,7 +21,7 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
     try {
-      const res: any = await api.get('/auth/mp-oauth', { params: { code } });
+      const res: any = await api.post('/auth/wx-mp-login', { code });
       localStorage.setItem('token', res.token);
       localStorage.setItem('referee_user_info', JSON.stringify(res.user));
       navigate('/referee/match', { replace: true });
@@ -35,7 +35,26 @@ export default function LoginPage() {
 
   /** 跳转微信服务号授权页面 */
   const handleWechatLogin = () => {
-    window.location.href = '/api/v1/auth/mp-oauth/authorize';
+    handleDevLogin();
+  };
+
+  /** P0 fix: dev mode login via wx-mp-login, skip WeChat OAuth redirect */
+  const handleDevLogin = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res: any = await api.post('/auth/wx-mp-login', { code: 'dev-test-code' });
+      localStorage.setItem('token', res.token);
+      if (res.user) {
+        localStorage.setItem('referee_user_info', JSON.stringify(res.user));
+      }
+      navigate('/referee/match', { replace: true });
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || '登录失败';
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

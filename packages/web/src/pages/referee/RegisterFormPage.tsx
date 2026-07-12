@@ -57,7 +57,7 @@ export default function RegisterFormPage() {
   const handleMpOAuth = async (code: string) => {
     setOauthLoading(true); setOauthError('');
     try {
-      const res: any = await api.get('/auth/mp-oauth', { params: { code } });
+      const res: any = await api.post('/auth/wx-mp-login', { code });
       const { token: jwtToken, user, is_new_user, referee_id } = res;
       localStorage.setItem('token', jwtToken);
       localStorage.setItem('referee_user_info', JSON.stringify(user));
@@ -77,7 +77,7 @@ export default function RegisterFormPage() {
 
   const handleWechatLogin = () => {
     const currentUrl = window.location.href.split('?')[0];
-    window.location.href = `/api/v1/auth/mp-oauth/authorize?redirect=${encodeURIComponent(`${currentUrl}?token=${token}`)}`;
+    window.location.href = `/api/v1/referee/invite/${token}/oauth?redirect=${encodeURIComponent(`${currentUrl}?token=${token}`)}`;
   };
 
   const handleProfileSubmit = async () => {
