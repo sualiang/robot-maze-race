@@ -42,19 +42,24 @@ export default function InviteGuidePage() {
   }, [token]);
 
   // Step 2: Handle OAuth callback (snsapi_base silent auth)
-  // 微信内第一步由 nginx 直接 302 到微信 OAuth，回调后带 code 参数
+  // P0 fix: 微信内先主动跳转到后端 OAuth 路由获取 code，回调后才 bind
   useEffect(() => {
     console.log('[InviteGuide] Step2 useEffect fired', {
       hasCode: !!code,
       hasToken: !!token,
       hasInviteInfo: !!inviteInfo,
-      codePresent: !!code,
-      tokenPresent: !!token,
-      inviteInfoPresent: !!inviteInfo,
+      isWeChat: /MicroMessenger/i.test(navigator.userAgent),
     });
+    const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
+
     if (code && token && inviteInfo) {
+      // 有 code → 微信 OAuth 回调回来了，执行 bind
       console.log('[InviteGuide] Step2 → calling handleBindOpenid', { code, token });
       handleBindOpenid(code);
+    } else if (isWeChat && token && inviteInfo && !code) {
+      // P0 fix: 微信内没有 code → 主动跳转后端 OAuth 路由发起静默授权
+      console.log('[InviteGuide] Step2 → no code in WeChat, redirecting to OAuth', { token });
+      window.location.replace(`/api/v1/referee/invite/${token}/oauth`);
     } else {
       console.log('[InviteGuide] Step2 → skipping, conditions not met');
     }
@@ -146,17 +151,17 @@ export default function InviteGuidePage() {
     );
   }
 
-  // 微信内：bind-openid 成功后自动跳服务号主页，不会渲染到这里
-  // 如果到达这里说明还在 bind 中
-  if (/MicroMessenger/i.test(navigator.userAgent)) {
+  // P0 fix: 微信内 — 有 code 才显示 bind 中，无 code 则 Step2 useEffect 已处理跳转
+  // 如果到达这里说明 bind-openid 正在执行中（有 code + inviteInfo）
+  if (/MicroMessenger/i.test(navigator.userAgent) && code) {
     return (
       <div className="referee-login-page">
         <div className="referee-login-glow-1" />
         <div className="referee-login-glow-2" />
         <div className="referee-login-box">
           <div className="referee-login-card" style={{ textAlign: 'center' }}>
-            <p style={{ color: 'rgba(255,255,255,0.6)', margin: 0 }}>
-              {bindDone ? '已完成身份校验...' : '正在校验身份...'}
+            <p style={{ color: 'rgba(255,255,255,0.6)', margin: 0, fontSize: 15 }}>
+              {bindDone ? '身份校验完成，自动跳转中...' : '正在校验身份...'}
             </p>
           </div>
         </div>
