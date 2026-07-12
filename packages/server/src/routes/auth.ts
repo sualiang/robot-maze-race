@@ -305,6 +305,101 @@ router.post('/admin-login', async (req: Request, res: Response) => {
 });
 
 /**
+/**
+ * POST /api/v1/auth/operator-member-login
+ * 运营商子账号登录（前端兼容别名路由）
+ * 功能与 POST /login + role='operator_member' 完全相同
+ * @param body.phone - 手机号
+ * @param body.password - 密码
+ */
+router.post('/operator-member-login', async (req: Request, res: Response) => {
+  const { phone, password } = req.body;
+
+  if (!phone || !password) {
+    return res.status(400).json({ code: 400, message: '缺少手机号或密码', data: null });
+  }
+
+  try {
+    const member = await queryOne<any>(
+      `SELECT m.id, m.password_hash as password, m.name as nickname, m.phone,
+              m.role, m.status, ar.label as role_name, ar.name as admin_role_name, ar.permissions,
+              m.operator_id,
+              o.name as operator_name, o.company_name,
+              m.first_login
+       FROM operator_members m
+       LEFT JOIN admin_roles ar ON ar.name = m.role
+       LEFT JOIN operators o ON o.id = m.operator_id
+       WHERE m.phone = $1`,
+      [phone]
+    );
+
+    if (!member) {
+      return res.status(401).json({ code: 401, message: '手机号或密码错误', data: null });
+    }
+
+    if (member.status === 'disabled') {
+      return res.status(403).json({ code: 403, message: '账号已被禁用', data: null });
+    }
+
+    if (!bcrypt.compareSync(password, member.password)) {
+      return res.status(401).json({ code: 401, message: '手机号或密码错误', data: null });
+    }
+
+    // 解析权限数组
+    let permissions: string[] = [];
+    try {
+      if (typeof member.permissions === 'object' && member.permissions !== null) {
+        permissions = Array.isArray(member.permissions) ? member.permissions : [];
+      } else {
+        permissions = JSON.parse(member.permissions || '[]');
+      }
+    } catch {
+      permissions = [];
+    }
+
+    if (member.role === 'op_super_admin') {
+      permissions = ['*'];
+    }
+
+    const firstLogin = member.first_login === 1;
+
+    const payload: any = {
+      userId: member.id,
+      openid: '',
+      role: 'operator',
+      operatorId: member.operator_id,
+      admin_role_name: member.admin_role_name,
+      permissions,
+    };
+
+    const token = jwt.sign(payload, config.jwt.secret, { expiresIn: config.jwt.expiresIn as any });
+
+    return res.json({
+      code: 0,
+      message: '登录成功',
+      data: {
+        token,
+        user: {
+          id: member.id,
+          nickname: member.nickname,
+          phone: member.phone,
+          role_id: member.role,
+          role_name: member.role_name,
+          permissions,
+          operator_id: member.operator_id,
+          operator_name: member.operator_name,
+          company_name: member.company_name || null,
+          firstLogin,
+        },
+      },
+    });
+  } catch (error: any) {
+    console.error('[Auth] operator-member-login error:', error.message);
+    return res.status(500).json({ code: 500, message: '登录失败', data: null });
+  }
+});
+
+/**
  * POST /api/v1/auth/login
  * 统一登录
  * - role='operator': 运营商超管（查 operators 表，username + password）
