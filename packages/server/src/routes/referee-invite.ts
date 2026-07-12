@@ -83,7 +83,7 @@ router.get('/invite/:token/oauth', (req: Request, res: Response) => {
 
   if (!isInWechat) {
     // 非微信浏览器，跳回前端 SPA 引导页
-    return res.redirect(`https://amberrobot.com.cn/referee/invite?token=${token}`);
+    return res.redirect(`https://dog.amberrobot.com.cn/referee/invite?token=${token}`);
   }
 
   // 微信内 → 构建微信 OAuth URL（snsapi_userinfo 静默授权）
@@ -93,7 +93,7 @@ router.get('/invite/:token/oauth', (req: Request, res: Response) => {
   }
 
   const redirectUri = encodeURIComponent(
-    `https://amberrobot.com.cn/referee/invite?token=${token}`
+    `https://amberrobot.com.cn/api/v1/wechat/callback`
   );
   const wxAuthUrl =
     `https://open.weixin.qq.com/connect/oauth2/authorize?` +

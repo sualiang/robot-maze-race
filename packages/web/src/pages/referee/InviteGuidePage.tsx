@@ -14,7 +14,7 @@ export default function InviteGuidePage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const token = searchParams.get('token') || searchParams.get('state') || '';
+  const token = searchParams.get('token') || '';
   const code = searchParams.get('code') || '';
 
   const [inviteInfo, setInviteInfo] = useState<InviteInfo | null>(null);
