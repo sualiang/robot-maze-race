@@ -290,8 +290,8 @@ router.post('/register', async (req: Request, res: Response) => {
 
     // 先创建 users 记录（如果没有）
     await execute(
-      `INSERT INTO users (id, openid, nickname, phone, role, status, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, 'referee', 'active', $5, $6)`,
+      `INSERT INTO users (id, openid, nickname, phone, role, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, 'referee', $5, $6)`,
       [tempUserId, 'ref_invite_' + phone, name, phone, nowStr, nowStr]
     );
 
@@ -299,7 +299,7 @@ router.post('/register', async (req: Request, res: Response) => {
     await execute(
       `INSERT INTO referees (id, user_id, name, phone, id_number, status, venue_id, operator_id,
         apply_remark, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10)`,
+       VALUES ($1, $2, $3, $4, $5, 'approved', $6, $7, $8, $9, $10)`,
       [
         refereeId,
         tempUserId,
@@ -322,12 +322,12 @@ router.post('/register', async (req: Request, res: Response) => {
 
     return res.status(201).json({
       code: 0,
-      message: '注册信息已提交，请等待运营商审核',
+      message: '注册成功',
       data: {
         id: refereeId,
         name,
         phone,
-        status: 'pending',
+        status: 'approved',
       },
     });
   } catch (error: any) {
