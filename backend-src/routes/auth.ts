@@ -199,11 +199,9 @@ router.post('/admin-login', async (req: Request, res: Response) => {
     let user = await queryOne<any>(
       `SELECT au.id, au.username, au.password, au.nickname, au.email, au.phone,
               au.role_id, au.status, ar.label as role_name, ar.name as admin_role_name, ar.permissions,
-              au.first_login,
-              o.name as operator_name, o.company_name
+              au.first_login
        FROM admin_users au
        LEFT JOIN admin_roles ar ON ar.id = au.role_id
-       LEFT JOIN operators o ON o.operator_username = au.username
        WHERE au.username = $1`,
       [username]
     );
@@ -212,11 +210,9 @@ router.post('/admin-login', async (req: Request, res: Response) => {
       user = await queryOne<any>(
         `SELECT au.id, au.username, au.password, au.nickname, au.email, au.phone,
                 au.role_id, au.status, ar.label as role_name, ar.name as admin_role_name, ar.permissions,
-                au.first_login,
-                o.name as operator_name, o.company_name
+                au.first_login
          FROM admin_users au
          LEFT JOIN admin_roles ar ON ar.id = au.role_id
-         LEFT JOIN operators o ON o.operator_username = au.username
          WHERE au.phone = $1`,
         [username]
       );
@@ -236,14 +232,10 @@ router.post('/admin-login', async (req: Request, res: Response) => {
       return res.status(401).json({ code: 401, message: '用户名或密码错误', data: null });
     }
 
-    // 解析权限数组（兼容 mysql2 JSON 自动解析导致的 object 类型）
+    // 解析权限数组
     let permissions: string[] = [];
     try {
-      if (typeof user.permissions === 'object' && user.permissions !== null) {
-        permissions = Array.isArray(user.permissions) ? user.permissions : [];
-      } else {
-        permissions = JSON.parse(user.permissions || '[]');
-      }
+      permissions = JSON.parse(user.permissions || '[]');
     } catch {
       permissions = [];
     }
@@ -294,7 +286,6 @@ router.post('/admin-login', async (req: Request, res: Response) => {
           role_name: user.role_name,
           permissions,
           first_login: user.first_login == 1,
-          operator_name: user.operator_name || user.nickname || user.username || '',
         },
       },
     });
@@ -305,26 +296,26 @@ router.post('/admin-login', async (req: Request, res: Response) => {
 });
 
 /**
-/**
  * POST /api/v1/auth/operator-login
- * 运营商子账号登录（前端兼容别名路由）
- * 功能与 POST /login + role='operator_member' 完全相同
+ * 运营商下属角色成员登录（admin_users 表中 operator_id 非空的记录）
  * @param body.phone - 手机号
  * @param body.password - 密码
+ * @returns { token, user }
  */
 router.post('/operator-login', async (req: Request, res: Response) => {
-  const { phone, password } = req.body;
-
-  if (!phone || !password) {
-    return res.status(400).json({ code: 400, message: '缺少手机号或密码', data: null });
-  }
-
   try {
-    const member = await queryOne<any>(
+    const { phone, password } = req.body;
+
+    if (!phone || !password) {
+      return res.status(400).json({ code: 400, message: '缺少手机号或密码', data: null });
+    }
+
+    // 查 operator_members 表
+    const user = await queryOne<any>(
       `SELECT m.id, m.password_hash as password, m.name as nickname, m.phone,
               m.role, m.status, ar.label as role_name, ar.name as admin_role_name, ar.permissions,
               m.operator_id,
-              o.name as operator_name, o.company_name,
+              o.name as operator_name,
               m.first_login
        FROM operator_members m
        LEFT JOIN admin_roles ar ON ar.name = m.role
@@ -333,43 +324,38 @@ router.post('/operator-login', async (req: Request, res: Response) => {
       [phone]
     );
 
-    if (!member) {
+    if (!user) {
       return res.status(401).json({ code: 401, message: '手机号或密码错误', data: null });
     }
 
-    if (member.status === 'disabled') {
+    if (user.status === 'disabled') {
       return res.status(403).json({ code: 403, message: '账号已被禁用', data: null });
     }
 
-    if (!bcrypt.compareSync(password, member.password)) {
+    if (!bcrypt.compareSync(password, user.password)) {
       return res.status(401).json({ code: 401, message: '手机号或密码错误', data: null });
     }
 
     // 解析权限数组
     let permissions: string[] = [];
     try {
-      if (typeof member.permissions === 'object' && member.permissions !== null) {
-        permissions = Array.isArray(member.permissions) ? member.permissions : [];
-      } else {
-        permissions = JSON.parse(member.permissions || '[]');
-      }
+      permissions = JSON.parse(user.permissions || '[]');
     } catch {
       permissions = [];
     }
 
-    if (member.role === 'op_super_admin') {
-      permissions = ['*'];
-    }
+    // 判断是否需要修改密码（first_login == 1 或 password_change_required != 0）
+    const passwordChangeRequired = user.first_login === 1 || user.password_change_required === 1;
 
-    const firstLogin = member.first_login === 1;
-
-    const payload: any = {
-      userId: member.id,
+    const payload: AuthPayload & { operatorId?: string; admin_role_id?: string; admin_role_name?: string; permissions?: string[]; passwordChangeRequired?: boolean } = {
+      userId: user.id,
       openid: '',
       role: 'operator',
-      operatorId: member.operator_id,
-      admin_role_name: member.admin_role_name,
+      operatorId: user.operator_id,
+      admin_role_id: user.role_id,
+      admin_role_name: user.admin_role_name,
       permissions,
+      passwordChangeRequired,
     };
 
     const token = jwt.sign(payload, config.jwt.secret, { expiresIn: config.jwt.expiresIn as any });
@@ -380,16 +366,15 @@ router.post('/operator-login', async (req: Request, res: Response) => {
       data: {
         token,
         user: {
-          id: member.id,
-          nickname: member.nickname,
-          phone: member.phone,
-          role_id: member.role,
-          role_name: member.role_name,
+          id: user.id,
+          nickname: user.nickname,
+          phone: user.phone,
+          role_id: user.role_id,
+          role_name: user.role_name,
           permissions,
-          operator_id: member.operator_id,
-          operator_name: member.operator_name,
-          company_name: member.company_name || null,
-          firstLogin,
+          operator_id: user.operator_id,
+          operator_name: user.operator_name,
+          firstLogin: passwordChangeRequired,
         },
       },
     });
@@ -401,14 +386,13 @@ router.post('/operator-login', async (req: Request, res: Response) => {
 
 /**
  * POST /api/v1/auth/login
- * 统一登录
- * - role='operator': 运营商超管（查 operators 表，username + password）
- * - role='operator_member': 运营商子账号（查 operator_members 表，phone + password）
- * - 无 role / 其他: 裁判/玩家（查 referees 表 / users 表，phone + password）
+ * 通用登录
+ * - role='operator': 使用 operator_username + 密码登录运营商后台
+ * - 其他: 手机号+密码（裁判 mock 兼容）
  * @param body.username - 运营商用户名（role='operator'时必填）
- * @param body.phone - 手机号（role='operator_member' 或无 role 时）
+ * @param body.phone - 手机号（裁判登录时）
  * @param body.password - 密码（必填）
- * @param body.role - 角色：operator | operator_member | 不传/其他
+ * @param body.role - 角色
  * @returns { token, user }
  */
 router.post('/login', async (req: Request, res: Response) => {
@@ -488,104 +472,56 @@ router.post('/login', async (req: Request, res: Response) => {
       });
     }
 
-    if (role === 'operator_member') {
-      // ===== 运营商子账号登录（operator_members 表） =====
-      if (!phone || !password) {
-        return res.status(400).json({ code: 400, message: '缺少手机号或密码', data: null });
-      }
+    // ===== 裁判/用户登录（referees 表） =====
+    if (!phone || !password) {
+      return res.status(400).json({ code: 400, message: '缺少手机号或密码', data: null });
+    }
 
-      const member = await queryOne<any>(
-        `SELECT m.id, m.password_hash as password, m.name as nickname, m.phone,
-                m.role, m.status, ar.label as role_name, ar.name as admin_role_name, ar.permissions,
-                m.operator_id,
-                o.name as operator_name, o.company_name,
-                m.first_login
-         FROM operator_members m
-         LEFT JOIN admin_roles ar ON ar.name = m.role
-         LEFT JOIN operators o ON o.id = m.operator_id
-         WHERE m.phone = $1`,
-        [phone]
-      );
+    // 先在 referees 表查，看是否有匹配的裁判
+    const referee = await queryOne<{
+      id: string;
+      phone: string;
+      user_id: string;
+      password: string;
+      name: string;
+      venue_id: string;
+      venue_name: string;
+      first_login: number;
+      role: string;
+    }>(
+      `SELECT r.id, r.phone, r.user_id, u.password, r.name, r.venue_id, v.name as venue_name, u.first_login, u.role
+       FROM referees r
+       LEFT JOIN users u ON u.id = r.user_id
+       LEFT JOIN venues v ON v.id = r.venue_id
+       WHERE r.phone = $1`,
+      [phone]
+    );
 
-      if (!member) {
+    if (referee) {
+      if (!referee.password || !bcrypt.compareSync(password, referee.password)) {
         return res.status(401).json({ code: 401, message: '手机号或密码错误', data: null });
       }
 
-      if (member.status === 'disabled') {
-        return res.status(403).json({ code: 403, message: '账号已被禁用', data: null });
-      }
-
-      if (!bcrypt.compareSync(password, member.password)) {
-        return res.status(401).json({ code: 401, message: '手机号或密码错误', data: null });
-      }
-
-      // 解析权限数组（兼容 mysql2 JSON 自动解析导致的 object 类型）
-      let permissions: string[] = [];
-      try {
-        if (typeof member.permissions === 'object' && member.permissions !== null) {
-          permissions = Array.isArray(member.permissions) ? member.permissions : [];
-        } else {
-          permissions = JSON.parse(member.permissions || '[]');
-        }
-      } catch {
-        permissions = [];
-      }
-
-      // 运营商超管（op_super_admin）自动给全权限
-      if (member.role === 'op_super_admin') {
-        permissions = ['*'];
-      }
-
-      const firstLogin = member.first_login === 1;
-
-      const payload: AuthPayload & { operatorId?: string; admin_role_name?: string; permissions?: string[] } = {
-        userId: member.id,
-        openid: '',
-        role: 'operator',
-        operatorId: member.operator_id,
-        admin_role_name: member.admin_role_name,
-        permissions,
+      const firstLogin = referee.first_login == 1;
+      const payload = {
+        userId: referee.user_id || referee.id,
+        openid: referee.user_id ? ('ref_' + referee.user_id) : '',
+        role: 'referee',
+        firstLogin
       };
-
       const token = jwt.sign(payload, config.jwt.secret, { expiresIn: config.jwt.expiresIn as any });
-
       return res.json({
         code: 0,
         message: '登录成功',
         data: {
           token,
           user: {
-            id: member.id,
-            nickname: member.nickname,
-            phone: member.phone,
-            role_id: member.role,
-            role_name: member.role_name,
-            permissions,
-            operator_id: member.operator_id,
-            operator_name: member.operator_name,
-            company_name: member.company_name || null,
-            firstLogin,
-          },
-        },
-      });
-    }
-
-    // ===== 裁判登录（仅微信OAuth，不支持手机号+密码） =====
-    if (!phone || !password) {
-      return res.status(400).json({ code: 400, message: '缺少手机号或密码', data: null });
-    }
-
-    // 检查是否是裁判手机号
-    const refereePhone = await queryOne<{ id: string; phone: string; name: string }>(
-      'SELECT id, phone, name FROM referees WHERE phone = $1',
-      [phone]
-    );
-
-    if (refereePhone) {
-      return res.status(400).json({
-        code: 400,
-        message: '裁判请使用微信授权登录，不支持手机号+密码登录',
-        data: null
+            id: referee.id,
+            nickname: referee.name,
+            role: 'referee',
+            firstLogin
+          }
+        }
       });
     }
 
@@ -633,12 +569,22 @@ router.post('/login', async (req: Request, res: Response) => {
       });
     }
 
-    // 所有合法角色分支均未匹配 → 返回 401
-    return res.status(401).json({
-      code: 401,
-      message: '手机号未注册，请联系运营商开通账号',
-      data: null
-    });
+    // ===== 原有 Mock 登录（回退/未注册手机号） =====
+    const userId = 'ref_' + Date.now();
+    const userRole = role || 'referee';
+    const user: User = {
+      id: userId,
+      openid: 'mock_openid_' + phone,
+      phone: phone,
+      nickname: '裁判_' + phone.slice(-4),
+      role: userRole as UserRole,
+      avatar_url: '',
+      race_count: 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    const token = generateToken(user);
+    return res.json({ code: 0, message: '登录成功', data: { token, user } });
   } catch (error: any) {
     return res.status(500).json({ code: 500, message: '登录失败', data: null });
   }
@@ -653,116 +599,7 @@ router.post('/login', async (req: Request, res: Response) => {
 router.get('/me', authMiddleware, async (req: Request, res: Response<ApiResponse<User>>) => {
   try {
     const userId = req.user!.userId;
-    const userRole = req.user!.role;
-
-    // 管理员用户：从 admin_users 表查询
-    if (userRole === 'admin') {
-      const admin = await queryOne<any>(
-        `SELECT au.id, au.username, au.nickname, au.email, au.phone,
-                au.role_id, au.status, ar.label as role_name, ar.name as admin_role_name, ar.permissions,
-                au.first_login
-         FROM admin_users au
-         LEFT JOIN admin_roles ar ON ar.id = au.role_id
-         WHERE au.id = $1`,
-        [userId]
-      );
-      if (!admin) {
-        return res.status(404).json({ code: 404, message: '管理员不存在', data: null as any });
-      }
-      let permissions: string[] = [];
-      try { permissions = typeof admin.permissions === 'object' ? admin.permissions : JSON.parse(admin.permissions || '[]'); } catch { permissions = []; }
-      if (admin.username === 'admin' || permissions.includes('*')) {
-        permissions = ['*'];
-      }
-      return res.json({
-        code: 0, message: 'ok',
-        data: {
-          id: admin.id,
-          username: admin.username,
-          nickname: admin.nickname || admin.username,
-          email: admin.email,
-          phone: admin.phone,
-          role_id: admin.role_id,
-          role_name: admin.role_name || admin.label,
-          permissions,
-          first_login: admin.first_login == 1,
-        } as any,
-      });
-    }
-
-    // 运营商成员：从 operator_members 表查询
-    if (userRole === 'operator') {
-      const member = await queryOne<any>(
-        `SELECT om.id, om.operator_id, om.phone, om.name, om.role, om.status,
-                o.name as operator_name, o.company_name
-         FROM operator_members om
-         LEFT JOIN operators o ON o.id = om.operator_id
-         WHERE om.id = $1`,
-        [userId]
-      );
-      if (member && (member.status === 1 || member.status === 'active')) {
-        // 超管自动给全权限，普通成员从 admin_roles 查
-        let permissions: string[] = [];
-        if (member.role === 'op_super_admin') {
-          permissions = ['*'];
-        } else {
-          try {
-            const roleResult = await queryOne<any>(
-              `SELECT permissions FROM admin_roles WHERE name = $1`,
-              [member.role]
-            );
-            if (roleResult?.permissions) {
-              permissions = typeof roleResult.permissions === 'object'
-                ? roleResult.permissions
-                : JSON.parse(roleResult.permissions || '[]');
-            }
-          } catch {}
-        }
-        return res.json({
-          code: 0, message: 'ok',
-          data: {
-            id: member.id,
-            operatorId: member.operator_id,
-            username: member.name,
-            nickname: member.name,
-            phone: member.phone,
-            role_name: member.role === 'op_super_admin' ? '运营商超管' : (member.role || '成员'),
-            admin_role_name: member.role,
-            operator_name: member.operator_name || '',
-            company_name: member.company_name || null,
-            role: 'operator',
-            permissions,
-          } as any,
-        });
-      }
-
-      // 运营商超管：从 operators 表查询（兼容旧的 operator 直接登录）
-      if ((req.user as any).operatorId && !member) {
-        const op = await queryOne<any>(
-          `SELECT id, name, operator_username, phone, status, password_change_required
-           FROM operators WHERE id = $1`,
-          [(req.user as any).operatorId]
-        );
-        if (op) {
-          return res.json({
-            code: 0, message: 'ok',
-            data: {
-              id: op.id,
-              operatorId: op.id,
-              username: op.operator_username,
-              nickname: op.name,
-              phone: op.phone || op.operator_username,
-              role_name: '运营商超管',
-              role: 'operator',
-              permissions: ['*'],
-            } as any,
-          });
-        }
-      }
-      // member 查不到且 operator 也查不到 → 继续往下走 404
-    }
-
-    // 普通用户 / 裁判：从 users 表查询
+    
     const user = await queryOne<User>(
       `SELECT id, openid, unionid, nickname, avatar_url, phone, role, race_count,
               total_race_time_ms, best_score_ms, created_at, updated_at
@@ -790,131 +627,9 @@ router.get('/me', authMiddleware, async (req: Request, res: Response<ApiResponse
 router.post('/refresh', authMiddleware, async (req: Request, res: Response<ApiResponse<{ token: string }>>) => {
   try {
     const payload = req.user!;
-    const userId = payload.userId;
-    const userRole = payload.role;
-
-    // 管理员用户：从 admin_users 表查询，重新生成完整 admin JWT
-    if (userRole === 'admin') {
-      const admin = await queryOne<any>(
-        `SELECT au.id, au.username, au.nickname, au.email, au.phone,
-                au.role_id, au.status, ar.label as role_name, ar.name as admin_role_name, ar.permissions,
-                au.first_login
-         FROM admin_users au
-         LEFT JOIN admin_roles ar ON ar.id = au.role_id
-         WHERE au.id = $1`,
-        [userId]
-      );
-      if (!admin) {
-        return res.status(404).json({ code: 404, message: '管理员不存在', data: null as any });
-      }
-      let permissions: string[] = [];
-      try { permissions = typeof admin.permissions === 'object' ? admin.permissions : JSON.parse(admin.permissions || '[]'); } catch { permissions = []; }
-      if (admin.username === 'admin' || permissions.includes('*')) {
-        permissions = ['*'];
-      }
-      let operatorId: string | undefined;
-      if ((payload as any).operatorId) {
-        operatorId = (payload as any).operatorId;
-      }
-      const newToken = jwt.sign(
-        {
-          userId: admin.id,
-          openid: '',
-          role: 'admin',
-          admin_role_id: admin.role_id,
-          admin_role_name: admin.admin_role_name,
-          permissions,
-          ...(operatorId ? { operatorId } : {}),
-        },
-        config.jwt.secret,
-        { expiresIn: config.jwt.expiresIn as any }
-      );
-      return res.json({ code: 0, message: 'token 已刷新', data: { token: newToken } });
-    }
-
-    // 运营商成员：从 operator_members 表查询
-    if (userRole === 'operator' && (payload as any).operatorId) {
-      const member = await queryOne<any>(
-        `SELECT m.id, m.phone, m.name, m.role, m.status, m.operator_id,
-                ar.label as role_name, ar.name as admin_role_name, ar.permissions,
-                m.first_login
-         FROM operator_members m
-         LEFT JOIN admin_roles ar ON ar.name = m.role
-         WHERE m.id = $1`,
-        [userId]
-      );
-      if (member) {
-        let permissions: string[] = [];
-        try { permissions = typeof member.permissions === 'object' ? member.permissions : JSON.parse(member.permissions || '[]'); } catch { permissions = []; }
-        const passwordChangeRequired = member.first_login === 1;
-        const newToken = jwt.sign(
-          {
-            userId: member.id,
-            openid: '',
-            role: 'operator',
-            operatorId: member.operator_id,
-            admin_role_id: member.role,
-            admin_role_name: member.admin_role_name || member.role_name,
-            permissions,
-            passwordChangeRequired,
-          },
-          config.jwt.secret,
-          { expiresIn: config.jwt.expiresIn as any }
-        );
-        return res.json({ code: 0, message: 'token 已刷新', data: { token: newToken } });
-      }
-    }
-
-    // 运营商超管（operator 角色但无 operatorId，或通过 operator 表查询）
-    if (userRole === 'operator') {
-      const op = await queryOne<any>(
-        `SELECT id, name, operator_username, phone, status
-         FROM operators WHERE id = $1`,
-        [userId]
-      );
-      if (op) {
-        const newToken = jwt.sign(
-          {
-            userId: op.id,
-            openid: '',
-            role: 'operator',
-            operatorId: op.id,
-            permissions: ['*'],
-          },
-          config.jwt.secret,
-          { expiresIn: config.jwt.expiresIn as any }
-        );
-        return res.json({ code: 0, message: 'token 已刷新', data: { token: newToken } });
-      }
-    }
-
-    // 裁判：从 referees + users 表查询
-    if (userRole === 'referee') {
-      const referee = await queryOne<any>(
-        `SELECT r.id, r.user_id, u.id as uid, u.openid, u.role
-         FROM referees r
-         LEFT JOIN users u ON u.id = r.user_id
-         WHERE r.user_id = $1 OR r.id = $1`,
-        [userId]
-      );
-      if (referee) {
-        const newToken = jwt.sign(
-          {
-            userId: referee.user_id || userId,
-            openid: referee.openid || '',
-            role: 'referee',
-          },
-          config.jwt.secret,
-          { expiresIn: config.jwt.expiresIn as any }
-        );
-        return res.json({ code: 0, message: 'token 已刷新', data: { token: newToken } });
-      }
-    }
-
-    // 普通用户/玩家：从 users 表查询
     const user = await queryOne<User>(
       `SELECT id, openid, role FROM users WHERE id = $1`,
-      [userId]
+      [payload.userId]
     );
 
     if (!user) {
@@ -1049,7 +764,7 @@ router.post('/admin/change-password', authMiddleware, async (req: Request, res: 
           phone: adminUserInfo.phone,
           role_name: adminUserInfo.role_name || '超级管理员',
           role: 'admin',
-          permissions: adminUserInfo.permissions ? (typeof adminUserInfo.permissions === 'object' ? adminUserInfo.permissions : JSON.parse(adminUserInfo.permissions)) : ['*'],
+          permissions: adminUserInfo.permissions ? JSON.parse(adminUserInfo.permissions) : ['*'],
           first_login: false,
         } : null,
       },
@@ -1232,7 +947,7 @@ router.post('/member/change-password', authMiddleware, async (req: Request, res:
           nickname: m.nickname,
           role_name: m.role_name,
           role: 'operator',
-          permissions: m.permissions ? (typeof m.permissions === 'object' ? m.permissions : JSON.parse(m.permissions)) : [],
+          permissions: m.permissions ? JSON.parse(m.permissions) : [],
         };
       }
     }
@@ -1459,37 +1174,26 @@ router.post('/upload-avatar', authMiddleware, async (req: Request, res: Response
  * GET /api/v1/auth/mp-oauth/authorize
  * 微信服务号 OAuth 授权入口 — 302 跳转到微信授权页面
  * 前端点击"微信授权登录"按钮后跳转至此，由后端拼接完整授权 URL 并重定向
- * @query scope - snsapi_base（静默）| snsapi_userinfo（弹窗，默认）
- * @query redirect - 回调路径
  */
-router.get('/mp-oauth/authorize', (req: Request, res: Response) => {
+router.get('/mp-oauth/authorize', (_req: Request, res: Response) => {
   const { appId } = config.wechatMp;
 
   if (!appId) {
     return res.status(500).json({ code: 500, message: '微信服务号未配置', data: null });
   }
 
-  // 支持 scope query 参数（snsapi_base / snsapi_userinfo）
-  const scope = (req.query.scope as string) || 'snsapi_userinfo';
-
-  // 支持自定义回调路径（通过 redirect 参数），写死为 amberrobot.com.cn
-  // 微信后台网页授权域名只配了 amberrobot.com.cn，子域名统一走此域名
-  const customRedirect = req.query.redirect as string | undefined;
-  const defaultRedirect = `https://amberrobot.com.cn${customRedirect || '/referee/login'}`;
-  const redirectUri = encodeURIComponent(customRedirect || defaultRedirect);
-
-  // state 传递回调地址，OAuth 回调后前端可以根据 state 决定跳转路径
-  const stateParam = customRedirect
-    ? `referee_invite_${encodeURIComponent(customRedirect)}`
-    : 'referee_login';
+  // 回调地址：前端裁判登录页
+  const redirectUri = encodeURIComponent(
+    `${_req.protocol}://${_req.get('host')}/referee/login`
+  );
 
   const wxAuthUrl =
     `https://open.weixin.qq.com/connect/oauth2/authorize?` +
     `appid=${appId}&` +
     `redirect_uri=${redirectUri}&` +
     `response_type=code&` +
-    `scope=${scope}&` +
-    `state=${stateParam}#wechat_redirect`;
+    `scope=snsapi_userinfo&` +
+    `state=referee_login#wechat_redirect`;
 
   res.redirect(wxAuthUrl);
 });
@@ -1542,8 +1246,6 @@ router.get('/mp-oauth', async (req: Request, res: Response) => {
 
     // 2. 查找或创建用户
     let user = await findUserByOpenid(openid);
-    let isNewUser = false;
-    let refereeId: string | null = null;
 
     if (!user) {
       const nickname = `裁判${Date.now().toString(36).slice(-6)}`;
@@ -1553,33 +1255,6 @@ router.get('/mp-oauth', async (req: Request, res: Response) => {
         nickname,
         role: UserRole.REFEREE,
       });
-      isNewUser = true;
-    } else {
-      // 判断 is_new_user：该 openid 是否已有关联的 referee 记录
-      const existingReferee = await queryOne<{ id: string }>(
-        'SELECT id FROM referees WHERE user_id = $1',
-        [user.id]
-      );
-      if (existingReferee) {
-        refereeId = existingReferee.id;
-      } else {
-        isNewUser = true;
-      }
-    }
-
-    // 如果是新裁判（is_new_user），创建 referees 记录
-    if (isNewUser && !refereeId) {
-      refereeId = uuidv4();
-      try {
-        await execute(
-          `INSERT INTO referees (id, user_id, name, phone, status, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, 'pending', NOW(), NOW())`,
-          [refereeId, user.id, user.nickname || '未设置', user.phone || '']
-        );
-      } catch (e: any) {
-        console.error('[Auth] mp-oauth create referee failed:', e.message);
-        refereeId = null;
-      }
     }
 
     // 3. 生成 JWT
@@ -1588,40 +1263,11 @@ router.get('/mp-oauth', async (req: Request, res: Response) => {
     return res.json({
       code: 0,
       message: '登录成功',
-      data: { token, user, is_new_user: isNewUser, referee_id: refereeId },
+      data: { token, user },
     });
   } catch (error: any) {
     console.error('[Auth] mp-oauth error:', error.message);
     return res.status(500).json({ code: 500, message: error.message || '登录失败', data: null });
-  }
-});
-
-/**
- * GET /api/v1/auth/mp-oauth/subscribe-status
- * 检查当前用户是否已关注微信服务号
- * @header Authorization: Bearer <token>
- * @returns { subscribed: boolean }
- */
-router.get('/mp-oauth/subscribe-status', authMiddleware, async (req: Request, res: Response) => {
-  try {
-    const userId = req.user!.userId;
-
-    const user = await queryOne<{ mp_openid: string; openid: string }>(
-      'SELECT mp_openid, openid FROM users WHERE id = $1',
-      [userId]
-    );
-
-    if (!user) {
-      return res.json({ code: 0, message: 'ok', data: { subscribed: false } });
-    }
-
-    // 如果 mp_openid 有值，说明已关注服务号
-    const subscribed = !!(user.mp_openid && user.mp_openid.trim() !== '');
-
-    return res.json({ code: 0, message: 'ok', data: { subscribed } });
-  } catch (error: any) {
-    console.error('[Auth] subscribe-status error:', error.message);
-    return res.status(500).json({ code: 500, message: '查询失败', data: null });
   }
 });
 
