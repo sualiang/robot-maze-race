@@ -9,7 +9,7 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import { config } from '../config';
-import { queryOne, execute } from '../config/database';
+import { queryOne, query, execute } from '../config/database';
 import { sendRegisterLink } from '../services/wechat-message';
 
 const router = Router();
@@ -32,6 +32,22 @@ function parseXml(xml: string): Record<string, string> {
   for (const [, tag, val] of xml.matchAll(/<(\w+)><!\[CDATA\[(.*?)\]\]><\/\1>/g)) m[tag] = val;
   for (const [, tag, val] of xml.matchAll(/<(\w+)>(.*?)<\/\1>/g)) { if (!(tag in m)) m[tag] = val; }
   return m;
+}
+
+/* ------------------------------------------------------------------ */
+/* 构建文本回复 XML                                                       */
+/* ------------------------------------------------------------------ */
+function buildTextReply(toUser: string, fromUser: string, content: string): string {
+  const createTime = Math.floor(Date.now() / 1000);
+  return [
+    '<xml>',
+    `<ToUserName><![CDATA[${toUser}]]></ToUserName>`,
+    `<FromUserName><![CDATA[${fromUser}]]></FromUserName>`,
+    `<CreateTime>${createTime}</CreateTime>`,
+    '<MsgType><![CDATA[text]]></MsgType>',
+    `<Content><![CDATA[${content}]]></Content>`,
+    '</xml>',
+  ].join('');
 }
 
 /* ------------------------------------------------------------------ */
@@ -136,6 +152,65 @@ router.post('/event', async (req: Request, res: Response) => {
     // ---------- CLICK（菜单点击）----------
     if (event === 'CLICK') {
       console.log(`[WechatEvent] CLICK: key=${eventKey} openid=${fromUser}`);
+
+      // 现场大屏 → 查裁判绑定赛场，回复大屏链接
+      if (eventKey === 'screen_display') {
+        try {
+          const userRow = await queryOne<{ id: string }>(
+            'SELECT id FROM users WHERE mp_openid = $1 OR openid = $1 LIMIT 1',
+            [fromUser]
+          );
+          if (!userRow) {
+            return res.type('application/xml').send(
+              buildTextReply(fromUser, toUser, '请先联系运营商完成裁判注册并分配到赛场，注册后即可获取现场大屏地址。')
+            );
+          }
+
+          const refRow = await queryOne<{ venue_id: string; operator_id: string }>(
+            'SELECT venue_id, operator_id FROM referees WHERE user_id = $1 LIMIT 1',
+            [userRow.id]
+          );
+          if (!refRow || !refRow.venue_id) {
+            return res.type('application/xml').send(
+              buildTextReply(fromUser, toUser, '请先联系运营商完成裁判注册并分配到赛场，注册后即可获取现场大屏地址。')
+            );
+          }
+
+          const [venueRow, opRow] = await Promise.all([
+            queryOne<{ name: string; address: string }>(
+              'SELECT name, address FROM venues WHERE id = $1', [refRow.venue_id]
+            ),
+            queryOne<{ company_name: string }>(
+              'SELECT company_name FROM operators WHERE id = $1', [refRow.operator_id]
+            ),
+          ]);
+
+          const venueName = venueRow?.name || '赛场';
+          const venueAddress = venueRow?.address || '暂无';
+          const companyName = opRow?.company_name || '暂无';
+
+          const content = [
+            '🐕 现场大屏',
+            '',
+            `「${venueName}」已就绪！`,
+            '',
+            `📌 赛场：${venueName}`,
+            `📍 地址：${venueAddress}`,
+            `🏢 运营商：${companyName}`,
+            '',
+            '🔗 大屏链接（请发送给赛场工作人员）：',
+            `https://dog.amberrobot.com.cn/screen?venueId=${refRow.venue_id}`,
+            '',
+            '工作人员打开链接后，输入裁判端「我的」页面显示的激活码即可激活大屏。',
+          ].join('\n');
+
+          return res.type('application/xml').send(
+            buildTextReply(fromUser, toUser, content)
+          );
+        } catch (e: any) {
+          console.error('[WechatEvent] screen_display error:', e.message);
+        }
+      }
     }
 
     // 必须返回空字符串通知微信服务器已收到
