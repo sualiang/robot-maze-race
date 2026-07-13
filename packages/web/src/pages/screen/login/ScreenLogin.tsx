@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { QRCode } from 'antd';
-import { ReloadOutlined, CheckCircleOutlined, LoadingOutlined } from '@ant-design/icons';
+import { ReloadOutlined, CheckCircleOutlined } from '@ant-design/icons';
 
 export default function ScreenLogin() {
   const navigate = useNavigate();
@@ -23,7 +22,7 @@ export default function ScreenLogin() {
   }, [activated, navigate]);
 
   const generateCode = useCallback(() => {
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const code = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
     setActivationCode(code);
     setExpired(false);
     setCountdown(60);
@@ -111,7 +110,7 @@ export default function ScreenLogin() {
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center',
-      justifyContent: 'center', height: '100vh', gap: 24,
+      justifyContent: 'center', height: '100vh', gap: 24, padding: 24,
     }}>
       {/* 标题 */}
       <div style={{ textAlign: 'center' }}>
@@ -128,75 +127,54 @@ export default function ScreenLogin() {
         </p>
       </div>
 
-      {/* 二维码激活区 */}
+      {/* 激活码展示区 */}
       <div style={{
         background: 'rgba(255,255,255,0.95)', borderRadius: 20,
-        padding: '40px 48px', textAlign: 'center',
+        padding: '48px 40px', textAlign: 'center',
         boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+        minWidth: 320,
       }}>
         <p style={{
-          fontSize: 22, color: '#333', marginBottom: 24, fontWeight: 500,
+          fontSize: 20, color: '#333', marginBottom: 28, fontWeight: 500,
         }}>
-          请使用 <span style={{ color: '#ff6b35', fontWeight: 700 }}>裁判小程序</span> 扫码激活
+          请输入以下激活码激活大屏
         </p>
 
-        {/* 二维码 */}
+        {/* 6位纯数字激活码大字 */}
         <div style={{
-          display: 'inline-block', padding: 16,
-          background: '#fff', borderRadius: 12,
-          border: '2px solid #f0f0f0',
+          fontSize: 72, fontFamily: 'monospace', fontWeight: 800,
+          letterSpacing: 16, color: '#ff6b35',
+          marginBottom: 12, textAlign: 'center',
+          paddingLeft: 16, /* compensate for letter-spacing on last char */
         }}>
-          {activationCode ? (
-            <QRCode
-              value={`robotmaze://activate-screen?code=${activationCode}`}
-              size={220}
-              bordered={false}
-              status={expired ? 'expired' : 'active'}
-            />
+          {activationCode}
+        </div>
+
+        {/* 倒计时 */}
+        <div style={{ fontSize: 14, color: expired ? '#f5222d' : '#999', marginBottom: 16 }}>
+          {expired ? (
+            <span>激活码已过期，请刷新</span>
           ) : (
-            <div style={{
-              width: 220, height: 220, display: 'flex',
-              alignItems: 'center', justifyContent: 'center',
-              background: '#f5f5f5', borderRadius: 8,
-            }}>
-              <LoadingOutlined style={{ fontSize: 32, color: '#ccc' }} />
-            </div>
+            <>
+              <span style={{
+                display: 'inline-block', width: 8, height: 8,
+                borderRadius: '50%', background: '#52c41a',
+                marginRight: 6,
+              }} />
+              有效期剩余 {countdown} 秒
+            </>
           )}
         </div>
 
-        {/* 激活码和倒计时 */}
-        <div style={{ marginTop: 20 }}>
-          <div style={{
-            fontSize: 32, fontFamily: 'monospace', fontWeight: 700,
-            letterSpacing: 8, color: '#ff6b35',
-            marginBottom: 8,
-          }}>
-            {activationCode}
-          </div>
-          <div style={{ fontSize: 14, color: expired ? '#f5222d' : '#999' }}>
-            {expired ? (
-              <span>二维码已过期，请刷新</span>
-            ) : (
-              <>
-                <span style={{
-                  display: 'inline-block', width: 8, height: 8,
-                  borderRadius: '50%', background: '#52c41a',
-                  marginRight: 6,
-                }} />
-                有效期剩余 {countdown} 秒
-              </>
-            )}
-          </div>
-          <div
-            onClick={handleRefresh}
-            style={{
-              marginTop: 12, cursor: 'pointer', color: '#ff6b35',
-              display: 'inline-flex', alignItems: 'center', gap: 4,
-              fontSize: 14, userSelect: 'none',
-            }}
-          >
-            <ReloadOutlined spin={false} /> 刷新二维码
-          </div>
+        <div
+          onClick={handleRefresh}
+          style={{
+            cursor: 'pointer', color: '#ff6b35',
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            fontSize: 14, userSelect: 'none',
+          }}
+        >
+          <ReloadOutlined /> 刷新激活码
         </div>
       </div>
 
@@ -205,7 +183,7 @@ export default function ScreenLogin() {
         color: '#555', fontSize: 14, textAlign: 'center',
         maxWidth: 400, lineHeight: 1.8,
       }}>
-        打开裁判小程序，扫描上方二维码即可激活本大屏。
+        在裁判端输入上方6位激活码即可激活本大屏。
         <br />
         激活后大屏将自动显示该赛场的实时竞赛画面。
       </p>

@@ -19,7 +19,7 @@ export default function AttendancePage() {
   const [durationText, setDurationText] = useState('');
   const [pageLoading, setPageLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
-  const [showScanner, setShowScanner] = useState(false);
+  const [inputCode, setInputCode] = useState('');
   const [scanError, setScanError] = useState('');
   const checkInTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const destroyedRef = useRef(false);
@@ -56,12 +56,12 @@ export default function AttendancePage() {
   };
 
   const scanAndCheckIn = async (activationCode: string) => {
-    setShowScanner(false);
     setStatus('loading');
     try {
       const res: any = await api.post('/referees/attendance/check-in-by-qr', { activationCode });
       const vi = { id: res.venueId, name: res.venueName, address: '' };
       setStatus('checked'); setVenueInfo(vi); setCheckInTime(res.checkinAt);
+      setInputCode('');
       localStorage.setItem('referee_venue', JSON.stringify(vi)); startCheckInTimer();
       setErrorMsg('✅ 签到成功！赛场已激活');
       setTimeout(() => setErrorMsg(''), 2000);
@@ -70,6 +70,16 @@ export default function AttendancePage() {
       setScanError(e?.message || '激活码无效，请重试');
       setTimeout(() => setScanError(''), 3000);
     }
+  };
+
+  const handleCheckIn = () => {
+    const code = inputCode.trim();
+    if (code.length !== 6 || !/^\d{6}$/.test(code)) {
+      setScanError('请输入6位数字激活码');
+      return;
+    }
+    setScanError('');
+    scanAndCheckIn(code);
   };
 
   const checkOut = async () => {
@@ -120,44 +130,44 @@ export default function AttendancePage() {
           </span>
         </div>
 
-        {/* 未签到 — 扫码入口 */}
-        {status === 'unchecked' && !showScanner && (
-          <button className="referee-btn referee-btn-success referee-btn-lg"
-            onClick={() => setShowScanner(true)} disabled={actionLoading}>
-            📷 扫描大屏二维码签到
-          </button>
-        )}
-
-        {/* 扫码输入区 */}
-        {showScanner && (
-          <div style={{ textAlign: 'center', padding: '12px 0' }}>
-            <p style={{ color: '#666', fontSize: 14, marginBottom: 12 }}>
-              请对准大屏上的二维码，或手动输入激活码
+        {/* 未签到 — 直接显示输入区 */}
+        {status === 'unchecked' && (
+          <div style={{ textAlign: 'center', padding: '4px 0 0' }}>
+            <p style={{ color: '#666', fontSize: 13, marginBottom: 12 }}>
+              请输入大屏上显示的6位数字激活码
             </p>
             <input
               type="text"
-              placeholder="输入6位激活码"
+              inputMode="numeric"
+              placeholder="输入6位数字激活码"
               maxLength={6}
-              autoFocus
-              style={{
-                width: '100%', padding: '12px', fontSize: 20,
-                textAlign: 'center', letterSpacing: 8, borderRadius: 8,
-                border: '1px solid #ddd', boxSizing: 'border-box',
+              value={inputCode}
+              onChange={(e) => {
+                const v = e.target.value.replace(/\D/g, '');
+                setInputCode(v);
+                if (scanError) setScanError('');
               }}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  const input = (e.target as HTMLInputElement).value.trim().toUpperCase();
-                  if (input.length === 6) scanAndCheckIn(input);
-                  else setScanError('请输入6位激活码');
-                }
+                if (e.key === 'Enter') handleCheckIn();
+              }}
+              style={{
+                width: '100%', padding: '14px 12px', fontSize: 24,
+                textAlign: 'center', letterSpacing: 10,
+                borderRadius: 12, border: '2px solid #e0e0e0',
+                boxSizing: 'border-box', outline: 'none',
+                fontFamily: 'monospace',
               }}
             />
             {scanError && (
               <p style={{ color: '#e74c3c', fontSize: 13, marginTop: 8 }}>{scanError}</p>
             )}
-            <button onClick={() => { setShowScanner(false); setScanError(''); }}
-              style={{ marginTop: 12, background: 'none', border: 'none', color: '#999', cursor: 'pointer', fontSize: 14 }}>
-              取消
+            <button
+              className="referee-btn referee-btn-success referee-btn-lg"
+              onClick={handleCheckIn}
+              disabled={actionLoading || inputCode.length !== 6}
+              style={{ marginTop: 14 }}
+            >
+              ✅ 确认签到
             </button>
           </div>
         )}
