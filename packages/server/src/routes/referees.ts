@@ -1120,7 +1120,7 @@ router.post('/attendance/check-in-by-qr', authMiddleware, async (req: Request, r
 
     // 3.5 验证裁判是否已绑定该赛场
     if (refRow.venue_id && refRow.venue_id !== venue.id) {
-      return res.status(403).json({ code: 403, message: '您未绑定此赛场，请联系管理员绑定', data: null });
+      return res.status(403).json({ code: 403, message: '抱歉，您并没有绑定本赛场', data: null });
     }
 
     // 4. 查今日是否已签到且未签退
