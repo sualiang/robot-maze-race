@@ -546,8 +546,8 @@ router.post('/match/select-racer', authMiddleware, async (req: Request, res: Res
       elapsed_ms: 0,
       next_racer: mockQueue.length > 0 ? { nickname: mockQueue[0].name, queue_number: mockQueue[0].queueNumber } : null,
       queue: mockQueue.map(q => ({ queue_number: q.queueNumber, nickname: q.name, status: 'waiting' })),
-      venue_name: '北京朝阳大悦城赛场',
-      venue_id: 'default_venue_001',
+      venue_name: cachedVenueName,
+      venue_id: cachedVenueId,
       leaderboard: getLeaderboard(),
       timestamp: new Date().toISOString(),
     });
@@ -588,8 +588,8 @@ router.post('/match/start', authMiddleware, async (_req: Request, res: Response)
       start_time: now,
       next_racer: mockQueue.length > 0 ? { nickname: mockQueue[0].name, queue_number: mockQueue[0].queueNumber } : null,
       queue: mockQueue.map(q => ({ queue_number: q.queueNumber, nickname: q.name, status: 'waiting' })),
-      venue_name: '北京朝阳大悦城赛场',
-      venue_id: 'default_venue_001',
+      venue_name: cachedVenueName,
+      venue_id: cachedVenueId,
       leaderboard: getLeaderboard(),
       timestamp: new Date().toISOString(),
     });
@@ -691,8 +691,8 @@ router.post('/match/end', authMiddleware, async (req: Request, res: Response) =>
       elapsed_ms: finalElapsed,
       next_racer: mockQueue.length > 0 ? { nickname: mockQueue[0].name, queue_number: mockQueue[0].queueNumber } : null,
       queue: mockQueue.map(q => ({ queue_number: q.queueNumber, nickname: q.name, status: 'waiting' })),
-      venue_name: '北京朝阳大悦城赛场',
-      venue_id: 'default_venue_001',
+      venue_name: cachedVenueName,
+      venue_id: cachedVenueId,
       leaderboard: getLeaderboard(),
       timestamp: new Date().toISOString(),
     });
@@ -727,8 +727,8 @@ router.post('/match/re-enter', authMiddleware, async (_req: Request, res: Respon
     elapsed_ms: 0,
     next_racer: mockQueue.length > 0 ? { nickname: mockQueue[0].name, queue_number: mockQueue[0].queueNumber } : null,
     queue: mockQueue.map(q => ({ queue_number: q.queueNumber, nickname: q.name, status: 'waiting' })),
-    venue_name: '北京朝阳大悦城赛场',
-    venue_id: 'default_venue_001',
+    venue_name: cachedVenueName,
+    venue_id: cachedVenueId,
     leaderboard: getLeaderboard(),
     timestamp: new Date().toISOString(),
   });
@@ -1234,26 +1234,25 @@ export function setVenueActive(active: boolean) {
   venueActive = active;
 }
 
-let cachedVenueName = '北京朝阳大悦城赛场';
-let cachedVenueId = 'default_venue_001';
-let cachedVenueStatus = 'active';
+let cachedVenueName = '机器狗迷宫赛场';
+let cachedVenueId = '';
+let cachedVenueStatus = 'inactive';
 
-try {
-  const fs = require('fs');
-  const path = require('path');
-  const dbPath = process.env.SQLITE_PATH || path.join(process.cwd(), 'data/robot-maze-race.db');
-  if (fs.existsSync(dbPath)) {
-    const Database = require('better-sqlite3');
-    const db = new Database(dbPath, { readonly: true });
-    const row = db.prepare('SELECT id, name, status FROM venues LIMIT 1').get();
+/** 从 MySQL venues 表加载首个赛场信息 */
+export async function initVenueCache(): Promise<void> {
+  try {
+    const row = await queryOne<{ id: string; name: string; status: string }>(
+      'SELECT id, name, status FROM venues LIMIT 1'
+    );
     if (row) {
       cachedVenueName = row.name || cachedVenueName;
       cachedVenueId = row.id || cachedVenueId;
       cachedVenueStatus = row.status || cachedVenueStatus;
     }
-    db.close();
+  } catch (e) {
+    console.warn('[VenueCache] 初始化失败，使用默认值:', (e as any)?.message || e);
   }
-} catch (e) {}
+}
 
 export function getCurrentScreenData() {
   const leaderboard = getLeaderboard();

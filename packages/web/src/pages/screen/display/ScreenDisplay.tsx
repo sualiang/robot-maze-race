@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Empty, Tag } from 'antd';
 import { TrophyOutlined, ClockCircleOutlined, UserOutlined, WifiOutlined, WifiOutlined as WifiOfflined } from '@ant-design/icons';
-import api from '../../../utils/api';
 
 interface LeaderboardEntry {
   rank: number;
@@ -245,48 +244,10 @@ export default function ScreenDisplay() {
   };
 
   // 默认场地数据（API 获取失败时的回退值）
-  const defaultVenueName = '机器狗迷宫赛场';
-  const defaultVenueStatus = 'inactive';
-
-  // 从 /api/v1/venues 获取真实场地数据
-  useEffect(() => {
-    let cancelled = false;
-    api.get('/venues')
-      .then((res: any) => {
-        if (cancelled) return;
-        // res 是 api.ts 拦截器处理后的 data.data，即 { list: Venue[], total, page, pageSize }
-        const venues = res?.list || [];
-        if (venues.length > 0) {
-          const firstVenue = venues[0];
-          setData(prev => prev ? {
-            ...prev,
-            venue_name: firstVenue.name || defaultVenueName,
-            venue_status: firstVenue.status || defaultVenueStatus,
-            venueId: firstVenue.id,
-          } : {
-            venue_name: firstVenue.name || defaultVenueName,
-            venue_status: firstVenue.status || defaultVenueStatus,
-            venueId: firstVenue.id,
-            current_racer: null,
-            elapsed_ms: 0,
-            race_status: 'idle',
-            leaderboard: [],
-            queue: [],
-            next_racer: null,
-          } as ScreenData);
-        }
-      })
-      .catch((err: any) => {
-        if (cancelled) return;
-        console.warn('[大屏] 获取场地列表失败，使用默认值:', err?.message || err);
-      });
-    return () => { cancelled = true; };
-  }, []);
-
   // 默认数据（当 WebSocket 返回 undefined 时的回退值）
   const fallbackData: ScreenData = {
-    venue_name: defaultVenueName,
-    venue_status: defaultVenueStatus,
+    venue_name: '机器狗迷宫赛场',
+    venue_status: 'inactive',
     current_racer: null,
     elapsed_ms: 0,
     race_status: 'idle',
@@ -301,8 +262,8 @@ export default function ScreenDisplay() {
     ...mergedData,
     leaderboard: Array.isArray(mergedData.leaderboard) ? mergedData.leaderboard : [],
     queue: Array.isArray(mergedData.queue) ? mergedData.queue : [],
-    venue_name: mergedData.venue_name || defaultVenueName,
-    venue_status: mergedData.venue_status || defaultVenueStatus,
+    venue_name: mergedData.venue_name || '机器狗迷宫赛场',
+    venue_status: mergedData.venue_status || 'inactive',
     race_status: mergedData.race_status || 'idle',
   } as ScreenData;
 
@@ -374,7 +335,7 @@ export default function ScreenDisplay() {
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           gap: 24,
         }}>
-          <img src="/logo.png" alt="铁甲快狗" style={{ width: 300, height: 'auto', maxWidth: '60vw' }} />
+          <img src="/logo-operator.png" alt="铁甲快狗" style={{ width: 300, height: 'auto', maxWidth: '60vw' }} />
           <div style={{ fontSize: 32, fontWeight: 700, color: '#fff' }}>赛场未激活</div>
           <div style={{ fontSize: 18, color: 'rgba(255,255,255,0.5)', letterSpacing: 1 }}>
             等待裁判签到激活…
@@ -420,7 +381,7 @@ export default function ScreenDisplay() {
         background: 'rgba(255,255,255,0.03)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <img src="/logo.png" alt="logo" style={{ height: 50, width: 'auto' }} />
+          <img src="/logo-operator.png" alt="logo" style={{ height: 50, width: 'auto' }} />
           <h1 style={{ fontSize: 32, margin: 0, lineHeight: 1.4, fontWeight: 700, background: 'linear-gradient(90deg, #ff6b35, #ff9a3c)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
             闯关竞速赛
           </h1>
