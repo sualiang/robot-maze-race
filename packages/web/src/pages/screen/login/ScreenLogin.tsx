@@ -127,7 +127,7 @@ export default function ScreenLogin() {
     }}>
       {/* 标题 */}
       <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 56, marginBottom: 8 }}>🐕</div>
+        <div style={{ fontSize: 56, marginBottom: 20 }}>🐕</div>
         <h1 style={{
           fontSize: 48, margin: 0, fontWeight: 800,
           background: 'linear-gradient(90deg, #ff6b35, #ff9a3c)',
