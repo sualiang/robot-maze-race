@@ -17,19 +17,9 @@ const MENU = {
       url: 'https://dog.amberrobot.com.cn/referee/login',
     },
     {
-      name: '赛事服务',
-      sub_button: [
-        {
-          name: '关于我们',
-          type: 'view',
-          url: 'https://dog.amberrobot.com.cn/about',
-        },
-        {
-          name: '联系客服',
-          type: 'click',
-          key: 'contact_support',
-        },
-      ],
+      name: '现场大屏',
+      type: 'click',
+      key: 'screen_display',
     },
   ],
 };
