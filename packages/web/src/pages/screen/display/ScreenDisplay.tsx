@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Empty, Tag } from 'antd';
-import { TrophyOutlined, ClockCircleOutlined, UserOutlined, WifiOutlined, WifiOutlined as WifiOfflined, MoneyCollectOutlined } from '@ant-design/icons';
+import { TrophyOutlined, ClockCircleOutlined, UserOutlined, WifiOutlined, WifiOutlined as WifiOfflined } from '@ant-design/icons';
 import api from '../../../utils/api';
 
 interface LeaderboardEntry {
@@ -47,8 +47,6 @@ export default function ScreenDisplay() {
   const [forfeitMessage, setForfeitMessage] = useState('');
   const [forfeitName, setForfeitName] = useState('');
   const [forfeitHint, setForfeitHint] = useState('');
-  const [prizePool, setPrizePool] = useState(0);
-  const [seasonName, setSeasonName] = useState('');
   const wsRef = useRef<WebSocket | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -246,20 +244,6 @@ export default function ScreenDisplay() {
     return formatTime(ms);
   };
 
-  // 获取赛季信息和奖池
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([
-      api.get('/seasons/current').catch(() => null),
-      api.get('/seasons/prize-pool').catch(() => null),
-    ]).then(([season, pool]: [any, any]) => {
-      if (cancelled) return;
-      if (season?.name) setSeasonName(season.name);
-      if (pool?.amount != null) setPrizePool(pool.amount);
-    });
-    return () => { cancelled = true; };
-  }, []);
-
   // 默认场地数据（API 获取失败时的回退值）
   const defaultVenueName = '机器狗迷宫赛场';
   const defaultVenueStatus = 'inactive';
@@ -442,15 +426,6 @@ export default function ScreenDisplay() {
           </h1>
           <span style={{ fontSize: 18, color: '#aaa' }}>|</span>
           <span style={{ fontSize: 20, fontWeight: 500 }}>{displayData.venue_name}</span>
-          {seasonName && (
-            <Tag color="gold" style={{ fontSize: 16, padding: '2px 12px', borderRadius: 6, fontWeight: 600 }}>
-              {seasonName}
-            </Tag>
-          )}
-          <span style={{ fontSize: 18, color: '#aaa' }}>|</span>
-          <span style={{ fontSize: 18, fontWeight: 500, color: '#ffd700' }}>
-            <MoneyCollectOutlined /> 奖池: ¥{prizePool.toLocaleString()}
-          </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{

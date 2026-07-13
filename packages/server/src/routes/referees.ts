@@ -982,6 +982,10 @@ router.post('/attendance/check-in', authMiddleware, async (req: Request, res: Re
 
     // 标记赛场已激活
     setVenueActive(true);
+    cachedVenueStatus = 'open';
+
+    // 回写 venues 表，确保 REST API 也返回正确状态
+    try { await execute('UPDATE venues SET status = \'open\' LIMIT 1'); } catch (_) {}
 
     // 广播赛场重新开放到大屏，大屏恢复全新状态
     broadcastToScreen({
@@ -1040,6 +1044,10 @@ router.post('/attendance/check-out', authMiddleware, async (req: Request, res: R
 
     // 赛场标记为未激活
     setVenueActive(false);
+    cachedVenueStatus = 'closed';
+
+    // 回写 venues 表
+    try { await execute('UPDATE venues SET status = \'closed\' LIMIT 1'); } catch (_) {}
 
     // 清空排队队列和当前选手，重置所有比赛状态（新玩家需重新扫码排队）
     mockQueue.length = 0;
@@ -1141,8 +1149,12 @@ router.post('/attendance/check-in-by-qr', authMiddleware, async (req: Request, r
 
     // 7. 标记赛场已激活
     setVenueActive(true);
+    cachedVenueStatus = 'open';
     cachedVenueName = venue.name;
     cachedVenueId = venue.id;
+
+    // 回写 venues 表
+    try { await execute('UPDATE venues SET status = \'open\' WHERE id = $1', [venue.id]); } catch (_) {}
 
     // 8. 通知大屏激活
     if (validation.ws && validation.ws.readyState === WebSocket.OPEN) {
