@@ -127,9 +127,9 @@ export default function RegisterFormPage() {
   }
 
   return (
-    <div className="referee-login-page" style={{ display: 'block', overflow: 'auto', padding: '16px 0' }}>
+    <div className="referee-login-page" style={{ display: 'block', overflowY: 'auto', padding: '24px 16px 48px' }}>
       <div className="referee-login-glow-1" /><div className="referee-login-glow-2" />
-      <div style={{ maxWidth: 440, margin: '0 auto', padding: '0 16px 40px' }}>
+      <div style={{ width: '100%', maxWidth: 440, margin: '0 auto', padding: '0 12px 48px', boxSizing: 'border-box' }}>
         <div style={{ textAlign: 'center', marginBottom: 20, paddingTop: 20 }}>
           <div className="referee-login-role" style={{ background: 'rgba(7,193,96,0.06)', border: '1px solid rgba(7,193,96,0.12)', color: '#07c160', display: 'inline-flex', marginBottom: 12 }}>
             <span className="referee-login-role-icon">📋</span> 裁判注册
@@ -138,7 +138,7 @@ export default function RegisterFormPage() {
         </div>
         <div className="referee-login-card" style={{ padding: '24px 20px' }}>
           {inviteInfo && (
-            <div style={{ background: 'rgba(7,193,96,0.05)', border: '1px solid rgba(7,193,96,0.1)', borderRadius: 10, padding: '12px 16px', marginBottom: 20, textAlign: 'center' }}>
+            <div style={{ background: 'rgba(7,193,96,0.05)', border: '1px solid rgba(7,193,96,0.1)', borderRadius: 10, padding: '12px 16px', marginBottom: 20, textAlign: 'center', wordBreak: 'break-all', overflowWrap: 'break-word' }}>
               {inviteInfo.operator_name && <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, margin: '0 0 4px' }}><span style={{ color: 'rgba(255,255,255,0.4)' }}>运营商：</span><strong style={{ color: '#fff' }}>{inviteInfo.operator_name}</strong></p>}
               {inviteInfo.venue_name && <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, margin: 0 }}><span style={{ color: 'rgba(255,255,255,0.4)' }}>赛场：</span><strong style={{ color: '#fff' }}>{inviteInfo.venue_name}</strong></p>}
             </div>
