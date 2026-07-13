@@ -2,8 +2,8 @@
 module.exports = {
   apps: [
     {
-      name: 'robot-maze-server',
-      script: './dist/server.js',
+      name: 'robot-maze-race-backend',
+      script: 'dist/server.js',
       cwd: __dirname,
       env: {
         NODE_ENV: 'production',
