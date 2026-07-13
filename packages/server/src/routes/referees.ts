@@ -971,13 +971,12 @@ router.post('/attendance/check-in', authMiddleware, async (req: Request, res: Re
       return res.status(400).json({ code: 400, message: '今日已签到，请勿重复签到', data: null });
     }
 
+    // 执行签到记录插入
     const id = uuidv4();
     const now = new Date().toISOString();
-
-    // 执行签到记录插入
     await execute(
-      'INSERT INTO attendance (id, referee_id, venue_id, checkin_at) VALUES ($1, $2, $3, $4)',
-      [id, refereeId, finalVenueId, now]
+      'INSERT INTO attendance (id, referee_id, venue_id, checkin_at) VALUES ($1, $2, $3, NOW())',
+      [id, refereeId, finalVenueId]
     );
 
     // 标记赛场已激活
@@ -1036,10 +1035,9 @@ router.post('/attendance/check-out', authMiddleware, async (req: Request, res: R
     const refereeId = ref.id;
 
     const now = new Date().toISOString();
-
     await execute(
-      `UPDATE attendance SET checkout_at = $1 WHERE referee_id = $2 AND date(checkin_at) = CURDATE() AND checkout_at IS NULL`,
-      [now, refereeId]
+      `UPDATE attendance SET checkout_at = NOW() WHERE referee_id = $1 AND date(checkin_at) = CURDATE() AND checkout_at IS NULL`,
+      [refereeId]
     );
 
     // 赛场标记为未激活
@@ -1137,15 +1135,15 @@ router.post('/attendance/check-in-by-qr', authMiddleware, async (req: Request, r
     }
 
     // 5. 写入 attendance 签到记录
-    const now = new Date().toISOString();
     const attendanceId = uuidv4();
+    const now = new Date().toISOString();
     await execute(
-      'INSERT INTO attendance (id, referee_id, user_id, venue_id, checkin_at) VALUES ($1, $2, $3, $4, $5)',
-      [attendanceId, refRow.id, userId, venue.id, now]
+      'INSERT INTO attendance (id, referee_id, user_id, venue_id, checkin_at) VALUES ($1, $2, $3, $4, NOW())',
+      [attendanceId, refRow.id, userId, venue.id]
     );
 
     // 6. 更新 referees 表最后签到时间
-    await execute('UPDATE referees SET last_checkin_at = $1 WHERE id = $2', [now, refRow.id]);
+    await execute('UPDATE referees SET last_checkin_at = NOW() WHERE id = $1', [refRow.id]);
 
     // 7. 标记赛场已激活
     setVenueActive(true);
