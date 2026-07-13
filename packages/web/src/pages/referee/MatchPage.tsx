@@ -110,7 +110,8 @@ export default function MatchPage() {
   const connectWebSocket = useCallback(() => {
     // 通过 Vite proxy 连接，避免直连后端端口
     // 直接连后端 WebSocket
-    const wsUrl = import.meta.env.VITE_REFEREE_WS_URL || 'ws://localhost:3000/ws/referee';
+    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const wsUrl = import.meta.env.VITE_REFEREE_WS_URL || `${protocol}://${window.location.host}/ws/referee`;
     if (wsRef.current) wsRef.current.close();
     try {
       const ws = new WebSocket(wsUrl); wsRef.current = ws;
