@@ -874,20 +874,12 @@ interface AttendanceRecord {
 router.get('/attendance/status', authMiddleware, async (req: Request, res: Response<ApiResponse<any>>) => {
   try {
     const userId = req.user!.userId;
-    const openid = req.user!.openid || '';
-    // 从 userId 或 openid 中提取手机号
-    let phone = '';
-    if (openid) {
-      phone = openid.replace('mock_openid_', '');
-    } else {
-      // 真实裁判用户：从 referees 表查手机号
-      const ref = await queryOne<{ phone: string }>('SELECT phone FROM referees WHERE id = $1', [userId]);
-      phone = ref?.phone || '';
-    }
-    if (!phone) return res.status(401).json({ code: 401, message: '未登录', data: null });
-
-    // Mock 模式：和 check-in 用同样的 referee_id 逻辑
-    const refereeId = 'ref_' + phone.replace(/[^\d]/g, '');
+    // 从 referees 表查真实 referee_id
+    const ref = await queryOne<{ id: string; phone: string }>(
+      'SELECT id, phone FROM referees WHERE user_id = $1', [userId]
+    );
+    if (!ref) return res.status(401).json({ code: 401, message: '未找到裁判记录', data: null });
+    const refereeId = ref.id;
 
     // 查询今日签到
     const todayCheckin = await queryOne<any>(
@@ -948,14 +940,15 @@ router.post('/attendance/check-in', authMiddleware, async (req: Request, res: Re
       return res.status(400).json({ code: 400, message: '缺少赛场ID', data: null });
     }
 
-    const phone = req.body.phone || req.user!.openid?.replace('mock_openid_', '') || '13800138000';
-
-    // Mock 模式：直接用手机号作为 referee_id，跳过 referees 表查找
-    const refereeId = 'ref_' + phone.replace(/[^\d]/g, '');
-
-    // 确保 referees 表和 venues 表有该记录（防止 FK 约束失败）
-    await execute('INSERT IGNORE INTO referees (id, user_id, phone, cert_status) VALUES ($1, $2, $3, $4)', [refereeId, 'test-referee-id', phone, 'certified']);
-// [FIX]     await execute('INSERT OR IGNORE INTO venues (id, name, status, open_time, close_time) VALUES ($1, $2, $3, $4, $5)', [finalVenueId, address ? address + '赛场' : '默认赛场', 'open', '09:00', '21:00']);
+    // 从 referees 表查找真实 referee_id
+    const refRow = await queryOne<{ id: string; phone: string }>(
+      'SELECT id, phone FROM referees WHERE user_id = $1', [userId]
+    );
+    if (!refRow) {
+      return res.status(400).json({ code: 400, message: '未找到裁判记录，请先完成注册', data: null });
+    }
+    const refereeId = refRow.id;
+    const phone = refRow.phone || req.user!.openid?.replace('mock_openid_', '') || '13800138000';
 
     // 检查今日是否已签到
     const existing = await queryOne<any>(
@@ -1025,12 +1018,12 @@ router.post('/attendance/check-out', authMiddleware, async (req: Request, res: R
     const finalLat = gpsLat || latitude || null;
     const finalLng = gpsLng || longitude || null;
 
-    const openid = req.user!.openid || '';
-    const phone = openid.replace('mock_openid_', '');
-    if (!phone) return res.status(401).json({ code: 401, message: '未登录', data: null });
-
-    // Mock 模式：和 check-in 用同样的 referee_id 逻辑
-    const refereeId = 'ref_' + phone.replace(/[^\d]/g, '');
+    // 从 referees 表查真实 referee_id
+    const ref = await queryOne<{ id: string }>(
+      'SELECT id FROM referees WHERE user_id = $1', [userId]
+    );
+    if (!ref) return res.status(401).json({ code: 401, message: '未找到裁判记录', data: null });
+    const refereeId = ref.id;
 
     const now = new Date().toISOString();
 
@@ -1078,12 +1071,10 @@ router.get('/attendance/records', authMiddleware, async (req: Request, res: Resp
     if (!userId) return res.status(401).json({ code: 401, message: '未登录', data: null });
 
     const { date } = req.query;
-    const openid = req.user!.openid || '';
-    const phone = openid.replace('mock_openid_', '');
-    if (!phone) return res.json({ code: 0, message: 'ok', data: [] });
-
-    // Mock 模式：和 check-in 用同样的 referee_id 逻辑
-    const refereeId = 'ref_' + phone.replace(/[^\d]/g, '');
+    // 从 referees 表查真实 referee_id
+    const ref = await queryOne<{ id: string }>('SELECT id FROM referees WHERE user_id = $1', [userId]);
+    if (!ref) return res.json({ code: 0, message: 'ok', data: [] });
+    const refereeId = ref.id;
 
     let sql = `SELECT a.*, v.name as venue_name
                FROM attendance a

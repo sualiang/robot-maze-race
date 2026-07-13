@@ -47,6 +47,12 @@ export default function RegisterFormPage() {
         url.searchParams.delete('code');
         url.searchParams.delete('state');
         window.history.replaceState({}, '', url.toString());
+
+        // 已有裁判记录 → 直接跳转裁判页，不展示注册表单
+        if (!res.is_new_user) {
+          navigate('/referee/match', { replace: true });
+          return;
+        }
         setLoading(false);
       })
       .catch((err: any) => {
@@ -73,13 +79,17 @@ export default function RegisterFormPage() {
     if (!/^\d{11}$/.test(phone)) { message.warning('请填写正确的11位手机号'); return; }
     setSubmitting(true);
     try {
-      await api.post('/referee/register', {
+      const res: any = await api.post('/referee/register', {
         invite_id: inviteId,
         operator_id: operatorId,
         name: name.trim(),
         phone,
       });
-      navigate('/referee/register-success', { replace: true });
+      if (res.token) {
+        localStorage.setItem('token', res.token);
+        localStorage.setItem('referee_user_info', JSON.stringify(res.user));
+      }
+      navigate('/referee/match', { replace: true });
     } catch (err: any) {
       message.error(err?.response?.data?.message || err?.message || '提交失败');
     } finally { setSubmitting(false); }

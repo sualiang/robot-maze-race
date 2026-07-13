@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import jwt from 'jsonwebtoken';
 import { query, queryOne, execute } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import { config } from '../config';
@@ -30,7 +31,7 @@ router.post('/invite', authMiddleware, async (req: Request, res: Response) => {
       );
       operatorId = member?.operator_id || (req.user as any).operatorId || req.user!.userId;
     }
-    const token = uuidv4();
+    const inviteToken = uuidv4();
     const inviteId = uuidv4();
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
@@ -53,18 +54,18 @@ router.post('/invite', authMiddleware, async (req: Request, res: Response) => {
     await execute(
       `INSERT INTO referee_invites (id, operator_id, phone, venue_id, token, note, status, scene_str, ticket, expires_at, created_at, updated_at)
        VALUES ($1,$2,$3,$4,$5,$6,'active',$7,$8,$9,$10,$11)`,
-      [inviteId, operatorId, phone || null, venue_id || null, token, note || null,
+      [inviteId, operatorId, phone || null, venue_id || null, inviteToken, note || null,
        sceneStr || null, ticket || null, toStr(expiresAt), toStr(now), toStr(now)]
     );
 
     const baseUrl = process.env.BASE_URL || `https://${req.get('host')}`;
-    const inviteUrl = `${baseUrl}/#/referee/invite?token=${token}`;
+    const inviteUrl = `${baseUrl}/#/referee/invite?token=${inviteToken}`;
 
     return res.json({
       code: 0, message: '邀请生成成功',
       data: {
         id: inviteId,
-        token,
+        token: inviteToken,
         invite_url: inviteUrl,
         qrcode_url: qrcodeUrl,
         scene_str: sceneStr,
@@ -115,8 +116,8 @@ router.get('/invite/:inviteId', async (req: Request, res: Response) => {
  */
 router.post('/register', async (req: Request, res: Response) => {
   try {
-    const { invite_id, token, operator_id, name, phone } = req.body;
-    const lookupId = invite_id || token;
+    const { invite_id, token: bodyToken, operator_id, name, phone } = req.body;
+    const lookupId = invite_id || bodyToken;
     if (!lookupId) return res.status(400).json({ code: 400, message: '缺少邀请ID', data: null });
     if (!name || !phone) return res.status(400).json({ code: 400, message: '请填写姓名和手机号', data: null });
     if (!/^\d{11}$/.test(phone)) return res.status(400).json({ code: 400, message: '手机号格式不正确', data: null });
@@ -161,7 +162,18 @@ router.post('/register', async (req: Request, res: Response) => {
       [refereeId, userId, name, phone, 'approved', invite.venue_id || null, invite.operator_id || null, nowStr, nowStr]
     );
     await execute('UPDATE referee_invites SET status=$1,updated_at=NOW() WHERE id=$2', ['used', invite.id]);
-    return res.status(201).json({ code: 0, message: '注册成功', data: { id: refereeId, name, phone, status: 'approved' } });
+
+    // 签发 JWT token
+    const token = jwt.sign(
+      { userId, openid: invite.openid || openid, role: 'referee' },
+      config.jwt.secret,
+      { expiresIn: config.jwt.expiresIn as any }
+    );
+
+    return res.status(201).json({
+      code: 0, message: '注册成功',
+      data: { token, user: { id: refereeId, name, phone, role: 'referee' } },
+    });
   } catch (error: any) {
     console.error('[RefereeInvite] register error:', error.message);
     return res.status(500).json({ code: 500, message: '提交注册失败: ' + error.message, data: null });
