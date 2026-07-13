@@ -1088,19 +1088,33 @@ router.post('/attendance/check-in-by-qr', authMiddleware, async (req: Request, r
     if (!userId) return res.status(401).json({ code: 401, message: '未登录', data: null });
 
     // 2. 从 referees 表查真实 referee_id
-    const refRow = await queryOne<{ id: string }>(
-      'SELECT id FROM referees WHERE user_id = $1', [userId]
+    const refRow = await queryOne<{ id: string; venue_id: string | null }>(
+      'SELECT id, venue_id FROM referees WHERE user_id = $1', [userId]
     );
     if (!refRow) {
       return res.status(400).json({ code: 400, message: '未找到裁判记录，请先完成注册', data: null });
     }
 
-    // 3. 取第一个可用场地
-    const venue = await queryOne<{ id: string; name: string; address: string }>(
-      'SELECT id, name, COALESCE(address, \'\') as address FROM venues LIMIT 1'
-    );
+    // 3. 取激活码绑定的场地（如果大屏传了 venueId 则用它，否则取第一个）
+    let venue: { id: string; name: string; address: string } | null = null;
+    if (validation.venueId) {
+      venue = await queryOne<{ id: string; name: string; address: string }>(
+        'SELECT id, name, COALESCE(address, \'\') as address FROM venues WHERE id = $1',
+        [validation.venueId]
+      );
+    }
+    if (!venue) {
+      venue = await queryOne<{ id: string; name: string; address: string }>(
+        'SELECT id, name, COALESCE(address, \'\') as address FROM venues LIMIT 1'
+      );
+    }
     if (!venue) {
       return res.status(500).json({ code: 500, message: '没有可用赛场', data: null });
+    }
+
+    // 3.5 验证裁判是否已绑定该赛场
+    if (refRow.venue_id && refRow.venue_id !== venue.id) {
+      return res.status(403).json({ code: 403, message: '您未绑定此赛场，请联系管理员绑定', data: null });
     }
 
     // 4. 查今日是否已签到且未签退

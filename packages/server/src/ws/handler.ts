@@ -120,11 +120,12 @@ function handleMessage(ws: WebSocket, msg: any) {
     }
 
     case 'screen_login': {
-      // 大屏生成激活码后注册映射
+      // 大屏生成激活码后注册映射（含 venueId 关联）
       const code = msg.activation_code;
       if (!code || typeof code !== 'string') break;
+      const venueId = msg.venueId || undefined;
       cleanExpiredCodes();
-      activationCodes.set(code, { ws, createdAt: Date.now() });
+      activationCodes.set(code, { ws, venueId, createdAt: Date.now() });
       ws.send(JSON.stringify({ type: 'login_ack', message: '等待裁判扫码' }));
       break;
     }

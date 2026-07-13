@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ReloadOutlined, CheckCircleOutlined } from '@ant-design/icons';
 
 export default function ScreenLogin() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const venueId = searchParams.get('venueId') || '';
   const [activationCode, setActivationCode] = useState('');
   const [activated, setActivated] = useState(false);
   const [venueName, setVenueName] = useState('');
@@ -17,10 +19,10 @@ export default function ScreenLogin() {
     if (!activated) return;
     sessionStorage.setItem('screen_activated', 'true');
     const timer = setTimeout(() => {
-      navigate('/screen/display', { replace: true });
+      navigate(`/screen/display?venueId=${venueId}`, { replace: true });
     }, 2000);
     return () => clearTimeout(timer);
-  }, [activated, navigate]);
+  }, [activated, navigate, venueId]);
 
   const generateCode = useCallback(() => {
     const code = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
@@ -53,6 +55,7 @@ export default function ScreenLogin() {
       ws.send(JSON.stringify({
         type: 'screen_login',
         activation_code: code,
+        venueId: venueId,
       }));
     };
 
@@ -68,7 +71,7 @@ export default function ScreenLogin() {
 
     ws.onerror = () => ws.close();
     wsRef.current = ws;
-  }, []);
+  }, [venueId]);
 
   useEffect(() => {
     const code = generateCode();
