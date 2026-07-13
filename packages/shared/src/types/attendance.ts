@@ -5,8 +5,6 @@ export interface Attendance {
   venue_id: string;
   check_in_at: string;
   check_out_at?: string;
-  gps_latitude?: number;
-  gps_longitude?: number;
   created_at: string;
   updated_at: string;
 }
@@ -14,8 +12,6 @@ export interface Attendance {
 export interface CreateAttendanceParams {
   referee_id: string;
   venue_id: string;
-  gps_latitude?: number;
-  gps_longitude?: number;
 }
 
 /** 支付流水 */

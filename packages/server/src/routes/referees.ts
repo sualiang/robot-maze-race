@@ -193,7 +193,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response<ApiResponse<P
     const list = await query<RefereeWithUser>(
       `SELECT r.id, r.user_id, r.venue_id, r.status,
               r.name,
-              r.phone, r.id_number, r.cert_image, r.gps_lat, r.gps_lng,
+              r.phone, r.id_number, r.cert_image,
               r.last_checkin_at, r.created_at, r.updated_at,
               r.apply_remark, r.review_remark, r.reviewed_at, r.operator_id,
               u.nickname, u.avatar_url,
@@ -233,7 +233,7 @@ router.get('/my', authMiddleware, async (req: Request, res: Response<ApiResponse
     const referee = await queryOne<RefereeWithUser>(
       `SELECT r.id, r.user_id, r.venue_id, r.status,
               r.name,
-              r.phone, r.id_number, r.cert_image, r.gps_lat, r.gps_lng,
+              r.phone, r.id_number, r.cert_image,
               r.last_checkin_at, r.created_at, r.updated_at,
               r.name,
               v.name as venue_name
@@ -272,7 +272,7 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response<ApiRespons
     const referee = await queryOne<RefereeWithUser>(
       `SELECT r.id, r.user_id, r.venue_id, r.status,
               r.name,
-              r.phone, r.id_number, r.cert_image, r.gps_lat, r.gps_lng,
+              r.phone, r.id_number, r.cert_image,
               r.last_checkin_at, r.created_at, r.updated_at,
               r.name,
               u.nickname, u.avatar_url,
@@ -344,7 +344,7 @@ router.put('/:id/bind-venue', authMiddleware, async (req: Request, res: Response
       [venue_id, new Date().toISOString(), id]
     );
     const referee = await queryOne<Referee>(
-      'SELECT id, user_id, venue_id, phone, id_number, cert_image, id_card_front, id_card_back, gps_lat, gps_lng, last_checkin_at, created_at, updated_at FROM referees WHERE id = $1',
+      'SELECT id, user_id, venue_id, phone, id_number, cert_image, id_card_front, id_card_back last_checkin_at, created_at, updated_at FROM referees WHERE id = $1',
       [id]
     );
 
@@ -862,8 +862,6 @@ interface AttendanceRecord {
   venue_id: string;
   checkin_at: string;
   checkout_at: string | null;
-  gps_lat: number | null;
-  gps_lng: number | null;
   venue_name?: string;
 }
 
@@ -931,10 +929,8 @@ router.post('/attendance/check-in', authMiddleware, async (req: Request, res: Re
     const userId = req.user!.userId;
     if (!userId) return res.status(401).json({ code: 401, message: '未登录', data: null });
 
-    const { venueId, venue_id, gpsLat, gpsLng, latitude, longitude, address } = req.body;
+    const { venueId, venue_id } = req.body;
     const finalVenueId = venueId || venue_id || 'default_venue_001';
-    const finalLat = gpsLat || latitude || null;
-    const finalLng = gpsLng || longitude || null;
 
     if (!finalVenueId) {
       return res.status(400).json({ code: 400, message: '缺少赛场ID', data: null });
@@ -966,8 +962,8 @@ router.post('/attendance/check-in', authMiddleware, async (req: Request, res: Re
 
     // 执行签到记录插入
     await execute(
-      'INSERT INTO attendance (id, referee_id, venue_id, checkin_at, gps_lat, gps_lng) VALUES ($1, $2, $3, $4, $5, $6)',
-      [id, refereeId, finalVenueId, now, finalLat, finalLng]
+      'INSERT INTO attendance (id, referee_id, venue_id, checkin_at) VALUES ($1, $2, $3, $4)',
+      [id, refereeId, finalVenueId, now]
     );
 
     // 标记赛场已激活
@@ -998,7 +994,7 @@ router.post('/attendance/check-in', authMiddleware, async (req: Request, res: Re
     return res.json({
       code: 0,
       message: '签到成功',
-      data: { id, checkinAt: now, venueInfo: { id: finalVenueId, name: venueName, address: venueAddress, latitude: finalLat, longitude: finalLng } } });
+      data: { id, checkinAt: now, venueInfo: { id: finalVenueId, name: venueName, address: venueAddress } } });
   } catch (error: any) {
     console.error('[Referee] 签到失败:', error.message || error, 'stack:', error.stack ? error.stack.substring(0,200) : 'none');
     return res.status(500).json({ code: 500, message: '签到失败: ' + (error.message || error), data: null });
@@ -1014,10 +1010,6 @@ router.post('/attendance/check-out', authMiddleware, async (req: Request, res: R
     const userId = req.user!.userId;
     if (!userId) return res.status(401).json({ code: 401, message: '未登录', data: null });
 
-    const { gpsLat, gpsLng, latitude, longitude } = req.body;
-    const finalLat = gpsLat || latitude || null;
-    const finalLng = gpsLng || longitude || null;
-
     // 从 referees 表查真实 referee_id
     const ref = await queryOne<{ id: string }>(
       'SELECT id FROM referees WHERE user_id = $1', [userId]
@@ -1028,8 +1020,8 @@ router.post('/attendance/check-out', authMiddleware, async (req: Request, res: R
     const now = new Date().toISOString();
 
     await execute(
-      `UPDATE attendance SET checkout_at = $1, gps_lat = COALESCE($2, gps_lat), gps_lng = COALESCE($3, gps_lng) WHERE referee_id = $4 AND date(checkin_at) = CURDATE() AND checkout_at IS NULL`,
-      [now, finalLat, finalLng, refereeId]
+      `UPDATE attendance SET checkout_at = $1 WHERE referee_id = $2 AND date(checkin_at) = CURDATE() AND checkout_at IS NULL`,
+      [now, refereeId]
     );
 
     // 赛场标记为未激活

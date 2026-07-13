@@ -21,8 +21,6 @@ export interface Referee {
   /** 姓名 */
   name?: string;
   cert_image_url?: string;
-  gps_latitude?: number;
-  gps_longitude?: number;
   last_active_at?: string;
   created_at: string;
   updated_at: string;
@@ -37,8 +35,6 @@ export interface CreateRefereeParams {
 export interface UpdateRefereeParams {
   venue_id?: string;
   cert_status?: RefereeCertStatus;
-  gps_latitude?: number;
-  gps_longitude?: number;
 }
 
 /** 裁判自助申请请求 */

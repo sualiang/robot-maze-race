@@ -56,7 +56,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
 
     const records = await query<any>(
       `SELECT a.id, a.referee_id, a.user_id, a.venue_id,
-              a.checkin_at, a.checkout_at, a.gps_lat, a.gps_lng,
+              a.checkin_at, a.checkout_at,
               a.created_at,
               u.nickname as user_nickname,
               v.name as venue_name

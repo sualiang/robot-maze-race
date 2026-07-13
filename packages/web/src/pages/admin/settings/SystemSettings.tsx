@@ -47,9 +47,6 @@ export default function SystemSettings() {
           default_timeout_seconds: 300,
           checkin_enabled: true,
           help_enabled: true,
-          gps_check_enabled: true,
-          gps_check_radius: 500,
-          auto_assign_venue: true,
           maintenance_mode: false,
           api_rate_limit: 100,
           max_race_per_day: 50,
@@ -117,23 +114,6 @@ export default function SystemSettings() {
             </Form.Item>
             <Form.Item name="help_enabled" label="助力功能" valuePropName="checked">
               <Switch />
-            </Form.Item>
-            <Form.Item name="auto_assign_venue" label="自动分配赛场" valuePropName="checked"
-              tooltip="启用后系统根据GPS自动将裁判分配到最近赛场">
-              <Switch />
-            </Form.Item>
-          </Space>
-
-          {/* GPS & 安全 */}
-          <Divider >GPS 与安全</Divider>
-          <Space size={24} wrap>
-            <Form.Item name="gps_check_enabled" label="GPS定位校验" valuePropName="checked"
-              tooltip="裁判签到/签退时校验GPS位置">
-              <Switch />
-            </Form.Item>
-            <Form.Item name="gps_check_radius" label="GPS校验半径(米)" rules={[{ required: true }]}
-              tooltip="裁判在赛场该范围内才可签到">
-              <InputNumber min={50} max={5000} style={{ width: 180 }} addonAfter="米" />
             </Form.Item>
           </Space>
 
