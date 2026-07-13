@@ -15,6 +15,7 @@ export default function ScreenLogin() {
   // 激活后 2 秒自动跳转到大屏
   useEffect(() => {
     if (!activated) return;
+    sessionStorage.setItem('screen_activated', 'true');
     const timer = setTimeout(() => {
       navigate('/screen/display', { replace: true });
     }, 2000);
