@@ -34,7 +34,7 @@ export default function ScreenDisplay() {
   // 激活守卫：未通过 ScreenLogin 激活则重定向回 /screen
   useEffect(() => {
     if (sessionStorage.getItem('screen_activated') !== 'true') {
-      window.location.replace('/screen');
+      window.location.replace('/screen/login');
     }
   }, []);
 
