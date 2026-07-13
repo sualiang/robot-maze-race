@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card, Table, Button, Space, Tag, Modal, Form, Input, InputNumber, Select, Tabs, message, Popconfirm, Cascader } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { PlusOutlined, EditOutlined, ReloadOutlined, StopOutlined, PlayCircleOutlined, UserSwitchOutlined, MonitorOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, ReloadOutlined, StopOutlined, PlayCircleOutlined, UserSwitchOutlined, MonitorOutlined, QrcodeOutlined, DownloadOutlined } from '@ant-design/icons';
 import { VenueStatus } from '@robot-race/shared';
 import api from '../../../utils/api';
 import { CITY_OPTIONS, getDistrictOptions } from '../../../utils/venueData';
@@ -72,6 +72,12 @@ function VenueTab() {
   const [globalMaxQueueSize, setGlobalMaxQueueSize] = useState(50);
   const [regionOptions, setRegionOptions] = useState<RegionOption[]>([]);
   const [form] = Form.useForm();
+
+  // 赛场小程序码
+  const [qrcodeModalOpen, setQrcodeModalOpen] = useState(false);
+  const [qrcodeVenue, setQrcodeVenue] = useState<VenueItem | null>(null);
+  const [qrcodeImage, setQrcodeImage] = useState('');
+  const [qrcodeLoading, setQrcodeLoading] = useState(false);
 
   // 绑定裁判员
   const [bindRefereeModalOpen, setBindRefereeModalOpen] = useState(false);
@@ -278,6 +284,29 @@ function VenueTab() {
     });
   };
 
+  const handleVenueQrcode = async (record: VenueItem) => {
+    setQrcodeVenue(record);
+    setQrcodeImage('');
+    setQrcodeLoading(true);
+    setQrcodeModalOpen(true);
+    try {
+      const res: any = await api.get(`/venues/${record.id}/qrcode`);
+      setQrcodeImage(res?.imageBase64 || '');
+    } catch (e: any) {
+      message.error(e?.message || '生成小程序码失败');
+    } finally {
+      setQrcodeLoading(false);
+    }
+  };
+
+  const handleDownloadQrcode = () => {
+    if (!qrcodeImage) return;
+    const link = document.createElement('a');
+    link.href = qrcodeImage;
+    link.download = `${qrcodeVenue?.name || '赛场'}_小程序码.jpg`;
+    link.click();
+  };
+
   const columns: ColumnsType<VenueItem> = [
     { title: '赛场名称', dataIndex: 'name', key: 'name', width: 160 },
     { title: '所在省市', key: 'region', width: 120,
@@ -305,6 +334,9 @@ function VenueTab() {
           </Button>
           <Button type="link" size="small" icon={<MonitorOutlined />} onClick={() => handleScreenUrl(record)}>
             现场大屏
+          </Button>
+          <Button type="link" size="small" icon={<QrcodeOutlined />} onClick={() => handleVenueQrcode(record)}>
+            赛场二维码
           </Button>
           <Button type="link" size="small" icon={<UserSwitchOutlined />} onClick={() => handleBindReferee(record)}>
             绑定裁判员
@@ -398,6 +430,35 @@ function VenueTab() {
             <Input.TextArea rows={3} placeholder="赛场描述（选填）" maxLength={500} />
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* 赛场小程序码弹窗 */}
+      <Modal
+        title={`赛场二维码 — ${qrcodeVenue?.name || ''}`}
+        open={qrcodeModalOpen}
+        onCancel={() => setQrcodeModalOpen(false)}
+        footer={[
+          <Button key="download" type="primary" icon={<DownloadOutlined />} disabled={!qrcodeImage} onClick={handleDownloadQrcode}>
+            下载
+          </Button>,
+          <Button key="close" onClick={() => setQrcodeModalOpen(false)}>关闭</Button>,
+        ]}
+        width={420}
+      >
+        <div style={{ textAlign: 'center', padding: '16px 0' }}>
+          {qrcodeLoading ? (
+            <div style={{ padding: 40, color: '#999' }}>生成中...</div>
+          ) : qrcodeImage ? (
+            <div>
+              <img src={qrcodeImage} alt="赛场小程序码" style={{ width: 280, height: 280, border: '1px solid #f0f0f0', borderRadius: 8 }} />
+              <p style={{ marginTop: 12, color: '#666', fontSize: 13 }}>
+                微信扫码进入小程序，自动绑定赛场
+              </p>
+            </div>
+          ) : (
+            <div style={{ padding: 40, color: '#999' }}>加载失败，请重试</div>
+          )}
+        </div>
       </Modal>
 
       {/* 绑定裁判员弹窗 */}

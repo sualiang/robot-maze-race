@@ -62,6 +62,51 @@ export async function getAccessToken(): Promise<string> {
 }
 
 /**
+ * 微信小程序 access_token
+ *
+ * 与 getAccessToken 独立缓存，因为小程序和公众号使用不同的 appId/secret。
+ * 注意：小程序和高频的公众号 access_token 必须分开管理，
+ * 否则相互覆盖导致接口调用失败。
+ */
+let cachedMiniToken: string | null = null;
+let miniTokenExpiresAt = 0;
+
+export async function getMiniProgramAccessToken(): Promise<string> {
+  const now = Date.now();
+
+  if (cachedMiniToken && now < miniTokenExpiresAt - 300_000) {
+    return cachedMiniToken;
+  }
+
+  const appId = process.env.WECHAT_APP_ID || config.wechat?.appId || '';
+  const secret = process.env.WECHAT_APP_SECRET || config.wechat?.appSecret || '';
+
+  if (!appId || !secret) {
+    throw new Error('微信小程序未配置（WECHAT_APP_ID / WECHAT_APP_SECRET）');
+  }
+
+  const url = `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${appId}&secret=${secret}`;
+  const resp = await fetch(url);
+  const data = (await resp.json()) as {
+    access_token: string;
+    expires_in: number;
+    errcode?: number;
+    errmsg?: string;
+  };
+
+  if (data.errcode && data.errcode !== 0) {
+    throw new Error(
+      `获取小程序 access_token 失败: ${data.errmsg || '未知错误'} (errcode=${data.errcode})`
+    );
+  }
+
+  cachedMiniToken = data.access_token;
+  miniTokenExpiresAt = now + (data.expires_in || 7200) * 1000;
+
+  return cachedMiniToken;
+}
+
+/**
  * 清除缓存的 access_token（用于强制刷新场景）
  */
 export function clearAccessTokenCache(): void {

@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { query, queryOne, execute } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
+import { createVenueMiniCode } from '../services/wechat-qrcode';
 import {
   ApiResponse,
   Venue,
@@ -458,6 +459,51 @@ router.put('/:id/referees', async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('[Venues] bind referees error:', error.message);
     return res.status(500).json({ code: 500, message: '绑定裁判失败', data: null });
+  }
+});
+
+/**
+ * GET /api/v1/venues/:id/qrcode
+ * 生成赛场带参数小程序码
+ *
+ * 调用微信 getwxacodeunlimit API，scene 携带 operator_id + venue_id，
+ * 用户扫码进入小程序后自动建立运营商上下文。
+ *
+ * 返回 base64 图片，前端可直接用 <img src="data:..."/> 预览。
+ */
+router.get('/:id/qrcode', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const venue = await queryOne<{ id: string; name: string; operator_id: string }>(
+      'SELECT id, name, operator_id FROM venues WHERE id = $1', [id]
+    );
+    if (!venue) {
+      return res.status(404).json({ code: 404, message: '赛场不存在', data: null });
+    }
+    if (!venue.operator_id) {
+      return res.status(400).json({ code: 400, message: '赛场未绑定运营商', data: null });
+    }
+
+    const { imageBase64, contentType } = await createVenueMiniCode(venue.operator_id, venue.id);
+
+    return res.json({
+      code: 0,
+      message: 'ok',
+      data: {
+        venueId: venue.id,
+        venueName: venue.name,
+        operatorId: venue.operator_id,
+        imageBase64: `data:${contentType};base64,${imageBase64}`,
+      },
+    });
+  } catch (error: any) {
+    console.error('[Venues] qrcode error:', error.message);
+    return res.status(500).json({
+      code: 500,
+      message: `生成小程序码失败: ${error.message}`,
+      data: null,
+    });
   }
 });
 
