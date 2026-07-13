@@ -49,7 +49,9 @@ export default function ScreenDisplay() {
   const [forfeitMessage, setForfeitMessage] = useState('');
   const [forfeitName, setForfeitName] = useState('');
   const [forfeitHint, setForfeitHint] = useState('');
-  const [closed, setClosed] = useState(false);
+  const [closed, setClosed] = useState(() => {
+    return sessionStorage.getItem('venue_closed') === 'true';
+  });
   const wsRef = useRef<WebSocket | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
