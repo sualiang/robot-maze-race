@@ -37,11 +37,6 @@ export default function ProfilePage() {
   const [venue, setVenue] = useState<VenueInfo | null>(null);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showPwdModal, setShowPwdModal] = useState(false);
-  const [oldPwd, setOldPwd] = useState('');
-  const [newPwd, setNewPwd] = useState('');
-  const [pwdMsg, setPwdMsg] = useState('');
-  const [pwdLoading, setPwdLoading] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [historyDate, setHistoryDate] = useState(new Date().toISOString().split('T')[0]);
   const [historyRecords, setHistoryRecords] = useState<AttendanceRecord[]>([]);
@@ -134,31 +129,6 @@ export default function ProfilePage() {
     navigate('/referee/login');
   };
 
-  // 修改密码
-  const handleChangePwd = async () => {
-    if (!oldPwd || !newPwd) { setPwdMsg('请填写旧密码和新密码'); return; }
-    setPwdLoading(true);
-    setPwdMsg('');
-    try {
-      const res = await fetch(`${BASE}/api/v1/auth/change-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-        body: JSON.stringify({ oldPassword: oldPwd, newPassword: newPwd }),
-      });
-      const data = await res.json();
-      if (data.code === 0) {
-        setPwdMsg('✅ 密码修改成功');
-        setOldPwd('');
-        setNewPwd('');
-      } else {
-        setPwdMsg(`❌ ${data.message || '修改失败'}`);
-      }
-    } catch (e) {
-      setPwdMsg('❌ 网络错误');
-    }
-    setPwdLoading(false);
-  };
-
   if (loading) {
     return (
       <div className="referee-page">
@@ -227,18 +197,8 @@ export default function ProfilePage() {
       {/* 功能按钮区 */}
       <div className="referee-card" style={{ padding: 16, marginTop: 16 }}>
         <button
-          className="referee-btn referee-btn-outline"
-          style={{ width: '100%', marginBottom: 8 }}
-          onClick={() => setShowPwdModal(true)}
-        >🔑 修改登录密码</button>
-        <button
-          className="referee-btn referee-btn-outline"
-          style={{ width: '100%', marginBottom: 8 }}
-          onClick={() => alert('NFC 硬件绑定功能开发中...')}
-        >📡 绑定 NFC 硬件</button>
-        <button
           className="referee-btn"
-          style={{ width: '100%', marginTop: 8, background: '#e74c3c', color: '#fff' }}
+          style={{ width: '100%', background: '#e74c3c', color: '#fff' }}
           onClick={handleLogout}
         >🚪 退出登录</button>
       </div>
@@ -301,36 +261,6 @@ export default function ProfilePage() {
               style={{ width: '100%', marginTop: 12, background: 'rgba(255,255,255,0.1)', color: 'var(--ref-text)' }}
               onClick={() => setShowHistoryModal(false)}
             >关闭</button>
-          </div>
-        </div>
-      )}
-
-      {/* 修改密码弹窗 */}
-      {showPwdModal && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
-          background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999,
-        }} onClick={() => setShowPwdModal(false)}>
-          <div className="referee-card" style={{ width: '85%', maxWidth: 340, padding: 24 }}
-            onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--ref-text)', marginBottom: 20 }}>修改密码</div>
-            <input
-              className="referee-input"
-              type="password" placeholder="旧密码" value={oldPwd}
-              onChange={(e) => setOldPwd(e.target.value)}
-              style={{ width: '100%', marginBottom: 12, padding: '12px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 15, outline: 'none' }}
-            />
-            <input
-              className="referee-input"
-              type="password" placeholder="新密码" value={newPwd}
-              onChange={(e) => setNewPwd(e.target.value)}
-              style={{ width: '100%', marginBottom: 12, padding: '12px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 15, outline: 'none' }}
-            />
-            {pwdMsg && <div style={{ fontSize: 13, marginBottom: 12, color: pwdMsg.includes('✅') ? '#27ae60' : '#e74c3c' }}>{pwdMsg}</div>}
-            <div style={{ display: 'flex', gap: 12 }}>
-              <button className="referee-btn" style={{ flex: 1, background: 'rgba(255,255,255,0.1)', color: 'var(--ref-text)' }} onClick={() => setShowPwdModal(false)}>取消</button>
-              <button className="referee-btn referee-btn-primary" style={{ flex: 1 }} onClick={handleChangePwd} disabled={pwdLoading}>{pwdLoading ? '修改中...' : '确认修改'}</button>
-            </div>
           </div>
         </div>
       )}
