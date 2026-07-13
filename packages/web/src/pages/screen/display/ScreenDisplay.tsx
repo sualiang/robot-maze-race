@@ -32,11 +32,7 @@ interface ScreenData {
 
 export default function ScreenDisplay() {
   // 激活守卫：未通过 ScreenLogin 激活则重定向回 /screen
-  // 签退后 venue_closed flag 在 sessionStorage，守卫不跳转，让覆盖层显示
   useEffect(() => {
-    if (sessionStorage.getItem('venue_closed') === 'true') {
-      return;
-    }
     if (sessionStorage.getItem('screen_activated') !== 'true') {
       window.location.replace('/screen');
     }
@@ -49,9 +45,7 @@ export default function ScreenDisplay() {
   const [forfeitMessage, setForfeitMessage] = useState('');
   const [forfeitName, setForfeitName] = useState('');
   const [forfeitHint, setForfeitHint] = useState('');
-  const [closed, setClosed] = useState(() => {
-    return sessionStorage.getItem('venue_closed') === 'true';
-  });
+  const [closed, setClosed] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -152,12 +146,10 @@ export default function ScreenDisplay() {
             setElapsed(screenData.elapsed_ms || 0);
           }
         } else if (msg.event === 'venue_closed') {
-          // 签退后设置 venue_closed flag，手刷后守卫不跳转，覆盖层正常显示
+          // 签退后清除激活标记，覆盖层显示；用户手刷后激活守卫放行，回到激活码页面
           sessionStorage.removeItem('screen_activated');
-          sessionStorage.setItem('venue_closed', 'true');
           setClosed(true);
         } else if (msg.event === 'venue_reopen') {
-          sessionStorage.removeItem('venue_closed');
           setClosed(false);
           setForfeitMessage('');
           setForfeitName('');
