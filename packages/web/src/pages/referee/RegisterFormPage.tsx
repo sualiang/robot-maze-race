@@ -4,12 +4,13 @@ import { message } from 'antd';
 import api from '../../utils/api';
 
 /**
- * 裁判注册表单 v3 — 扫码→客服消息推送→点链接到此页
- * 参数: invite_id, operator_id
+ * 裁判注册表单 v3 — 扫码→OAuth→填写姓名手机号
+ * 参数: invite_token（优先）| invite_id + operator_id（兼容旧链接）
  */
 export default function RegisterFormPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const inviteToken = searchParams.get('invite_token') || '';
   const inviteId = searchParams.get('invite_id') || '';
   const operatorId = searchParams.get('operator_id') || '';
   const [name, setName] = useState('');
@@ -17,26 +18,41 @@ export default function RegisterFormPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [inviteInfo, setInviteInfo] = useState<any>(null);
+  const [resolvedInviteId, setResolvedInviteId] = useState(inviteId);
+  const [resolvedOperatorId, setResolvedOperatorId] = useState(operatorId);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!inviteId) { setError('缺少邀请信息'); setLoading(false); return; }
-    api.get('/referee/invite/' + inviteId)
+    const lookup = inviteToken || inviteId;
+    if (!lookup) { setError('缺少邀请信息'); setLoading(false); return; }
+
+    api.get('/referee/invite/' + lookup)
       .then((data: any) => {
         setInviteInfo(data);
+        // Use the invite id from the response for registration
+        if (data?.id) setResolvedInviteId(data.id);
+        if (data?.operator_id) setResolvedOperatorId(data.operator_id);
         if (data?.status === 'expired') setError('该邀请链接已过期');
         else if (data?.status === 'used') setError('该邀请链接已被使用');
       })
       .catch((err: any) => setError(err?.response?.data?.message || err?.message || '获取邀请信息失败'))
       .finally(() => setLoading(false));
-  }, [inviteId]);
+  }, [inviteToken, inviteId]);
 
   const handleSubmit = async () => {
     if (!name.trim()) { message.warning('请填写姓名'); return; }
     if (!/^\d{11}$/.test(phone)) { message.warning('请填写正确的11位手机号'); return; }
     setSubmitting(true);
     try {
-      await api.post('/referee/register', { invite_id: inviteId, operator_id: operatorId, name: name.trim(), phone });
+      const payload: any = { name: name.trim(), phone };
+      // 优先用 invite_token（token），否则用 invite_id
+      if (inviteToken) {
+        payload.token = inviteToken;
+      } else {
+        payload.invite_id = resolvedInviteId;
+        payload.operator_id = resolvedOperatorId;
+      }
+      await api.post('/referee/register', payload);
       navigate('/referee/register-success', { replace: true });
     } catch (err: any) {
       message.error(err?.response?.data?.message || err?.message || '提交失败');

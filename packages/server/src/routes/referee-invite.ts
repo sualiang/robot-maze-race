@@ -57,11 +57,15 @@ router.post('/invite', authMiddleware, async (req: Request, res: Response) => {
        sceneStr || null, ticket || null, toStr(expiresAt), toStr(now), toStr(now)]
     );
 
+    const baseUrl = process.env.BASE_URL || `https://${req.get('host')}`;
+    const inviteUrl = `${baseUrl}/#/referee/invite?token=${token}`;
+
     return res.json({
       code: 0, message: '邀请生成成功',
       data: {
         id: inviteId,
         token,
+        invite_url: inviteUrl,
         qrcode_url: qrcodeUrl,
         scene_str: sceneStr,
         expires_at: toStr(expiresAt),
@@ -98,7 +102,7 @@ router.get('/invite/:inviteId', async (req: Request, res: Response) => {
     let operatorName = '', venueName = '';
     if (invite.operator_id) { const op = await queryOne<{ name: string }>('SELECT name FROM operators WHERE id=$1', [invite.operator_id]); operatorName = op?.name || ''; }
     if (invite.venue_id) { const v = await queryOne<{ name: string }>('SELECT name FROM venues WHERE id=$1', [invite.venue_id]); venueName = v?.name || ''; }
-    return res.json({ code: 0, message: 'ok', data: { operator_name: operatorName, venue_name: venueName, status: invite.status, expires_at: invite.expires_at, note: invite.note || '' } });
+    return res.json({ code: 0, message: 'ok', data: { id: invite.id, operator_id: invite.operator_id, operator_name: operatorName, venue_name: venueName, status: invite.status, expires_at: invite.expires_at, note: invite.note || '' } });
   } catch (error: any) {
     console.error('[RefereeInvite] get error:', error.message);
     return res.status(500).json({ code: 500, message: '获取邀请信息失败', data: null });
@@ -107,18 +111,25 @@ router.get('/invite/:inviteId', async (req: Request, res: Response) => {
 
 /**
  * POST /api/v1/referee/register
- * 裁判注册 v3：invite_id + operator_id + 姓名 + 手机号
+ * 裁判注册 v3：invite_id（或 token） + operator_id + 姓名 + 手机号
  */
 router.post('/register', async (req: Request, res: Response) => {
   try {
-    const { invite_id, operator_id, name, phone } = req.body;
-    if (!invite_id) return res.status(400).json({ code: 400, message: '缺少邀请ID', data: null });
+    const { invite_id, token, operator_id, name, phone } = req.body;
+    const lookupId = invite_id || token;
+    if (!lookupId) return res.status(400).json({ code: 400, message: '缺少邀请ID', data: null });
     if (!name || !phone) return res.status(400).json({ code: 400, message: '请填写姓名和手机号', data: null });
     if (!/^\d{11}$/.test(phone)) return res.status(400).json({ code: 400, message: '手机号格式不正确', data: null });
 
-    const invite = await queryOne<{ id: string; operator_id: string; venue_id: string; status: string; expires_at: string; openid: string }>(
-      'SELECT id, operator_id, venue_id, status, expires_at, openid FROM referee_invites WHERE id = $1', [invite_id]
+    // 支持 invite_id 或 token 查找邀请记录
+    let invite = await queryOne<{ id: string; operator_id: string; venue_id: string; status: string; expires_at: string; openid: string }>(
+      'SELECT id, operator_id, venue_id, status, expires_at, openid FROM referee_invites WHERE id = $1', [lookupId]
     );
+    if (!invite) {
+      invite = await queryOne<{ id: string; operator_id: string; venue_id: string; status: string; expires_at: string; openid: string }>(
+        'SELECT id, operator_id, venue_id, status, expires_at, openid FROM referee_invites WHERE token = $1', [lookupId]
+      );
+    }
     if (!invite) return res.status(400).json({ code: 400, message: '邀请链接无效', data: null });
     const now = new Date();
     if (now > new Date(invite.expires_at)) {
@@ -183,16 +194,68 @@ router.get('/invitations', authMiddleware, async (req: Request, res: Response) =
       `SELECT id, operator_id, phone, venue_id, token, note, status, openid, scene_str, ticket, expires_at, created_at, updated_at FROM referee_invites ${where} ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
       [...params, pageSize, offset]
     );
-    const enriched = list.map((inv: any) => ({
-      ...inv,
-      qrcode_url: inv.ticket
-        ? `https://mp.weixin.qq.com/cgi-bin/showqrcode?ticket=${encodeURIComponent(inv.ticket)}`
-        : '',
-    }));
+    const enriched = list.map((inv: any) => {
+      const baseUrl = process.env.BASE_URL || `https://${req.get('host')}`;
+      return {
+        ...inv,
+        invite_url: `${baseUrl}/#/referee/invite?token=${encodeURIComponent(inv.token)}`,
+        qrcode_url: inv.ticket
+          ? `https://mp.weixin.qq.com/cgi-bin/showqrcode?ticket=${encodeURIComponent(inv.ticket)}`
+          : '',
+      };
+    });
     return res.json({ code: 0, message: 'ok', data: { list: enriched, total, page, pageSize } });
   } catch (error: any) {
     console.error('[RefereeInvite] invitations error:', error.message);
     return res.status(500).json({ code: 500, message: '获取邀请列表失败', data: null });
+  }
+});
+
+/**
+ * GET /api/v1/referee/invite/:token/oauth
+ * 微信 OAuth 授权入口 — 校验 token 有效性 → 302 跳转微信授权页
+ */
+router.get('/invite/:token/oauth', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    if (!token) {
+      return res.status(400).json({ code: 400, message: '缺少邀请令牌', data: null });
+    }
+
+    // 校验邀请记录
+    const invite = await queryOne<{ id: string; status: string; expires_at: string }>(
+      'SELECT id, status, expires_at FROM referee_invites WHERE token = $1', [token]
+    );
+    if (!invite) {
+      return res.status(400).json({ code: 400, message: '邀请链接无效', data: null });
+    }
+    if (invite.status !== 'active' || new Date() > new Date(invite.expires_at)) {
+      return res.status(400).json({ code: 400, message: '邀请链接已过期', data: null });
+    }
+
+    const { appId } = config.wechatMp;
+    if (!appId) {
+      return res.status(500).json({ code: 500, message: '微信服务号未配置', data: null });
+    }
+
+    // 回调地址：OAuth 授权后回到当前 H5 页面
+    // 使用 hash 路由，确保 WeChat 回调的 ?code=xxx 能正确被 SPA useSearchParams 读取
+    const baseUrl = process.env.BASE_URL || `https://${req.get('host')}`;
+    const callbackUrl = `${baseUrl}/#/referee/invite?token=${encodeURIComponent(token)}`;
+    const redirectUri = encodeURIComponent(callbackUrl);
+
+    const wxUrl =
+      `https://open.weixin.qq.com/connect/oauth2/authorize?` +
+      `appid=${appId}&` +
+      `redirect_uri=${redirectUri}&` +
+      `response_type=code&` +
+      `scope=snsapi_userinfo&` +
+      `state=referee_invite#wechat_redirect`;
+
+    return res.redirect(wxUrl);
+  } catch (error: any) {
+    console.error('[RefereeInvite] oauth error:', error.message);
+    return res.status(500).json({ code: 500, message: '授权失败', data: null });
   }
 });
 

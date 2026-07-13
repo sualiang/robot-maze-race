@@ -4,16 +4,39 @@ import api from '../../utils/api';
 
 /**
  * 邀请引导页 v2
- * - 显示服务号二维码
+ * - 显示服务号二维码引导关注
+ * - 处理 OAuth 回调（微信回跳带 code）
  * - "我已关注，继续注册" -> OAuth
  */
 export default function InviteGuidePage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const token = searchParams.get('token') || '';
+  const code = searchParams.get('code') || '';
   const [inviteInfo, setInviteInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [oauthLoading, setOauthLoading] = useState(false);
+
+  // OAuth 回调处理：如果 URL 带有 code，说明刚从微信授权页回来
+  useEffect(() => {
+    if (code && token) {
+      setOauthLoading(true);
+      setError('');
+      api.post('/auth/wx-mp-login', { code })
+        .then((res: any) => {
+          localStorage.setItem('token', res.token);
+          localStorage.setItem('referee_user_info', JSON.stringify(res.user));
+          navigate(`/referee/register?invite_token=${encodeURIComponent(token)}`, { replace: true });
+        })
+        .catch((err: any) => {
+          const msg = err?.response?.data?.message || err?.message || '微信授权登录失败';
+          setError(msg);
+          setOauthLoading(false);
+        });
+      return;
+    }
+  }, [code, token, navigate]);
 
   useEffect(() => {
     if (!token) { setError('缺少邀请令牌'); setLoading(false); return; }
@@ -30,6 +53,20 @@ export default function InviteGuidePage() {
   const handleFollowed = () => {
     window.location.href = '/api/v1/referee/invite/' + token + '/oauth';
   };
+
+  if (oauthLoading) {
+    return (
+      <div className="referee-login-page">
+        <div className="referee-login-glow-1" /><div className="referee-login-glow-2" />
+        <div className="referee-login-box">
+          <div className="referee-login-card" style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>⏳</div>
+            <p style={{ color: 'rgba(255,255,255,0.6)', margin: 0 }}>正在验证微信授权...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
