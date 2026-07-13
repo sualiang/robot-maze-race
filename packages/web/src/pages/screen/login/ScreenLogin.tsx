@@ -147,6 +147,7 @@ export default function ScreenLogin() {
         <div style={{ fontSize: 56, marginBottom: 20 }}>🐕</div>
         <h1 style={{
           fontSize: 48, margin: 0, fontWeight: 800,
+          lineHeight: 1.2,
           background: 'linear-gradient(90deg, #ff6b35, #ff9a3c)',
           WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
         }}>
