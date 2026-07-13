@@ -66,7 +66,8 @@ export default function ScreenDisplay() {
 
   const connect = useCallback(() => {
     // 直接连后端 WebSocket，跳过 Vite proxy 避免 EPIPE 崩溃
-    const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:3000/ws/screen';
+    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const wsUrl = import.meta.env.VITE_WS_URL || `${protocol}://${window.location.host}/ws/screen`;
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
