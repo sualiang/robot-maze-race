@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ReloadOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import api from '../../../utils/api';
 
 export default function ScreenLogin() {
   const navigate = useNavigate();
@@ -13,6 +14,14 @@ export default function ScreenLogin() {
   const [expired, setExpired] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // 加载赛场名称
+  useEffect(() => {
+    if (!venueId) return;
+    api.get(`/venues/${venueId}`).then((res: any) => {
+      setVenueName(res.name || '');
+    }).catch(() => {});
+  }, [venueId]);
 
   // 激活后 2 秒自动跳转到大屏
   useEffect(() => {
@@ -129,6 +138,11 @@ export default function ScreenLogin() {
         <p style={{ fontSize: 20, color: '#888', marginTop: 8 }}>
           赛场大屏展示端
         </p>
+        {venueName && (
+          <p style={{ fontSize: 24, color: '#ff9a3c', marginTop: 4, fontWeight: 600 }}>
+            📍 {venueName}
+          </p>
+        )}
       </div>
 
       {/* 激活码展示区 */}
