@@ -392,7 +392,7 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response<ApiResp
     // 清理 users 表的 referee 角色关联（不删 user 本身，只清空 role）
     if (ref?.user_id) {
       await execute(
-        "UPDATE users SET role = NULL, updated_at = NOW() WHERE id = $1 AND role = 'referee'",
+        "UPDATE users SET role = 'player', updated_at = NOW() WHERE id = $1 AND role = 'referee'",
         [ref.user_id]
       );
     }
