@@ -235,12 +235,18 @@ function VenueTab() {
   };
 
   const handleScreenUrl = (record: VenueItem) => {
-    const url = `https://dog.amberrobot.com.cn/screen/display?venueId=${record.id}`;
+    const url = 'https://dog.amberrobot.com.cn/screen';
     const modal = Modal.info({
-      title: '现场大屏网址',
+      title: `现场大屏 — ${record.name}`,
       content: (
         <div>
-          <p style={{ marginBottom: 8 }}>赛场「{record.name}」的大屏地址：</p>
+          <p style={{ marginBottom: 12, color: '#333' }}>大屏激活流程：</p>
+          <ol style={{ paddingLeft: 20, marginBottom: 12, color: '#666', lineHeight: 2 }}>
+            <li>浏览器打开下方地址，进入大屏登录页</li>
+            <li>页面自动生成 <strong style={{ color: '#ff6b35' }}>6位数字激活码</strong></li>
+            <li>裁判员在裁判端输入该激活码完成绑定</li>
+            <li>激活后大屏自动跳转至赛场画面</li>
+          </ol>
           <div style={{
             background: '#f5f5f5',
             padding: '8px 12px',
