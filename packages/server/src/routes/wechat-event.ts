@@ -199,7 +199,7 @@ router.post('/event', async (req: Request, res: Response) => {
             `🏢 运营商：${companyName}`,
             '',
             '🔗 大屏链接（请发送给赛场工作人员）：',
-            `https://dog.amberrobot.com.cn/screen?venueId=${refRow.venue_id}`,
+            `https://dog.amberrobot.com.cn/screen/login?venueId=${refRow.venue_id}`,
             '',
             '工作人员打开链接后，输入裁判端「我的」页面显示的激活码即可激活大屏。',
           ].join('\n');
