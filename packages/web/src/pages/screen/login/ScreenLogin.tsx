@@ -102,7 +102,7 @@ export default function ScreenLogin() {
     return (
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center',
-        justifyContent: 'center', height: '100vh', gap: 24,
+        justifyContent: 'flex-start', minHeight: '100vh', gap: 24, padding: '5vh 24px 24px',
       }}>
         <div style={{
           width: 120, height: 120, borderRadius: '50%',
@@ -123,7 +123,7 @@ export default function ScreenLogin() {
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center',
-      justifyContent: 'center', height: '100vh', gap: 24, padding: 24,
+      justifyContent: 'flex-start', minHeight: '100vh', gap: 24, padding: '5vh 24px 24px',
     }}>
       {/* 标题 */}
       <div style={{ textAlign: 'center' }}>
