@@ -1566,21 +1566,6 @@ router.get('/mp-oauth', async (req: Request, res: Response) => {
       }
     }
 
-    // 如果是新裁判（is_new_user），创建 referees 记录
-    if (isNewUser && !refereeId) {
-      refereeId = uuidv4();
-      try {
-        await execute(
-          `INSERT INTO referees (id, user_id, name, phone, status, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, 'pending', NOW(), NOW())`,
-          [refereeId, user.id, user.nickname || '未设置', user.phone || '']
-        );
-      } catch (e: any) {
-        console.error('[Auth] mp-oauth create referee failed:', e.message);
-        refereeId = null;
-      }
-    }
-
     // 3. 生成 JWT
     const token = generateToken(user);
 
