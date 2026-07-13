@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Card, Table, Button, Space, Tag, Modal, Form, Input, InputNumber, Select, Tabs, message, Popconfirm, QRCode, Cascader } from 'antd';
+import { Card, Table, Button, Space, Tag, Modal, Form, Input, InputNumber, Select, Tabs, message, Popconfirm, Cascader } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { PlusOutlined, EditOutlined, QrcodeOutlined, DownloadOutlined, ReloadOutlined, StopOutlined, PlayCircleOutlined, UserSwitchOutlined, MonitorOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, ReloadOutlined, StopOutlined, PlayCircleOutlined, UserSwitchOutlined, MonitorOutlined } from '@ant-design/icons';
 import { VenueStatus } from '@robot-race/shared';
 import api from '../../../utils/api';
 import { CITY_OPTIONS, getDistrictOptions } from '../../../utils/venueData';
@@ -70,8 +70,6 @@ function VenueTab() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [globalMaxQueueSize, setGlobalMaxQueueSize] = useState(50);
-  const [qrModalOpen, setQrModalOpen] = useState(false);
-  const [qrVenue, setQrVenue] = useState<VenueItem | null>(null);
   const [regionOptions, setRegionOptions] = useState<RegionOption[]>([]);
   const [form] = Form.useForm();
 
@@ -236,11 +234,6 @@ function VenueTab() {
     }
   };
 
-  const handleShowQR = (record: VenueItem) => {
-    setQrVenue(record);
-    setQrModalOpen(true);
-  };
-
   const handleScreenUrl = (record: VenueItem) => {
     const url = `https://dog.amberrobot.com.cn/screen/display?venueId=${record.id}`;
     const modal = Modal.info({
@@ -279,18 +272,6 @@ function VenueTab() {
     });
   };
 
-  const downloadQR = () => {
-    const canvas = document.querySelector('.qr-canvas canvas') as HTMLCanvasElement;
-    if (canvas && qrVenue) {
-      const url = canvas.toDataURL('image/png');
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `venue-${qrVenue.name}-qr.png`;
-      a.click();
-      message.success('二维码已下载');
-    }
-  };
-
   const columns: ColumnsType<VenueItem> = [
     { title: '赛场名称', dataIndex: 'name', key: 'name', width: 160 },
     { title: '所在省市', key: 'region', width: 120,
@@ -310,7 +291,7 @@ function VenueTab() {
     },
     { title: '今日参赛', dataIndex: 'today_races', key: 'today_races', width: 80 },
     {
-      title: '操作', key: 'action', width: 380, fixed: 'right',
+      title: '操作', key: 'action', width: 320, fixed: 'right',
       render: (_: unknown, record: VenueItem) => (
         <Space size="small" wrap>
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
@@ -321,9 +302,6 @@ function VenueTab() {
           </Button>
           <Button type="link" size="small" icon={<UserSwitchOutlined />} onClick={() => handleBindReferee(record)}>
             绑定裁判员
-          </Button>
-          <Button type="link" size="small" icon={<QrcodeOutlined />} onClick={() => handleShowQR(record)}>
-            二维码
           </Button>
           {record.status === VenueStatus.OPEN ? (
             <Popconfirm title="确定关闭此赛场？" onConfirm={() => handleStatusChange(record.id, VenueStatus.CLOSED)}>
@@ -414,35 +392,6 @@ function VenueTab() {
             <Input.TextArea rows={3} placeholder="赛场描述（选填）" maxLength={500} />
           </Form.Item>
         </Form>
-      </Modal>
-
-      {/* 二维码弹窗 */}
-      <Modal
-        title={qrVenue ? `赛场二维码 - ${qrVenue.name}` : '赛场二维码'}
-        open={qrModalOpen}
-        onCancel={() => setQrModalOpen(false)}
-        footer={
-          <Button type="primary" icon={<DownloadOutlined />} onClick={downloadQR}>
-            下载二维码
-          </Button>
-        }
-        width={400}
-      >
-        {qrVenue && (
-          <div style={{ textAlign: 'center', padding: 24 }}>
-            <div className="qr-canvas">
-              <QRCode
-                value={`robotmaze://venue/${qrVenue.id}`}
-                size={200}
-                bordered={false}
-              />
-            </div>
-            <p style={{ marginTop: 16, color: '#666', fontSize: 13 }}>
-              赛场ID: {qrVenue.id}<br />
-              扫描二维码可进入此赛场
-            </p>
-          </div>
-        )}
       </Modal>
 
       {/* 绑定裁判员弹窗 */}
