@@ -45,6 +45,7 @@ export default function ScreenDisplay() {
   const [forfeitMessage, setForfeitMessage] = useState('');
   const [forfeitName, setForfeitName] = useState('');
   const [forfeitHint, setForfeitHint] = useState('');
+  const [closed, setClosed] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -145,10 +146,11 @@ export default function ScreenDisplay() {
             setElapsed(screenData.elapsed_ms || 0);
           }
         } else if (msg.event === 'venue_closed') {
-          // 签退后清除激活标记并跳回登录页，刷新后不会绕过激活守卫
+          // 签退后清除激活标记，显示原地覆盖层避免 WS 重连循环
           sessionStorage.removeItem('screen_activated');
-          window.location.replace('/screen');
+          setClosed(true);
         } else if (msg.event === 'venue_reopen') {
+          setClosed(false);
           setForfeitMessage('');
           setForfeitName('');
           setForfeitHint('');
@@ -346,6 +348,18 @@ export default function ScreenDisplay() {
             borderRadius: 2, marginTop: 8,
             animation: 'referee-pulse 1.5s ease-in-out infinite',
           }} />
+        </div>
+      )}
+      {/* 赛场已签退覆盖层 */}
+      {closed && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999, background: '#1a1a2e',
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          justifyContent: 'center', gap: 20,
+        }}>
+          <div style={{ fontSize: 64 }}>🏁</div>
+          <div style={{ fontSize: 32, color: '#fff', fontWeight: 700 }}>赛场已签退</div>
+          <div style={{ fontSize: 18, color: '#888' }}>请手动刷新页面重新激活大屏</div>
         </div>
       )}
       {/* 断网提示 */}
