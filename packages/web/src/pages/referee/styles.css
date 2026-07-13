@@ -269,7 +269,7 @@
 }
 
 .referee-btn-lg {
-  padding: 16px 24px;
+  padding: 14px 20px;
   font-size: 16px;
   border-radius: 14px;
 }
@@ -754,15 +754,16 @@
 .referee-timer-card {
   background: linear-gradient(135deg, rgba(26,26,46,0.95), rgba(26,26,46,0.85));
   color: #fff;
+  padding: 16px 16px;
   transition: background-color 0.3s;
 }
 
 /* 计时器数字 */
 .referee-timer-display {
-  padding: 16px 0;
+  padding: 8px 0;
 }
 .referee-timer-main {
-  font-size: 80px;
+  font-size: 56px;
   font-weight: 200;
   font-family: 'SF Mono', Menlo, Monaco, monospace;
   font-variant-numeric: tabular-nums;
@@ -804,7 +805,7 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  margin-top: 8px;
+  margin-top: 4px;
 }
 .referee-racer-avatar {
   width: 44px;
@@ -843,7 +844,7 @@
 
 /* 按钮区域 */
 .referee-actions {
-  margin-top: 20px;
+  margin-top: 12px;
 }
 
 /* 超时提示 */
