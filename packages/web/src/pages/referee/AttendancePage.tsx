@@ -181,7 +181,7 @@ export default function AttendancePage() {
         <div>
           <div className="referee-row-line"><span className="referee-row-label">赛场名称</span><span className="referee-row-value">{venueInfo.name}</span></div>
           <div className="referee-row-line"><span className="referee-row-label">地址</span><span className="referee-row-value">{venueInfo.address}</span></div>
-          <div className="referee-row-line"><span className="referee-row-label">签到时间</span><span className="referee-row-value">{checkInTime}</span></div>
+          <div className="referee-row-line"><span className="referee-row-label">签到时间</span><span className="referee-row-value">{checkInTime ? new Date(checkInTime).toLocaleString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '-'}</span></div>
           {durationText && <div className="referee-row-line"><span className="referee-row-label">已签到</span><span className="referee-row-value" style={{ color: '#e94560', fontWeight: 600 }}>{durationText}</span></div>}
           <div className="referee-row-line"><span className="referee-row-label">赛场状态</span><span className="referee-tag referee-tag-success">活跃</span></div>
         </div>
