@@ -1475,8 +1475,8 @@ router.get('/mp-oauth/authorize', (req: Request, res: Response) => {
   // 支持自定义回调路径（通过 redirect 参数），写死为 amberrobot.com.cn
   // 微信后台网页授权域名只配了 amberrobot.com.cn，子域名统一走此域名
   const customRedirect = req.query.redirect as string | undefined;
-  const defaultRedirect = `https://amberrobot.com.cn${customRedirect || '/referee/login'}`;
-  const redirectUri = encodeURIComponent(customRedirect || defaultRedirect);
+  const redirectPath = customRedirect || '/referee/login';
+  const redirectUri = encodeURIComponent(`https://amberrobot.com.cn${redirectPath}`);
 
   // state 传递回调地址，OAuth 回调后前端可以根据 state 决定跳转路径
   const stateParam = customRedirect

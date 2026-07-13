@@ -7,7 +7,6 @@
  * 文档: https://developers.weixin.qq.com/doc/offiaccount/Message_Management/Service_Center_messages.html
  */
 import { getAccessToken } from './wechat-token';
-import { queryOne } from '../config/database';
 
 /**
  * 发送裁判注册链接（文本消息）
@@ -23,14 +22,8 @@ export async function sendRegisterLink(
 ): Promise<void> {
   const accessToken = await getAccessToken();
 
-  // 获取邀请记录的 token
-  const invite = await queryOne<{ token: string }>(
-    'SELECT token FROM referee_invites WHERE id = $1', [inviteId]
-  );
-  const token = invite?.token || inviteId;
-
   const baseUrl = process.env.BASE_URL || 'https://dog.amberrobot.com.cn';
-  const registerUrl = `${baseUrl}/#/referee/invite?token=${encodeURIComponent(token)}`;
+  const registerUrl = `${baseUrl}/referee/register?invite_id=${encodeURIComponent(inviteId)}&operator_id=${encodeURIComponent(operatorId)}`;
 
   const content =
     `欢迎申请铁甲快狗裁判资格，请点击下方链接完成注册：\n\n` +

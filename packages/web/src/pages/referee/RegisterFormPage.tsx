@@ -4,55 +4,81 @@ import { message } from 'antd';
 import api from '../../utils/api';
 
 /**
- * 裁判注册表单 v3 — 扫码→OAuth→填写姓名手机号
- * 参数: invite_token（优先）| invite_id + operator_id（兼容旧链接）
+ * 裁判注册表单 v3 — 扫码→客服消息链接→此页→自动OAuth→填写姓名手机号
+ * 参数: invite_id + operator_id
+ *
+ * 流程:
+ *  1. 首次进入（无 code）→ 自动跳转微信 OAuth 授权
+ *  2. OAuth 回调（有 code）→ code 换登录态 → 展示表单
  */
 export default function RegisterFormPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const inviteToken = searchParams.get('invite_token') || '';
   const inviteId = searchParams.get('invite_id') || '';
   const operatorId = searchParams.get('operator_id') || '';
+  const code = searchParams.get('code') || '';
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [inviteInfo, setInviteInfo] = useState<any>(null);
-  const [resolvedInviteId, setResolvedInviteId] = useState(inviteId);
-  const [resolvedOperatorId, setResolvedOperatorId] = useState(operatorId);
   const [loading, setLoading] = useState(true);
 
+  // Step 1: 首次进入无 code → 自动触发 OAuth
   useEffect(() => {
-    const lookup = inviteToken || inviteId;
-    if (!lookup) { setError('缺少邀请信息'); setLoading(false); return; }
+    if (inviteId && !code) {
+      const redirectPath = `/referee/register?invite_id=${encodeURIComponent(inviteId)}&operator_id=${encodeURIComponent(operatorId)}`;
+      const oauthUrl = `/api/v1/auth/mp-oauth/authorize?redirect=${encodeURIComponent(redirectPath)}&scope=snsapi_userinfo`;
+      window.location.href = oauthUrl;
+      return;
+    }
+  }, [inviteId, operatorId, code]);
 
-    api.get('/referee/invite/' + lookup)
+  // Step 2: OAuth 回调 → 用 code 调用 GET /auth/mp-oauth 换 JWT
+  useEffect(() => {
+    if (!code) return;
+    setLoading(true);
+    api.get('/auth/mp-oauth?code=' + encodeURIComponent(code))
+      .then((res: any) => {
+        localStorage.setItem('token', res.token);
+        localStorage.setItem('referee_user_info', JSON.stringify(res.user));
+        // 清除 URL 中的 code/state 参数
+        const url = new URL(window.location.href);
+        url.searchParams.delete('code');
+        url.searchParams.delete('state');
+        window.history.replaceState({}, '', url.toString());
+        setLoading(false);
+      })
+      .catch((err: any) => {
+        setError('微信授权登录失败，请重新打开链接');
+        setLoading(false);
+      });
+  }, [code]);
+
+  // Step 3: 已登录 → 加载邀请信息
+  useEffect(() => {
+    if (!inviteId || !!code || loading) return;
+    api.get('/referee/invite/' + inviteId)
       .then((data: any) => {
         setInviteInfo(data);
-        // Use the invite id from the response for registration
-        if (data?.id) setResolvedInviteId(data.id);
-        if (data?.operator_id) setResolvedOperatorId(data.operator_id);
         if (data?.status === 'expired') setError('该邀请链接已过期');
         else if (data?.status === 'used') setError('该邀请链接已被使用');
       })
       .catch((err: any) => setError(err?.response?.data?.message || err?.message || '获取邀请信息失败'))
       .finally(() => setLoading(false));
-  }, [inviteToken, inviteId]);
+  }, [inviteId, code, loading]);
 
   const handleSubmit = async () => {
     if (!name.trim()) { message.warning('请填写姓名'); return; }
     if (!/^\d{11}$/.test(phone)) { message.warning('请填写正确的11位手机号'); return; }
     setSubmitting(true);
     try {
-      const payload: any = { name: name.trim(), phone };
-      // 优先用 invite_token（token），否则用 invite_id
-      if (inviteToken) {
-        payload.token = inviteToken;
-      } else {
-        payload.invite_id = resolvedInviteId;
-        payload.operator_id = resolvedOperatorId;
-      }
-      await api.post('/referee/register', payload);
+      await api.post('/referee/register', {
+        invite_id: inviteId,
+        operator_id: operatorId,
+        name: name.trim(),
+        phone,
+      });
       navigate('/referee/register-success', { replace: true });
     } catch (err: any) {
       message.error(err?.response?.data?.message || err?.message || '提交失败');
