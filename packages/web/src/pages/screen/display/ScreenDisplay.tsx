@@ -42,7 +42,6 @@ export default function ScreenDisplay() {
   const [elapsed, setElapsed] = useState(0);
   const [connected, setConnected] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
-  const [venueClosed, setVenueClosed] = useState(false);
   const [forfeitMessage, setForfeitMessage] = useState('');
   const [forfeitName, setForfeitName] = useState('');
   const [forfeitHint, setForfeitHint] = useState('');
@@ -146,9 +145,10 @@ export default function ScreenDisplay() {
             setElapsed(screenData.elapsed_ms || 0);
           }
         } else if (msg.event === 'venue_closed') {
-          setVenueClosed(true);
+          // 签退后清除激活标记并跳回登录页，刷新后不会绕过激活守卫
+          sessionStorage.removeItem('screen_activated');
+          window.location.replace('/screen');
         } else if (msg.event === 'venue_reopen') {
-          setVenueClosed(false);
           setForfeitMessage('');
           setForfeitName('');
           setForfeitHint('');
@@ -328,7 +328,7 @@ export default function ScreenDisplay() {
   return (
     <div className="screen-display" style={{ height: '100vh', width: '100vw', background: 'linear-gradient(135deg, #0a0a1a 0%, #1a1040 50%, #0d0d2b 100%)', fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", color: '#fff', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
       {/* 赛场未激活状态 */}
-      {displayData.venue_status === 'inactive' && !venueClosed && (
+      {displayData.venue_status === 'inactive' && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
           background: '#0a0a1a', zIndex: 9999,
@@ -346,19 +346,6 @@ export default function ScreenDisplay() {
             borderRadius: 2, marginTop: 8,
             animation: 'referee-pulse 1.5s ease-in-out infinite',
           }} />
-        </div>
-      )}
-      {/* 今日赛事结束浮层 */}
-      {venueClosed && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.85)', zIndex: 9999,
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          gap: 48,
-        }}>
-          <div style={{ fontSize: 80, marginBottom: 16 }}>🌙</div>
-          <div style={{ fontSize: 48, fontWeight: 700, color: '#ffd700', textShadow: '0 0 30px rgba(255,215,0,0.5)' }}>今日赛事结束</div>
-          <div style={{ fontSize: 20, color: '#aaa' }}>感谢各位选手与裁判的参与</div>
         </div>
       )}
       {/* 断网提示 */}
