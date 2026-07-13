@@ -207,11 +207,13 @@ export default function ProfilePage() {
       {showHistoryModal && (
         <div style={{
           position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
-          background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999,
+          background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999,
         }} onClick={() => setShowHistoryModal(false)}>
-          <div className="referee-card" style={{ width: '85%', maxWidth: 380, padding: 24, maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}
-            onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--ref-text)', marginBottom: 16 }}>查询签到/签退记录</div>
+          <div style={{
+            width: '85%', maxWidth: 380, padding: 24, maxHeight: '80vh', display: 'flex', flexDirection: 'column',
+            background: '#fff', borderRadius: 12,
+          }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#333', marginBottom: 16 }}>查询签到/签退记录</div>
             {/* 日期输入 */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
               <input
@@ -219,8 +221,8 @@ export default function ProfilePage() {
                 value={historyDate}
                 onChange={(e) => setHistoryDate(e.target.value)}
                 style={{
-                  flex: 1, padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)',
-                  background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 14, outline: 'none',
+                  flex: 1, padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd',
+                  background: '#f5f5f5', color: '#333', fontSize: 14, outline: 'none',
                 }}
               />
               <button
@@ -234,17 +236,17 @@ export default function ProfilePage() {
             {/* 查询结果 */}
             <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
               {historyRecords.length === 0 ? (
-                <div style={{ fontSize: 14, color: 'var(--ref-text-dim)', textAlign: 'center', padding: 20 }}>该日暂无签到记录</div>
+                <div style={{ fontSize: 14, color: '#999', textAlign: 'center', padding: 20 }}>该日暂无签到记录</div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {historyRecords.map((r) => (
                     <div key={r.id} style={{
                       display: 'flex', alignItems: 'flex-start',
-                      padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.04)',
-                      fontSize: 13, color: 'var(--ref-text-dim)',
+                      padding: '10px 12px', borderRadius: 8, background: '#f8f8f8',
+                      fontSize: 13, color: '#999',
                     }}>
                       <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
-                        <div style={{ color: 'var(--ref-text)', fontWeight: 500 }}>{formatDateOnly(r.checkin_at)}</div>
+                        <div style={{ color: '#333', fontWeight: 500 }}>{formatDateOnly(r.checkin_at)}</div>
                         <div style={{ fontSize: 12, opacity: 0.6, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.venue_name || r.venue_id}</div>
                       </div>
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -257,8 +259,7 @@ export default function ProfilePage() {
               )}
             </div>
             <button
-              className="referee-btn"
-              style={{ width: '100%', marginTop: 12, background: 'rgba(255,255,255,0.1)', color: 'var(--ref-text)' }}
+              style={{ width: '100%', marginTop: 12, padding: '10px 0', border: '1px solid #ddd', borderRadius: 8, background: '#f5f5f5', color: '#333', fontSize: 14, cursor: 'pointer' }}
               onClick={() => setShowHistoryModal(false)}
             >关闭</button>
           </div>
