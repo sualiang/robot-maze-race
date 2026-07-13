@@ -10,6 +10,7 @@ export default function ScreenLogin() {
   const [activationCode, setActivationCode] = useState('');
   const [activated, setActivated] = useState(false);
   const [venueName, setVenueName] = useState('');
+  const [venueClosed, setVenueClosed] = useState(false);
   const [countdown, setCountdown] = useState(60);
   const [expired, setExpired] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
@@ -19,7 +20,9 @@ export default function ScreenLogin() {
   useEffect(() => {
     if (!venueId) return;
     api.get(`/venues/${venueId}`).then((res: any) => {
-      setVenueName(res.name || '');
+      const v = res.data || res;
+      setVenueName(v.name || '');
+      if (v.status === 'closed') setVenueClosed(true);
     }).catch(() => {});
   }, [venueId]);
 
@@ -97,6 +100,20 @@ export default function ScreenLogin() {
     const code = generateCode();
     connectWS(code);
   };
+
+  // 赛场已关闭
+  if (venueClosed) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: 24, padding: 24 }}>
+        <div style={{ width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,77,79,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <span style={{ fontSize: 64 }}>🚫</span>
+        </div>
+        <h1 style={{ fontSize: 36, color: '#ff4d4f', margin: 0 }}>赛场已关闭</h1>
+        <p style={{ fontSize: 20, color: '#aaa', margin: 0 }}>本赛场目前处于关闭状态，无法激活大屏</p>
+        {venueName && <p style={{ fontSize: 18, color: '#888' }}>📍 {venueName}</p>}
+      </div>
+    );
+  }
 
   if (activated) {
     return (
