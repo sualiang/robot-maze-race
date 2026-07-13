@@ -32,7 +32,11 @@ interface ScreenData {
 
 export default function ScreenDisplay() {
   // 激活守卫：未通过 ScreenLogin 激活则重定向回 /screen
+  // 签退后 venue_closed flag 在 sessionStorage，守卫不跳转，让覆盖层显示
   useEffect(() => {
+    if (sessionStorage.getItem('venue_closed') === 'true') {
+      return;
+    }
     if (sessionStorage.getItem('screen_activated') !== 'true') {
       window.location.replace('/screen');
     }
@@ -146,10 +150,12 @@ export default function ScreenDisplay() {
             setElapsed(screenData.elapsed_ms || 0);
           }
         } else if (msg.event === 'venue_closed') {
-          // 签退后清除激活标记，显示原地覆盖层避免 WS 重连循环
+          // 签退后设置 venue_closed flag，手刷后守卫不跳转，覆盖层正常显示
           sessionStorage.removeItem('screen_activated');
+          sessionStorage.setItem('venue_closed', 'true');
           setClosed(true);
         } else if (msg.event === 'venue_reopen') {
+          sessionStorage.removeItem('venue_closed');
           setClosed(false);
           setForfeitMessage('');
           setForfeitName('');
