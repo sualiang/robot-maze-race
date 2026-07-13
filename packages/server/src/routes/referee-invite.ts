@@ -139,7 +139,13 @@ router.post('/register', async (req: Request, res: Response) => {
     }
     if (invite.status === 'used') return res.status(400).json({ code: 400, message: '邀请链接已被使用', data: null });
 
-    const existingReferee = await queryOne<{ id: string }>('SELECT id FROM referees WHERE phone = $1', [phone]);
+    // 同时查 referees 和 users 表（删除裁判后 users 表可能残留记录）
+    const existingReferee = await queryOne<{ id: string }>(
+      `SELECT r.id FROM referees r WHERE r.phone = $1
+       UNION ALL
+       SELECT u.id FROM users u WHERE u.phone = $1 AND u.role = 'referee'`,
+      [phone]
+    );
     if (existingReferee) return res.status(400).json({ code: 400, message: '该手机号已被注册为裁判', data: null });
 
     const nowStr = now.toISOString().replace('T', ' ').substring(0, 19);

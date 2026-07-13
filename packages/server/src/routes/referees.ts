@@ -375,6 +375,11 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response<ApiResp
       return res.status(403).json({ code: 403, message: '仅管理员或运营商可删除裁判记录', data: null });
     }
 
+    // 先取 user_id 再删裁判，同时清理 users 表残留
+    const ref = await queryOne<{ user_id: string }>(
+      'SELECT user_id FROM referees WHERE id = $1', [id]
+    );
+
     const result = await execute(
       'DELETE FROM referees WHERE id = $1',
       [id]
@@ -382,6 +387,14 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response<ApiResp
 
     if (result.changes === 0) {
       return res.status(404).json({ code: 404, message: '裁判记录不存在', data: null });
+    }
+
+    // 清理 users 表的 referee 角色关联（不删 user 本身，只清空 role）
+    if (ref?.user_id) {
+      await execute(
+        "UPDATE users SET role = NULL, updated_at = NOW() WHERE id = $1 AND role = 'referee'",
+        [ref.user_id]
+      );
     }
 
     return res.json({ code: 0, message: '裁判记录已删除', data: null });
