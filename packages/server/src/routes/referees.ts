@@ -341,8 +341,8 @@ router.put('/:id/bind-venue', authMiddleware, async (req: Request, res: Response
     }
 
     await execute(
-      'UPDATE referees SET venue_id = $1, updated_at = $2 WHERE id = $3',
-      [venue_id, new Date().toISOString(), id]
+      'UPDATE referees SET venue_id = $1, updated_at = NOW() WHERE id = $2',
+      [venue_id, id]
     );
     const referee = await queryOne<Referee>(
       'SELECT id, user_id, venue_id, phone, id_number, cert_image, id_card_front, id_card_back last_checkin_at, created_at, updated_at FROM referees WHERE id = $1',
@@ -549,7 +549,7 @@ router.post('/match/select-racer', authMiddleware, async (req: Request, res: Res
       venue_name: cachedVenueName,
       venue_id: cachedVenueId,
       leaderboard: getLeaderboard(),
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toLocaleString('zh-CN'),
     });
   } catch (e: any) {
     console.error('[广播] select-racer 广播失败:', e.message);
@@ -591,7 +591,7 @@ router.post('/match/start', authMiddleware, async (_req: Request, res: Response)
       venue_name: cachedVenueName,
       venue_id: cachedVenueId,
       leaderboard: getLeaderboard(),
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toLocaleString('zh-CN'),
     });
   } catch (e: any) {
     console.error('[广播] start 广播失败:', e.message);
@@ -694,7 +694,7 @@ router.post('/match/end', authMiddleware, async (req: Request, res: Response) =>
       venue_name: cachedVenueName,
       venue_id: cachedVenueId,
       leaderboard: getLeaderboard(),
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toLocaleString('zh-CN'),
     });
   } catch (e: any) {
     console.error('[广播] end 广播失败:', e.message);
@@ -730,7 +730,7 @@ router.post('/match/re-enter', authMiddleware, async (_req: Request, res: Respon
     venue_name: cachedVenueName,
     venue_id: cachedVenueId,
     leaderboard: getLeaderboard(),
-    timestamp: new Date().toISOString(),
+    timestamp: new Date().toLocaleString('zh-CN'),
   });
 
   return res.json({
@@ -973,7 +973,7 @@ router.post('/attendance/check-in', authMiddleware, async (req: Request, res: Re
 
     // 执行签到记录插入
     const id = uuidv4();
-    const now = new Date().toISOString();
+    const now = new Date().toLocaleString('zh-CN');
     await execute(
       'INSERT INTO attendance (id, referee_id, venue_id, checkin_at) VALUES ($1, $2, $3, NOW())',
       [id, refereeId, finalVenueId]
@@ -1034,7 +1034,7 @@ router.post('/attendance/check-out', authMiddleware, async (req: Request, res: R
     if (!ref) return res.status(401).json({ code: 401, message: '未找到裁判记录', data: null });
     const refereeId = ref.id;
 
-    const now = new Date().toISOString();
+    const now = new Date().toLocaleString('zh-CN');
     await execute(
       `UPDATE attendance SET checkout_at = NOW() WHERE referee_id = $1 AND date(checkin_at) = CURDATE() AND checkout_at IS NULL`,
       [refereeId]
@@ -1136,7 +1136,7 @@ router.post('/attendance/check-in-by-qr', authMiddleware, async (req: Request, r
 
     // 5. 写入 attendance 签到记录
     const attendanceId = uuidv4();
-    const now = new Date().toISOString();
+    const now = new Date().toLocaleString('zh-CN');
     await execute(
       'INSERT INTO attendance (id, referee_id, user_id, venue_id, checkin_at) VALUES ($1, $2, $3, $4, NOW())',
       [attendanceId, refRow.id, userId, venue.id]
@@ -1282,7 +1282,7 @@ export function getCurrentScreenData() {
       finishTimeMs: mockCurrentRacer.elapsed,
       isTimeout: false,
     } : undefined,
-    timestamp: new Date().toISOString(),
+    timestamp: new Date().toLocaleString('zh-CN'),
   };
 }
 
@@ -1354,8 +1354,7 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response<ApiRespo
       return res.status(400).json({ code: 400, message: '没有需要更新的字段', data: null });
     }
 
-    fields.push(`updated_at = $${paramIdx++}`);
-    values.push(new Date().toISOString());
+    fields.push('updated_at = NOW()');
     values.push(id);
 
     await query(
