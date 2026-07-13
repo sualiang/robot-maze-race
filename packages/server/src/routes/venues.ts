@@ -152,7 +152,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response<ApiResponse<
     const id = uuidv4();
     // admin可传入operator_id指定所属运营商，否则从operators表查
     const operatorId = (body as any).operator_id;
-    const effectiveOperatorId = operatorId || await getEffectiveOperatorId(req.user!.userId);
+    const effectiveOperatorId = operatorId || (req.user as any).operatorId || await getEffectiveOperatorId(req.user!.userId);
     if (!effectiveOperatorId) {
       return res.status(400).json({ code: 400, message: '无法确定运营商，请联系管理员', data: null as any });
     }
