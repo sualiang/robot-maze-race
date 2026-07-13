@@ -7,6 +7,7 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { logger, responseTime } from './middleware/logger';
 import { config } from './config';
 import { initSchema } from './config/database';
+import { createMenu } from './services/wechat-menu';
 import { setupWebSocket } from './ws/handler';
 
 // 路由
@@ -56,6 +57,9 @@ const PORT = config.port || 3000;
 // 初始化数据库（启动时自动建表）
 // ============================================================
 initSchema();
+
+// 创建微信服务号自定义菜单（非阻塞，失败不影响服务启动）
+createMenu().catch((e: any) => console.error('[Server] 微信菜单创建失败:', e.message));
 
 // ============================================================
 // 基础中间件

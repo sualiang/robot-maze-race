@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import { config } from '../config';
-import { queryOne, query } from '../config/database';
+import { queryOne, query, execute } from '../config/database';
+import { sendRegisterLink } from '../services/wechat-message';
 
 const router = Router();
 
@@ -156,65 +157,49 @@ router.post('/callback', async (req: Request, res: Response) => {
 
     // 4. 处理事件
     if (msgType === 'event') {
-      if (event === 'subscribe') {
-        // 用户关注服务号 → 查 referee_invites 是否有此 openid 的活跃邀请
-        console.log(`[WechatCallback] subscribe 事件: openid=${fromUserName}`);
+      if (event === 'subscribe' || event === 'SCAN') {
+        console.log(`[WechatCallback] ${event} 事件: openid=${fromUserName}, EventKey=${msg.EventKey}`);
 
-        const invite = await queryOne<{
-          id: string;
-          token: string;
-          operator_id: string;
-          note: string;
-        }>(
-          `SELECT id, token, operator_id, note
-           FROM referee_invites
-           WHERE openid = $1 AND status = 'active'
-           ORDER BY created_at DESC LIMIT 1`,
-          [fromUserName]
-        );
+        // 解析 EventKey 提取 inviteId
+        // subscribe: EventKey = "qrscene_referee_invite_{inviteId}"
+        // SCAN:      EventKey = "referee_invite_{inviteId}"
+        const eventKey = (msg.EventKey || '').replace(/^qrscene_/, '');
+        const sceneMatch = eventKey.match(/^referee_invite_(.+)$/);
 
-        if (invite) {
-          // 找到邀请 → 回复图文消息（邀请链接）
-          const inviteUrl = `https://dog.amberrobot.com.cn/referee/register?token=${invite.token}`;
-          const operatorNote = invite.note || '您收到一个赛事裁判注册邀请';
-
-          console.log(`[WechatCallback] 匹配到邀请 invite_id=${invite.id}, 回复邀请链接`);
-
+        if (sceneMatch) {
+          const inviteId = sceneMatch[1];
+          // 查 DB 获取 operator_id
+          const invite = await queryOne<{ id: string; operator_id: string }>(
+            'SELECT id, operator_id FROM referee_invites WHERE id = $1', [inviteId]
+          );
+          if (invite) {
+            // 写入 openid
+            await execute(
+              'UPDATE referee_invites SET openid=$1, updated_at=NOW() WHERE id=$2 AND openid IS NULL',
+              [fromUserName, inviteId]
+            );
+            // 推送客服消息
+            try {
+              await sendRegisterLink(fromUserName, inviteId, invite.operator_id);
+              console.log(`[WechatCallback] 已推送注册链接: inviteId=${inviteId}`);
+            } catch (e: any) {
+              console.error('[WechatCallback] 客服消息推送失败:', e.message);
+            }
+          } else {
+            console.log(`[WechatCallback] 未找到邀请记录: inviteId=${inviteId}`);
+          }
+        } else {
+          // 普通关注/扫码（无邀请场景）→ 回复欢迎语
           return res
             .type('application/xml')
             .send(
-              buildNewsReply(fromUserName, toUserName, [
-                {
-                  title: '赛事裁判注册邀请',
-                  description: operatorNote,
-                  picUrl: 'https://dog.amberrobot.com.cn/logo-avatar.png',
-                  url: inviteUrl,
-                },
-              ])
+              buildTextReply(
+                fromUserName,
+                toUserName,
+                '欢迎关注安博天智！\n\n点击菜单栏「裁判入口」进入裁判工作台。如需注册，请联系运营商获取邀请链接。'
+              )
             );
         }
-
-        // 没有匹配的邀请 → 普通关注欢迎语
-        return res
-          .type('application/xml')
-          .send(
-            buildTextReply(
-              fromUserName,
-              toUserName,
-              '欢迎关注安博天智！\n\n点击菜单栏「裁判入口」进入裁判工作台。如需注册，请联系运营商获取邀请链接。'
-            )
-          );
-      }
-
-      if (event === 'unsubscribe') {
-        console.log(`[WechatCallback] unsubscribe 事件: openid=${fromUserName}`);
-        return res.send('success');
-      }
-
-      if (event === 'SCAN') {
-        // 已关注用户扫码
-        console.log(`[WechatCallback] SCAN 事件: openid=${fromUserName}`);
-        return res.send('success');
       }
 
       // 菜单点击事件
