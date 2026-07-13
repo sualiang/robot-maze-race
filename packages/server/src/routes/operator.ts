@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config';
 import { query, queryOne, execute, generateSecurePassword } from '../config/database';
 import { authMiddleware, AuthPayload } from '../middleware/auth';
-import pcaCodeData from '../../../shared/src/pca-code.json';
+import pcaCodeData from '../pca-code.json';
 
 
 const router = Router();
