@@ -184,8 +184,12 @@ app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 // 客户端错误日志（无需鉴权）
 app.use('/api/v1', clientLogRoutes);
 
+// 玩家运营商上下文
+import playerContextRoutes from './routes/player-context';
+
 // 首页公告栏
 import announcementRoutes from './routes/announcement';
+app.use('/api/v1', playerContextRoutes);
 app.use('/api/v1/announcement', announcementRoutes);
 
 // ============================================================
