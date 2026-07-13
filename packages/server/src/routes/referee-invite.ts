@@ -44,7 +44,7 @@ router.post('/invite', authMiddleware, async (req: Request, res: Response) => {
       const qrResult = await createRefereeQRCode(inviteId);
       ticket = qrResult.ticket;
       qrcodeUrl = qrResult.qrcodeUrl;
-      sceneStr = `referee_invite_${operatorId}_${inviteId}`;
+      sceneStr = `referee_invite_${inviteId}`;
     } catch (e: any) {
       // 二维码生成失败不阻塞 — 降级为普通 token 链接
       console.error('[RefereeInvite] 二维码生成失败:', e.message);
