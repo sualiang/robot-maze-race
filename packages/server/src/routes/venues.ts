@@ -142,15 +142,26 @@ router.post('/', authMiddleware, async (req: Request, res: Response<ApiResponse<
     }
 
     const id = uuidv4();
-    // admin可传入operator_id指定所属运营商，否则用登录用户id
-    const operatorId = (body as any).operator_id || req.user!.userId;
+    // admin可传入operator_id指定所属运营商，否则从operators表查
+    const inputOpId = (body as any).operator_id as string | undefined;
+    let effectiveOperatorId: string;
 
-    // 校验 operator_id 有效性
-    if ((body as any).operator_id) {
-      const operator = await queryOne<{ id: string }>('SELECT id FROM operators WHERE id = $1', [operatorId]);
+    if (inputOpId) {
+      // 校验传入的 operator_id 有效性
+      const operator = await queryOne<{ id: string }>('SELECT id FROM operators WHERE id = $1', [inputOpId]);
       if (!operator) {
         return res.status(400).json({ code: 400, message: '运营商不存在，请选择有效的运营商', data: null as any });
       }
+      effectiveOperatorId = inputOpId;
+    } else {
+      // 不传时通过 created_by（users 表 ID）查 operators 表
+      const op = await queryOne<{ id: string }>(
+        'SELECT id FROM operators WHERE created_by = $1', [req.user!.userId]
+      );
+      if (!op) {
+        return res.status(400).json({ code: 400, message: '无法确定运营商，请联系管理员', data: null as any });
+      }
+      effectiveOperatorId = op.id;
     }
 
     // 读取系统默认分润比例
@@ -179,7 +190,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response<ApiResponse<
         body.city || '',
         body.district || '',
         body.description || null,
-        operatorId,
+        effectiveOperatorId,
         defaultRate,
       ]
     );
