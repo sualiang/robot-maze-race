@@ -1210,6 +1210,11 @@ router.get('/attendance/records', authMiddleware, async (req: Request, res: Resp
 
     sql += ' ORDER BY a.checkin_at DESC';
 
+    // 无日期参数时限制最近 5 条，按日期查不做限制
+    if (!date) {
+      sql += ' LIMIT 5';
+    }
+
     const records = await query<any>(sql, params);
 
     return res.json({ code: 0, message: 'ok', data: records });
