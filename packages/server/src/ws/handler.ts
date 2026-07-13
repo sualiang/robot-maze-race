@@ -9,6 +9,36 @@ const clientRooms = new Map<WebSocket, string>();
 const screenClients = new Set<WebSocket>();
 const refereeClients = new Set<WebSocket>();
 
+// 激活码映射: code → { ws, venueId?, venueName?, createdAt }
+const activationCodes = new Map<string, {
+  ws: WebSocket;
+  venueId?: string;
+  venueName?: string;
+  createdAt: number;
+}>();
+
+const ACTIVATION_CODE_TTL = 60_000; // 60秒
+
+function cleanExpiredCodes() {
+  const now = Date.now();
+  for (const [code, entry] of activationCodes.entries()) {
+    if (now - entry.createdAt > ACTIVATION_CODE_TTL) {
+      activationCodes.delete(code);
+    }
+  }
+}
+
+export function validateActivationCode(code: string): { valid: boolean; ws?: WebSocket; venueId?: string; venueName?: string } {
+  cleanExpiredCodes();
+  const entry = activationCodes.get(code);
+  if (!entry) return { valid: false };
+  if (Date.now() - entry.createdAt > ACTIVATION_CODE_TTL) {
+    activationCodes.delete(code);
+    return { valid: false };
+  }
+  return { valid: true, ws: entry.ws, venueId: entry.venueId, venueName: entry.venueName };
+}
+
 function handleConnection(ws: WebSocket, req: IncomingMessage) {
   console.log('[WS] 客户端已连接:', req.url);
 
@@ -38,6 +68,10 @@ function handleConnection(ws: WebSocket, req: IncomingMessage) {
 function handleClose(ws: WebSocket) {
   screenClients.delete(ws);
   refereeClients.delete(ws);
+  // 清理该 ws 对应的激活码映射
+  for (const [code, entry] of activationCodes.entries()) {
+    if (entry.ws === ws) activationCodes.delete(code);
+  }
   const room = clientRooms.get(ws);
   if (room) {
     const clients = rooms.get(room);
@@ -82,6 +116,25 @@ function handleMessage(ws: WebSocket, msg: any) {
       // 客户端主动请求当前数据
       const data = getCurrentScreenData();
       ws.send(JSON.stringify({ type: 'screen_data', data }));
+      break;
+    }
+
+    case 'screen_login': {
+      // 大屏生成激活码后注册映射
+      const code = msg.activation_code;
+      if (!code || typeof code !== 'string') break;
+      cleanExpiredCodes();
+      activationCodes.set(code, { ws, createdAt: Date.now() });
+      ws.send(JSON.stringify({ type: 'login_ack', message: '等待裁判扫码' }));
+      break;
+    }
+
+    case 'get_activation_code': {
+      // 查询有效激活码列表（不暴露 ws 对象）
+      cleanExpiredCodes();
+      const codes: string[] = [];
+      activationCodes.forEach((_entry, c) => codes.push(c));
+      ws.send(JSON.stringify({ type: 'activation_codes', codes }));
       break;
     }
 

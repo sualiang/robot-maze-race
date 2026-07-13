@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { QRCode } from 'antd';
 import { ReloadOutlined, CheckCircleOutlined, LoadingOutlined } from '@ant-design/icons';
 
 export default function ScreenLogin() {
+  const navigate = useNavigate();
   const [activationCode, setActivationCode] = useState('');
   const [activated, setActivated] = useState(false);
   const [venueName, setVenueName] = useState('');
@@ -10,6 +12,15 @@ export default function ScreenLogin() {
   const [expired, setExpired] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // 激活后 2 秒自动跳转到大屏
+  useEffect(() => {
+    if (!activated) return;
+    const timer = setTimeout(() => {
+      navigate('/screen/display', { replace: true });
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [activated, navigate]);
 
   const generateCode = useCallback(() => {
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -75,7 +86,6 @@ export default function ScreenLogin() {
     connectWS(code);
   };
 
-  // 已激活状态
   if (activated) {
     return (
       <div style={{

@@ -19,6 +19,8 @@ export default function AttendancePage() {
   const [durationText, setDurationText] = useState('');
   const [pageLoading, setPageLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
+  const [showScanner, setShowScanner] = useState(false);
+  const [scanError, setScanError] = useState('');
   const checkInTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const destroyedRef = useRef(false);
 
@@ -53,18 +55,21 @@ export default function AttendancePage() {
     }
   };
 
-  const checkIn = async () => {
-    setActionLoading(true); setStatus('loading');
+  const scanAndCheckIn = async (activationCode: string) => {
+    setShowScanner(false);
+    setStatus('loading');
     try {
-      const res: any = await api.post('/referees/attendance/check-in', { venueId: venueInfo?.id || 'default_venue_001' });
-      const vi = res.venueInfo || { id: 'default_venue_001', name: '默认赛场', address: '' };
-      setStatus('checked'); setVenueInfo(vi); setCheckInTime(res.checkinAt || new Date().toISOString());
+      const res: any = await api.post('/referees/attendance/check-in-by-qr', { activationCode });
+      const vi = { id: res.venueId, name: res.venueName, address: '' };
+      setStatus('checked'); setVenueInfo(vi); setCheckInTime(res.checkinAt);
       localStorage.setItem('referee_venue', JSON.stringify(vi)); startCheckInTimer();
-      setErrorMsg('✅ 签到成功！赛场已激活'); setTimeout(() => setErrorMsg(''), 2000);
+      setErrorMsg('✅ 签到成功！赛场已激活');
+      setTimeout(() => setErrorMsg(''), 2000);
     } catch (e: any) {
-      console.error('[签到] 签到失败:', e);
       setStatus('unchecked');
-    } finally { setActionLoading(false); }
+      setScanError(e?.message || '激活码无效，请重试');
+      setTimeout(() => setScanError(''), 3000);
+    }
   };
 
   const checkOut = async () => {
@@ -114,7 +119,49 @@ export default function AttendancePage() {
             {status === 'checked' ? '已签到 · 赛场激活中' : status === 'loading' ? '签到中...' : '未签到'}
           </span>
         </div>
-        {status === 'unchecked' && <button className="referee-btn referee-btn-success referee-btn-lg" onClick={checkIn} disabled={actionLoading}>📍 签到激活赛场</button>}
+
+        {/* 未签到 — 扫码入口 */}
+        {status === 'unchecked' && !showScanner && (
+          <button className="referee-btn referee-btn-success referee-btn-lg"
+            onClick={() => setShowScanner(true)} disabled={actionLoading}>
+            📷 扫描大屏二维码签到
+          </button>
+        )}
+
+        {/* 扫码输入区 */}
+        {showScanner && (
+          <div style={{ textAlign: 'center', padding: '12px 0' }}>
+            <p style={{ color: '#666', fontSize: 14, marginBottom: 12 }}>
+              请对准大屏上的二维码，或手动输入激活码
+            </p>
+            <input
+              type="text"
+              placeholder="输入6位激活码"
+              maxLength={6}
+              autoFocus
+              style={{
+                width: '100%', padding: '12px', fontSize: 20,
+                textAlign: 'center', letterSpacing: 8, borderRadius: 8,
+                border: '1px solid #ddd', boxSizing: 'border-box',
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const input = (e.target as HTMLInputElement).value.trim().toUpperCase();
+                  if (input.length === 6) scanAndCheckIn(input);
+                  else setScanError('请输入6位激活码');
+                }
+              }}
+            />
+            {scanError && (
+              <p style={{ color: '#e74c3c', fontSize: 13, marginTop: 8 }}>{scanError}</p>
+            )}
+            <button onClick={() => { setShowScanner(false); setScanError(''); }}
+              style={{ marginTop: 12, background: 'none', border: 'none', color: '#999', cursor: 'pointer', fontSize: 14 }}>
+              取消
+            </button>
+          </div>
+        )}
+
         {status === 'checked' && <button className="referee-btn referee-btn-danger referee-btn-lg" onClick={checkOut} disabled={actionLoading}>🏁 签退暂停赛场</button>}
         {status === 'loading' && <button className="referee-btn referee-btn-primary referee-btn-lg" disabled>⏳ 处理中...</button>}
       </div>

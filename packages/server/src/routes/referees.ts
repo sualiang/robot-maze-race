@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { broadcastToScreen } from '../ws/handler';
+import { broadcastToScreen, validateActivationCode } from '../ws/handler';
+import { WebSocket } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
 import { query, queryOne, execute } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
@@ -1050,6 +1051,97 @@ router.post('/attendance/check-out', authMiddleware, async (req: Request, res: R
   } catch (error: any) {
     console.error('[Referee] 签退失败:', error.message);
     return res.status(500).json({ code: 500, message: '签退失败', data: null });
+  }
+});
+
+/**
+ * POST /attendance/check-in-by-qr
+ * 裁判扫大屏二维码签到 + 激活大屏
+ */
+router.post('/attendance/check-in-by-qr', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { activationCode } = req.body;
+    if (!activationCode) {
+      return res.status(400).json({ code: 400, message: '缺少激活码', data: null });
+    }
+
+    // 1. 验证激活码
+    const validation = validateActivationCode(activationCode);
+    if (!validation.valid) {
+      return res.status(400).json({ code: 400, message: '激活码无效或已过期，请刷新大屏二维码', data: null });
+    }
+
+    const userId = req.user!.userId;
+    if (!userId) return res.status(401).json({ code: 401, message: '未登录', data: null });
+
+    // 2. 从 referees 表查真实 referee_id
+    const refRow = await queryOne<{ id: string }>(
+      'SELECT id FROM referees WHERE user_id = $1', [userId]
+    );
+    if (!refRow) {
+      return res.status(400).json({ code: 400, message: '未找到裁判记录，请先完成注册', data: null });
+    }
+
+    // 3. 取第一个可用场地
+    const venue = await queryOne<{ id: string; name: string; address: string }>(
+      'SELECT id, name, COALESCE(address, \'\') as address FROM venues LIMIT 1'
+    );
+    if (!venue) {
+      return res.status(500).json({ code: 500, message: '没有可用赛场', data: null });
+    }
+
+    // 4. 查今日是否已签到且未签退
+    const existing = await queryOne<any>(
+      `SELECT id FROM attendance
+       WHERE referee_id = $1 AND date(checkin_at) = CURDATE() AND checkout_at IS NULL
+       LIMIT 1`,
+      [refRow.id]
+    );
+    if (existing) {
+      return res.status(400).json({ code: 400, message: '今日已签到，请先签退', data: null });
+    }
+
+    // 5. 写入 attendance 签到记录
+    const now = new Date().toISOString();
+    const attendanceId = uuidv4();
+    await execute(
+      'INSERT INTO attendance (id, referee_id, user_id, venue_id, checkin_at) VALUES ($1, $2, $3, $4, $5)',
+      [attendanceId, refRow.id, userId, venue.id, now]
+    );
+
+    // 6. 更新 referees 表最后签到时间
+    await execute('UPDATE referees SET last_checkin_at = $1 WHERE id = $2', [now, refRow.id]);
+
+    // 7. 标记赛场已激活
+    setVenueActive(true);
+    cachedVenueName = venue.name;
+    cachedVenueId = venue.id;
+
+    // 8. 通知大屏激活
+    if (validation.ws && validation.ws.readyState === WebSocket.OPEN) {
+      validation.ws.send(JSON.stringify({
+        type: 'activated',
+        data: { venue_name: venue.name, venue_id: venue.id },
+      }));
+    }
+
+    // 9. 广播 screen_data 更新
+    const screenData = getCurrentScreenData();
+    broadcastToScreen({ type: 'screen_data', data: screenData });
+
+    return res.json({
+      code: 0,
+      message: '签到成功，赛场已激活',
+      data: {
+        attendanceId,
+        checkinAt: now,
+        venueId: venue.id,
+        venueName: venue.name,
+      },
+    });
+  } catch (error: any) {
+    console.error('[QR签到] 失败:', error.message);
+    return res.status(500).json({ code: 500, message: '签到失败: ' + error.message, data: null });
   }
 });
 
