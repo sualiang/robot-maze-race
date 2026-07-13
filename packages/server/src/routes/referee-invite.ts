@@ -41,7 +41,7 @@ router.post('/invite', authMiddleware, async (req: Request, res: Response) => {
     let ticket = '';
     let qrcodeUrl = '';
     try {
-      const qrResult = await createRefereeQRCode(operatorId, inviteId);
+      const qrResult = await createRefereeQRCode(inviteId);
       ticket = qrResult.ticket;
       qrcodeUrl = qrResult.qrcodeUrl;
       sceneStr = `referee_invite_${operatorId}_${inviteId}`;

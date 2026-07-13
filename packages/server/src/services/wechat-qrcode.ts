@@ -19,15 +19,17 @@ interface QRCodeResult {
 /**
  * 创建裁判邀请二维码
  *
- * @param operatorId 运营商 ID
+ * scene_str 只使用 inviteId 以控制在 64 字符以内。
+ * 微信 QR_LIMIT_STR_SCENE 限制 scene_str ≤ 64 字符，
+ * "referee_invite_" (15) + UUID (36) = 51 字符 ✅
+ *
  * @param inviteId   邀请记录 ID
  * @returns { ticket, url, qrcodeUrl }
  */
 export async function createRefereeQRCode(
-  operatorId: string,
   inviteId: string
 ): Promise<QRCodeResult> {
-  const sceneStr = `referee_invite_${operatorId}_${inviteId}`;
+  const sceneStr = `referee_invite_${inviteId}`;
   const accessToken = await getAccessToken();
 
   const url = `https://api.weixin.qq.com/cgi-bin/qrcode/create?access_token=${accessToken}`;

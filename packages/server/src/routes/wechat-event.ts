@@ -35,16 +35,16 @@ function parseXml(xml: string): Record<string, string> {
 }
 
 /* ------------------------------------------------------------------ */
-/* 从 EventKey 提取 operator_id + invite_id                             */
-/*   subscribe: EventKey = "qrscene_referee_invite_{opId}_{invId}"    */
-/*   SCAN:      EventKey = "referee_invite_{opId}_{invId}"            */
+/* 从 EventKey 提取 inviteId                                          */
+/*   subscribe: EventKey = "qrscene_referee_invite_{invId}"         */
+/*   SCAN:      EventKey = "referee_invite_{invId}"                 */
+/* scene_str 仅含 inviteId，operator_id 需从 DB 查询                         */
 /* ------------------------------------------------------------------ */
-function parseScene(key: string): { operatorId: string; inviteId: string } | null {
-  // strip qrscene_ prefix if present
+function parseScene(key: string): string | null {
   const scene = key.replace(/^qrscene_/, '');
-  const m = scene.match(/^referee_invite_(.+?)_(.+)$/);
+  const m = scene.match(/^referee_invite_(.+)$/);
   if (!m) return null;
-  return { operatorId: m[1], inviteId: m[2] };
+  return m[1]; // inviteId only
 }
 
 /* ------------------------------------------------------------------ */
@@ -96,19 +96,28 @@ router.post('/event', async (req: Request, res: Response) => {
 
     // ---------- subscribe / SCAN ----------
     if (event === 'subscribe' || event === 'SCAN') {
-      const parsed = parseScene(eventKey);
-      if (parsed) {
-        console.log(`[WechatEvent] scene matched: op=${parsed.operatorId} inv=${parsed.inviteId}`);
+      const inviteId = parseScene(eventKey);
+      if (inviteId) {
+        console.log(`[WechatEvent] scene matched: inviteId=${inviteId}`);
+
+        // 查 DB 获取 operator_id
+        const invite = await queryOne<{ id: string; operator_id: string }>(
+          'SELECT id, operator_id FROM referee_invites WHERE id = $1', [inviteId]
+        );
+        if (!invite) {
+          console.error(`[WechatEvent] 邀请记录不存在: ${inviteId}`);
+          return res.send('');
+        }
 
         // 将 openid 写入邀请记录
         await execute(
           `UPDATE referee_invites SET openid=$1, updated_at=NOW() WHERE id=$2 AND openid IS NULL`,
-          [fromUser, parsed.inviteId]
+          [fromUser, inviteId]
         );
 
         // 推送客服消息
         try {
-          await sendRegisterLink(fromUser, parsed.inviteId, parsed.operatorId);
+          await sendRegisterLink(fromUser, inviteId, invite.operator_id);
         } catch (e: any) {
           console.error('[WechatEvent] 推送失败:', e.message);
         }
