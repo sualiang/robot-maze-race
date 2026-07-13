@@ -11,6 +11,14 @@ import {
 
 const router = Router();
 
+// 辅助：通过 users 表 ID 查找对应的 operators 记录
+const getEffectiveOperatorId = async (userId: string): Promise<string | null> => {
+  const row = await queryOne<{ id: string }>(
+    'SELECT id FROM operators WHERE created_by = $1', [userId]
+  );
+  return row?.id || null;
+};
+
 // ============================================================
 // Race Packages 路由 — 参赛包 CRUD + 礼券自动选配
 // ============================================================
@@ -209,7 +217,10 @@ router.post('/', authMiddleware, async (req: Request, res: Response<ApiResponse<
     const growthValue = b.growthValue || 0;
     const pointValue = b.pointValue || 0;
 
-    const opId = req.user?.operatorId || '00000000-0000-0000-0000-000000000000';
+    const opId = req.user?.operatorId || await getEffectiveOperatorId(req.user!.userId) || null;
+    if (!opId) {
+      return res.status(400).json({ code: 400, message: '无法确定运营商，请联系管理员', data: null as any });
+    }
     await execute(
       `INSERT INTO race_packages (id, operator_id, name, description, price_cents,
                standard_price_cents, discount_price_cents, tag, special_rights,
