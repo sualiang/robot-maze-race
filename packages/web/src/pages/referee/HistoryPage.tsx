@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../utils/api';
+import { useOperatorContext } from '../../hooks/useOperatorContext';
+import NoContextBanner from '../../components/NoContextBanner';
 
 interface RecordItem {
   id: string;
@@ -95,6 +97,7 @@ export default function HistoryPage() {
   const [filterDate, setFilterDate] = useState('');
   const [total, setTotal] = useState(0);
   const [selectedRecord, setSelectedRecord] = useState<RecordItem | null>(null);
+  const { hasContext, loading: contextLoading } = useOperatorContext();
   const pageSize = 20;
 
   useEffect(() => {
@@ -162,6 +165,22 @@ export default function HistoryPage() {
 
   if (pageLoading && records.length === 0) {
     return <div className="referee-loading-mask"><div className="referee-loading-spinner">加载中...</div></div>;
+  }
+
+  // 无运营商上下文：不显示历史成绩
+  if (!hasContext && !contextLoading) {
+    return (
+      <div className="referee-page">
+        <NoContextBanner />
+        <div className="referee-card" style={{ marginBottom: 16, padding: 24, textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>📋</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ref-text)', marginBottom: 8 }}>历史成绩暂不可查看</div>
+          <div style={{ fontSize: 14, color: 'var(--ref-text-dim)', lineHeight: 1.6 }}>
+            请前往线下赛场扫描官方小程序码<br />查看运营商专属比赛历史成绩
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

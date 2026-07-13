@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../utils/api';
+import { useOperatorContext } from '../../hooks/useOperatorContext';
+import NoContextBanner from '../../components/NoContextBanner';
 
 interface Racer {
   id: string;
@@ -71,6 +73,7 @@ export default function MatchPage() {
   const [maxTimeout] = useState(180);
   const [checkedIn, setCheckedIn] = useState<boolean | null>(null);
   const [checkingStatus, setCheckingStatus] = useState(true);
+  const { hasContext, loading: contextLoading } = useOperatorContext();
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const elapsedRef = useRef(0);
   const destroyedRef = useRef(false);
@@ -264,7 +267,26 @@ export default function MatchPage() {
   const isTimeoutDanger = maxTimeout > 0 && elapsed >= (maxTimeout - 10) * 1000;
   const timeoutPercent = maxTimeout > 0 ? Math.min(100, (elapsed / (maxTimeout * 1000)) * 100) : 0;
 
-  if (pageLoading || checkingStatus) return <div className="referee-loading-mask"><div className="referee-loading-spinner">加载中...</div></div>;
+  if (pageLoading || checkingStatus || contextLoading) return <div className="referee-loading-mask"><div className="referee-loading-spinner">加载中...</div></div>;
+
+  // 无运营商上下文：引导线下扫码
+  if (!hasContext) {
+    return (
+      <div className="referee-page">
+        <div className="referee-ws-badge">
+          <span>在线模式</span>
+        </div>
+        <NoContextBanner />
+        <div className="referee-card" style={{ marginBottom: 16, padding: 24, textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>🏁</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ref-text)', marginBottom: 8 }}>参赛功能暂未开放</div>
+          <div style={{ fontSize: 14, color: 'var(--ref-text-dim)', lineHeight: 1.6 }}>
+            请前往线下赛场扫描官方小程序码<br />解锁参赛、计时、排队等全部功能
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="referee-page">

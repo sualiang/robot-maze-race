@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../utils/api';
+import { useOperatorContext } from '../../hooks/useOperatorContext';
+import NoContextBanner from '../../components/NoContextBanner';
 import './styles.css';
 
 interface UserInfo {
@@ -42,6 +44,7 @@ export default function ProfilePage() {
   const [historyRecords, setHistoryRecords] = useState<AttendanceRecord[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState('');
+  const { hasContext, loading: contextLoading } = useOperatorContext();
 
   const fetchData = useCallback(async () => {
     const token = getToken();
@@ -141,6 +144,9 @@ export default function ProfilePage() {
 
   return (
     <div className="referee-page" style={{ paddingBottom: 80 }}>
+      {/* 无运营商上下文时显示引导条 */}
+      {!hasContext && !contextLoading && <NoContextBanner />}
+
       {/* 个人信息卡片 */}
       <div className="referee-card" style={{ padding: 24, marginTop: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
