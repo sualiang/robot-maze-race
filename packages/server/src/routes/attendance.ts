@@ -29,6 +29,15 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
     const conditions: string[] = [];
     const params: any[] = [];
 
+    // Operator isolation: non-admin sees only own data
+    if (req.user?.role !== 'admin') {
+      const opId = (req.user as any)?.operatorId || '';
+      if (opId) {
+        conditions.push('a.operator_id = $' + (params.length + 1));
+        params.push(opId);
+      }
+    }
+
     if (venue_id) {
       conditions.push('a.venue_id = $' + (params.length + 1));
       params.push(venue_id);
@@ -91,14 +100,27 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
  */
 router.get('/stats', authMiddleware, async (req: Request, res: Response) => {
   try {
+    // Operator filter
+    let opFilter = '';
+    let opParams: any[] = [];
+    if (req.user?.role !== 'admin') {
+      const opId = (req.user as any)?.operatorId || '';
+      if (opId) {
+        opFilter = ' WHERE a.operator_id = $1';
+        opParams = [opId];
+      }
+    }
+
     // 总人次
     const totalRecords = await queryOne<{ count: string }>(
-      'SELECT COUNT(*) as count FROM attendance'
+      `SELECT COUNT(*) as count FROM attendance a${opFilter}`,
+      opParams.length > 0 ? opParams : undefined
     );
 
     // 今日签到人次
     const todayRecords = await queryOne<{ count: string }>(
-      "SELECT COUNT(*) as count FROM attendance WHERE date(checkin_at) = CURDATE()"
+      `SELECT COUNT(*) as count FROM attendance a WHERE date(a.checkin_at) = CURDATE()${opFilter ? ' AND a.operator_id = $1' : ''}`,
+      opParams.length > 0 ? opParams : undefined
     );
 
     // 各赛场分布
@@ -110,8 +132,10 @@ router.get('/stats', authMiddleware, async (req: Request, res: Response) => {
       `SELECT a.venue_id, COALESCE(v.name, '未知赛场') as venue_name, COUNT(*) as count
        FROM attendance a
        LEFT JOIN venues v ON v.id = a.venue_id
+       ${opFilter ? 'WHERE a.operator_id = $1' : ''}
        GROUP BY a.venue_id
-       ORDER BY count DESC`
+       ORDER BY count DESC`,
+      opParams.length > 0 ? opParams : undefined
     );
 
     return res.json({

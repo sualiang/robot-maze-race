@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { query, queryOne, execute } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
+import { getOperatorContext } from '../middleware/operator-context';
 import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();
@@ -22,16 +23,20 @@ function operatorOnly(req: Request, res: Response, next: Function): void {
  */
 router.get('/points-shop/items', authMiddleware, async (req: Request, res: Response) => {
   try {
+    const userId = req.user!.userId;
+    const ctx = await getOperatorContext(userId);
+    const opId = ctx?.operator_id || '';
+
     const items = await query<any>(
       `SELECT id, item_type, item_id, name, description, need_points, stock, exchange_limit,
               sort_weight, status, created_at
        FROM point_shop
-       WHERE status = 1
-       ORDER BY sort_weight ASC, created_at ASC`
+       WHERE status = 1 AND operator_id = $1
+       ORDER BY sort_weight ASC, created_at ASC`,
+      [opId]
     );
 
     // 同时查询用户积分余额
-    const userId = req.user!.userId;
     const userPoints = await queryOne<{ points: number }>(
       `SELECT COALESCE(points, 0) as points FROM users WHERE id = $1`,
       [userId]
@@ -68,10 +73,13 @@ router.get('/points-shop/items', authMiddleware, async (req: Request, res: Respo
  */
 router.get('/points-shop/items/all', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
+    const operatorId = (req.user as any)?.operatorId || '';
     const items = await query<any>(
       `SELECT id, item_type, item_id, name, description, need_points, stock, sort_weight, status, created_at, updated_at
        FROM point_shop
-       ORDER BY sort_weight ASC, created_at ASC`
+       WHERE operator_id = $1
+       ORDER BY sort_weight ASC, created_at ASC`,
+      [operatorId]
     );
     res.json({
       code: 0,
@@ -110,10 +118,11 @@ router.post('/points-shop/items', authMiddleware, operatorOnly, async (req: Requ
       return res.status(400).json({ code: 400, message: '不支持创建商家消费券类型', data: null });
     }
     const id = uuidv4();
+    const operatorId = (req.user as any)?.operatorId || '';
     await execute(
-      `INSERT INTO point_shop (id, item_type, item_id, name, description, need_points, sort_weight, stock)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [id, itemType, itemId || '', name, description || '', needPoints, sortWeight || 0, stock ?? 0]
+      `INSERT INTO point_shop (id, item_type, item_id, name, description, need_points, sort_weight, stock, operator_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [id, itemType, itemId || '', name, description || '', needPoints, sortWeight || 0, stock ?? 0, operatorId]
     );
     res.status(201).json({ code: 0, message: '商品已创建', data: { id } });
   } catch (error: any) {
@@ -154,9 +163,14 @@ router.put('/points-shop/items/:id', authMiddleware, operatorOnly, async (req: R
     }
 
     updates.push(`updated_at = NOW()`);
+    const operatorId = (req.user as any)?.operatorId || '';
     params.push(id);
+    params.push(operatorId);
 
-    await execute(`UPDATE point_shop SET ${updates.join(', ')} WHERE id = $${idx}`, params);
+    await execute(
+      `UPDATE point_shop SET ${updates.join(', ')} WHERE id = $${idx} AND operator_id = $${idx + 1}`,
+      params
+    );
     res.json({ code: 0, message: '商品已更新', data: null });
   } catch (error: any) {
     console.error('[PointsShop] update error:', error.message);
@@ -172,9 +186,10 @@ router.delete('/points-shop/items/:id', authMiddleware, operatorOnly, async (req
   try {
     const { id } = req.params;
 
-    // Check record exists
+    // Check record exists and belongs to operator
+    const operatorId = (req.user as any)?.operatorId || '';
     const existing = await queryOne<{ id: string }>(
-      'SELECT id FROM point_shop WHERE id = $1', [id]
+      'SELECT id FROM point_shop WHERE id = $1 AND operator_id = $2', [id, operatorId]
     );
     if (!existing) {
       return res.status(404).json({ code: 404, message: '商品不存在', data: null });
@@ -203,10 +218,13 @@ router.post('/points-shop/exchange', authMiddleware, async (req: Request, res: R
   }
 
   try {
+    const ctx = await getOperatorContext(userId);
+    const opId = ctx?.operator_id || '';
+
     // 1. 查询商品信息
     const item = await queryOne<any>(
-      `SELECT * FROM point_shop WHERE id = $1 AND status = 1`,
-      [itemId]
+      `SELECT * FROM point_shop WHERE id = $1 AND status = 1 AND operator_id = $2`,
+      [itemId, opId]
     );
 
     if (!item) {
@@ -268,9 +286,9 @@ router.post('/points-shop/exchange', authMiddleware, async (req: Request, res: R
     if (itemType === 'entry_deduction') {
       // 发放参赛抵扣金到 entry_deductions（id 是 INTEGER 自增主键，传 NULL）
       await execute(
-        `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, expires_at, created_at)
-         VALUES (NULL, $1, $2, 'point_shop_exchange', 'available', DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
-        [userId, itemValue]
+        `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, expires_at, created_at, operator_id)
+         VALUES (NULL, $1, $2, 'point_shop_exchange', 'available', DATE_ADD(NOW(), INTERVAL 365 DAY), NOW(), $3)`,
+        [userId, itemValue, opId]
       );
       console.log('[PointsShop] 兑换参赛抵扣金:', userId, 'item:', item.name, '金额:', itemValue / 100, '元');
     } else if (itemType === 'merchant_coupon') {
@@ -280,14 +298,14 @@ router.post('/points-shop/exchange', authMiddleware, async (req: Request, res: R
       await execute(
         `INSERT INTO user_coupons (id, user_id, coupon_id, merchant_id, name, description,
                 denomination_cents, min_consume_cents, status, valid_start, valid_end,
-                coupon_type, extra_data, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, $9, $10, 11, $11, NOW(), NOW())`,
+                coupon_type, extra_data, created_at, updated_at, operator_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, $9, $10, 11, $11, NOW(), NOW(), $12)`,
         [
           couponId, userId, couponId, 'platform',
           item.name,
           `积分商城兑换·${item.description || item.name}`, itemValue, 0,
           new Date().toISOString(), validEnd,
-          JSON.stringify({ source: 'point_shop', item_id: itemId })
+          JSON.stringify({ source: 'point_shop', item_id: itemId }), opId
         ]
       );
       console.log('[PointsShop] 兑换商家消费券:', userId, 'item:', item.name, '面额:', itemValue / 100, '元');
@@ -299,14 +317,14 @@ router.post('/points-shop/exchange', authMiddleware, async (req: Request, res: R
       await execute(
         `INSERT INTO user_coupons (id, user_id, coupon_id, merchant_id, name, description,
                 denomination_cents, min_consume_cents, status, valid_start, valid_end,
-                coupon_type, extra_data, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, $9, $10, $11, $12, NOW(), NOW())`,
+                coupon_type, extra_data, created_at, updated_at, operator_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, $9, $10, $11, $12, NOW(), NOW(), $13)`,
         [
           couponId, userId, couponId, 'platform',
           item.name,
           `积分商城兑换·${item.description || item.name}`, itemValue, 0,
           new Date().toISOString(), validEnd, couponType,
-          JSON.stringify({ source: 'point_shop', item_id: itemId })
+          JSON.stringify({ source: 'point_shop', item_id: itemId }), opId
         ]
       );
       console.log('[PointsShop] 兑换平台券:', userId, 'item:', item.name, 'coupon_type:', couponType);
@@ -331,15 +349,16 @@ router.post('/points-shop/exchange', authMiddleware, async (req: Request, res: R
           item_type TEXT NOT NULL,
           item_name TEXT NOT NULL,
           spent_points INTEGER NOT NULL,
+          operator_id VARCHAR(36) DEFAULT '',
           created_at TEXT DEFAULT (NOW())
         )`
       );
     } catch { /* ignore */ }
     try {
       await execute(
-        `INSERT INTO points_exchange_log (id, user_id, item_id, item_type, item_name, spent_points)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [exchangeId, userId, itemId, itemType, item.name, needPoints]
+        `INSERT INTO points_exchange_log (id, user_id, item_id, item_type, item_name, spent_points, operator_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [exchangeId, userId, itemId, itemType, item.name, needPoints, opId]
       );
     } catch { /* ignore */ }
 
@@ -379,13 +398,16 @@ router.post('/points-shop/exchange', authMiddleware, async (req: Request, res: R
 router.get('/points-shop/history', authMiddleware, async (req: Request, res: Response) => {
   const userId = req.user!.userId;
   try {
+    const ctx = await getOperatorContext(userId);
+    const opId = ctx?.operator_id || '';
+
     const logs = await query<any>(
       `SELECT id, item_id, item_type, item_name, spent_points, created_at
        FROM points_exchange_log
-       WHERE user_id = $1
+       WHERE user_id = $1 AND operator_id = $2
        ORDER BY created_at DESC
        LIMIT 50`,
-      [userId]
+      [userId, opId]
     );
 
     res.json({
