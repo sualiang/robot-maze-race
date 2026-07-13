@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { query, queryOne, execute } from '../config/database';
 import { merchantAuthMiddleware } from './merchant-auth';
+import { getOperatorContext } from '../middleware/operator-context';
 
 const router = Router();
 
@@ -72,13 +73,18 @@ async function doVerify(
   );
 
   // 写入核销流水
+  const merchantOp = await queryOne<{ operator_id: string }>(
+    `SELECT operator_id FROM merchants WHERE id = $1`,
+    [merchantId]
+  );
+  const mOpId = merchantOp?.operator_id || '';
   await execute(
     `INSERT INTO coupon_verify_log (
       id, user_coupon_id, merchant_id, verifier_id, verifier_name,
-      user_id, coupon_name, denomination_cents, verify_type, verify_time, created_at
+      user_id, coupon_name, denomination_cents, verify_type, verify_time, created_at, operator_id
     ) VALUES (
       $1, $2, $3, $4, $5,
-      $6, $7, $8, $9, NOW(), NOW()
+      $6, $7, $8, $9, NOW(), NOW(), $10
     )`,
     [
       uuidv4(),
@@ -90,6 +96,7 @@ async function doVerify(
       coupon.name || coupon.mc_name || '',
       coupon.denomination_cents || coupon.mc_denomination || 0,
       verifyType,
+      mOpId
     ]
   );
 
