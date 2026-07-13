@@ -5,12 +5,12 @@ import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 
 // MySQL 数据库连接 URL（格式：mysql://user:pass@host:port/db）
-const DATABASE_URL = process.env.DATABASE_URL || 'mysql://root:root@localhost:3306/robot_maze_race';
+const DATABASE_URL = process.env.DATABASE_URL || 'mysql://root:AmberBot2026!Root@localhost:3308/robot_maze_race';
 
 // 从 DATABASE_URL 解析连接信息
 function parseDatabaseUrl(url: string): mysql.PoolOptions {
   const parsed = new URL(url);
-  const port = parseInt(process.env.DB_PORT || parsed.port || '3306', 10);
+  const port = parseInt(process.env.DB_PORT || parsed.port || '3308', 10);
   return {
     host: parsed.hostname || 'localhost',
     port,
@@ -484,6 +484,29 @@ export async function initSchema(): Promise<void> {
     } catch { /* ignore */ }
   }
 
+  // migration: ensure users table has status column
+  try {
+    const [cols] = await conn.execute<any>(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users' AND COLUMN_NAME = 'status'`,
+      [getPoolOptions().database]
+    );
+    if ((cols as any[]).length === 0) {
+      await conn.execute("ALTER TABLE users ADD COLUMN status VARCHAR(20) DEFAULT 'active'");
+    }
+  } catch { /* ignore */ }
+
+  // migration: ensure users table has created_at column
+  try {
+    const [cols] = await conn.execute<any>(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users' AND COLUMN_NAME = 'created_at'`,
+      [getPoolOptions().database]
+    );
+    if ((cols as any[]).length === 0) {
+      await conn.execute('ALTER TABLE users ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP');
+      await conn.execute('ALTER TABLE users ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP');
+    }
+  } catch { /* ignore */ }
+
   // users 表新增 phone / gender / wechat_nickname / avatar_url / points / rank_title 字段
   const userCols: [string, string][] = [
     ['phone', "VARCHAR(20) DEFAULT ''"],
@@ -671,7 +694,7 @@ export async function initSchema(): Promise<void> {
   try {
     await conn.execute(`
       CREATE TABLE IF NOT EXISTS entry_deductions (
-        id INT AUTO_INCREMENT PRIMARY KEY,
+        id VARCHAR(36) PRIMARY KEY,
         user_id VARCHAR(36) NOT NULL,
         amount_cents INTEGER NOT NULL DEFAULT 0,
         source VARCHAR(50) DEFAULT '',
@@ -682,6 +705,17 @@ export async function initSchema(): Promise<void> {
         INDEX idx_entry_deductions_status (status)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     `);
+  } catch { /* ignore */ }
+
+  // migration: fix entry_deductions id type
+  try {
+    const [cols] = await conn.execute<any>(
+      `SELECT DATA_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'entry_deductions' AND COLUMN_NAME = 'id'`,
+      [getPoolOptions().database]
+    );
+    if ((cols as any[]).length > 0 && (cols as any[])[0].DATA_TYPE === 'int') {
+      await conn.execute('ALTER TABLE entry_deductions MODIFY COLUMN id VARCHAR(36) NOT NULL');
+    }
   } catch { /* ignore */ }
 
   // user_coupons 表
