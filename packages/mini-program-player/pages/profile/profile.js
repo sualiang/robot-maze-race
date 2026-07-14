@@ -39,22 +39,19 @@ Page({
   },
 
   onShow: function () {
-    // Bug fix: 直接检查 storage 中的 token，不信任可能过期的 globalData
     var token = wx.getStorageSync('player_token');
-    var loggedIn = !!token;
-    // 同步 globalData（防止 request.js 401 只清了 storage 没清 globalData）
     if (!token) {
       app.globalData.isLoggedIn = false;
       app.globalData.token = null;
       app.globalData.userInfo = null;
-    } else {
-      app.globalData.isLoggedIn = true;
-      app.globalData.token = token;
+      // 未登录直接跳微信登录页，跳过占位页
+      wx.redirectTo({ url: '/pages/login/login?from=profile' });
+      return;
     }
-    this.setData({ isLoggedIn: loggedIn });
-    if (loggedIn) {
-      this.loadData();
-    }
+    app.globalData.isLoggedIn = true;
+    app.globalData.token = token;
+    this.setData({ isLoggedIn: true });
+    this.loadData();
   },
 
   onPullDownRefresh: function () {

@@ -8,11 +8,12 @@ Page({
     loading: false
   },
 
-  onLoad: function () {
+  onLoad: function (options) {
     var app = getApp();
-    // 已登录直接去首页
+    this._from = options.from || '';
     if (app.globalData.isLoggedIn) {
-      wx.switchTab({ url: '/pages/index/index' });
+      var dest = this._from === 'profile' ? '/pages/profile/profile' : '/pages/index/index';
+      wx.switchTab({ url: dest });
     }
   },
 
@@ -88,13 +89,12 @@ Page({
               }
 
               if (isNewUser) {
-                // 新用户 → 编辑资料页
                 wx.redirectTo({ url: '/pages/edit-profile/edit-profile' });
               } else {
-                // 老用户 → 首页
                 wx.showToast({ title: '登录成功', icon: 'success', duration: 1000 });
+                var dest = that._from === 'profile' ? '/pages/profile/profile' : '/pages/index/index';
                 setTimeout(function () {
-                  wx.switchTab({ url: '/pages/index/index' });
+                  wx.switchTab({ url: dest });
                 }, 1000);
               }
             }).catch(function () {
