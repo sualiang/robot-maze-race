@@ -139,7 +139,7 @@ Page({
       request.post('/auth/upload-avatar', { image: this.data.avatarBase64 }).then(function (res) {
         if (res && res.url) {
           // 后端返回相对路径 /uploads/xxx.jpg，拼完整 URL 存库
-          data.avatarUrl = 'https://amberrobot.com.cn' + res.url;
+          data.avatarUrl = 'https://dog.amberrobot.com.cn' + res.url;
         }
         doSave();
       }).catch(function () {

@@ -477,8 +477,10 @@ router.get('/dashboard', authMiddleware, operatorOnly, async (req: Request, res:
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
     const todayPlayers = await queryOne<{ count: string }>(
-      `SELECT COUNT(DISTINCT player_id) as count FROM race_attendance
-       WHERE venue_id = $1 AND date(check_in_at) = $2`,
+      `SELECT COUNT(DISTINCT ra.player_id) as count
+       FROM race_attendance ra
+       JOIN races r ON r.id = ra.race_id
+       WHERE r.venue_id = $1 AND date(ra.check_in_at) = $2`,
       [venueId, today]
     );
 
@@ -489,10 +491,11 @@ router.get('/dashboard', authMiddleware, operatorOnly, async (req: Request, res:
     }>(
       `SELECT
          COUNT(*) as total,
-         SUM(CASE WHEN status = 'finished' THEN 1 ELSE 0 END) as completed,
-         COALESCE(SUM(score_ms), 0) as total_score
-       FROM race_records
-       WHERE venue_id = $1 AND date(created_at) = $2`,
+         SUM(CASE WHEN rr.status = 'finished' THEN 1 ELSE 0 END) as completed,
+         COALESCE(SUM(rr.score), 0) as total_score
+       FROM race_records rr
+       JOIN races r ON r.id = rr.race_id
+       WHERE r.venue_id = $1 AND date(rr.created_at) = $2`,
       [venueId, today]
     );
 
