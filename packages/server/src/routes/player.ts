@@ -396,8 +396,8 @@ router.get('/me/profile-check', authMiddleware, async (req: Request, res: Respon
     let availableDeductionCents = 0;
     try {
       const deductionRow = await queryOne<{ total: number }>(
-        `SELECT COALESCE(SUM(amount_cents), 0) as total FROM entry_deductions WHERE user_id = $1 AND status = 'available' AND operator_id = $2`,
-        [userId, opId]
+        `SELECT COALESCE(SUM(amount_cents), 0) as total FROM entry_deductions WHERE user_id = $1 AND status = 'available'`,
+        [userId]
       );
       availableDeductionCents = deductionRow?.total || 0;
     } catch (deductionErr) {
@@ -408,8 +408,8 @@ router.get('/me/profile-check', authMiddleware, async (req: Request, res: Respon
     let couponTotalCents = 0;
     try {
       const couponRow = await queryOne<{ total: number }>(
-        `SELECT COALESCE(SUM(denomination_cents), 0) as total FROM user_coupons WHERE user_id = $1 AND status = 1 AND (valid_end IS NULL OR valid_end >= NOW()) AND operator_id = $2`,
-        [userId, opId]
+        `SELECT COALESCE(SUM(denomination_cents), 0) as total FROM user_coupons WHERE user_id = $1 AND status = 1 AND (valid_end IS NULL OR valid_end >= NOW())`,
+        [userId]
       );
       couponTotalCents = couponRow?.total || 0;
     } catch (couponErr) {
@@ -584,17 +584,14 @@ router.get('/me/race-records', authMiddleware, async (req: Request, res: Respons
  */
 router.get('/deductions', authMiddleware, async (req: Request, res: Response) => {
   const userId = req.user!.userId;
-  let opId = '';
-  try { const ctx = await getOperatorContext(userId); opId = ctx?.operator_id || ''; } catch {}
-
   try {
     const deductions = await query<any>(
       `SELECT id, amount_cents, amount_cents as used_cents, source, status, order_id,
               race_package_id, expires_at, created_at
        FROM entry_deductions
-       WHERE user_id = $1 AND operator_id = $2
+       WHERE user_id = $1
        ORDER BY created_at DESC`,
-      [userId, opId]
+      [userId]
     );
     const list = (deductions || []).map((d: any) => ({
       id: d.id,
@@ -624,19 +621,9 @@ router.get('/coupons', authMiddleware, async (req: Request, res: Response) => {
   const userId = req.user!.userId;
   const { type, status } = req.query;
 
-  // Get operator context for isolation
-  let opId = '';
-  try { const ctx = await getOperatorContext(userId); opId = ctx?.operator_id || ''; } catch {}
-
   try {
     let whereClause = 'WHERE uc.user_id = $1';
     const params: any[] = [userId];
-
-    // Operator isolation
-    if (opId) {
-      params.push(opId);
-      whereClause += ' AND uc.operator_id = $' + params.length;
-    }
 
     // 按 coupon_type 筛选
     if (type) {
@@ -868,9 +855,9 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
       try {
         const deductionId = uuidv4();
         await query(
-          `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at, operator_id)
-           VALUES ($1, $2, $3, 'order_purchase', 'available', $4, $5, DATE_ADD(NOW(), INTERVAL 365 DAY), NOW(), $6)`,
-          [deductionId, userId, freeDeductionCents, orderId, packageId, pkgOpId]
+          `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
+           VALUES ($1, $2, $3, 'order_purchase', 'available', $4, $5, DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
+          [deductionId, userId, freeDeductionCents, orderId, packageId]
         );
         console.log(`[订单] 购买参赛包赠送抵扣金${freeDeductionCents}分`);
       } catch (grantErr: any) {
@@ -904,9 +891,9 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
         for (let i = 0; i < 3; i++) {
           const dedId = uuidv4();
           await execute(
-            `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at, operator_id)
-             VALUES ($1, $2, $3, 'order_purchase_pro', 'available', $4, $5, DATE_ADD(NOW(), INTERVAL 365 DAY), NOW(), $6)`,
-            [dedId, userId, 2000, orderId, packageId, pkgOpId]
+            `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
+             VALUES ($1, $2, $3, 'order_purchase_pro', 'available', $4, $5, DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
+            [dedId, userId, 2000, orderId, packageId]
           );
         }
         console.log(`[订单] 专业包购包赠参赛抵扣金：用户${userId}，参赛包${packageId}，共3张×2000分`);
@@ -914,18 +901,18 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
         // 标准包：发1张1500分参赛抵扣卡
         const dedId = uuidv4();
         await execute(
-          `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at, operator_id)
-           VALUES ($1, $2, $3, 'order_purchase', 'available', $4, $5, DATE_ADD(NOW(), INTERVAL 365 DAY), NOW(), $6)`,
-          [dedId, userId, 1500, orderId, packageId, pkgOpId]
+          `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
+           VALUES ($1, $2, $3, 'order_purchase', 'available', $4, $5, DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
+          [dedId, userId, 1500, orderId, packageId]
         );
         console.log(`[订单] 标准包购包赠参赛抵扣金：用户${userId}，1张×1500分`);
       } else if (tag === 'basic') {
         // 基础包：发1张500分参赛抵扣卡
         const dedId = uuidv4();
         await execute(
-          `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at, operator_id)
-           VALUES ($1, $2, $3, 'order_purchase', 'available', $4, $5, DATE_ADD(NOW(), INTERVAL 365 DAY), NOW(), $6)`,
-          [dedId, userId, 500, orderId, packageId, pkgOpId]
+          `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
+           VALUES ($1, $2, $3, 'order_purchase', 'available', $4, $5, DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
+          [dedId, userId, 500, orderId, packageId]
         );
         console.log(`[订单] 基础包购包赠参赛抵扣金：用户${userId}，1张×500分`);
       }

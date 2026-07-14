@@ -213,7 +213,7 @@ router.post('/unified-order', authMiddleware, async (req: Request, res: Response
       amount: number;
       status: string;
     }>(
-      `SELECT id, order_no, user_id, amount, status FROM orders WHERE id = ?`,
+      `SELECT id, order_no, user_id, amount_cents as amount, status FROM orders WHERE id = ?`,
       [order_id]
     );
 
@@ -368,7 +368,7 @@ router.post('/notify', async (req: Request, res: Response) => {
 
     // 3. 查询订单
     const order = await queryOne<{ id: string; status: string; amount: number }>(
-      `SELECT id, status, amount FROM orders WHERE order_no = ?`,
+      `SELECT id, status, amount_cents as amount FROM orders WHERE order_no = ?`,
       [outTradeNo]
     );
 
@@ -451,7 +451,7 @@ router.get('/query/:orderId', authMiddleware, async (req: Request, res: Response
       prepay_id: string;
       paid_at: string;
     }>(
-      `SELECT id, order_no, user_id, amount, status, transaction_id, prepay_id, paid_at FROM orders WHERE id = ?`,
+      `SELECT id, order_no, user_id, amount_cents as amount, status, transaction_id, prepay_id, paid_at FROM orders WHERE id = ?`,
       [orderId]
     );
 
@@ -534,7 +534,7 @@ router.post('/refund', authMiddleware, async (req: Request, res: Response<ApiRes
       status: string;
       transaction_id: string;
     }>(
-      `SELECT id, order_no, user_id, amount, status, transaction_id FROM orders WHERE id = ?`,
+      `SELECT id, order_no, user_id, amount_cents as amount, status, transaction_id FROM orders WHERE id = ?`,
       [order_id]
     );
 
