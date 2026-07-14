@@ -29,8 +29,7 @@ function generateInviteCode(): string {
 
 /**
  * GET /api/v1/operator/merchant/pending
- * 待审核商家列表（运营商本区域的）
- * 注意：如果运营商没有 region 字段关联，则返回所有待审核；有 region 则按区域过滤
+ * 待审核商家列表
  */
 router.get('/merchant/pending', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
@@ -39,20 +38,8 @@ router.get('/merchant/pending', authMiddleware, operatorOnly, async (req: Reques
     const pageSize = Math.min(Math.max(parseInt(req.query.pageSize as string, 10) || 20, 1), 100);
     const offset = (page - 1) * pageSize;
 
-    // 获取运营商信息（看是否有 region 限制）
-    const operator = await queryOne<{ region?: string }>(
-      `SELECT region FROM operators WHERE id = $1`,
-      [operatorId]
-    );
-
     const conditions: string[] = ['m.audit_status = 0'];
     const params: any[] = [];
-
-    // 如果运营商有 region 字段约束，则过滤区域内商家
-    if (operator && operator.region) {
-      conditions.push('m.region = ?');
-      params.push(operator.region);
-    }
 
     const whereClause = 'WHERE ' + conditions.join(' AND ');
 

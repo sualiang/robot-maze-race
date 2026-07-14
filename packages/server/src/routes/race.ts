@@ -28,7 +28,7 @@ function operatorOnly(req: Request, res: Response, next: Function): void {
  */
 router.post('/races', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
-    const { venueId, name, maxParticipants, startTime, endTime, entryFee, description, venueName } = req.body;
+    const { venueId, name, maxParticipants, startTime, endTime, entryFee, venueName } = req.body;
     const operatorId = req.user?.operatorId || null;
 
     if (!venueId || !name) {
@@ -51,15 +51,14 @@ router.post('/races', authMiddleware, operatorOnly, async (req: Request, res: Re
     const now = new Date().toISOString();
 
     await query(
-      `INSERT INTO races (id, venue_id, name, status, max_participants, entry_fee, start_time, end_time, description, venue_name, operator_id, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+      `INSERT INTO races (id, venue_id, name, status, max_participants, entry_fee, start_time, end_time, venue_name, operator_id, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
       [
         raceId, venueId, name, 'pending',
         maxParticipants || 20,
         entryFee || 0,
         startTime || now,
         endTime || now,
-        description || null,
         venueName || null,
         operatorId || null,
         now, now
@@ -117,8 +116,8 @@ router.get('/races', authMiddleware, operatorOnly, async (req: Request, res: Res
     const total = parseInt(countResult?.count || '0', 10);
 
     const rows = await query<any>(
-      `SELECT id, name, status, start_time, end_time, description,
-              player_count, created_at, updated_at
+      `SELECT id, name, status, start_time, end_time,
+              created_at, updated_at
        FROM races ${whereClause}
        ORDER BY start_time DESC
        LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
@@ -129,9 +128,7 @@ router.get('/races', authMiddleware, operatorOnly, async (req: Request, res: Res
       id: r.id,
       name: r.name,
       status: r.status,
-      description: r.description,
       startTime: r.start_time,
-      playerCount: r.player_count || 0,
     }));
 
     return res.json({
@@ -154,7 +151,7 @@ router.get('/races/:id', authMiddleware, operatorOnly, async (req: Request, res:
     const { id } = req.params;
 
     const race = await queryOne<any>(
-      `SELECT id, name, status, start_time, end_time, description, player_count
+      `SELECT id, name, status, start_time, end_time
        FROM races WHERE id = $1`,
       [id]
     );
@@ -171,9 +168,7 @@ router.get('/races/:id', authMiddleware, operatorOnly, async (req: Request, res:
           id: race.id,
           name: race.name,
           status: race.status,
-          description: race.description,
           startTime: race.start_time,
-          playerCount: race.player_count || 0,
         },
       },
     });

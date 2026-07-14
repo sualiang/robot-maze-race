@@ -477,7 +477,7 @@ router.get('/dashboard', authMiddleware, operatorOnly, async (req: Request, res:
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
     const todayPlayers = await queryOne<{ count: string }>(
-      `SELECT COUNT(DISTINCT user_id) as count FROM race_attendance
+      `SELECT COUNT(DISTINCT player_id) as count FROM race_attendance
        WHERE venue_id = $1 AND date(check_in_at) = $2`,
       [venueId, today]
     );
