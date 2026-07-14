@@ -40,7 +40,6 @@ import AdminProfile from '../pages/admin/profile/AdminProfile';
 
 // 总部后台新页面
 import AdminSeasonList from '../pages/admin/season/AdminSeasonList';
-import PrizeList from '../pages/admin/prize/PrizeList';
 import TaskList from '../pages/admin/task/TaskList';
 import MerchantManage from '../pages/admin/merchant/MerchantManage';
 
@@ -112,7 +111,6 @@ export default function AppRouter() {
         <Route path="settings" element={<SystemSettings />} />
         <Route path="profile" element={<AdminProfile />} />
         <Route path="season" element={<AdminSeasonList />} />
-        <Route path="prize" element={<PrizeList />} />
         <Route path="task" element={<TaskList />} />
         <Route path="operators/:id/merchants" element={<MerchantManage />} />
       </Route>

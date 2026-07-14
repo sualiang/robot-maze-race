@@ -11,10 +11,8 @@
     "pages/help/assist/assist",
     "pages/edit-profile/edit-profile",
     "pages/coupon/coupon",
-    "pages/lottery/lottery",
     "pages/task/task",
     "pages/evaluation/evaluation",
-    "pages/prize/prize",
     "pages/orders/orders",
     "pages/points-shop/points-shop"
   ],

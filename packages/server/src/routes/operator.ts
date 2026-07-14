@@ -521,66 +521,6 @@ router.get('/dashboard', authMiddleware, operatorOnly, async (req: Request, res:
 });
 
 /**
- * POST /api/v1/operator/verify
- * 扫码核销参赛码
- * @body code - 参赛码（必填）
- * @body venueId - 场馆 ID（必填）
- */
-router.post('/verify', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
-  try {
-    const { code, venueId } = req.body;
-
-    if (!code || !venueId) {
-      return res.status(400).json({ code: 400, message: '参赛码和场馆 ID 不能为空', data: null });
-    }
-
-    // 查找该参赛码
-    const ticket = await queryOne<{
-      id: string;
-      user_id: string;
-      race_count: number;
-      used_count: number;
-    }>(
-      `SELECT id, user_id, race_count, used_count
-       FROM user_tickets WHERE code = $1`,
-      [code]
-    );
-
-    if (!ticket) {
-      return res.status(404).json({ code: 404, message: '参赛码无效', data: null });
-    }
-
-    if (ticket.used_count >= ticket.race_count) {
-      return res.status(400).json({ code: 400, message: '参赛次数已用完', data: null });
-    }
-
-    // 更新使用次数
-    await query(
-      `UPDATE user_tickets SET used_count = used_count + 1, updated_at = $1 WHERE id = $2`,
-      [new Date().toISOString(), ticket.id]
-    );
-
-    // 记录核销日志
-    await query(
-      `INSERT INTO ticket_redemptions (id, ticket_id, user_id, venue_id, redeemed_at)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [uuidv4(), ticket.id, ticket.user_id, venueId, new Date().toISOString()]
-    );
-
-    return res.json({
-      code: 0,
-      message: '核销成功',
-      data: {
-        remaining: ticket.race_count - ticket.used_count - 1,
-      },
-    });
-  } catch (error: any) {
-    console.error('[Operator] verify error:', error.message);
-    return res.status(500).json({ code: 500, message: '核销失败', data: null });
-  }
-});
-
-/**
  * GET /api/v1/operator/profile
  * 获取运营商个人信息
  */

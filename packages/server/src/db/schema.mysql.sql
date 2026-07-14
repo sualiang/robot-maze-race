@@ -459,17 +459,6 @@ CREATE TABLE IF NOT EXISTS race_attendance (
   status VARCHAR(20)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- ==================== 用户票券表 ====================
-CREATE TABLE IF NOT EXISTS user_tickets (
-  id VARCHAR(36) PRIMARY KEY,
-  player_id VARCHAR(36),
-  ticket_type VARCHAR(32),
-  status VARCHAR(20) DEFAULT 'unused',
-  created_at DATETIME,
-  used_at DATETIME,
-  expires_at DATETIME
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
 -- ==================== 票券兑换表 ====================
 CREATE TABLE IF NOT EXISTS ticket_redemptions (
   id VARCHAR(36) PRIMARY KEY,
@@ -541,37 +530,6 @@ CREATE TABLE IF NOT EXISTS points_transactions (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE INDEX IF NOT EXISTS idx_points_transactions_user ON points_transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_points_transactions_created ON points_transactions(created_at);
-
--- ==================== 奖品表 ====================
-CREATE TABLE IF NOT EXISTS lottery_prizes (
-  id VARCHAR(36) PRIMARY KEY,
-  name VARCHAR(128) NOT NULL,
-  image_url VARCHAR(512) DEFAULT '',
-  prize_type INT NOT NULL DEFAULT 1,
-  prize_value VARCHAR(256) DEFAULT '',
-  total_count INT NOT NULL DEFAULT 0,
-  remain_count INT NOT NULL DEFAULT 0,
-  probability DOUBLE NOT NULL DEFAULT 0,
-  weight INT NOT NULL DEFAULT 1,
-  status INT NOT NULL DEFAULT 1,
-  sort_order INT DEFAULT 0,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX IF NOT EXISTS idx_lottery_prizes_status ON lottery_prizes(status);
-
--- ==================== 抽奖记录表 ====================
-CREATE TABLE IF NOT EXISTS lottery_records (
-  id VARCHAR(36) PRIMARY KEY,
-  user_id VARCHAR(36) NOT NULL,
-  prize_id VARCHAR(36),
-  prize_name VARCHAR(128) DEFAULT '',
-  points_cost INT NOT NULL DEFAULT 0,
-  is_win INT NOT NULL DEFAULT 0,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX IF NOT EXISTS idx_lottery_records_user ON lottery_records(user_id);
-CREATE INDEX IF NOT EXISTS idx_lottery_records_created ON lottery_records(created_at);
 
 -- ==================== 商家优惠券模板表 ====================
 CREATE TABLE IF NOT EXISTS merchant_coupons (

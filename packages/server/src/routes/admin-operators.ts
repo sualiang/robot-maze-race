@@ -461,9 +461,8 @@ router.delete('/:id', authMiddleware, checkPermission('operators:delete'), async
         await tx.query('UPDATE users SET role = NULL WHERE id = $1', [uid]);
       }
 
-      // 删除参赛包、票务
+      // 删除参赛包
       await tx.query('DELETE FROM race_packages WHERE operator_id = $1', [id]);
-      await tx.query('DELETE FROM user_tickets WHERE operator_id = $1', [id]);
       await tx.query('DELETE FROM ticket_redemptions WHERE operator_id = $1', [id]);
 
       // 最后删除运营商本身

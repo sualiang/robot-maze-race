@@ -425,20 +425,6 @@ CREATE TABLE IF NOT EXISTS race_attendance (
   updated_at TEXT DEFAULT (datetime('now'))
 );
 
--- ==================== 用户票券表 ====================
-CREATE TABLE IF NOT EXISTS user_tickets (
-  id TEXT PRIMARY KEY,
-  player_id TEXT,
-  ticket_type TEXT,
-  status TEXT DEFAULT 'unused',
-  created_at TEXT,
-  used_at TEXT,
-  expires_at TEXT
-  operator_id TEXT REFERENCES operators(id),
-  created_at TEXT DEFAULT (datetime('now')),
-  updated_at TEXT DEFAULT (datetime('now'))
-);
-
 -- ==================== 票券兑换表 ====================
 CREATE TABLE IF NOT EXISTS ticket_redemptions (
   id TEXT PRIMARY KEY,

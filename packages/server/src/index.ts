@@ -42,11 +42,9 @@ import merchantCouponRoutes from './routes/merchant-coupon';
 import merchantVerifyRoutes from './routes/merchant-verify';
 import operatorMerchantRoutes from './routes/operator-merchant';
 import rankRoutes from './routes/rank';
-import prizeRoutes from './routes/prize';
 import taskRoutes from './routes/task';
 import adminSeasonRoutes from './routes/admin-season';
 import adminMerchantRoutes from './routes/admin-merchant';
-import adminPrizeRoutes from './routes/admin-prize';
 import adminTaskRoutes from './routes/admin-task';
 import uploadRoutes from './routes/upload';
 
@@ -124,7 +122,6 @@ app.use('/api/v1/operator/players', operatorPlayersRouter);
 app.use('/api/v1/rank', rankRoutes);
 app.use('/api/v1/season', seasonRoutes);
 app.use('/api/v1/points', pointsRoutes);
-app.use('/api/v1/prize', prizeRoutes);
 // 注意：merchant-coupon 和 merchant-verify 必须先注册（有更具体的路径）
 // merchantRoutes（玩家端卡包）在最后注册，避免被 `/coupon` 前缀抢占
 app.use('/api/v1/merchant/auth', merchantAuthRoutes);
@@ -136,7 +133,6 @@ app.use('/api/v1/operator', operatorMerchantRoutes);
 app.use('/api/v1/task', taskRoutes);
 app.use('/api/v1/admin/season', adminSeasonRoutes);
 app.use('/api/v1/admin/merchant', adminMerchantRoutes);
-app.use('/api/v1/admin/prize', adminPrizeRoutes);
 app.use('/api/v1/admin/task', adminTaskRoutes);
 
 // 参赛抵扣金
