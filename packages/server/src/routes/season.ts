@@ -195,7 +195,7 @@ router.get('/config', async (_req: Request, res: Response) => {
     let season: any = null;
     try {
       season = await queryOne<any>(
-        `SELECT start_time, end_time, name FROM seasons WHERE status = 1 ORDER BY sort_order ASC LIMIT 1`
+        `SELECT start_date, end_date, name FROM seasons WHERE status = 1 ORDER BY sort_order ASC LIMIT 1`
       );
     } catch {
       // seasons 表可能不存在
@@ -224,8 +224,8 @@ router.get('/config', async (_req: Request, res: Response) => {
       cycleStart = start.toISOString();
       cycleEnd = end.toISOString();
     } else {
-      cycleStart = season?.start_time || now.toISOString();
-      cycleEnd = season?.end_time || new Date('2099-12-31').toISOString();
+      cycleStart = season?.start_date || now.toISOString();
+      cycleEnd = season?.end_date || new Date('2099-12-31').toISOString();
     }
 
     res.json({

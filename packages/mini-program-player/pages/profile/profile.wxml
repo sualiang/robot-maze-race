@@ -1,6 +1,21 @@
+<!-- 个人中心 -- 未登录显示 CTA，已登录显示完整信息 -->
 <view class="page">
 
-  <!-- ========== 模块1: 用户信息栏 ========== -->
+  <!-- ===== 未登录状态 ===== -->
+  <view wx:if="{{!isLoggedIn}}" class="unlogged-section">
+    <image class="unlogged-avatar" src="/assets/images/default-avatar.png" mode="aspectFill" />
+    <text class="unlogged-title">未登录</text>
+    <text class="unlogged-desc">登录后可查看个人信息和赛季数据</text>
+    <button class="unlogged-btn" bindtap="onGoLogin">
+      <image class="unlogged-btn-icon" src="/assets/images/wechat-icon.svg" mode="aspectFit" />
+      <text>微信登录</text>
+    </button>
+  </view>
+
+  <!-- ===== 已登录状态 ===== -->
+  <block wx:else>
+
+  <!-- 模块1: 用户信息栏 -->
   <view class="user-card" bindtap="onEditProfile">
     <image class="user-avatar" src="{{userInfo.avatar_url || userInfo.avatarUrl || '/assets/images/default-avatar.png'}}" mode="aspectFill" />
     <view class="user-info">
@@ -9,7 +24,7 @@
     </view>
   </view>
 
-  <!-- ========== 模块2: 赛季段位卡片 ========== -->
+  <!-- 模块2: 赛季段位卡片 -->
   <view wx:if="{{!seasonClosed}}" class="medal-card">
     <view class="medal-card-hd">
       <view class="medal-icon-area">
@@ -23,7 +38,6 @@
         <view class="medal-upgrade-btn" bindtap="onUpgrade">去升级</view>
       </view>
     </view>
-    <!-- 进度条 -->
     <view class="medal-progress-wrap">
       <view class="medal-progress-bg">
         <view class="medal-progress-fill" style="width: {{medalInfo.expPercent}}%"></view>
@@ -35,14 +49,13 @@
     </view>
   </view>
 
-  <!-- 赛季未开启 -->
   <view wx:elif="{{seasonClosed}}" class="season-closed-card">
     <image class="season-closed-icon" src="/assets/images/trophy-1.svg" mode="aspectFit" />
     <text class="season-closed-text">赛季即将开启</text>
     <text class="season-closed-desc">敬请期待</text>
   </view>
 
-  <!-- ========== 模块3: 福利资产卡片 ========== -->
+  <!-- 模块3: 福利资产卡片 -->
   <view class="assets-card">
     <view class="assets-col" bindtap="onDeductTap">
       <text class="assets-number assets-number-red">¥{{assets.deductible}}</text>
@@ -57,7 +70,7 @@
     </view>
   </view>
 
-  <!-- ========== 模块4: 赛季数据轻览 ========== -->
+  <!-- 模块4: 赛季数据轻览 -->
   <view class="stats-bar">
     <view class="stats-item">
       <text class="stats-value">{{seasonStats.totalRaces}}场</text>
@@ -69,7 +82,7 @@
     </view>
   </view>
 
-  <!-- ========== 模块5: 功能入口列表 ========== -->
+  <!-- 模块5: 功能入口列表 -->
   <view class="menu-section">
     <view
       wx:for="{{menuList}}"
@@ -86,9 +99,11 @@
     </view>
   </view>
 
-  <!-- ========== 模块6: 退出登录按钮 ========== -->
+  <!-- 模块6: 退出登录按钮 -->
   <view class="logout-area">
     <view class="logout-btn" bindtap="onLogout">退出登录</view>
   </view>
+
+  </block>
 
 </view>

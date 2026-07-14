@@ -1,23 +1,23 @@
-<view class="login-container">
-  <view class="login-box">
-    <!-- Logo + 应用名 -->
-    <view class="logo-area">
-      <image class="logo-image" src="/assets/images/logo-avatar.png" mode="aspectFit" />
-      <text class="app-name">迷宫竞速</text>
-      <text class="app-subtitle">微信一键登录</text>
-    </view>
+<view class="page">
+  <!-- Logo + 标题 -->
+  <view class="header">
+    <image class="logo" src="/assets/images/logo-avatar.png" mode="aspectFit" />
+    <text class="title">迷宫竞速</text>
+    <text class="subtitle">微信授权登录，开启竞速之旅</text>
+  </view>
 
-    <!-- 微信登录按钮 -->
-    <view class="form-area">
-      <button
-        class="wx-login-btn"
-        loading="{{loading}}"
-        disabled="{{loading}}"
-        bindtap="doWxLogin"
-      >
-        <image class="wx-login-icon" src="/assets/images/wechat-icon.svg" mode="aspectFit" />
-        <text>{{loading ? '登录中...' : '微信一键登录'}}</text>
-      </button>
-    </view>
+  <!-- 微信手机号授权登录按钮 -->
+  <view class="login-area">
+    <button
+      class="weui-btn weui-btn_primary"
+      open-type="getPhoneNumber"
+      loading="{{loading}}"
+      disabled="{{loading}}"
+      bindgetphonenumber="onGetPhoneNumber"
+    >
+      <image class="weui-btn_icon" src="/assets/images/wechat-icon.svg" mode="aspectFit" />
+      <text>{{loading ? '登录中...' : '微信手机号一键登录'}}</text>
+    </button>
+    <text class="hint">点击即授权微信绑定的手机号</text>
   </view>
 </view>

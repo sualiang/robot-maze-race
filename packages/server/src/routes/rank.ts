@@ -31,7 +31,7 @@ async function getCurrentSeason(): Promise<{
   let season: any = null;
   try {
     season = await queryOne<any>(
-      `SELECT id, name, start_time, end_time, status
+      `SELECT id, name, start_date, end_date, status
        FROM seasons
        WHERE status = 1
        ORDER BY sort_order ASC, created_at DESC
@@ -68,8 +68,8 @@ async function getCurrentSeason(): Promise<{
   } else {
     // total = 整个赛季
     if (season) {
-      cycleStart = season.start_time || now.toISOString();
-      cycleEnd = season.end_time || new Date('2099-12-31').toISOString();
+      cycleStart = season.start_date || now.toISOString();
+      cycleEnd = season.end_date || new Date('2099-12-31').toISOString();
     } else {
       cycleStart = now.toISOString();
       cycleEnd = new Date('2099-12-31').toISOString();

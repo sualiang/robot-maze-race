@@ -1,179 +1,121 @@
-// pages/login/login.js - 微信一键登录
-// 深色主题，支持 QR 回跳（redirect 参数）
+// pages/login/login.js — 微信登录（三步流程，WeUI 白底风格）
+// 步骤: getPhoneNumber → wx.login → /auth/wx-login → /auth/decrypt-phone → /auth/me
 var request = require('../../utils/request');
 var storage = require('../../utils/storage');
 
 Page({
   data: {
-    loading: false,
-    redirect: null,
-    redirectParams: null
+    loading: false
   },
 
-  onLoad: function (options) {
+  onLoad: function () {
     var app = getApp();
-
-    // 如果已登录则直接跳转
+    // 已登录直接去首页
     if (app.globalData.isLoggedIn) {
-      this.handleRedirect();
-      return;
+      wx.switchTab({ url: '/pages/index/index' });
     }
-
-    // 解析 redirect 参数
-    var redirect = options.redirect || '';
-    var params = {};
-    if (redirect) {
-      for (var key in options) {
-        if (key !== 'redirect' && options.hasOwnProperty(key)) {
-          params[key] = options[key];
-        }
-      }
-    }
-
-    this.setData({
-      redirect: redirect || null,
-      redirectParams: params
-    });
   },
 
   // ===== 保存登录态 =====
   _saveLogin: function (token, user) {
-    var userData = Object.assign({}, user || {}, {
-      gender: (user && user.gender) || '',
-      phone: (user && user.phone) || ''
-    });
-
     storage.setSync(storage.STORAGE_KEYS.TOKEN, token);
-    storage.setSync(storage.STORAGE_KEYS.USER, userData);
-
+    storage.setSync(storage.STORAGE_KEYS.USER, user || {});
     var app = getApp();
     app.globalData.token = token;
     app.globalData.userInfo = user || {};
     app.globalData.isLoggedIn = true;
   },
 
-  // ===== 微信一键登录 =====
-  doWxLogin: function () {
+  // ===== 微信登录按钮（open-type="getPhoneNumber" 回调） =====
+  onGetPhoneNumber: function (e) {
     var that = this;
-    if (that.data.loading) return;
+    var detail = e.detail;
 
-    that.setData({ loading: true });
-
-    wx.login({
-      success: function (loginRes) {
-        if (!loginRes.code) {
-          that.setData({ loading: false });
-          wx.showToast({ title: '获取微信授权失败', icon: 'none' });
-          return;
-        }
-
-        // POST /auth/wx-login 用 code 换取 token
-        request.post('/auth/wx-login', {
-          code: loginRes.code
-        }).then(function (d) {
-          that.setData({ loading: false });
-
-          if (!d || !d.token) {
-            wx.showToast({ title: '登录失败，请重试', icon: 'none' });
-            return;
-          }
-
-          // 保存登录态
-          that._saveLogin(d.token, d.user);
-
-          wx.showToast({ title: '登录成功', icon: 'success', duration: 1500 });
-
-          setTimeout(function () {
-            if (d.is_new_user === true) {
-              // 新用户（未绑定手机号）→ 编辑资料页
-              wx.redirectTo({ url: '/pages/edit-profile/edit-profile' });
-            } else {
-              // 老用户（已绑定手机号）→ 首页
-              that.handleRedirect();
-            }
-          }, 1500);
-        }).catch(function (err) {
-          that.setData({ loading: false });
-          var msg = (err && err.message) || '登录失败，请重试';
-          wx.showToast({ title: msg, icon: 'none', duration: 2000 });
-        });
-      },
-      fail: function () {
-        that.setData({ loading: false });
-        wx.showToast({ title: '微信登录失败，请重试', icon: 'none' });
-      }
-    });
-  },
-
-  // ===== 根据 redirect 参数跳转 =====
-  handleRedirect: function () {
-    var redirect = this.data.redirect;
-    var params = this.data.redirectParams;
-
-    if (redirect) {
-      var url = '/pages/' + redirect + '/' + redirect;
-
-      var queryParts = [];
-      for (var key in params) {
-        if (params.hasOwnProperty(key)) {
-          queryParts.push(key + '=' + encodeURIComponent(String(params[key])));
-        }
-      }
-      if (queryParts.length > 0) {
-        url += '?' + queryParts.join('&');
-      }
-
-      wx.redirectTo({
-        url: url,
-        fail: function () {
-          // 如果 redirect 页面不存在，降级到首页
-          wx.switchTab({ url: '/pages/index/index' });
-        }
-      });
-    } else {
-      // 无 redirect 参数，跳首页（Tab 页）
-      wx.switchTab({ url: '/pages/index/index' });
+    // 用户拒绝授权
+    if (detail.errMsg && detail.errMsg.indexOf(':ok') === -1) {
+      return;
     }
-  },
 
-  // ===== 注册入口 → 微信登录后跳编辑资料页 =====
-  doRegister: function () {
-    var that = this;
-    if (that.data.loading) return;
+    if (!detail.code) {
+      wx.showToast({ title: '获取手机号失败', icon: 'none' });
+      return;
+    }
 
     that.setData({ loading: true });
 
+    var phoneCode = detail.code;
+
+    // 第一步: wx.login 拿 code
     wx.login({
       success: function (loginRes) {
         if (!loginRes.code) {
           that.setData({ loading: false });
-          wx.showToast({ title: '获取微信授权失败', icon: 'none' });
+          wx.showToast({ title: '微信登录失败', icon: 'none' });
           return;
         }
 
+        // 第二步: /auth/wx-login 用微信 code 换 token
         request.post('/auth/wx-login', {
           code: loginRes.code
         }).then(function (d) {
-          that.setData({ loading: false });
-
           if (!d || !d.token) {
-            wx.showToast({ title: '登录失败，请重试', icon: 'none' });
+            that.setData({ loading: false });
+            wx.showToast({ title: '登录失败', icon: 'none' });
             return;
           }
 
-          that._saveLogin(d.token, d.user);
+          // 保存 token
+          that._saveLogin(d.token, d.user || {});
 
-          // 注册模式：始终跳编辑资料页
-          wx.redirectTo({ url: '/pages/edit-profile/edit-profile' });
+          // 第三步: /auth/decrypt-phone 解密手机号
+          request.post('/auth/decrypt-phone', {
+            code: phoneCode
+          }).then(function (phoneRes) {
+            var phone = (phoneRes && phoneRes.phone) || '';
+
+            // 第四步: /auth/me 查用户完整信息
+            request.silentGet('/auth/me').then(function (me) {
+              that.setData({ loading: false });
+              var user = me || {};
+
+              // 判断新老用户：有昵称 且 有头像 → 老用户
+              var isNewUser = !user.nickname || !user.avatar_url;
+
+              if (phone) {
+                user.phone = phone;
+                storage.setSync(storage.STORAGE_KEYS.USER, user);
+                getApp().globalData.userInfo = user;
+              }
+
+              if (isNewUser) {
+                // 新用户 → 编辑资料页
+                wx.redirectTo({ url: '/pages/edit-profile/edit-profile' });
+              } else {
+                // 老用户 → 首页
+                wx.showToast({ title: '登录成功', icon: 'success', duration: 1000 });
+                setTimeout(function () {
+                  wx.switchTab({ url: '/pages/index/index' });
+                }, 1000);
+              }
+            }).catch(function () {
+              that.setData({ loading: false });
+              // /auth/me 失败，按新用户处理
+              wx.redirectTo({ url: '/pages/edit-profile/edit-profile' });
+            });
+          }).catch(function (err) {
+            that.setData({ loading: false });
+            var msg = (err && err.message) || '获取手机号失败';
+            wx.showToast({ title: msg, icon: 'none' });
+          });
         }).catch(function (err) {
           that.setData({ loading: false });
-          var msg = (err && err.message) || '登录失败，请重试';
-          wx.showToast({ title: msg, icon: 'none', duration: 2000 });
+          var msg = (err && err.message) || '登录失败';
+          wx.showToast({ title: msg, icon: 'none' });
         });
       },
       fail: function () {
         that.setData({ loading: false });
-        wx.showToast({ title: '微信登录失败，请重试', icon: 'none' });
+        wx.showToast({ title: '微信登录失败', icon: 'none' });
       }
     });
   }

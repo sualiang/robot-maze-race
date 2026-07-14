@@ -1,15 +1,13 @@
-// 个人中心 V2.0 - 完整重构
-// 模块：用户信息 | 赛季段位 | 福利资产 | 赛季数据 | 功能入口 | 退出登录
+// 个人中心 — 未登录显示 CTA，已登录显示完整信息
 var request = require('../../utils/request');
 var storage = require('../../utils/storage');
 var app = getApp();
 
 Page({
   data: {
-    // 模块1: 用户信息
+    isLoggedIn: false,
     userInfo: {},
 
-    // 模块2: 赛季段位
     seasonClosed: false,
     medalInfo: {
       level: 1,
@@ -21,21 +19,18 @@ Page({
       upgradeDesc: '升级白银立得：5元无门槛参赛抵价券 + 50积分'
     },
 
-    // 模块3: 福利资产
     assets: {
-      deductible: 0,    // 参赛抵扣卡
-      couponCount: 0,   // 券数量
-      couponTotal: 0    // 券总价值
+      deductible: 0,
+      couponCount: 0,
+      couponTotal: 0
     },
 
-    // 模块4: 赛季数据
     seasonStats: {
       totalRaces: 0,
       bestTime: '--',
       totalPoints: 0
     },
 
-    // 模块5: 功能入口
     menuList: [
       { key: 'order', icon: '📋', label: '我的订单', url: '/pages/orders/orders', rightText: '' },
       { key: 'coupon', icon: '🎫', label: '我的卡券', url: '/pages/coupon/coupon', rightText: '' },
@@ -44,29 +39,45 @@ Page({
   },
 
   onShow: function () {
-    if (!app.globalData.isLoggedIn) {
-      wx.redirectTo({ url: '/pages/login/login' });
-      return;
+    // Bug fix: 直接检查 storage 中的 token，不信任可能过期的 globalData
+    var token = wx.getStorageSync('player_token');
+    var loggedIn = !!token;
+    // 同步 globalData（防止 request.js 401 只清了 storage 没清 globalData）
+    if (!token) {
+      app.globalData.isLoggedIn = false;
+      app.globalData.token = null;
+      app.globalData.userInfo = null;
+    } else {
+      app.globalData.isLoggedIn = true;
+      app.globalData.token = token;
     }
-    this.loadData();
+    this.setData({ isLoggedIn: loggedIn });
+    if (loggedIn) {
+      this.loadData();
+    }
   },
 
   onPullDownRefresh: function () {
-    this.loadData();
+    if (app.globalData.isLoggedIn) {
+      this.loadData();
+    } else {
+      wx.stopPullDownRefresh();
+    }
+  },
+
+  // 去登录
+  onGoLogin: function () {
+    wx.navigateTo({ url: '/pages/login/login' });
   },
 
   loadData: function () {
     var that = this;
-
-    // 从缓存取基本信息
     var user = storage.getSync(storage.STORAGE_KEYS.USER, {});
     that.setData({ userInfo: user });
 
-    // 1. GET /api/v1/player/me/profile - 用户信息
     request.silentGet('/player/me/profile').then(function (res) {
       if (res) {
         var profileData = res.code === 0 && res.data ? res.data : res;
-        // 补全驼峰→蛇形字段映射，避免覆盖本地缓存中的蛇形字段
         if (profileData.avatarUrl && !profileData.avatar_url) {
           profileData.avatar_url = profileData.avatarUrl;
         }
@@ -79,11 +90,9 @@ Page({
       }
     }).catch(function () {});
 
-    // 2. 统一从 profile-check 获取所有汇总数据
     request.silentGet('/player/me/profile-check').then(function (res) {
       var d = res.data || res;
       var balance = d.pointsBalance || 0;
-
       that.setData({
         assets: {
           deductible: (d.availableDeductionCents || 0) / 100,
@@ -95,17 +104,14 @@ Page({
       });
     }).catch(function () {});
 
-    // 3. GET /api/v1/season/user/info - 段位/排名/成长值
     request.silentGet('/season/user/info').then(function (res) {
       if (res) {
         var currentExp = res.exp || res.currentExp || res.current_exp || 0;
         var nextLevelExp = res.nextLevelExp || res.next_level_exp || 200;
         var expPercent = nextLevelExp > 0 ? Math.min(100, Math.round((currentExp / nextLevelExp) * 100)) : 0;
-
-        var level = res.level || 1;
         that.setData({
           medalInfo: {
-            level: level,
+            level: res.level || 1,
             levelName: res.levelName || res.level_name || '青铜选手',
             currentExp: currentExp,
             nextLevelExp: nextLevelExp,
@@ -124,27 +130,22 @@ Page({
     wx.stopPullDownRefresh();
   },
 
-  // 跳转编辑资料
   onEditProfile: function () {
     wx.navigateTo({ url: '/pages/edit-profile/edit-profile' });
   },
 
-  // 去升级 → 跳转首页参赛包区域
   onUpgrade: function () {
     wx.switchTab({ url: '/pages/index/index' });
   },
 
-  // 跳转卡券页 — 参赛抵扣卡 → Tab 0
   onDeductTap: function () {
     wx.navigateTo({ url: '/pages/coupon/coupon?tab=0' });
   },
 
-  // 跳转卡券页 — 消费券 → Tab 1 立减券
   onCouponTap: function () {
     wx.navigateTo({ url: '/pages/coupon/coupon?tab=1' });
   },
 
-  // 功能入口点击
   onMenuItemTap: function (e) {
     var url = e.currentTarget.dataset.url;
     if (url) {
@@ -152,7 +153,6 @@ Page({
     }
   },
 
-  // 退出登录
   onLogout: function () {
     var that = this;
     wx.showModal({
@@ -162,7 +162,18 @@ Page({
         if (res.confirm) {
           var auth = require('../../utils/auth');
           auth.logout();
-          wx.redirectTo({ url: '/pages/login/login' });
+          that.setData({
+            isLoggedIn: false,
+            userInfo: {},
+            medalInfo: {
+              level: 1, levelName: '青铜选手',
+              currentExp: 0, nextLevelExp: 100, rank: 0,
+              expPercent: 0,
+              upgradeDesc: '升级白银立得：5元无门槛参赛抵价券 + 50积分'
+            },
+            assets: { deductible: 0, couponCount: 0, couponTotal: 0 },
+            seasonStats: { totalRaces: 0, bestTime: '--', totalPoints: 0 }
+          });
         }
       }
     });

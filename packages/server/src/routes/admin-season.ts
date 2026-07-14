@@ -35,8 +35,8 @@ router.get('/season', authMiddleware, adminMiddleware, async (_req: Request, res
           id: s.id,
           name: s.name,
           description: s.description || '',
-          startTime: s.start_time,
-          endTime: s.end_time,
+          startTime: s.start_date,
+          endTime: s.end_date,
           status: s.status || 0,
           sortOrder: s.sort_order || 0,
           createdAt: s.created_at,
@@ -65,7 +65,7 @@ router.post('/season', authMiddleware, adminMiddleware, async (req: Request, res
   try {
     const id = uuidv4();
     await execute(
-      `INSERT INTO seasons (id, name, description, start_time, end_time, status, sort_order, created_at, updated_at)
+      `INSERT INTO seasons (id, name, description, start_date, end_date, status, sort_order, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, 0, $6, NOW(), NOW())`,
       [id, name, description || '', startTime || null, endTime || null, sortOrder || 0]
     );
@@ -101,8 +101,8 @@ router.put('/season/:id', authMiddleware, adminMiddleware, async (req: Request, 
 
     if (name !== undefined) { updates.push(`name = $${idx++}`); params.push(name); }
     if (description !== undefined) { updates.push(`description = $${idx++}`); params.push(description); }
-    if (startTime !== undefined) { updates.push(`start_time = $${idx++}`); params.push(startTime); }
-    if (endTime !== undefined) { updates.push(`end_time = $${idx++}`); params.push(endTime); }
+    if (startTime !== undefined) { updates.push(`start_date = $${idx++}`); params.push(startTime); }
+    if (endTime !== undefined) { updates.push(`end_date = $${idx++}`); params.push(endTime); }
     if (sortOrder !== undefined) { updates.push(`sort_order = $${idx++}`); params.push(sortOrder); }
     if (status !== undefined) { updates.push(`status = $${idx++}`); params.push(status); }
 

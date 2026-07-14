@@ -1,99 +1,137 @@
+/* 编辑资料页 — WeUI 白底风格 */
+page {
+  background-color: #f6f6f6;
+}
+
 .page {
-  padding: 20rpx;
+  min-height: 100vh;
+  box-sizing: border-box;
 }
 
-.section {
-  background: #1a1a2e;
-  border-radius: 14rpx;
-  margin-bottom: 20rpx;
-  overflow: hidden;
-}
-
-.field-row {
+/* WeUI 风格 cell */
+.weui-cell {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 28rpx 24rpx;
-  min-height: 56rpx;
-}
-
-.field-row + .field-row {
-  border-top: 1rpx solid rgba(255,255,255,0.04);
-}
-
-.field-label {
+  padding: 28rpx 30rpx;
+  background-color: #fff;
+  position: relative;
+  border: none;
+  border-radius: 0;
+  width: 100%;
+  box-sizing: border-box;
   font-size: 28rpx;
-  color: #ccc;
+  line-height: inherit;
+  text-align: left;
+}
+
+.weui-cell::after {
+  content: '';
+  position: absolute;
+  left: 30rpx;
+  right: 0;
+  bottom: 0;
+  height: 1rpx;
+  background-color: #e5e5e5;
+}
+
+.weui-cell:last-child::after {
+  left: 0;
+}
+
+.weui-cell_access {
+  justify-content: space-between;
+}
+
+.weui-cell__hd {
+  color: #000;
+  font-size: 28rpx;
   flex-shrink: 0;
   width: 140rpx;
 }
 
-.field-input {
+.weui-cell__bd {
   flex: 1;
+  color: #000;
   font-size: 28rpx;
-  color: #e0e0e0;
+}
+
+.weui-cell__bd_right {
   text-align: right;
+}
+
+.weui-cell__bd_readonly {
+  color: #999;
+}
+
+.weui-cell__ft {
+  flex-shrink: 0;
+}
+
+.weui-cell__ft_arrow::after {
+  content: '';
+  display: inline-block;
+  width: 14rpx;
+  height: 14rpx;
+  border-right: 3rpx solid #c7c7cc;
+  border-bottom: 3rpx solid #c7c7cc;
+  transform: rotate(-45deg);
+}
+
+/* 头像预览 */
+.avatar-preview {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 8rpx;
+  background-color: #e5e5e5;
+}
+
+/* 昵称输入 */
+.weui-input {
+  width: 100%;
+  text-align: right;
+  font-size: 28rpx;
+  color: #000;
   background: transparent;
   border: none;
   outline: none;
 }
 
-.field-value-row {
+.weui-input::placeholder {
+  color: #b2b2b2;
+}
+
+/* 保存按钮区 */
+.btn-area {
+  padding: 40rpx 30rpx;
+}
+
+.weui-btn {
+  width: 100%;
+  height: 88rpx;
   display: flex;
   align-items: center;
-  gap: 12rpx;
-}
-
-.field-value {
-  font-size: 28rpx;
-  color: #e0e0e0;
-}
-
-.field-placeholder {
-  color: #666;
-}
-
-.arrow-icon {
+  justify-content: center;
+  border-radius: 8rpx;
   font-size: 32rpx;
-  color: #666;
-}
-
-.avatar-preview {
-  width: 88rpx;
-  height: 88rpx;
-  border-radius: 50%;
-  border: 2rpx solid rgba(255,255,255,0.1);
-}
-
-/* ===== 原生按钮去样式 ===== */
-.native-btn {
-  width: 100%;
-  background: transparent;
+  font-weight: 500;
   border: none;
-  padding: 0;
+}
+
+.weui-btn_primary {
+  background-color: #07C160;
+  color: #fff;
+}
+
+.weui-btn_primary:active {
+  background-color: #06ad56;
+}
+
+/* 原生按钮去样式 */
+button.weui-cell {
+  padding: 28rpx 30rpx;
   margin: 0;
-  line-height: inherit;
-  font-size: inherit;
-  text-align: left;
-  border-radius: 0;
 }
 
-.native-btn::after {
+button.weui-cell::after {
   border: none;
-}
-
-/* ===== 保存按钮 ===== */
-.save-section {
-  margin-top: 60rpx;
-  padding: 0 20rpx;
-}
-
-.save-btn {
-  width: 100%;
-  height: 88rpx;
-  line-height: 88rpx;
-  text-align: center;
-  font-size: 30rpx;
-  font-weight: 700;
-  border-radius: 44rpx;
 }

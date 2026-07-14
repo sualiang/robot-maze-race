@@ -38,6 +38,10 @@ function request(url, options) {
         } else if (res.statusCode === 401) {
           wx.removeStorageSync('player_token');
           wx.removeStorageSync('player_user');
+          var app = getApp();
+          app.globalData.token = null;
+          app.globalData.isLoggedIn = false;
+          app.globalData.userInfo = null;
           wx.showToast({ title: '登录已过期，请重新进入', icon: 'none', duration: 2000 });
           reject({ code: 401, message: '登录已过期' });
         } else {
