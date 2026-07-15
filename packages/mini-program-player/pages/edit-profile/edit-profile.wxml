@@ -1,8 +1,8 @@
 <!-- pages/edit-profile/edit-profile.wxml — 完善个人信息（深色主题） -->
 <view class="page">
 
-  <!-- 头像 — 顶部居中大圆，微信原生 chooseAvatar -->
-  <button class="avatar-area" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+  <!-- 头像 — 顶部居中大圆 -->
+  <button class="avatar-area" bindtap="onChooseAvatarTap">
     <image class="avatar-circle" src="{{avatar || '/assets/images/default-avatar.png'}}" mode="aspectFill" />
     <text class="avatar-hint">点击更换头像</text>
   </button>
@@ -14,7 +14,7 @@
     <view class="form-cell">
       <text class="form-cell__hd">昵称</text>
       <view class="form-cell__bd form-cell__bd_right">
-        <input class="form-input" type="nickname" value="{{nickname}}" placeholder="请输入昵称" placeholder-style="color:#475569" maxlength="12" bindinput="onNicknameInput" />
+        <input class="form-input" type="text" value="{{nickname}}" placeholder="请输入昵称" placeholder-style="color:#475569" maxlength="12" bindinput="onNicknameInput" />
       </view>
     </view>
 
