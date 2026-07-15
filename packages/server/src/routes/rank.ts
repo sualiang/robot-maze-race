@@ -1,7 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { query, queryOne } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
-import { getOperatorContext } from '../middleware/operator-context';
 
 const router = Router();
 
@@ -91,8 +90,6 @@ async function getCurrentSeason(): Promise<{
  */
 router.get('/my', authMiddleware, async (req: Request, res: Response) => {
   const userId = req.user!.userId;
-  let opId = '';
-  try { const ctx = await getOperatorContext(userId); opId = ctx?.operator_id || ''; } catch {}
 
   try {
     const season = await getCurrentSeason();
@@ -107,9 +104,8 @@ router.get('/my', authMiddleware, async (req: Request, res: Response) => {
          AND rr.status = 'completed'
          AND rr.score_ms IS NOT NULL
          AND rr.score_ms > 0
-         AND rr.finished_at >= $2
-         AND rr.operator_id = $3`,
-      [userId, season.startTime, opId]
+         AND rr.finished_at >= $2`,
+      [userId, season.startTime]
     );
 
     if (!myResult || !myResult.best_score) {
@@ -134,9 +130,8 @@ router.get('/my', authMiddleware, async (req: Request, res: Response) => {
          AND rr.score_ms IS NOT NULL
          AND rr.score_ms > 0
          AND rr.score_ms < $1
-         AND rr.finished_at >= $2
-         AND rr.operator_id = $3`,
-      [myResult.best_score, season.startTime, opId]
+         AND rr.finished_at >= $2`,
+      [myResult.best_score, season.startTime]
     );
 
     const rank = (beforeCount?.cnt || 0) + 1;
@@ -148,9 +143,8 @@ router.get('/my', authMiddleware, async (req: Request, res: Response) => {
        WHERE rr.status = 'completed'
          AND rr.score_ms IS NOT NULL
          AND rr.score_ms > 0
-         AND rr.finished_at >= $1
-         AND rr.operator_id = $2`,
-      [season.startTime, opId]
+         AND rr.finished_at >= $1`,
+      [season.startTime]
     );
     const totalPlayers = totalRow?.cnt || 0;
 
@@ -192,9 +186,6 @@ router.get('/:type', authMiddleware, async (req: Request, res: Response) => {
     return;
   }
 
-  let opId = '';
-  try { const ctx = await getOperatorContext(userId); opId = ctx?.operator_id || ''; } catch {}
-
   try {
     const season = await getCurrentSeason();
     const now = new Date().toISOString();
@@ -217,10 +208,8 @@ router.get('/:type', authMiddleware, async (req: Request, res: Response) => {
     // 排序: score_ms ASC (用时越短排名越高)
     // 仅统计 status = 'completed' 且有成绩的记录
     let rows: any[];
-    let params: any[];
 
     if (type === 'total') {
-      params = [season.startTime, opId];
       rows = await query<any>(
         `SELECT
            u.id as user_id,
@@ -234,14 +223,12 @@ router.get('/:type', authMiddleware, async (req: Request, res: Response) => {
            AND rr.score_ms IS NOT NULL
            AND rr.score_ms > 0
            AND rr.finished_at >= $1
-           AND rr.operator_id = $2
          GROUP BY rr.user_id
          ORDER BY best_score ASC
          LIMIT 100`,
-        [season.startTime, opId]
+        [season.startTime]
       );
     } else {
-      params = [userId, opId];
       rows = await query<any>(
         `SELECT
            u.id as user_id,
@@ -254,12 +241,10 @@ router.get('/:type', authMiddleware, async (req: Request, res: Response) => {
          WHERE rr.status = 'completed'
            AND rr.score_ms IS NOT NULL
            AND rr.score_ms > 0
-           AND rr.operator_id = $2
            AND ${timeWhere}
          GROUP BY rr.user_id
          ORDER BY best_score ASC
-         LIMIT 100`,
-        params
+         LIMIT 100`
       );
     }
 
@@ -299,14 +284,13 @@ router.get('/:type', authMiddleware, async (req: Request, res: Response) => {
            AND rr.status = 'completed'
            AND rr.score_ms IS NOT NULL
            AND rr.score_ms > 0
-           AND rr.operator_id = $${type === 'total' ? '3' : '2'}
            ${type === 'daily'
              ? `AND rr.finished_at >= CURDATE()`
              : type === 'weekly'
                ? `AND rr.finished_at >= DATE_SUB(CURDATE(), INTERVAL (DAYOFWEEK(CURDATE()) + 5) % 7 DAY)`
                : `AND rr.finished_at >= $2`
            }`,
-        type === 'total' ? [userId, season.startTime, opId] : [userId, opId]
+        type === 'total' ? [userId, season.startTime] : [userId]
       );
       if (myResult && myResult.best_score) {
         // 全局排名
@@ -318,7 +302,6 @@ router.get('/:type', authMiddleware, async (req: Request, res: Response) => {
              AND rr.score_ms IS NOT NULL
              AND rr.score_ms > 0
              AND rr.score_ms < $1
-             AND rr.operator_id = $${type === 'total' ? '3' : '2'}
              ${type === 'daily'
                ? `AND rr.finished_at >= CURDATE()`
                : type === 'weekly'
@@ -326,8 +309,8 @@ router.get('/:type', authMiddleware, async (req: Request, res: Response) => {
                  : `AND rr.finished_at >= $2`
              }`,
           type === 'total'
-            ? [myResult.best_score, season.startTime, opId]
-            : [myResult.best_score, opId]
+            ? [myResult.best_score, season.startTime]
+            : [myResult.best_score]
         );
         myRank = (beforeCount?.cnt || 0) + 1;
         myBestScore = myResult.best_score;

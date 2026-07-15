@@ -333,7 +333,6 @@ router.post('/points-shop/exchange', authMiddleware, async (req: Request, res: R
           item_type TEXT NOT NULL,
           item_name TEXT NOT NULL,
           spent_points INTEGER NOT NULL,
-          operator_id VARCHAR(36) DEFAULT '',
           created_at TEXT DEFAULT (NOW())
         )`
       );

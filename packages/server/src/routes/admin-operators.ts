@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
-import { query, queryOne, transaction, generateSecurePassword, queryOp, queryOpOne, executeOp } from '../config/database';
+import { query, queryOne, queryOp, queryOpOne, executeOp, transaction, generateSecurePassword, createOperatorDatabase } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import { checkPermission } from '../middleware/rbac';
 
@@ -216,6 +216,22 @@ router.post('/', authMiddleware, checkPermission('operators:create'), async (req
         1,
       ]
     );
+
+    // Card 4: 自动创建独立数据库 + 执行 schema
+    const dbName = `op_${id}`;
+    try {
+      await createOperatorDatabase(dbName);
+      // 注册到 operators_registry（公共库）
+      await query(
+        `INSERT INTO operators_registry (id, operator_id, db_name, operator_name)
+         VALUES ($1, $2, $3, $4)`,
+        [uuidv4(), id, dbName, name]
+      );
+      console.log(`[AdminOp] Operator DB created: ${dbName}`);
+    } catch (dbErr: any) {
+      console.error('[AdminOp] Failed to create operator DB:', dbErr?.message);
+      // 不阻止创建流程 — operator 已创建，可后续手动修复
+    }
 
     return res.status(201).json({
       code: 0,
