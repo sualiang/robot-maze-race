@@ -12,6 +12,8 @@ App({
     scanData: null,   // 存储扫码结果，用于跨页面传递
     operatorId: null, // 运营商 ID（从扫码/启动参数解析）
     venueId: null,    // 赛场 ID
+    needPrivacyAuth: false,  // 是否需要隐私授权
+    privacyResolve: null,    // 隐私授权 resolve 回调
   },
 
   onLaunch: function (options) {
@@ -30,6 +32,32 @@ App({
         storage.removeSync(storage.STORAGE_KEYS.USER);
       }
     } catch (e) {}
+
+    // 隐私协议检查（2.32.3+ 强制要求，否则 chooseAvatar/nickname 不可用）
+    if (wx.getPrivacySetting) {
+      wx.getPrivacySetting({
+        success: function (res) {
+          if (res.needAuthorization) {
+            that.globalData.needPrivacyAuth = true;
+          }
+        }
+      });
+    }
+
+    // 监听隐私接口调用
+    if (wx.onNeedPrivacyAuthorization) {
+      wx.onNeedPrivacyAuthorization(function (resolve) {
+        that.globalData.privacyResolve = resolve;
+        // 跳转到登录页，登录页有 agreePrivacyAuthorization 按钮
+        var pages = getCurrentPages();
+        if (pages.length > 0) {
+          var currentPage = pages[pages.length - 1];
+          if (currentPage && currentPage.route !== 'pages/login/login') {
+            wx.redirectTo({ url: '/pages/login/login' });
+          }
+        }
+      });
+    }
 
     var token = storage.getSync(storage.STORAGE_KEYS.TOKEN);
     if (token) {

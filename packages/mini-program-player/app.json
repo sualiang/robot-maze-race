@@ -70,5 +70,5 @@
   ],
   "style": "v2",
   "sitemapLocation": "sitemap.json",
-  "__usePrivacyCheck__": false
+  "__usePrivacyCheck__": true
 }
