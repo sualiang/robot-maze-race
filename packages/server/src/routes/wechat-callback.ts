@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import { config } from '../config';
-import { queryOne, query, execute } from '../config/database';
+import { queryOne, query, execute, queryOpOne } from '../config/database';
 import { sendRegisterLink } from '../services/wechat-message';
 
 const router = Router();

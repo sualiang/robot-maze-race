@@ -252,7 +252,7 @@ router.post('/wx-mp-login', async (req: Request, res: Response<ApiResponse<WxMpL
       isNewUser = true;
 
       // 新用户注册赠送参赛抵扣金
-      await grantFreeEntryDeduction(user.id);
+      await grantFreeEntryDeduction(req, user.id);
     } else {
       // 已有用户更新头像昵称（如果新拉取的更优）
       if (wxNickname && wxNickname !== user.nickname && !user.nickname.startsWith('玩家')) {
@@ -352,7 +352,7 @@ router.post('/wx-mp-bind', async (req: Request, res: Response) => {
  * 新用户注册赠送参赛抵扣金
  * 从 system_config 读取配置
  */
-async function grantFreeEntryDeduction(userId: string): Promise<void> {
+async function grantFreeEntryDeduction(req: Request, userId: string): Promise<void> {
   try {
     const cfgRow = await queryOne<{ value: string }>(
       `SELECT value FROM system_config WHERE \`key\` = $1`,

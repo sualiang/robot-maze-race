@@ -58,7 +58,7 @@ router.get('/user/info', authMiddleware, async (req: Request, res: Response) => 
       console.log('[Season] auto upgrade user', userId, 'from level', oldLevel, 'to', currentLevel);
       await execute('UPDATE users SET level = $1 WHERE id = $2', [currentLevel, userId]);
       // 发放段位升级奖励
-      await grantLevelUpReward(userId, currentLevel);
+      await grantLevelUpReward(req, userId, currentLevel);
     }
 
     // 计算下一级所需经验
@@ -301,7 +301,7 @@ router.get('/qualifier/assessment', authMiddleware, async (req: Request, res: Re
  * 发放段位升级奖励（优惠券 + 积分）
  * 每个等级终身仅发放一次
  */
-async function grantLevelUpReward(userId: string, level: number): Promise<void> {
+async function grantLevelUpReward(req: Request, userId: string, level: number): Promise<void> {
   try {
     if (level < 2 || level > 6) return;
 

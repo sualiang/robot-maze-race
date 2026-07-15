@@ -57,10 +57,6 @@ router.get('/', authMiddleware, adminOnly, async (req: Request, res: Response) =
       conditions.push(`a.venue_id = $${params.length + 1}`);
       params.push(venue_id);
     }
-    if (operator_id) {
-      conditions.push(`v.operator_id = $${params.length + 1}`);
-      params.push(operator_id);
-    }
 
     const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
 
@@ -139,10 +135,6 @@ router.get('/export', authMiddleware, adminOnly, async (req: Request, res: Respo
     if (venue_id) {
       conditions.push(`a.venue_id = $${params.length + 1}`);
       params.push(venue_id);
-    }
-    if (operator_id) {
-      conditions.push(`v.operator_id = $${params.length + 1}`);
-      params.push(operator_id);
     }
 
     const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';

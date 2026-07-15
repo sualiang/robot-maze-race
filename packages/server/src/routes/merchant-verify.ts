@@ -11,6 +11,7 @@ router.use(merchantAuthMiddleware);
  * 核心核销逻辑（供 scan / manual 共用）
  */
 async function doVerify(
+  req: Request,
   merchantId: string,
   verifierId: string,
   verifierName: string,
@@ -125,7 +126,7 @@ router.post('/scan', async (req: Request, res: Response) => {
       return;
     }
 
-    const result = await doVerify(merchantId, verifierId, verifierName, verifyCode, 1);
+    const result = await doVerify(req, merchantId, verifierId, verifierName, verifyCode, 1);
     if (result.code !== 0) {
       res.json(result);
       return;
@@ -154,7 +155,7 @@ router.post('/manual', async (req: Request, res: Response) => {
       return;
     }
 
-    const result = await doVerify(merchantId, verifierId, verifierName, verifyCode, 2);
+    const result = await doVerify(req, merchantId, verifierId, verifierName, verifyCode, 2);
     if (result.code !== 0) {
       res.json(result);
       return;

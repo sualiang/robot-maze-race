@@ -233,6 +233,63 @@ router.post('/checkin/validate', authMiddleware, async (req: Request, res: Respo
  * 提交签到（进入排队）
  * 需要用户有剩余参赛次数 + 校验参赛包属于当前 operator
  */
+
+/**
+ * 成长值发放：签到后从已购参赛包中扣减一次并发放成长值/积分
+ */
+async function grantGrowthOnCheckin(req: Request, userId: string, checkinId: string): Promise<void> {
+  try {
+    const order = await queryOpOne<any>(req,
+      `SELECT o.id, o.remaining_times, o.remaining_growth, rp.race_count, rp.growth_value, rp.point_value
+       FROM orders o
+       JOIN race_packages rp ON o.package_id = rp.id
+       WHERE o.user_id = $1 AND o.status = 'paid' AND o.remaining_times > 0
+       ORDER BY o.paid_at ASC
+       LIMIT 1`,
+      [userId]
+    );
+    if (!order) return;
+
+    const raceCount = order.race_count || 1;
+    const perCheckinGrowth = Math.floor((order.growth_value || 0) / raceCount);
+    const perCheckinPoints = Math.floor((order.point_value || 0) / raceCount);
+
+    if (perCheckinGrowth > 0) {
+      const season = await queryOne<{ id: string }>(
+        `SELECT id FROM seasons WHERE status = 1 ORDER BY created_at DESC LIMIT 1`
+      );
+      if (season) {
+        const existing = await queryOne<{ id: string; exp: number; points: number }>(
+          `SELECT id, exp, points FROM season_user_info WHERE user_id = $1 AND season_id = $2`,
+          [userId, season.id]
+        );
+        if (existing) {
+          await execute(
+            `UPDATE season_user_info SET exp = exp + $1, points = points + $2, updated_at = NOW() WHERE id = $3`,
+            [perCheckinGrowth, perCheckinPoints, existing.id]
+          );
+        } else {
+          await query(
+            `INSERT INTO season_user_info (id, user_id, season_id, level, exp, points)
+             VALUES ($1, $2, $3, 1, $4, $5)`,
+            [uuidv4(), userId, season.id, perCheckinGrowth, perCheckinPoints]
+          );
+        }
+      }
+      await execute(
+        `UPDATE users SET exp = COALESCE(exp, 0) + $1, points = COALESCE(points, 0) + $2, updated_at = NOW() WHERE id = $3`,
+        [perCheckinGrowth, perCheckinPoints, userId]
+      );
+    }
+    await executeOp(req,
+      `UPDATE orders SET remaining_times = remaining_times - 1, updated_at = NOW() WHERE id = $1 AND remaining_times > 0`,
+      [order.id]
+    );
+  } catch (err: any) {
+    console.error('[成长值发放] 失败:', err?.message || err);
+  }
+}
+
 router.post('/checkin', authMiddleware, async (req: Request, res: Response) => {
   const userId = req.user!.userId;
   const { code } = req.body;
@@ -300,7 +357,7 @@ router.post('/checkin', authMiddleware, async (req: Request, res: Response) => {
 
     // 成长值发放：从已购且还有剩余次数的参赛包中，按包扣减
     // 找到最新一个有 remaining_times > 0 的订单，扣减一次，发放 growth_value / race_count
-    await grantGrowthOnCheckin(userId, checkinId);
+    await grantGrowthOnCheckin(req, userId, checkinId);
 
     res.json({
       code: 0,

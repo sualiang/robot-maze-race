@@ -156,7 +156,7 @@ router.post('/wx-login', async (req: Request, res: Response<ApiResponse<WxLoginR
       });
 
       // 新用户注册赠送参赛抵扣金（通过 system_config 控制开关和金额，默认 1000分=10元）
-      await grantFreeEntryDeduction(user.id);
+      await grantFreeEntryDeduction(req, user.id);
     }
 
     // 2a. is_new_user 依据 phone 是否有值判断（手机号是否已绑定）
@@ -1280,7 +1280,7 @@ router.post('/register', async (req: Request, res: Response) => {
     );
 
     // 注册成功赠送参赛抵扣金（通过 system_config 控制开关和金额）
-    await grantFreeEntryDeduction(userId);
+    await grantFreeEntryDeduction(req, userId);
 
     const user: User = {
       id: userId,
@@ -1322,7 +1322,7 @@ router.post('/register', async (req: Request, res: Response) => {
  * key='register_deduction_cents' default=1000（10元）
  * 发放记录写入 entry_deductions，source='register_reward'
  */
-async function grantFreeEntryDeduction(userId: string): Promise<void> {
+async function grantFreeEntryDeduction(req: Request, userId: string): Promise<void> {
   try {
     // 从 system_config 读取配置，默认 1000分=10元
     const cfgRow = await queryOne<{ value: string }>(

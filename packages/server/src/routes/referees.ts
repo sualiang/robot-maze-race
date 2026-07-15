@@ -1241,7 +1241,7 @@ let cachedVenueStatus = 'inactive';
 /** 从 MySQL venues 表加载首个赛场信息 */
 export async function initVenueCache(): Promise<void> {
   try {
-    const row = await queryOpOne<{ id: string; name: string; status: string }>(req, 
+    const row = await queryOne<{ id: string; name: string; status: string }>( 
       'SELECT id, name, status FROM venues LIMIT 1'
     );
     if (row) {

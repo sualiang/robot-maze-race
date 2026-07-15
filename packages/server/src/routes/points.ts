@@ -269,7 +269,7 @@ router.post('/mall/exchange', authMiddleware, async (req: Request, res: Response
  * GET /api/v1/points/shop
  * 列出可兑换商品（从 point_shop 表查询）
  */
-router.get('/shop', async (_req: Request, res: Response) => {
+router.get('/shop', async (req: Request, res: Response) => {
   try {
     const items = await queryOp<any>(req, 
       `SELECT id, item_type, item_id, name, description, need_points,
@@ -496,7 +496,7 @@ router.post('/redeem', authMiddleware, async (req: Request, res: Response) => {
  * GET /api/v1/points/shop/merchant-coupons
  * 获取可兑换的商家消费券列表（商家定价的积分商品）
  */
-router.get('/shop/merchant-coupons', async (_req: Request, res: Response) => {
+router.get('/shop/merchant-coupons', async (req: Request, res: Response) => {
   try {
     const items = await queryOp<any>(req, 
       `SELECT ps.id, ps.name, ps.description, ps.need_points,

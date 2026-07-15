@@ -228,7 +228,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response<ApiResponse<
     // 如果有礼券区间，自动匹配
     if (rewardMaxCents > 0) {
       try {
-        await autoMatchCoupons(id, rewardMinCents, rewardMaxCents);
+        await autoMatchCoupons(req, id, rewardMinCents, rewardMaxCents);
       } catch (matchErr) {
         console.warn('[RacePackages] auto-match failed (non-fatal):', matchErr);
       }
@@ -367,7 +367,7 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response<ApiRespons
       const updated = await queryOpOne<RacePackageRow>(req, 'SELECT * FROM race_packages WHERE id = $1', [id]);
       if (updated && updated.coupon_reward_max_cents > 0) {
         try {
-          await clearAndRematchCoupons(id, updated.coupon_reward_min_cents, updated.coupon_reward_max_cents);
+          await clearAndRematchCoupons(req, id, updated.coupon_reward_min_cents, updated.coupon_reward_max_cents);
         } catch (matchErr) {
           console.warn('[RacePackages] re-match failed:', matchErr);
         }
@@ -402,7 +402,7 @@ router.post('/:id/match-coupons', authMiddleware, async (req: Request, res: Resp
       });
     }
 
-    const result = await doMatch(minCents, maxCents);
+    const result = await doMatch(req, minCents, maxCents);
     return res.json({ code: 0, data: result });
   } catch (error: any) {
     console.error('[RacePackages] match error:', error.message);
@@ -428,7 +428,7 @@ router.post('/:id/save-matched-coupons', authMiddleware, async (req: Request, re
       return res.json({ code: 400, message: '未设置礼券匹配区间', data: null });
     }
 
-    await clearAndRematchCoupons(id, minCents, maxCents);
+    await clearAndRematchCoupons(req, id, minCents, maxCents);
 
     const saved = await queryOp<PackageCouponRow>(req, 
       `SELECT rpc.*, mc.name as coupon_name, m.merchant_name as merchant_name
@@ -545,7 +545,7 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response<ApiRespo
  * 从所有可用的券池中选出总面值在 [minCents, maxCents] 区间的组合
  * 优先跨商家、跨类型
  */
-async function doMatch(minCents: number, maxCents: number): Promise<{
+async function doMatch(req: Request, minCents: number, maxCents: number): Promise<{
   matched: any[];
   totalValue: number;
   message: string;
@@ -636,18 +636,18 @@ async function doMatch(minCents: number, maxCents: number): Promise<{
 /**
  * 清除旧匹配 + 重新匹配并保存
  */
-async function clearAndRematchCoupons(packageId: string, minCents: number, maxCents: number) {
+async function clearAndRematchCoupons(req: Request, packageId: string, minCents: number, maxCents: number) {
   // 删除旧的匹配
   await executeOp(req, `DELETE FROM race_package_coupons WHERE package_id = $1`, [packageId]);
   // 重新匹配
-  await autoMatchCoupons(packageId, minCents, maxCents);
+  await autoMatchCoupons(req, packageId, minCents, maxCents);
 }
 
 /**
  * 匹配并保存到 race_package_coupons
  */
-async function autoMatchCoupons(packageId: string, minCents: number, maxCents: number) {
-  const result = await doMatch(minCents, maxCents);
+async function autoMatchCoupons(req: Request, packageId: string, minCents: number, maxCents: number) {
+  const result = await doMatch(req, minCents, maxCents);
   if (result.matched.length === 0) return;
 
   for (const m of result.matched) {
