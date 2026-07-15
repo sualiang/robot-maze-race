@@ -1,7 +1,9 @@
 /**
- * pages/race/race.js - 比赛页 (V2 重做)
- * 设计基准: 750rpx | 背景 #0F172A | 卡片 #1E293B
- * API: GET /api/v1/player/me/race-records, GET /api/v1/season/user/info
+ * pages/race/race.js - 比赛页 (V3 三状态重构)
+ * 
+ * 状态1: 无运营商上下文 → 显示扫码引导
+ * 状态2: 有上下文 + 剩余次数 > 0 → 立即参赛按钮
+ * 状态3: 有上下文 + 剩余次数 = 0 → 购买参赛包引导
  */
 var request = require('../../utils/request');
 
@@ -11,16 +13,18 @@ Page({
     pageLoading: true,
     isLoggedIn: false,
 
-    // 赛季最佳成绩（模块2 状态B）
-    seasonBest: null,        // { scoreText, rank, beatPercent } 或 null(无记录)
+    // 三状态核心
+    hasContext: false,
+    venueName: '',
+    remainCount: 0,
+
+    // 赛季最佳成绩
+    seasonBest: null,
     hasSeasonBest: false,
 
-    // 历史参赛列表（模块3）
+    // 历史参赛列表
     historyRecords: [],
-    historyLoading: false,
-
-    // 参赛次数/购买逻辑
-    remainCount: 0
+    historyLoading: false
   },
 
   onLoad: function () {
@@ -28,7 +32,6 @@ Page({
   },
 
   onShow: function () {
-    // 每次显示刷新数据
     if (getApp().globalData.isLoggedIn) {
       this.fetchAll();
     } else {
@@ -48,9 +51,6 @@ Page({
     }
   },
 
-  /**
-   * 检查登录状态
-   */
   checkLogin: function () {
     var that = this;
     var app = getApp();
@@ -59,7 +59,6 @@ Page({
       this.setData({ isLoggedIn: true });
       this.fetchAll();
     } else {
-      // 尝试静默登录
       var auth = require('../../utils/auth');
       auth.wxLogin().then(function () {
         that.setData({ isLoggedIn: true });
@@ -67,21 +66,17 @@ Page({
       }).catch(function () {
         that.setData({
           isLoggedIn: false,
-          pageLoading: false,
-          hasSeasonBest: false,
-          historyRecords: []
+          pageLoading: false
         });
       });
     }
   },
 
-  /**
-   * 拉取所有数据
-   */
   fetchAll: function () {
     var that = this;
 
     return Promise.all([
+      that.fetchVenueContext(),
       that.fetchSeasonInfo(),
       that.fetchHistoryRecords()
     ]).then(function () {
@@ -92,31 +87,52 @@ Page({
   },
 
   /**
-   * GET /api/v1/season/user/info — 赛季信息(最佳成绩/排名)
+   * 获取运营商上下文 + 赛场名称
+   */
+  fetchVenueContext: function () {
+    var that = this;
+
+    return request.get('/player/context/current').then(function (data) {
+      var d = data.data || data;
+      if (d && d.hasContext) {
+        that.setData({
+          hasContext: true,
+          venueName: d.venueName || ''
+        });
+      } else {
+        that.setData({
+          hasContext: false,
+          venueName: ''
+        });
+      }
+    }).catch(function () {
+      that.setData({
+        hasContext: false,
+        venueName: ''
+      });
+    });
+  },
+
+  /**
+   * 获取赛季信息（最佳成绩/排名/剩余次数）
    */
   fetchSeasonInfo: function () {
     var that = this;
 
     return request.get('/season/user/info').then(function (data) {
       if (!data) {
-        that.setData({
-          hasSeasonBest: false,
-          seasonBest: null
-        });
+        that.setData({ hasSeasonBest: false, seasonBest: null });
         return;
       }
 
-      // 后端格式: { bestScore, bestRank, beatPercent, remainCount }
       var score = data.bestScore || data.score || 0;
       var rank = data.bestRank || data.rank || 0;
+      var remain = data.remainCount || 0;
 
-      // 如果成绩为0或没有,视为无记录
+      that.setData({ remainCount: remain });
+
       if (score <= 0) {
-        that.setData({
-          hasSeasonBest: false,
-          seasonBest: null,
-          remainCount: data.remainCount || 0
-        });
+        that.setData({ hasSeasonBest: false, seasonBest: null });
         return;
       }
 
@@ -124,7 +140,6 @@ Page({
 
       that.setData({
         hasSeasonBest: true,
-        remainCount: data.remainCount || 0,
         seasonBest: {
           score: score,
           scoreText: scoreText,
@@ -134,15 +149,12 @@ Page({
       });
     }).catch(function (err) {
       console.error('获取赛季信息失败', err);
-      // 不阻塞页面,标记无记录
-      that.setData({
-        hasSeasonBest: false
-      });
+      that.setData({ hasSeasonBest: false });
     });
   },
 
   /**
-   * GET /api/v1/player/me/race-records — 历史参赛记录
+   * 获取历史参赛记录
    */
   fetchHistoryRecords: function () {
     var that = this;
@@ -155,21 +167,18 @@ Page({
         var scoreText = formatScore(score);
         var rank = item.rank || 0;
 
-        // 日期
         var dateText = '';
         if (item.createdAt || item.date) {
           var d = new Date(item.createdAt || item.date);
           dateText = (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
         }
 
-        // 奖牌
         var medal = '';
         if (rank === 1) medal = '🥇';
         else if (rank === 2) medal = '🥈';
         else if (rank === 3) medal = '🥉';
-        else if (rank <= 10) medal = '🏆';  // 前十展示奖杯
+        else if (rank <= 10) medal = '🏆';
 
-        // 成长/积分 (mock or from backend)
         var growth = item.growth || 0;
         var points = item.points || 0;
 
@@ -198,19 +207,47 @@ Page({
       });
     }).catch(function (err) {
       console.error('获取历史记录失败', err);
-      that.setData({
-        historyRecords: [],
-        historyLoading: false
-      });
+      that.setData({ historyRecords: [], historyLoading: false });
     });
   },
 
   // ===== 事件处理 =====
 
   /**
-   * 去扫码参赛
+   * 状态1: 无上下文 → 弹出引导弹窗
    */
-  onScanToRace: function () {
+  onScanGuide: function () {
+    var that = this;
+    wx.showModal({
+      title: '扫码参赛',
+      content: '请扫描赛场专属小程序码入场，获取参赛上下文后再开始比赛',
+      confirmText: '知道了',
+      showCancel: false,
+      success: function () {
+        // 尝试调用扫码
+        wx.scanCode({
+          onlyFromCamera: false,
+          success: function (res) {
+            if (res.result) {
+              request.post('/player/context/set', { code: res.result }).then(function () {
+                that.fetchAll();
+              }).catch(function (err) {
+                wx.showToast({ title: (err && err.message) || '入场失败', icon: 'none' });
+              });
+            }
+          },
+          fail: function () {
+            // 用户取消
+          }
+        });
+      }
+    });
+  },
+
+  /**
+   * 状态2: 立即参赛 → POST /checkin
+   */
+  onRaceNow: function () {
     var that = this;
 
     if (!this.data.isLoggedIn) {
@@ -218,16 +255,13 @@ Page({
       return;
     }
 
-    // 检查是否有剩余参赛次数
     if (this.data.remainCount <= 0) {
       wx.showModal({
         title: '参赛次数不足',
         content: '当前没有可用的参赛次数，是否前往购买参赛包？',
         confirmText: '去购买',
         success: function (res) {
-          if (res.confirm) {
-            that.onBuyPackage();
-          }
+          if (res.confirm) that.onBuyPackage();
         }
       });
       return;
@@ -236,27 +270,32 @@ Page({
     wx.scanCode({
       onlyFromCamera: false,
       success: function (res) {
-        // 扫码成功，交给后端解析
         wx.showLoading({ title: '处理中...' });
-        request.post('/race/result', {
-          code: res.result
-        }).then(function () {
+        request.post('/checkin', { code: res.result }).then(function () {
           wx.hideLoading();
-          // 刷新数据
           that.fetchAll();
         }).catch(function (err) {
           wx.hideLoading();
-          wx.showToast({ title: (err && err.message) || '扫码失败', icon: 'none' });
+          wx.showToast({ title: (err && err.message) || '参赛失败', icon: 'none' });
         });
       },
       fail: function () {
-        // 用户取消扫码
+        // 用户取消
       }
     });
   },
 
   /**
-   * 点击最佳成绩卡片 → 跳转排行榜
+   * 状态3: 购买参赛包 → 跳转购买页
+   */
+  onBuyPackage: function () {
+    wx.navigateTo({
+      url: '/pages/packages/packages'
+    });
+  },
+
+  /**
+   * 跳转排行榜
    */
   onGoLeaderboard: function () {
     wx.switchTab({
@@ -285,18 +324,6 @@ Page({
     });
   },
 
-  /**
-   * 购买参赛包 (底部固定条 + 次数不足引导)
-   */
-  onBuyPackage: function () {
-    wx.navigateTo({
-      url: '/pages/packages/packages'
-    });
-  },
-
-  /**
-   * 提示登录
-   */
   promptLogin: function () {
     var that = this;
     wx.showModal({
@@ -315,16 +342,9 @@ Page({
   }
 });
 
-/**
- * 格式化成绩
- * 小于60秒: "38.1s"
- * 大于60秒: "1m23.4s"
- */
 function formatScore(score) {
   if (typeof score !== 'number') return '--';
-  if (score < 60) {
-    return score.toFixed(1) + 's';
-  }
+  if (score < 60) return score.toFixed(1) + 's';
   var m = Math.floor(score / 60);
   var s = (score % 60).toFixed(1);
   return m + 'm' + s + 's';

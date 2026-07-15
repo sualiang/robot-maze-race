@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { getOperatorContext, setOperatorContext } from '../middleware/operator-context';
+import { queryOne } from '../config/database';
 
 const router = Router();
 
@@ -30,35 +31,67 @@ router.post('/player/context/set', authMiddleware, async (req: Request, res: Res
 
 /**
  * GET /api/v1/player/context/current
- * 获取当前玩家的运营商上下文
+ * 获取当前玩家的运营商上下文（含运营商名和赛场名）
+ * 返回: { hasContext, operatorId, operatorName, venueId, venueName }
  */
 router.get('/player/context/current', authMiddleware, async (req: Request, res: Response) => {
   const userId = req.user!.userId;
 
   try {
+    let operatorId: string | null = null;
+    let venueId: string | null = null;
+
     // 检查 JWT 中是否有 operatorId（运营商用户）
     const jwtOperatorId = (req.user as any)?.operatorId;
     if (jwtOperatorId) {
+      operatorId = jwtOperatorId;
+    } else {
+      // 从 Redis 获取
+      const ctx = await getOperatorContext(userId);
+      if (ctx?.operator_id) {
+        operatorId = ctx.operator_id;
+        venueId = ctx.venue_id || null;
+      }
+    }
+
+    if (!operatorId) {
       res.json({
         code: 0,
-        data: { operatorId: jwtOperatorId, venueId: null, source: 'jwt' },
+        data: { hasContext: false, operatorId: null, operatorName: null, venueId: null, venueName: null },
       });
       return;
     }
 
-    // 从 Redis 获取
-    const ctx = await getOperatorContext(userId);
-    if (!ctx?.operator_id) {
-      res.json({ code: 0, data: null });
-      return;
+    // 查询运营商名称
+    let operatorName: string | null = null;
+    try {
+      const op = await queryOne<{ name: string }>(
+        `SELECT name FROM operators WHERE id = $1`,
+        [operatorId]
+      );
+      operatorName = op?.name || null;
+    } catch { /* ignore */ }
+
+    // 查询赛场名称
+    let venueName: string | null = null;
+    if (venueId) {
+      try {
+        const v = await queryOne<{ name: string }>(
+          `SELECT name FROM venues WHERE id = $1`,
+          [venueId]
+        );
+        venueName = v?.name || null;
+      } catch { /* ignore */ }
     }
 
     res.json({
       code: 0,
       data: {
-        operatorId: ctx.operator_id,
-        venueId: ctx.venue_id || null,
-        source: 'redis',
+        hasContext: true,
+        operatorId,
+        operatorName,
+        venueId,
+        venueName,
       },
     });
   } catch (e: any) {

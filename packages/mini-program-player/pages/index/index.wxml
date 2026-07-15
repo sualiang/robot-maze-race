@@ -4,7 +4,15 @@
 <view class="container">
 
   <!-- ============================================================ -->
-  <!-- 模块1: 顶部导航栏（已精简） -->
+  <!-- 模块1: 顶部导航栏 -->
+  <!-- ============================================================ -->
+  <view class="top-nav">
+    <text class="top-nav-title">RobotMaze</text>
+    <view wx:if="{{venueName}}" class="top-nav-venue">
+      <text class="top-nav-venue-icon">📍</text>
+      <text class="top-nav-venue-name">{{venueName}}</text>
+    </view>
+  </view>
 
   <!-- ============================================================ -->
   <!-- 模块2: 主视觉Banner -->

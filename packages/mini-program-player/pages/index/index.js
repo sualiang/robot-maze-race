@@ -45,8 +45,8 @@ Page({
   loadAllData: function () {
     var that = this;
 
-    // 读本地存储的赛场名（扫码入场时存储）
-    // 占位 — 赛场名称此前保留为将来扩展
+    // 获取赛场上下文（顶部场地名）
+    that.fetchVenueContext();
 
     // 统一从 profile-check 拿参赛次数 + 福利总额 + 积分
     that.fetchProfileSummary();
@@ -57,6 +57,30 @@ Page({
     that.fetchSeasonConfig();
 
     return Promise.resolve();
+  },
+
+  /**
+   * 获取当前赛场上下文 /api/v1/player/context/current
+   */
+  fetchVenueContext: function () {
+    var that = this;
+    var app = getApp();
+
+    if (!app.globalData.isLoggedIn) {
+      that.setData({ venueName: '' });
+      return;
+    }
+
+    request.silentGet('/player/context/current').then(function (data) {
+      var d = data.data || data;
+      if (d && d.hasContext && d.venueName) {
+        that.setData({ venueName: d.venueName });
+      } else {
+        that.setData({ venueName: '' });
+      }
+    }).catch(function () {
+      that.setData({ venueName: '' });
+    });
   },
 
   /**

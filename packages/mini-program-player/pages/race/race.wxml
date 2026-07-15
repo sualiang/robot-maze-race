@@ -1,5 +1,5 @@
-<!-- pages/race/race.wxml - 比赛页 V2 重做 -->
-<!-- 设计基准: 750rpx | 背景 #0F172A | 卡片 #1E293B -->
+<!-- pages/race/race.wxml - 比赛页 V3 三状态重构 -->
+<!-- 状态1: 无上下文 → 扫码引导 | 状态2: 有次数 → 立即参赛 | 状态3: 次数=0 → 购买参赛包 -->
 <view class="race-page">
 
   <!-- 全局加载 -->
@@ -9,33 +9,36 @@
 
   <block wx:else>
 
-    <!-- ============================================================ -->
-    <!-- 模块1: 顶部标题                                               -->
-    <!-- ============================================================ -->
+    <!-- 顶部标题 -->
     <view class="race-header">
       <text class="race-header-title">比赛记录</text>
     </view>
 
     <!-- ============================================================ -->
-    <!-- 模块2: 主行动区                                               -->
+    <!-- 状态1: 无运营商上下文 → 扫码引导 -->
     <!-- ============================================================ -->
-
-    <!-- 状态A: 无记录 -->
-    <block wx:if="{{!hasSeasonBest}}">
-      <view class="action-empty">
-        <text class="action-empty-title">开启你的第一场竞技挑战</text>
-        <text class="action-empty-desc">扫码赛场二维码，记录成绩冲击排名</text>
-        <!-- 机器狗冲线插画 160rpx×160rpx -->
-        <view class="action-empty-illustration">🤖🏁</view>
-        <view class="btn-scan" bindtap="onScanToRace">
-          <text>去扫码参赛</text>
-        </view>
+    <view wx:if="{{!hasContext}}" class="action-empty">
+      <view class="action-empty-illustration">🤖🏁</view>
+      <text class="action-empty-title">开启你的第一场竞技挑战</text>
+      <text class="action-empty-desc">扫描赛场专属小程序码入场，记录成绩冲击排名</text>
+      <view class="btn-scan" bindtap="onScanGuide">
+        <text>去扫码参赛</text>
       </view>
-    </block>
+    </view>
 
-    <!-- 状态B: 有记录 — 本赛季最佳成绩卡片 -->
+    <!-- ============================================================ -->
+    <!-- 状态2 & 状态3: 有上下文 -->
+    <!-- ============================================================ -->
     <block wx:else>
-      <view class="best-card" bindtap="onGoLeaderboard">
+
+      <!-- 赛场名标识 -->
+      <view class="venue-badge">
+        <text class="venue-badge-icon">📍</text>
+        <text class="venue-badge-name">{{venueName || '当前赛场'}}</text>
+      </view>
+
+      <!-- 赛季最佳成绩卡片（有记录时） -->
+      <view wx:if="{{hasSeasonBest}}" class="best-card" bindtap="onGoLeaderboard">
         <text class="best-card-label">本赛季最佳成绩</text>
         <text class="best-card-score">{{seasonBest.scoreText}}</text>
         <text class="best-card-desc">
@@ -43,22 +46,47 @@
         </text>
         <text class="best-card-tip">继续参赛刷新成绩，冲击决赛名额</text>
       </view>
+
+      <!-- 无记录时的副标题 -->
+      <view wx:if="{{!hasSeasonBest}}" class="action-empty" style="padding-top: 40rpx;">
+        <text class="action-empty-title" style="font-size: 32rpx;">准备好上场了吗？</text>
+        <text class="action-empty-desc">扫码出发，创造你的最佳记录</text>
+      </view>
+
+      <!-- ============================================================ -->
+      <!-- 状态2: 有次数 → 立即参赛 -->
+      <!-- ============================================================ -->
+      <view wx:if="{{remainCount > 0}}" class="race-cta-wrap">
+        <view class="race-cta-btn" bindtap="onRaceNow">
+          <text class="race-cta-text">立即参赛（剩余 {{remainCount}} 次）</text>
+        </view>
+        <text class="race-cta-hint">扫描赛场二维码即可出发</text>
+      </view>
+
+      <!-- ============================================================ -->
+      <!-- 状态3: 次数 = 0 → 购买参赛包 -->
+      <!-- ============================================================ -->
+      <view wx:if="{{remainCount <= 0}}" class="race-cta-wrap">
+        <view class="race-cta-btn race-cta-buy" bindtap="onBuyPackage">
+          <text class="race-cta-text">购买参赛包</text>
+        </view>
+        <text class="race-cta-hint race-cta-hint-empty">当前无可用参赛次数</text>
+      </view>
+
     </block>
 
     <!-- ============================================================ -->
-    <!-- 模块3: 历史参赛记录列表                                       -->
+    <!-- 历史参赛记录 -->
     <!-- ============================================================ -->
     <view class="history-section">
       <text class="history-title">历史参赛记录</text>
 
-      <!-- 加载中骨架 -->
       <view wx:if="{{historyLoading && historyRecords.length === 0}}" class="history-loading">
         <view class="history-skeleton-item"></view>
         <view class="history-skeleton-item"></view>
         <view class="history-skeleton-item"></view>
       </view>
 
-      <!-- 列表 -->
       <view
         wx:for="{{historyRecords}}"
         wx:key="id"
@@ -69,25 +97,19 @@
         data-bonustext="{{item.bonusText}}"
         bindtap="onTapHistoryRecord"
       >
-        <!-- 左侧: 成绩 + 日期 -->
         <view class="history-left">
           <text class="history-score">{{item.scoreText}}</text>
           <text class="history-date">{{item.dateText}}</text>
         </view>
-
-        <!-- 中间: 排名 + 奖牌 -->
         <view class="history-middle">
           <text wx:if="{{item.medal}}" class="history-medal">{{item.medal}}</text>
           <text class="history-rank">{{item.rankText || '-'}}</text>
         </view>
-
-        <!-- 右侧: 成长/积分 -->
         <view wx:if="{{item.bonusText}}" class="history-right">
           <text class="history-bonus">{{item.bonusText}}</text>
         </view>
       </view>
 
-      <!-- 无记录占位 -->
       <view wx:if="{{historyRecords.length === 0 && !historyLoading}}" class="history-empty">
         <text class="history-empty-text">暂无参赛记录</text>
       </view>
@@ -95,9 +117,7 @@
 
   </block>
 
-  <!-- ============================================================ -->
-  <!-- 模块4: 底部固定转化条                                         -->
-  <!-- ============================================================ -->
+  <!-- 底部固定条 -->
   <view class="race-footer-bar" bindtap="onBuyPackage">
     <text class="footer-bar-text">
       积分不足？<text class="footer-bar-highlight">购买参赛包</text> 提升段位

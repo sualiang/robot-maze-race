@@ -4,6 +4,18 @@ import { query, queryOne, execute } from '../config/database';
 import { getConfigInt } from '../config/utils';
 import { authMiddleware } from '../middleware/auth';
 import { getOperatorContext } from '../middleware/operator-context';
+
+/**
+ * 获取当前用户的 operator_id（无 context 时返回 null，不抛错）
+ */
+async function getEffectiveOperatorId(userId: string): Promise<string | null> {
+  try {
+    const ctx = await getOperatorContext(userId);
+    return ctx?.operator_id || null;
+  } catch {
+    return null;
+  }
+}
 import { autoAssignMerchantCoupons } from '../services/coupon-service';
 import { rateLimiter } from '../middleware/rateLimiter';
 
@@ -47,10 +59,22 @@ function getTierInfo(priceCents: number) {
   return PACKAGE_TIERS[PACKAGE_TIERS.length - 1];
 }
 
-router.get('/packages', async (_req: Request, res: Response) => {
+router.get('/packages', authMiddleware, async (req: Request, res: Response) => {
+  const userId = req.user!.userId;
+  const operatorId = await getEffectiveOperatorId(userId);
+
+  // 无 operator 上下文 → 返回空列表
+  if (!operatorId) {
+    res.json({ code: 0, data: [] });
+    return;
+  }
+
   try {
     const rows = await query<any>(
-      `SELECT * FROM race_packages WHERE status = 'active' ORDER BY sort_order ASC, price_cents ASC`
+      `SELECT * FROM race_packages
+       WHERE status = 'active' AND (operator_id = $1 OR operator_id IS NULL OR operator_id = '')
+       ORDER BY sort_order ASC, price_cents ASC`,
+      [operatorId]
     );
 
     const result = await Promise.all((rows || []).map(async (row: any) => {
@@ -229,7 +253,7 @@ router.post('/checkin/validate', authMiddleware, async (req: Request, res: Respo
 /**
  * POST /player/checkin
  * 提交签到（进入排队）
- * 需要用户有剩余参赛次数
+ * 需要用户有剩余参赛次数 + 校验参赛包属于当前 operator
  */
 router.post('/checkin', authMiddleware, async (req: Request, res: Response) => {
   const userId = req.user!.userId;
@@ -237,6 +261,13 @@ router.post('/checkin', authMiddleware, async (req: Request, res: Response) => {
 
   if (!code) {
     res.json({ code: 400, message: '缺少签到码', data: null });
+    return;
+  }
+
+  // 获取当前 operator 上下文
+  const operatorId = await getEffectiveOperatorId(userId);
+  if (!operatorId) {
+    res.json({ code: 400, message: '请先通过赛场小程序码进入，获取运营商上下文', data: null });
     return;
   }
 
@@ -262,8 +293,8 @@ router.post('/checkin', authMiddleware, async (req: Request, res: Response) => {
       return;
     }
 
-    // 检查剩余参赛次数
-    const remainingRaces = await getUserRemainingRaces(userId);
+    // 检查剩余参赛次数（跨赛场核销：同一 operator 下任意订单 remaining_times > 0 即可）
+    const remainingRaces = await getUserRemainingRaces(userId, operatorId);
     if (remainingRaces <= 0) {
       res.json({ code: 400, message: '您没有剩余参赛次数，请购买参赛包或发起好友助力', data: null });
       return;
@@ -392,26 +423,30 @@ router.get('/me/profile-check', authMiddleware, async (req: Request, res: Respon
       [userId]
     );
 
-    // 查询可用抵扣金余额
+    // 查询可用抵扣金余额（按 operator_id 过滤）
     let availableDeductionCents = 0;
     try {
-      const deductionRow = await queryOne<{ total: number }>(
-        `SELECT COALESCE(SUM(amount_cents), 0) as total FROM entry_deductions WHERE user_id = $1 AND status = 'available'`,
-        [userId]
-      );
-      availableDeductionCents = deductionRow?.total || 0;
+      if (opId) {
+        const deductionRow = await queryOne<{ total: number }>(
+          `SELECT COALESCE(SUM(amount_cents), 0) as total FROM entry_deductions WHERE user_id = $1 AND status = 'available' AND operator_id = $2`,
+          [userId, opId]
+        );
+        availableDeductionCents = deductionRow?.total || 0;
+      }
     } catch (deductionErr) {
       console.error('[profile-check] 查询参赛抵扣卡失败:', (deductionErr as Error)?.message);
     }
 
-    // 查询消费券总额
+    // 查询消费券总额（按 operator_id 过滤）
     let couponTotalCents = 0;
     try {
-      const couponRow = await queryOne<{ total: number }>(
-        `SELECT COALESCE(SUM(denomination_cents), 0) as total FROM user_coupons WHERE user_id = $1 AND status = 1 AND (valid_end IS NULL OR valid_end >= NOW())`,
-        [userId]
-      );
-      couponTotalCents = couponRow?.total || 0;
+      if (opId) {
+        const couponRow = await queryOne<{ total: number }>(
+          `SELECT COALESCE(SUM(denomination_cents), 0) as total FROM user_coupons WHERE user_id = $1 AND status = 1 AND (valid_end IS NULL OR valid_end >= NOW()) AND operator_id = $2`,
+          [userId, opId]
+        );
+        couponTotalCents = couponRow?.total || 0;
+      }
     } catch (couponErr) {
       console.error('[profile-check] 查询消费券失败:', (couponErr as Error)?.message);
     }
@@ -584,14 +619,22 @@ router.get('/me/race-records', authMiddleware, async (req: Request, res: Respons
  */
 router.get('/deductions', authMiddleware, async (req: Request, res: Response) => {
   const userId = req.user!.userId;
+  const operatorId = await getEffectiveOperatorId(userId);
+
+  // 无 operator 上下文 → 返回空列表
+  if (!operatorId) {
+    res.json({ code: 0, data: { list: [] } });
+    return;
+  }
+
   try {
     const deductions = await query<any>(
       `SELECT id, amount_cents, amount_cents as used_cents, source, status, order_id,
               race_package_id, expires_at, created_at
        FROM entry_deductions
-       WHERE user_id = $1
+       WHERE user_id = $1 AND operator_id = $2
        ORDER BY created_at DESC`,
-      [userId]
+      [userId, operatorId]
     );
     const list = (deductions || []).map((d: any) => ({
       id: d.id,
@@ -619,17 +662,31 @@ router.get('/deductions', authMiddleware, async (req: Request, res: Response) =>
  */
 router.get('/coupons', authMiddleware, async (req: Request, res: Response) => {
   const userId = req.user!.userId;
+  const operatorId = await getEffectiveOperatorId(userId);
+
+  // 无 operator 上下文 → 返回空列表
+  if (!operatorId) {
+    res.json({
+      code: 0,
+      data: {
+        list: [], type1: [], type3: [], type4: [],
+        totalCount: 0, totalDenominationCents: 0, totalDenominationYuan: 0
+      }
+    });
+    return;
+  }
+
   const { type, status } = req.query;
 
   try {
-    let whereClause = 'WHERE uc.user_id = $1';
-    const params: any[] = [userId];
+    let whereClause = 'WHERE uc.user_id = $1 AND uc.operator_id = $2';
+    const params: any[] = [userId, operatorId];
 
     // 按 coupon_type 筛选
     if (type) {
       const typeNum = parseInt(type as string, 10);
       if ([1, 3, 4].includes(typeNum)) {
-        whereClause += ' AND uc.coupon_type = $2';
+        whereClause += ' AND uc.coupon_type = $' + (params.length + 1);
         params.push(typeNum);
       }
     }
@@ -1002,9 +1059,24 @@ async function getSystemConfig(key: string, defaultVal: string): Promise<string>
  * 来源 ② 好友助力完成的 race_count 奖励（存入 users.race_count）
  *
  * race_count 同步：由 issueRaceCountRewardForCompletion 写入，本函数一起统计
+ *
+ * @param operatorId 可选，传入时只统计属于该运营商的参赛包订单
  */
-async function getUserRemainingRaces(userId: string): Promise<number> {
+async function getUserRemainingRaces(userId: string, operatorId?: string): Promise<number> {
   try {
+    if (operatorId) {
+      // 跨赛场核销：同一 operator 下任意订单 remaining_times > 0 即可
+      const row = await queryOne<{ total: number }>(
+        `SELECT COALESCE(SUM(o.remaining_times), 0) as total
+         FROM orders o
+         JOIN race_packages rp ON o.package_id = rp.id
+         WHERE o.user_id = $1 AND o.status = 'paid' AND o.remaining_times > 0
+           AND (rp.operator_id = $2 OR rp.operator_id IS NULL OR rp.operator_id = '')`,
+        [userId, operatorId]
+      );
+      return row?.total ?? 0;
+    }
+
     // 从 orders.remaining_times 统计剩余可用参赛次数
     const row = await queryOne<{ total: number }>(
       `SELECT COALESCE(SUM(remaining_times), 0) as total FROM orders
