@@ -21,6 +21,16 @@ App({
       that.globalData.systemInfo = info;
     } catch (e) {}
 
+    // 开发版/体验版自动清空登录态，方便本地调试（正式版不受影响）
+    try {
+      var accountInfo = wx.getAccountInfoSync();
+      if (accountInfo && accountInfo.miniProgram &&
+          (accountInfo.miniProgram.envVersion === 'develop' || accountInfo.miniProgram.envVersion === 'trial')) {
+        storage.removeSync(storage.STORAGE_KEYS.TOKEN);
+        storage.removeSync(storage.STORAGE_KEYS.USER);
+      }
+    } catch (e) {}
+
     var token = storage.getSync(storage.STORAGE_KEYS.TOKEN);
     if (token) {
       that.globalData.token = token;
