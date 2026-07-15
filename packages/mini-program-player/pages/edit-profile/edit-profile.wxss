@@ -1,22 +1,60 @@
-/* 编辑资料页 — App深色主题 */
+/* 编辑资料页 — App深色主题 · 精致版 */
 page {
   background-color: #0f0f23;
 }
 
 .page {
   min-height: 100vh;
-  padding-top: 24rpx;
+  padding-top: 40rpx;
   box-sizing: border-box;
 }
 
-/* 表单行 */
+/* ===== 头像区 — 顶部居中 120rpx 圆形 ===== */
+.avatar-area,
+button.avatar-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0 0 40rpx;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  line-height: 1;
+}
+
+button.avatar-area::after {
+  border: none;
+}
+
+.avatar-circle {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 50%;
+  background-color: #1e293b;
+  border: 3rpx solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.3);
+}
+
+.avatar-hint {
+  font-size: 24rpx;
+  color: #475569;
+  margin-top: 16rpx;
+}
+
+/* ===== 表单卡片 ===== */
+.form-card {
+  margin: 0 24rpx;
+  background-color: #1a1a2e;
+  border-radius: 12rpx;
+  overflow: hidden;
+}
+
 .form-cell {
   display: flex;
   align-items: center;
   padding: 28rpx 30rpx;
-  background-color: #1a1a2e;
   position: relative;
-  width: 100%;
   box-sizing: border-box;
   font-size: 28rpx;
 }
@@ -25,14 +63,14 @@ page {
   content: '';
   position: absolute;
   left: 30rpx;
-  right: 0;
+  right: 30rpx;
   bottom: 0;
   height: 1rpx;
-  background-color: rgba(255, 255, 255, 0.08);
+  background-color: rgba(255, 255, 255, 0.06);
 }
 
 .form-cell:last-child::after {
-  left: 0;
+  display: none;
 }
 
 .form-cell_tap:active {
@@ -48,7 +86,9 @@ page {
 
 .form-cell__bd {
   flex: 1;
-  color: #e2e8f0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
   font-size: 28rpx;
 }
 
@@ -56,7 +96,11 @@ page {
   text-align: right;
 }
 
-.form-cell__bd_readonly .form-cell__value {
+.form-cell__value {
+  color: #e2e8f0;
+}
+
+.form-cell__value_muted {
   color: #64748b;
 }
 
@@ -65,18 +109,6 @@ page {
   color: #475569;
   font-size: 36rpx;
   margin-left: 8rpx;
-}
-
-.form-cell__value {
-  color: #e2e8f0;
-}
-
-/* 头像预览 */
-.avatar-preview {
-  width: 96rpx;
-  height: 96rpx;
-  border-radius: 8rpx;
-  background-color: #1e293b;
 }
 
 /* 昵称输入 */
@@ -90,28 +122,9 @@ page {
   outline: none;
 }
 
-/* 去掉原生 button 默认样式 */
-button.form-cell {
-  padding: 28rpx 30rpx;
-  margin: 0;
-  border: none;
-  border-radius: 0;
-  background-color: #1a1a2e;
-  line-height: inherit;
-  font-size: 28rpx;
-}
-
-button.form-cell::after {
-  border: none;
-}
-
-button.form-cell_tap:active {
-  background-color: #22223a;
-}
-
-/* 保存按钮区 */
+/* ===== 保存按钮 ===== */
 .btn-area {
-  padding: 48rpx 30rpx;
+  padding: 80rpx 40rpx 0;
 }
 
 .save-btn {
@@ -120,7 +133,7 @@ button.form-cell_tap:active {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8rpx;
+  border-radius: 12rpx;
   font-size: 32rpx;
   font-weight: 500;
   border: none;
