@@ -159,18 +159,7 @@ Page({
         if (res.confirm) {
           var auth = require('../../utils/auth');
           auth.logout();
-          that.setData({
-            isLoggedIn: false,
-            userInfo: {},
-            medalInfo: {
-              level: 1, levelName: '青铜选手',
-              currentExp: 0, nextLevelExp: 100, rank: 0,
-              expPercent: 0,
-              upgradeDesc: '升级白银立得：5元无门槛参赛抵价券 + 50积分'
-            },
-            assets: { deductible: 0, couponCount: 0, couponTotal: 0 },
-            seasonStats: { totalRaces: 0, bestTime: '--', totalPoints: 0 }
-          });
+          wx.redirectTo({ url: '/pages/login/login?from=profile' });
         }
       }
     });
