@@ -27,16 +27,7 @@ Page({
     app.globalData.isLoggedIn = true;
   },
 
-  // ===== 隐私授权回调 =====
-  onAgreePrivacy: function () {
-    var app = getApp();
-    if (app.globalData.privacyResolve) {
-      app.globalData.privacyResolve({ event: 'agree' });
-      app.globalData.needPrivacyAuth = false;
-    }
-  },
-
-  // ===== 微信登录按钮（open-type="getPhoneNumber|agreePrivacyAuthorization" 回调） =====
+  // ===== 微信登录按钮（open-type="getPhoneNumber" 回调） =====
   onGetPhoneNumber: function (e) {
     var that = this;
     var detail = e.detail;

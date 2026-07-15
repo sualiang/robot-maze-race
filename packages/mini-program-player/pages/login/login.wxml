@@ -10,11 +10,10 @@
   <view class="login-area">
     <button
       class="weui-btn weui-btn_primary"
-      open-type="getPhoneNumber|agreePrivacyAuthorization"
+      open-type="getPhoneNumber"
       loading="{{loading}}"
       disabled="{{loading}}"
       bindgetphonenumber="onGetPhoneNumber"
-      bindagreeprivacyauthorization="onAgreePrivacy"
     >
       <image class="weui-btn_icon" src="/assets/images/wechat-icon.svg" mode="aspectFit" />
       <text>{{loading ? '登录中...' : '微信登录'}}</text>
