@@ -1,43 +1,45 @@
-<!-- pages/edit-profile/edit-profile.wxml — 完善个人信息（WeUI 白底风格） -->
+<!-- pages/edit-profile/edit-profile.wxml — 完善个人信息（深色主题） -->
 <view class="page">
-  <!-- 头像 — 微信原生 chooseAvatar -->
-  <button class="weui-cell weui-cell_access" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
-    <view class="weui-cell__hd">头像</view>
-    <view class="weui-cell__bd weui-cell__bd_right">
+
+  <!-- 头像 — 传统选择图片 -->
+  <view class="form-cell form-cell_tap" bindtap="onPickAvatar">
+    <text class="form-cell__hd">头像</text>
+    <view class="form-cell__bd form-cell__bd_right">
       <image class="avatar-preview" src="{{avatar || '/assets/images/default-avatar.png'}}" mode="aspectFill" />
     </view>
-    <view class="weui-cell__ft weui-cell__ft_arrow"></view>
-  </button>
+    <text class="form-cell__arrow">›</text>
+  </view>
 
-  <!-- 昵称 — 微信原生 type="nickname" -->
-  <view class="weui-cell">
-    <view class="weui-cell__hd">昵称</view>
-    <view class="weui-cell__bd weui-cell__bd_right">
-      <input class="weui-input" type="nickname" value="{{nickname}}" placeholder="请输入昵称" maxlength="12" bindinput="onNicknameInput" />
+  <!-- 昵称 — 普通 input -->
+  <view class="form-cell">
+    <text class="form-cell__hd">昵称</text>
+    <view class="form-cell__bd form-cell__bd_right">
+      <input class="form-input" value="{{nickname}}" placeholder="请输入昵称" placeholder-style="color:#475569" maxlength="12" bindinput="onNicknameInput" />
     </view>
   </view>
 
-  <!-- 性别 — picker -->
+  <!-- 性别 -->
   <picker mode="selector" range="{{genderOptions}}" bindchange="onGenderChange">
-    <view class="weui-cell weui-cell_access">
-      <view class="weui-cell__hd">性别</view>
-      <view class="weui-cell__bd weui-cell__bd_right">
-        {{genderOptions[genderIndex]}}
+    <view class="form-cell form-cell_tap">
+      <text class="form-cell__hd">性别</text>
+      <view class="form-cell__bd form-cell__bd_right">
+        <text class="form-cell__value">{{genderOptions[genderIndex]}}</text>
       </view>
-      <view class="weui-cell__ft weui-cell__ft_arrow"></view>
+      <text class="form-cell__arrow">›</text>
     </view>
   </picker>
 
   <!-- 手机号 — 只读 -->
-  <view class="weui-cell">
-    <view class="weui-cell__hd">手机号</view>
-    <view class="weui-cell__bd weui-cell__bd_right weui-cell__bd_readonly">
-      {{phone || '未获取'}}
+  <view class="form-cell">
+    <text class="form-cell__hd">手机号</text>
+    <view class="form-cell__bd form-cell__bd_right form-cell__bd_readonly">
+      <text class="form-cell__value">{{phone || '未获取'}}</text>
     </view>
   </view>
 
   <!-- 保存按钮 -->
   <view class="btn-area">
-    <button class="weui-btn weui-btn_primary" bindtap="onSave">保存</button>
+    <button class="save-btn" bindtap="onSave">保存</button>
   </view>
+
 </view>

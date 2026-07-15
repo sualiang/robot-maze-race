@@ -1,4 +1,4 @@
-// pages/edit-profile/edit-profile.js — 完善个人信息（WeUI 白底风格）
+// pages/edit-profile/edit-profile.js — 完善个人信息（深色主题 + 传统选择）
 var request = require('../../utils/request');
 var storage = require('../../utils/storage');
 
@@ -27,24 +27,29 @@ Page({
     });
   },
 
-  // ===== 微信原生 chooseAvatar 回调 =====
-  onChooseAvatar: function (e) {
+  // ===== 选择头像（传统 wx.chooseImage） =====
+  onPickAvatar: function () {
     var that = this;
-    var avatarUrl = e.detail.avatarUrl;
-    if (!avatarUrl) return;
-
-    that.setData({ avatar: avatarUrl });
-
-    wx.getFileSystemManager().readFile({
-      filePath: avatarUrl,
-      encoding: 'base64',
-      success: function (fsRes) {
-        that.setData({ avatarBase64: 'data:image/jpeg;base64,' + fsRes.data });
+    wx.chooseImage({
+      count: 1,
+      sizeType: ['compressed'],
+      sourceType: ['album', 'camera'],
+      success: function (res) {
+        var tempPath = res.tempFilePaths[0];
+        if (!tempPath) return;
+        that.setData({ avatar: tempPath });
+        wx.getFileSystemManager().readFile({
+          filePath: tempPath,
+          encoding: 'base64',
+          success: function (fsRes) {
+            that.setData({ avatarBase64: 'data:image/jpeg;base64,' + fsRes.data });
+          }
+        });
       }
     });
   },
 
-  // ===== 昵称输入（微信原生 type="nickname"） =====
+  // ===== 昵称输入（普通 input） =====
   onNicknameInput: function (e) {
     this.setData({ nickname: e.detail.value });
   },

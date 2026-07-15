@@ -1,5 +1,5 @@
 // pages/help/assist/assist.js - 好友的助力落地页
-var request = require('../../utils/request');
+var request = require('../../../utils/request');
 
 Page({
   data: {

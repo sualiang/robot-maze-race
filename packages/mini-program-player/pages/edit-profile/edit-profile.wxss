@@ -1,80 +1,74 @@
-/* 编辑资料页 — WeUI 白底风格 */
+/* 编辑资料页 — App深色主题 */
 page {
-  background-color: #f6f6f6;
+  background-color: #0f0f23;
 }
 
 .page {
   min-height: 100vh;
+  padding-top: 24rpx;
   box-sizing: border-box;
 }
 
-/* WeUI 风格 cell */
-.weui-cell {
+/* 表单行 */
+.form-cell {
   display: flex;
   align-items: center;
   padding: 28rpx 30rpx;
-  background-color: #fff;
+  background-color: #1a1a2e;
   position: relative;
-  border: none;
-  border-radius: 0;
   width: 100%;
   box-sizing: border-box;
   font-size: 28rpx;
-  line-height: inherit;
-  text-align: left;
 }
 
-.weui-cell::after {
+.form-cell::after {
   content: '';
   position: absolute;
   left: 30rpx;
   right: 0;
   bottom: 0;
   height: 1rpx;
-  background-color: #e5e5e5;
+  background-color: rgba(255, 255, 255, 0.08);
 }
 
-.weui-cell:last-child::after {
+.form-cell:last-child::after {
   left: 0;
 }
 
-.weui-cell_access {
-  justify-content: space-between;
+.form-cell_tap:active {
+  background-color: #22223a;
 }
 
-.weui-cell__hd {
-  color: #000;
+.form-cell__hd {
+  color: #e2e8f0;
   font-size: 28rpx;
   flex-shrink: 0;
   width: 140rpx;
 }
 
-.weui-cell__bd {
+.form-cell__bd {
   flex: 1;
-  color: #000;
+  color: #e2e8f0;
   font-size: 28rpx;
 }
 
-.weui-cell__bd_right {
+.form-cell__bd_right {
   text-align: right;
 }
 
-.weui-cell__bd_readonly {
-  color: #999;
+.form-cell__bd_readonly .form-cell__value {
+  color: #64748b;
 }
 
-.weui-cell__ft {
+.form-cell__arrow {
   flex-shrink: 0;
+  color: #475569;
+  font-size: 36rpx;
+  margin-left: 8rpx;
 }
 
-.weui-cell__ft_arrow::after {
-  content: '';
-  display: inline-block;
-  width: 14rpx;
-  height: 14rpx;
-  border-right: 3rpx solid #c7c7cc;
-  border-bottom: 3rpx solid #c7c7cc;
-  transform: rotate(-45deg);
+.form-cell__value {
+  color: #e2e8f0;
 }
 
 /* 头像预览 */
@@ -82,30 +76,26 @@ page {
   width: 96rpx;
   height: 96rpx;
   border-radius: 8rpx;
-  background-color: #e5e5e5;
+  background-color: #1e293b;
 }
 
 /* 昵称输入 */
-.weui-input {
+.form-input {
   width: 100%;
   text-align: right;
   font-size: 28rpx;
-  color: #000;
+  color: #e2e8f0;
   background: transparent;
   border: none;
   outline: none;
 }
 
-.weui-input::placeholder {
-  color: #b2b2b2;
-}
-
 /* 保存按钮区 */
 .btn-area {
-  padding: 40rpx 30rpx;
+  padding: 48rpx 30rpx;
 }
 
-.weui-btn {
+.save-btn {
   width: 100%;
   height: 88rpx;
   display: flex;
@@ -115,23 +105,10 @@ page {
   font-size: 32rpx;
   font-weight: 500;
   border: none;
-}
-
-.weui-btn_primary {
   background-color: #07C160;
   color: #fff;
 }
 
-.weui-btn_primary:active {
+.save-btn:active {
   background-color: #06ad56;
-}
-
-/* 原生按钮去样式 */
-button.weui-cell {
-  padding: 28rpx 30rpx;
-  margin: 0;
-}
-
-button.weui-cell::after {
-  border: none;
 }
