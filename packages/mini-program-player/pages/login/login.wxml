@@ -16,8 +16,7 @@
       bindgetphonenumber="onGetPhoneNumber"
     >
       <image class="weui-btn_icon" src="/assets/images/wechat-icon.svg" mode="aspectFit" />
-      <text>{{loading ? '登录中...' : '微信手机号一键登录'}}</text>
+      <text>{{loading ? '登录中...' : '微信登录'}}</text>
     </button>
-    <text class="hint">点击即授权微信绑定的手机号</text>
   </view>
 </view>
