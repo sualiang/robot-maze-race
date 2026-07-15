@@ -44,7 +44,7 @@ Page({
       app.globalData.isLoggedIn = false;
       app.globalData.token = null;
       app.globalData.userInfo = null;
-      this.setData({ isLoggedIn: false });
+      wx.redirectTo({ url: '/pages/login/login?from=profile' });
       return;
     }
     app.globalData.isLoggedIn = true;
