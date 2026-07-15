@@ -2,60 +2,6 @@
 /* 设计基准 750rpx */
 /* 页面背景: #0F172A, 卡片背景: #1E293B */
 
-/* ===== 未登录状态 ===== */
-.unlogged-section {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 100rpx 40rpx 60rpx;
-}
-
-.unlogged-avatar {
-  width: 140rpx;
-  height: 140rpx;
-  border-radius: 50%;
-  background: #1E293B;
-  margin-bottom: 32rpx;
-  opacity: 0.7;
-}
-
-.unlogged-title {
-  font-size: 36rpx;
-  font-weight: 600;
-  color: #ffffff;
-  margin-bottom: 12rpx;
-}
-
-.unlogged-desc {
-  font-size: 26rpx;
-  color: #94A3B8;
-  margin-bottom: 48rpx;
-}
-
-.unlogged-btn {
-  width: 400rpx;
-  height: 88rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #07C160;
-  color: #fff;
-  border-radius: 8rpx;
-  font-size: 30rpx;
-  font-weight: 500;
-  border: none;
-  gap: 12rpx;
-}
-
-.unlogged-btn:active {
-  background: #06ad56;
-}
-
-.unlogged-btn-icon {
-  width: 32rpx;
-  height: 32rpx;
-}
-
 /* ===== 模块1: 用户信息栏 ===== */
 .user-card {
   display: flex;

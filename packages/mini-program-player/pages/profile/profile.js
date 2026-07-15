@@ -1,4 +1,4 @@
-// 个人中心 — 未登录显示 CTA，已登录显示完整信息
+// 个人中心
 var request = require('../../utils/request');
 var storage = require('../../utils/storage');
 var app = getApp();
@@ -59,11 +59,6 @@ Page({
     } else {
       wx.stopPullDownRefresh();
     }
-  },
-
-  // 去登录
-  onGoLogin: function () {
-    wx.navigateTo({ url: '/pages/login/login' });
   },
 
   loadData: function () {

@@ -1,18 +1,5 @@
-<!-- 个人中心 -- 未登录显示 CTA，已登录显示完整信息 -->
+<!-- 个人中心 -->
 <view class="page">
-
-  <!-- ===== 未登录状态 ===== -->
-  <view wx:if="{{!isLoggedIn}}" class="unlogged-section">
-    <image class="unlogged-avatar" src="/assets/images/default-avatar.png" mode="aspectFill" />
-    <text class="unlogged-title">未登录</text>
-    <text class="unlogged-desc">登录后可查看个人信息和赛季数据</text>
-    <button class="unlogged-btn" bindtap="onGoLogin">
-      <image class="unlogged-btn-icon" src="/assets/images/wechat-icon.svg" mode="aspectFit" />
-      <text>微信登录</text>
-    </button>
-  </view>
-
-  <block wx:else>
 
   <!-- 模块1: 用户信息栏 -->
   <view class="user-card" bindtap="onEditProfile">
@@ -102,7 +89,5 @@
   <view class="logout-area">
     <view class="logout-btn" bindtap="onLogout">退出登录</view>
   </view>
-
-  </block>
 
 </view>
