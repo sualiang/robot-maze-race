@@ -1,20 +1,20 @@
 <!-- pages/edit-profile/edit-profile.wxml — 完善个人信息（深色主题） -->
 <view class="page">
 
-  <!-- 头像 — 传统选择图片 -->
-  <view class="form-cell form-cell_tap" bindtap="onPickAvatar">
+  <!-- 头像 — 微信原生 chooseAvatar -->
+  <button class="form-cell form-cell_tap" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
     <text class="form-cell__hd">头像</text>
     <view class="form-cell__bd form-cell__bd_right">
       <image class="avatar-preview" src="{{avatar || '/assets/images/default-avatar.png'}}" mode="aspectFill" />
     </view>
     <text class="form-cell__arrow">›</text>
-  </view>
+  </button>
 
-  <!-- 昵称 — 普通 input -->
+  <!-- 昵称 — 微信原生 type="nickname" -->
   <view class="form-cell">
     <text class="form-cell__hd">昵称</text>
     <view class="form-cell__bd form-cell__bd_right">
-      <input class="form-input" value="{{nickname}}" placeholder="请输入昵称" placeholder-style="color:#475569" maxlength="12" bindinput="onNicknameInput" />
+      <input class="form-input" type="nickname" value="{{nickname}}" placeholder="请输入昵称" placeholder-style="color:#475569" maxlength="12" bindinput="onNicknameInput" />
     </view>
   </view>
 
@@ -28,6 +28,14 @@
       <text class="form-cell__arrow">›</text>
     </view>
   </picker>
+
+  <!-- 手机号 — 只读 -->
+  <view class="form-cell">
+    <text class="form-cell__hd">手机号</text>
+    <view class="form-cell__bd form-cell__bd_right form-cell__bd_readonly">
+      <text class="form-cell__value">{{phone || '未获取'}}</text>
+    </view>
+  </view>
 
   <!-- 保存按钮 -->
   <view class="btn-area">
