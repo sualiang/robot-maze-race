@@ -44,8 +44,7 @@ Page({
       app.globalData.isLoggedIn = false;
       app.globalData.token = null;
       app.globalData.userInfo = null;
-      // 未登录直接跳微信登录页，跳过占位页
-      wx.redirectTo({ url: '/pages/login/login?from=profile' });
+      this.setData({ isLoggedIn: false });
       return;
     }
     app.globalData.isLoggedIn = true;
