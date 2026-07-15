@@ -90,6 +90,25 @@ page {
   outline: none;
 }
 
+/* 去掉原生 button 默认样式 */
+button.form-cell {
+  padding: 28rpx 30rpx;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background-color: #1a1a2e;
+  line-height: inherit;
+  font-size: 28rpx;
+}
+
+button.form-cell::after {
+  border: none;
+}
+
+button.form-cell_tap:active {
+  background-color: #22223a;
+}
+
 /* 保存按钮区 */
 .btn-area {
   padding: 48rpx 30rpx;
