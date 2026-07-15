@@ -63,6 +63,8 @@
     }
   },
   "requiredPrivateInfos": [
+    "chooseAvatar",
+    "chooseNickname",
     "getLocation",
     "chooseAddress"
   ],
