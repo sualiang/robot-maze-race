@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
-import { query, queryOne, execute } from '../config/database';
+import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 
 const router = Router();
@@ -43,12 +43,12 @@ router.get('/merchant/pending', authMiddleware, operatorOnly, async (req: Reques
 
     const whereClause = 'WHERE ' + conditions.join(' AND ');
 
-    const countRow = await queryOne<{ total: number }>(
+    const countRow = await queryOpOne<{ total: number }>(req, 
       `SELECT COUNT(*) as total FROM merchants m ${whereClause}`,
       params
     );
 
-    const merchants = await query<any>(
+    const merchants = await queryOp<any>(req, 
       `SELECT m.*, op.name as operator_name
        FROM merchants m
        LEFT JOIN operators op ON m.operator_id = op.id
@@ -107,7 +107,7 @@ router.post('/merchant/audit', authMiddleware, operatorOnly, async (req: Request
       return;
     }
 
-    const existing = await queryOne<any>(
+    const existing = await queryOpOne<any>(req, 
       `SELECT * FROM merchants WHERE id = $1`,
       [merchantId]
     );
@@ -135,13 +135,12 @@ router.post('/merchant/audit', authMiddleware, operatorOnly, async (req: Request
     // 审核通过时自动绑定运营商
     if (auditStatus === 1) {
       updates.push(`operator_id = $4`);
-      params.push(operatorId);
-    }
+          }
 
     params.push(merchantId);
     const idx = params.length;
 
-    await execute(
+    await executeOp(req, 
       `UPDATE merchants SET ${updates.join(', ')} WHERE id = $${idx}`,
       params
     );
@@ -166,11 +165,11 @@ router.get('/merchant/invite-codes', authMiddleware, operatorOnly, async (req: R
     const pageSize = Math.min(Math.max(parseInt(req.query.pageSize as string, 10) || 20, 1), 100);
     const offset = (page - 1) * pageSize;
 
-    const countRow = await queryOne<{ total: number }>(
+    const countRow = await queryOpOne<{ total: number }>(req, 
       `SELECT COUNT(*) as total FROM merchant_invite_codes`
     );
 
-    const codes = await query<any>(
+    const codes = await queryOp<any>(req, 
       `SELECT ic.*, m.merchant_name
        FROM merchant_invite_codes ic
        LEFT JOIN merchants m ON ic.merchant_id = m.id
@@ -216,7 +215,7 @@ router.post('/merchant/invite-code', authMiddleware, operatorOnly, async (req: R
     }
 
     // 验证商家存在
-    const merchant = await queryOne<any>(
+    const merchant = await queryOpOne<any>(req, 
       `SELECT * FROM merchants WHERE id = $1`,
       [merchantId]
     );
@@ -229,7 +228,7 @@ router.post('/merchant/invite-code', authMiddleware, operatorOnly, async (req: R
     const id = uuidv4();
     const code = generateInviteCode();
 
-    await execute(
+    await executeOp(req, 
       `INSERT INTO merchant_invite_codes (id, code, merchant_id, used, created_at)
        VALUES ($1, $2, $3, 0, NOW())`,
       [id, code, merchantId]
@@ -277,14 +276,14 @@ router.get('/merchant/coupon/pending', authMiddleware, operatorOnly, async (req:
 
     const whereClause = 'WHERE ' + conditions.join(' AND ');
 
-    const countRow = await queryOne<{ total: number }>(
+    const countRow = await queryOpOne<{ total: number }>(req, 
       `SELECT COUNT(*) as total FROM merchant_coupons mc
        LEFT JOIN merchants m ON mc.merchant_id = m.id
        ${whereClause}`,
       params
     );
 
-    const coupons = await query<any>(
+    const coupons = await queryOp<any>(req, 
       `SELECT mc.*, m.merchant_name
        FROM merchant_coupons mc
        LEFT JOIN merchants m ON mc.merchant_id = m.id
@@ -350,7 +349,7 @@ router.post('/merchant/coupon/audit', authMiddleware, operatorOnly, async (req: 
     }
 
     // 校验：该优惠券的商家是否属于该运营商
-    const coupon = await queryOne<any>(
+    const coupon = await queryOpOne<any>(req, 
       `SELECT mc.*, m.operator_id
        FROM merchant_coupons mc
        LEFT JOIN merchants m ON mc.merchant_id = m.id
@@ -380,7 +379,7 @@ router.post('/merchant/coupon/audit', authMiddleware, operatorOnly, async (req: 
     }
 
     const isRejected = auditStatus === 3;
-    await execute(
+    await executeOp(req, 
       `UPDATE merchant_coupons SET
         audit_status = $1,
         audit_remark = $2,
@@ -417,14 +416,14 @@ router.get('/merchant/coupon/offline-pending', authMiddleware, operatorOnly, asy
     const pageSize = Math.min(Math.max(parseInt(req.query.pageSize as string, 10) || 20, 1), 100);
     const offset = (page - 1) * pageSize;
 
-    const countRow = await queryOne<{ total: number }>(
+    const countRow = await queryOpOne<{ total: number }>(req, 
       `SELECT COUNT(*) as total FROM merchant_coupons mc
        LEFT JOIN merchants m ON mc.merchant_id = m.id
        WHERE mc.audit_status = 1 AND mc.offline_request = 1 AND m.operator_id = $1`,
       [operatorId]
     );
 
-    const coupons = await query<any>(
+    const coupons = await queryOp<any>(req, 
       `SELECT mc.*, m.merchant_name
        FROM merchant_coupons mc
        LEFT JOIN merchants m ON mc.merchant_id = m.id
@@ -482,7 +481,7 @@ router.post('/merchant/coupon/offline-audit', authMiddleware, operatorOnly, asyn
       return;
     }
 
-    const coupon = await queryOne<any>(
+    const coupon = await queryOpOne<any>(req, 
       `SELECT mc.*, m.operator_id
        FROM merchant_coupons mc
        LEFT JOIN merchants m ON mc.merchant_id = m.id
@@ -507,7 +506,7 @@ router.post('/merchant/coupon/offline-audit', authMiddleware, operatorOnly, asyn
 
     if (approved) {
       // 同意下架：status=0(下架), audit_status=2(已通过), offline_request=0
-      await execute(
+      await executeOp(req, 
         `UPDATE merchant_coupons SET
           status = 0,
           audit_status = 2,
@@ -522,7 +521,7 @@ router.post('/merchant/coupon/offline-audit', authMiddleware, operatorOnly, asyn
       );
     } else {
       // 驳回下架申请：audit_status=3(已驳回), 回到已上架状态
-      await execute(
+      await executeOp(req, 
         `UPDATE merchant_coupons SET
           audit_status = 3,
           status = 1,
@@ -562,21 +561,21 @@ router.get('/merchant/coupon/rejected', authMiddleware, operatorOnly, async (req
     const pageSize = Math.min(Math.max(parseInt(req.query.pageSize as string, 10) || 20, 1), 100);
     const offset = (page - 1) * pageSize;
 
-    const countRow = await queryOne<{ total: number }>(
+    const countRow = await queryOpOne<{ total: number }>(req, 
       `SELECT COUNT(*) as total FROM merchant_coupons mc
        LEFT JOIN merchants m ON mc.merchant_id = m.id
        WHERE mc.audit_status = 3 AND m.operator_id = $1`,
       [operatorId]
     );
 
-    const countRowUnread = await queryOne<{ total: number }>(
+    const countRowUnread = await queryOpOne<{ total: number }>(req, 
       `SELECT COUNT(*) as total FROM merchant_coupons mc
        LEFT JOIN merchants m ON mc.merchant_id = m.id
        WHERE mc.audit_status = 3 AND m.operator_id = $1 AND mc.op_read = 0`,
       [operatorId]
     );
 
-    const coupons = await query<any>(
+    const coupons = await queryOp<any>(req, 
       `SELECT mc.*, m.merchant_name
        FROM merchant_coupons mc
        LEFT JOIN merchants m ON mc.merchant_id = m.id
@@ -637,7 +636,7 @@ router.post('/merchant/coupon/rejected/read', authMiddleware, operatorOnly, asyn
       return;
     }
 
-    await execute(
+    await executeOp(req, 
       `UPDATE merchant_coupons SET op_read = 1 WHERE id = $1`,
       [couponId]
     );

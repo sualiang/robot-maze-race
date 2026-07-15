@@ -17,7 +17,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config';
-import { query, queryOne, execute, transaction as dbTransaction } from '../config/database';
+import { query, queryOne, execute, transaction as dbTransaction, queryOp, queryOpOne, executeOp } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import {
   ApiResponse,
@@ -206,13 +206,13 @@ router.post('/unified-order', authMiddleware, async (req: Request, res: Response
     }
 
     // 1. 查询订单（同时验证所有权 + 状态）
-    const order = await queryOne<{
+    const order = await queryOpOne<{
       id: string;
       order_no: string;
       user_id: string;
       amount: number;
       status: string;
-    }>(
+    }>(req, 
       `SELECT id, order_no, user_id, amount_cents as amount, status FROM orders WHERE id = ?`,
       [order_id]
     );
@@ -236,7 +236,7 @@ router.post('/unified-order', authMiddleware, async (req: Request, res: Response
     let outTradeNo = order.order_no;
     if (!outTradeNo) {
       outTradeNo = generateOutTradeNo();
-      await execute('UPDATE orders SET order_no = ? WHERE id = ?', [outTradeNo, order_id]);
+      await executeOp(req, 'UPDATE orders SET order_no = ? WHERE id = ?', [outTradeNo, order_id]);
     }
 
     // 开发模式：模拟支付
@@ -245,7 +245,7 @@ router.post('/unified-order', authMiddleware, async (req: Request, res: Response
 
       // 模拟 prepay_id
       const prepayId = `prepay_mock_${Date.now()}`;
-      await execute(
+      await executeOp(req, 
         `UPDATE orders SET payment_method = 'wechat_pay', prepay_id = ? WHERE id = ?`,
         [prepayId, order_id]
       );
@@ -287,7 +287,7 @@ router.post('/unified-order', authMiddleware, async (req: Request, res: Response
       });
 
       // 5. 保存 prepay_id
-      await execute(
+      await executeOp(req, 
         `UPDATE orders SET payment_method = 'wechat_pay', prepay_id = ? WHERE id = ?`,
         [wxOrder.prepay_id, order_id]
       );
@@ -367,7 +367,7 @@ router.post('/notify', async (req: Request, res: Response) => {
     console.log('[WxPay] 支付回调:', outTradeNo, 'state:', tradeState, 'amount:', transaction.amount?.total);
 
     // 3. 查询订单
-    const order = await queryOne<{ id: string; status: string; amount: number }>(
+    const order = await queryOpOne<{ id: string; status: string; amount: number }>(req, 
       `SELECT id, status, amount_cents as amount FROM orders WHERE order_no = ?`,
       [outTradeNo]
     );
@@ -390,7 +390,7 @@ router.post('/notify', async (req: Request, res: Response) => {
       if (paidAmount && paidAmount !== order.amount) {
         console.error('[WxPay] 支付金额不匹配! order:', order.amount, 'paid:', paidAmount, outTradeNo);
         // 标记异常待人工处理
-        await execute(
+        await executeOp(req, 
           `UPDATE orders SET status = 'abnormal', payment_remark = ? WHERE id = ?`,
           [`金额不匹配: 订单${order.amount}分, 实付${paidAmount}分`, order.id]
         );
@@ -399,13 +399,13 @@ router.post('/notify', async (req: Request, res: Response) => {
 
       await dbTransaction(async (tx: any) => {
         // 更新订单状态
-        await tx.execute(
+        await tx.executeOp(req, 
           `UPDATE orders SET status = 'paid', transaction_id = ?, paid_at = NOW(), updated_at = NOW() WHERE id = ? AND status = 'pending'`,
           [transaction.transaction_id, order.id]
         );
 
         // 记录支付流水
-        await tx.execute(
+        await tx.executeOp(req, 
           `INSERT INTO payment_transactions (id, order_id, user_id, amount, transaction_id, payment_method, status, created_at)
            VALUES (?, ?, (SELECT user_id FROM orders WHERE id = ?), ?, ?, 'wechat_pay', 'success', NOW())`,
           [uuidv4(), order.id, order.id, order.amount, transaction.transaction_id]
@@ -415,7 +415,7 @@ router.post('/notify', async (req: Request, res: Response) => {
         console.log('[WxPay] 支付成功:', outTradeNo, 'transaction_id:', transaction.transaction_id);
       });
     } else if (['CLOSED', 'PAYERROR', 'REVOKED'].includes(tradeState)) {
-      await execute(
+      await executeOp(req, 
         `UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = ? AND status = 'pending'`,
         [order.id]
       );
@@ -441,7 +441,7 @@ router.get('/query/:orderId', authMiddleware, async (req: Request, res: Response
     const userId = req.user!.userId;
     const { orderId } = req.params;
 
-    const order = await queryOne<{
+    const order = await queryOpOne<{
       id: string;
       order_no: string;
       user_id: string;
@@ -450,7 +450,7 @@ router.get('/query/:orderId', authMiddleware, async (req: Request, res: Response
       transaction_id: string;
       prepay_id: string;
       paid_at: string;
-    }>(
+    }>(req, 
       `SELECT id, order_no, user_id, amount_cents as amount, status, transaction_id, prepay_id, paid_at FROM orders WHERE id = ?`,
       [orderId]
     );
@@ -472,7 +472,7 @@ router.get('/query/:orderId', authMiddleware, async (req: Request, res: Response
 
         if (wxOrder.trade_state === 'SUCCESS') {
           // 兜底更新为已支付
-          await execute(
+          await executeOp(req, 
             `UPDATE orders SET status = 'paid', transaction_id = ?, paid_at = NOW(), updated_at = NOW() WHERE id = ? AND status = 'pending'`,
             [wxOrder.transaction_id, order.id]
           );
@@ -480,7 +480,7 @@ router.get('/query/:orderId', authMiddleware, async (req: Request, res: Response
           order.transaction_id = wxOrder.transaction_id;
           console.log('[WxPay] 兜底发现已支付订单:', order.order_no, 'transaction_id:', wxOrder.transaction_id);
         } else if (['CLOSED', 'PAYERROR'].includes(wxOrder.trade_state)) {
-          await execute(
+          await executeOp(req, 
             `UPDATE orders SET status = 'cancelled' WHERE id = ? AND status = 'pending'`,
             [order.id]
           );
@@ -526,14 +526,14 @@ router.post('/refund', authMiddleware, async (req: Request, res: Response<ApiRes
       return res.status(400).json({ code: 400, message: '缺少订单 ID', data: null as any });
     }
 
-    const order = await queryOne<{
+    const order = await queryOpOne<{
       id: string;
       order_no: string;
       user_id: string;
       amount: number;
       status: string;
       transaction_id: string;
-    }>(
+    }>(req, 
       `SELECT id, order_no, user_id, amount_cents as amount, status, transaction_id FROM orders WHERE id = ?`,
       [order_id]
     );
@@ -553,7 +553,7 @@ router.post('/refund', authMiddleware, async (req: Request, res: Response<ApiRes
     // 开发模式：模拟退款
     if (!config.wechatPay.mchId || config.nodeEnv === 'development') {
       const refundId = `refund_mock_${Date.now()}`;
-      await execute(
+      await executeOp(req, 
         `UPDATE orders SET status = 'refunding', refund_id = ?, updated_at = NOW() WHERE id = ?`,
         [refundId, order_id]
       );
@@ -588,7 +588,7 @@ router.post('/refund', authMiddleware, async (req: Request, res: Response<ApiRes
       },
     });
 
-    await execute(
+    await executeOp(req, 
       `UPDATE orders SET status = 'refunding', refund_id = ?, refund_amount = ?, updated_at = NOW() WHERE id = ?`,
       [wxRefund.refund_id, refundAmount, order_id]
     );
@@ -634,14 +634,14 @@ router.post('/notify-refund', async (req: Request, res: Response) => {
     console.log('[WxPay] 退款回调:', refundResult.out_trade_no, 'status:', refundResult.refund_status);
 
     if (refundResult.refund_status === 'SUCCESS') {
-      await execute(
+      await executeOp(req, 
         `UPDATE orders SET status = 'refunded', refunded_at = NOW(), updated_at = NOW()
          WHERE order_no = ? AND status = 'refunding'`,
         [refundResult.out_trade_no]
       );
 
       // 更新支付流水
-      await execute(
+      await executeOp(req, 
         `UPDATE payment_transactions SET status = 'refunded', refund_id = ?, updated_at = NOW()
          WHERE transaction_id = ?`,
         [refundResult.refund_id, refundResult.transaction_id]
@@ -673,7 +673,7 @@ router.post('/mock-pay-success', authMiddleware, async (req: Request, res: Respo
     const userId = req.user!.userId;
     const { order_id } = req.body;
 
-    const order = await queryOne<{ id: string; user_id: string; status: string }>(
+    const order = await queryOpOne<{ id: string; user_id: string; status: string }>(req, 
       `SELECT id, user_id, status FROM orders WHERE id = ?`,
       [order_id]
     );
@@ -688,7 +688,7 @@ router.post('/mock-pay-success', authMiddleware, async (req: Request, res: Respo
       return res.status(400).json({ code: 400, message: `订单状态不支持模拟支付: ${order.status}`, data: null });
     }
 
-    await execute(
+    await executeOp(req, 
       `UPDATE orders SET status = 'paid', transaction_id = ?, paid_at = NOW(), updated_at = NOW() WHERE id = ? AND status = 'pending'`,
       [`test_txn_${Date.now()}`, order_id]
     );

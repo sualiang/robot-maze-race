@@ -14,7 +14,7 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config';
-import { query, queryOne, execute } from '../config/database';
+import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../config/database';
 import { authMiddleware, optionalAuth } from '../middleware/auth';
 import {
   ApiResponse,
@@ -171,7 +171,7 @@ router.post('/race-reminder', authMiddleware, async (req: Request, res: Response
     }
 
     // 查询所有参赛选手
-    const players = await query<{ user_id: string; openid: string; nickname: string }>(
+    const players = await queryOp<{ user_id: string; openid: string; nickname: string }>(req, 
       `SELECT rr.user_id, u.openid, u.nickname
        FROM race_results rr
        JOIN users u ON u.id = rr.user_id
@@ -279,7 +279,7 @@ router.post('/operation', authMiddleware, async (req: Request, res: Response) =>
           break;
         case NotificationScene.COUPON_EXPIRE:
           // 持有有效优惠券的用户
-          targetUsers = await query<{ id: string; openid: string; nickname: string }>(
+          targetUsers = await queryOp<{ id: string; openid: string; nickname: string }>(req, 
             `SELECT DISTINCT u.id, u.openid, u.nickname
              FROM users u
              JOIN user_coupons uc ON uc.user_id = u.id

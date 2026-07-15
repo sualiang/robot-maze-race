@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config';
-import { query, queryOne, execute } from '../config/database';
+import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../config/database';
 import { authMiddleware, optionalAuth, AuthPayload } from '../middleware/auth';
 import { getAccessToken } from '../services/wechat-token';
 import {
@@ -320,7 +320,7 @@ router.post('/operator-login', async (req: Request, res: Response) => {
   }
 
   try {
-    const member = await queryOne<any>(
+    const member = await queryOpOne<any>(req, 
       `SELECT m.id, m.password_hash as password, m.name as nickname, m.phone,
               m.role, m.status, ar.label as role_name, ar.name as admin_role_name, ar.permissions,
               m.operator_id,
@@ -494,7 +494,7 @@ router.post('/login', async (req: Request, res: Response) => {
         return res.status(400).json({ code: 400, message: '缺少手机号或密码', data: null });
       }
 
-      const member = await queryOne<any>(
+      const member = await queryOpOne<any>(req, 
         `SELECT m.id, m.password_hash as password, m.name as nickname, m.phone,
                 m.role, m.status, ar.label as role_name, ar.name as admin_role_name, ar.permissions,
                 m.operator_id,
@@ -576,7 +576,7 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     // 检查是否是裁判手机号
-    const refereePhone = await queryOne<{ id: string; phone: string; name: string }>(
+    const refereePhone = await queryOpOne<{ id: string; phone: string; name: string }>(req, 
       'SELECT id, phone, name FROM referees WHERE phone = $1',
       [phone]
     );
@@ -692,7 +692,7 @@ router.get('/me', authMiddleware, async (req: Request, res: Response<ApiResponse
 
     // 运营商成员：从 operator_members 表查询
     if (userRole === 'operator') {
-      const member = await queryOne<any>(
+      const member = await queryOpOne<any>(req, 
         `SELECT om.id, om.operator_id, om.phone, om.name, om.role, om.status,
                 o.name as operator_name, o.company_name
          FROM operator_members om
@@ -834,7 +834,7 @@ router.post('/refresh', authMiddleware, async (req: Request, res: Response<ApiRe
 
     // 运营商成员：从 operator_members 表查询
     if (userRole === 'operator' && (payload as any).operatorId) {
-      const member = await queryOne<any>(
+      const member = await queryOpOne<any>(req, 
         `SELECT m.id, m.phone, m.name, m.role, m.status, m.operator_id,
                 ar.label as role_name, ar.name as admin_role_name, ar.permissions,
                 m.first_login
@@ -890,7 +890,7 @@ router.post('/refresh', authMiddleware, async (req: Request, res: Response<ApiRe
 
     // 裁判：从 referees + users 表查询
     if (userRole === 'referee') {
-      const referee = await queryOne<any>(
+      const referee = await queryOpOne<any>(req, 
         `SELECT r.id, r.user_id, u.id as uid, u.openid, u.role
          FROM referees r
          LEFT JOIN users u ON u.id = r.user_id
@@ -955,7 +955,7 @@ router.post('/admin/change-password', authMiddleware, async (req: Request, res: 
 
     if (userRole === 'referee') {
       // 裁判改密：通过 referee userId 找到对应的 users 记录
-      const referee = await queryOne<{ id: string; user_id: string }>(
+      const referee = await queryOpOne<{ id: string; user_id: string }>(req, 
         'SELECT id, user_id FROM referees WHERE user_id = $1',
         [userId]
       );
@@ -1144,7 +1144,7 @@ router.post('/member/change-password', authMiddleware, async (req: Request, res:
     }
 
     // 先查 admin_users 表（总部管理员和运营商角色成员）
-    let user = await queryOne<{ id: string; password: string }>(
+    let user = await queryOpOne<{ id: string; password: string }>(req, 
       'SELECT id, password_hash as password FROM operator_members WHERE id = $1',
       [userId]
     );
@@ -1177,7 +1177,7 @@ router.post('/member/change-password', authMiddleware, async (req: Request, res:
       );
     } else {
       // 运营商角色成员 → 更新 operator_members 表
-      await query(
+      await queryOp(req, 
         "UPDATE operator_members SET password_hash = $1, first_login = 0, updated_at = NOW() WHERE id = $2",
         [hashedPassword, userId]
       );
@@ -1217,7 +1217,7 @@ router.post('/member/change-password', authMiddleware, async (req: Request, res:
         };
       }
     } else {
-      const m = await queryOne<any>(
+      const m = await queryOpOne<any>(req, 
         `SELECT m.id, m.operator_id, m.phone, m.name as nickname, m.status, ar.label as role_name, ar.permissions
          FROM operator_members m
          LEFT JOIN admin_roles ar ON ar.name = m.role
@@ -1340,7 +1340,7 @@ async function grantFreeEntryDeduction(userId: string): Promise<void> {
     }
 
     const deductionId = uuidv4();
-    await execute(
+    await executeOp(req, 
       `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, expires_at, created_at)
        VALUES ($1, $2, $3, 'register_reward', 'available', DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
       [deductionId, userId, deductionCents]
@@ -1555,7 +1555,7 @@ router.get('/mp-oauth', async (req: Request, res: Response) => {
       isNewUser = true;
     } else {
       // 判断 is_new_user：该 openid 是否已有关联的 referee 记录
-      const existingReferee = await queryOne<{ id: string }>(
+      const existingReferee = await queryOpOne<{ id: string }>(req, 
         'SELECT id FROM referees WHERE user_id = $1',
         [user.id]
       );

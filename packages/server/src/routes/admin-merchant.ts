@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
-import { query, queryOne, execute, generateSecurePassword } from '../config/database';
+import { query, queryOne, execute, generateSecurePassword, queryOp, queryOpOne, executeOp } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 
 const router = Router();
@@ -49,12 +49,12 @@ router.get('/', authMiddleware, anyPermissionMiddleware, async (req: Request, re
     const pageSize = Math.min(Math.max(parseInt(req.query.pageSize as string, 10) || 20, 1), 100);
     const offset = (page - 1) * pageSize;
 
-    const merchants = await query<any>(
+    const merchants = await queryOp<any>(req, 
       `SELECT * FROM merchants ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
       [pageSize, offset]
     );
 
-    const countRow = await queryOne<{ total: number }>(
+    const countRow = await queryOpOne<{ total: number }>(req, 
       `SELECT COUNT(*) as total FROM merchants`
     );
 
@@ -92,7 +92,7 @@ router.get('/', authMiddleware, anyPermissionMiddleware, async (req: Request, re
 router.get('/:id', authMiddleware, anyPermissionMiddleware, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const merchant = await queryOne<any>(
+    const merchant = await queryOpOne<any>(req, 
       `SELECT m.*, (SELECT COUNT(*) FROM merchant_admin ma WHERE ma.merchant_id = m.id) as admin_count
        FROM merchants m WHERE m.id = $1`,
       [id]
@@ -139,7 +139,7 @@ router.post('/', authMiddleware, anyPermissionMiddleware, async (req: Request, r
 
   try {
     const merchantId = uuidv4();
-    await execute(
+    await executeOp(req, 
       `INSERT INTO merchants (id, merchant_name, merchant_address, longitude, latitude, contact_name, contact_phone, logo_url, status, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, NOW(), NOW())`,
       [
@@ -165,7 +165,7 @@ router.post('/', authMiddleware, anyPermissionMiddleware, async (req: Request, r
     if (adminPhone) {
       adminId = uuidv4();
       const passwordHash = bcrypt.hashSync(adminPassword, 10);
-      await execute(
+      await executeOp(req, 
         `INSERT INTO merchant_admin (id, merchant_id, username, password_hash, phone, real_name, status, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, '', 1, NOW(), NOW())`,
         [adminId, merchantId, adminPhone, passwordHash, adminPhone]
@@ -199,7 +199,7 @@ router.put('/:id', authMiddleware, anyPermissionMiddleware, async (req: Request,
   const { merchantName, merchantAddress, longitude, latitude, contactName, contactPhone, logoUrl, status } = req.body;
 
   try {
-    const existing = await queryOne<{ id: string }>('SELECT id FROM merchants WHERE id = $1', [id]);
+    const existing = await queryOpOne<{ id: string }>(req, 'SELECT id FROM merchants WHERE id = $1', [id]);
     if (!existing) {
       res.json({ code: 404, message: '商家不存在', data: null });
       return;
@@ -226,7 +226,7 @@ router.put('/:id', authMiddleware, anyPermissionMiddleware, async (req: Request,
     updates.push(`updated_at = NOW()`);
     params.push(id);
 
-    await execute(
+    await executeOp(req, 
       `UPDATE merchants SET ${updates.join(', ')} WHERE id = $${idx}`,
       params
     );
@@ -249,19 +249,19 @@ router.put('/:id', authMiddleware, anyPermissionMiddleware, async (req: Request,
  */
 router.get('/coupon/stats', authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
   try {
-    const totalCoupons = await queryOne<{ total: number }>(
+    const totalCoupons = await queryOpOne<{ total: number }>(req, 
       `SELECT COUNT(*) as total FROM merchant_coupons`
     );
-    const pendingAudit = await queryOne<{ total: number }>(
+    const pendingAudit = await queryOpOne<{ total: number }>(req, 
       `SELECT COUNT(*) as total FROM merchant_coupons WHERE audit_status = 0`
     );
-    const approved = await queryOne<{ total: number }>(
+    const approved = await queryOpOne<{ total: number }>(req, 
       `SELECT COUNT(*) as total FROM merchant_coupons WHERE audit_status = 1`
     );
-    const online = await queryOne<{ total: number }>(
+    const online = await queryOpOne<{ total: number }>(req, 
       `SELECT COUNT(*) as total FROM merchant_coupons WHERE status = 1 AND audit_status = 1`
     );
-    const totalVerified = await queryOne<{ total: number }>(
+    const totalVerified = await queryOpOne<{ total: number }>(req, 
       `SELECT COUNT(*) as total FROM user_coupons WHERE status = 2`
     );
 
@@ -289,7 +289,7 @@ router.post('/coupon/:id/force-offline', authMiddleware, adminMiddleware, async 
   try {
     const { id } = req.params;
 
-    const existing = await queryOne<any>(
+    const existing = await queryOpOne<any>(req, 
       `SELECT * FROM merchant_coupons WHERE id = $1`,
       [id]
     );
@@ -304,7 +304,7 @@ router.post('/coupon/:id/force-offline', authMiddleware, adminMiddleware, async 
       return;
     }
 
-    await execute(
+    await executeOp(req, 
       `UPDATE merchant_coupons SET status = 0, audit_remark = $1, updated_at = NOW() WHERE id = $2`,
       ['总部强制下架', id]
     );
@@ -329,16 +329,16 @@ router.delete('/:id', authMiddleware, adminMiddleware, async (req: Request, res:
       return;
     }
 
-    const existing = await queryOne<any>('SELECT id FROM merchants WHERE id = $1', [id]);
+    const existing = await queryOpOne<any>(req, 'SELECT id FROM merchants WHERE id = $1', [id]);
     if (!existing) {
       res.status(404).json({ code: 404, message: '商家不存在', data: null });
       return;
     }
 
     // 删除关联数据
-    await execute('DELETE FROM merchant_admin WHERE merchant_id = $1', [id]);
-    await execute('DELETE FROM merchant_coupons WHERE merchant_id = $1', [id]);
-    await execute('DELETE FROM merchants WHERE id = $1', [id]);
+    await executeOp(req, 'DELETE FROM merchant_admin WHERE merchant_id = $1', [id]);
+    await executeOp(req, 'DELETE FROM merchant_coupons WHERE merchant_id = $1', [id]);
+    await executeOp(req, 'DELETE FROM merchants WHERE id = $1', [id]);
 
     res.json({ code: 0, message: '商家已删除' });
   } catch (e: any) {
@@ -360,13 +360,13 @@ router.patch('/:id/status', authMiddleware, anyPermissionMiddleware, async (req:
       return;
     }
 
-    const existing = await queryOne<any>('SELECT id FROM merchants WHERE id = $1', [id]);
+    const existing = await queryOpOne<any>(req, 'SELECT id FROM merchants WHERE id = $1', [id]);
     if (!existing) {
       res.status(404).json({ code: 404, message: '商家不存在', data: null });
       return;
     }
 
-    await execute('UPDATE merchants SET status = $1, updated_at = NOW() WHERE id = $2', [status, id]);
+    await executeOp(req, 'UPDATE merchants SET status = $1, updated_at = NOW() WHERE id = $2', [status, id]);
 
     res.json({ code: 0, message: status === 1 ? '商家已启用' : '商家已禁用' });
   } catch (e: any) {
@@ -385,13 +385,13 @@ router.put('/:id/status', authMiddleware, anyPermissionMiddleware, async (req: R
     return;
   }
 
-  const existing = await queryOne<any>('SELECT id FROM merchants WHERE id = $1', [id]);
+  const existing = await queryOpOne<any>(req, 'SELECT id FROM merchants WHERE id = $1', [id]);
   if (!existing) {
     res.status(404).json({ code: 404, message: '商家不存在', data: null });
     return;
   }
 
-  await execute('UPDATE merchants SET status = $1, updated_at = NOW() WHERE id = $2', [status, id]);
+  await executeOp(req, 'UPDATE merchants SET status = $1, updated_at = NOW() WHERE id = $2', [status, id]);
 
   res.json({ code: 0, message: status === 1 ? '商家已启用' : '商家已禁用' });
 });
@@ -405,14 +405,14 @@ router.post('/:id/reset-password', authMiddleware, operatorMiddleware, async (re
     const { id } = req.params;
 
     // 查商家是否存在
-    const merchant = await queryOne<{ id: string }>('SELECT id FROM merchants WHERE id = $1', [id]);
+    const merchant = await queryOpOne<{ id: string }>(req, 'SELECT id FROM merchants WHERE id = $1', [id]);
     if (!merchant) {
       res.json({ code: 404, message: '商家不存在', data: null });
       return;
     }
 
     // 查商家管理员账号（可能不存在）
-    let admin = await queryOne<{ id: string; username: string }>(
+    let admin = await queryOpOne<{ id: string; username: string }>(req, 
       'SELECT id, username FROM merchant_admin WHERE merchant_id = $1 LIMIT 1',
       [id]
     );
@@ -424,14 +424,14 @@ router.post('/:id/reset-password', authMiddleware, operatorMiddleware, async (re
     if (!admin) {
       // 没有管理员：自动创建
       const adminId = uuidv4();
-      await execute(
+      await executeOp(req, 
         `INSERT INTO merchant_admin (id, merchant_id, username, password_hash, phone, first_login, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, 1, NOW(), NOW())`,
         [adminId, id, 'admin', passwordHash, '']
       );
     } else {
       // 有管理员：重置密码 + 标记首次登录
-      await execute(
+      await executeOp(req, 
         `UPDATE merchant_admin SET password_hash = $1, first_login = 1, updated_at = NOW() WHERE id = $2`,
         [passwordHash, admin.id]
       );

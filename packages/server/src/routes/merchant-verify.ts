@@ -1,9 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { query, queryOne, execute } from '../config/database';
+import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../config/database';
 import { merchantAuthMiddleware } from './merchant-auth';
-import { getOperatorContext } from '../middleware/operator-context';
-
 const router = Router();
 
 // 所有接口都需要商家认证
@@ -20,7 +18,7 @@ async function doVerify(
   verifyType: number
 ): Promise<{ code: number; message: string; data?: any }> {
   // 查询 user_coupons 通过 verify_code
-  const coupon = await queryOne<any>(
+  const coupon = await queryOpOne<any>(req, 
     `SELECT uc.*, mc.name as mc_name, mc.denomination_cents as mc_denomination,
             mc.coupon_type as mc_coupon_type, mc.discount_percent as mc_discount_percent
      FROM user_coupons uc
@@ -46,7 +44,7 @@ async function doVerify(
   // 检查有效期
   if (coupon.valid_end && new Date(coupon.valid_end) < new Date()) {
     // 标记为过期
-    await execute(
+    await executeOp(req, 
       `UPDATE user_coupons SET status = 3, updated_at = NOW() WHERE id = $1`,
       [coupon.id]
     );
@@ -60,29 +58,28 @@ async function doVerify(
 
   // 标记为已使用
   const now = new Date().toISOString();
-  await execute(
+  await executeOp(req, 
     `UPDATE user_coupons SET status = 2, used_at = NOW(), updated_at = NOW() WHERE id = $1 AND status = 1`,
     [coupon.id]
   );
 
   // 扣减 merchant_coupons.remain_count
-  await execute(
+  await executeOp(req, 
     `UPDATE merchant_coupons SET remain_count = remain_count - 1, updated_at = NOW()
      WHERE id = $1 AND remain_count > 0`,
     [coupon.coupon_id]
   );
 
   // 写入核销流水
-  const merchantOp = await queryOne<{ operator_id: string }>(
+  const merchantOp = await queryOpOne<{ operator_id: string }>(req, 
     `SELECT operator_id FROM merchants WHERE id = $1`,
     [merchantId]
   );
   const mOpId = merchantOp?.operator_id || '';
-  await execute(
+  await executeOp(req, 
     `INSERT INTO coupon_verify_log (
       id, user_coupon_id, merchant_id, verifier_id, verifier_name,
-      user_id, coupon_name, denomination_cents, verify_type, verify_time, created_at, operator_id
-    ) VALUES (
+      user_id, coupon_name, denomination_cents, verify_type, verify_time, created_at) VALUES (
       $1, $2, $3, $4, $5,
       $6, $7, $8, $9, NOW(), NOW(), $10
     )`,
@@ -181,12 +178,12 @@ router.get('/log', async (req: Request, res: Response) => {
     const pageSize = Math.min(Math.max(parseInt(req.query.pageSize as string, 10) || 20, 1), 100);
     const offset = (page - 1) * pageSize;
 
-    const countRow = await queryOne<{ total: number }>(
+    const countRow = await queryOpOne<{ total: number }>(req, 
       `SELECT COUNT(*) as total FROM coupon_verify_log WHERE merchant_id = $1`,
       [merchantId]
     );
 
-    const logs = await query<any>(
+    const logs = await queryOp<any>(req, 
       `SELECT * FROM coupon_verify_log
        WHERE merchant_id = $1
        ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
@@ -227,7 +224,7 @@ router.get('/log/:id', async (req: Request, res: Response) => {
     const merchantId = req.merchantAdmin!.merchantId;
     const { id } = req.params;
 
-    const log = await queryOne<any>(
+    const log = await queryOpOne<any>(req, 
       `SELECT * FROM coupon_verify_log WHERE id = $1 AND merchant_id = $2`,
       [id, merchantId]
     );
@@ -269,26 +266,26 @@ router.get('/stats', async (req: Request, res: Response) => {
     const todayStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}T00:00:00`;
     const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01T00:00:00`;
 
-    const todayRow = await queryOne<{ total: number }>(
+    const todayRow = await queryOpOne<{ total: number }>(req, 
       `SELECT COUNT(*) as total FROM coupon_verify_log
        WHERE merchant_id = $1 AND verify_time >= $2`,
       [merchantId, todayStart]
     );
 
-    const monthRow = await queryOne<{ total: number }>(
+    const monthRow = await queryOpOne<{ total: number }>(req, 
       `SELECT COUNT(*) as total FROM coupon_verify_log
        WHERE merchant_id = $1 AND verify_time >= $2`,
       [merchantId, monthStart]
     );
 
-    const totalRow = await queryOne<{ total: number }>(
+    const totalRow = await queryOpOne<{ total: number }>(req, 
       `SELECT COUNT(*) as total FROM coupon_verify_log
        WHERE merchant_id = $1`,
       [merchantId]
     );
 
     // 今日核销金额
-    const todayAmountRow = await queryOne<{ total: number }>(
+    const todayAmountRow = await queryOpOne<{ total: number }>(req, 
       `SELECT COALESCE(SUM(denomination_cents), 0) as total FROM coupon_verify_log
        WHERE merchant_id = $1 AND verify_time >= $2`,
       [merchantId, todayStart]

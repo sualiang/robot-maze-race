@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { query, queryOne, execute } from '../config/database';
+import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import {
   ApiResponse,
@@ -10,14 +10,6 @@ import {
 } from '@robot-race/shared';
 
 const router = Router();
-
-// 辅助：通过 users 表 ID 查找对应的 operators 记录
-const getEffectiveOperatorId = async (userId: string): Promise<string | null> => {
-  const row = await queryOne<{ id: string }>(
-    'SELECT id FROM operators WHERE created_by = $1', [userId]
-  );
-  return row?.id || null;
-};
 
 // ============================================================
 // Race Packages 路由 — 参赛包 CRUD + 礼券自动选配
@@ -104,12 +96,12 @@ router.get('/', async (req: Request, res: Response<ApiResponse<PaginatedResult<R
       params.push(status);
     }
 
-    const countResult = await queryOne<{ count: string }>(
+    const countResult = await queryOpOne<{ count: string }>(req, 
       `SELECT COUNT(*) as count FROM race_packages ${whereClause}`, params
     );
     const total = parseInt(countResult?.count || '0', 10);
 
-    const rows = await query<RacePackageRow>(
+    const rows = await queryOp<RacePackageRow>(req, 
       `SELECT * FROM race_packages ${whereClause}
        ORDER BY sort_order ASC, created_at DESC
        LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
@@ -137,7 +129,7 @@ router.get('/:id', async (req: Request, res: Response<ApiResponse<any>>) => {
   try {
     const { id } = req.params;
 
-    const row = await queryOne<RacePackageRow>(
+    const row = await queryOpOne<RacePackageRow>(req, 
       `SELECT * FROM race_packages WHERE id = $1`, [id]
     );
 
@@ -146,7 +138,7 @@ router.get('/:id', async (req: Request, res: Response<ApiResponse<any>>) => {
     }
 
     // 查关联礼券
-    const coupons = await query<PackageCouponRow>(
+    const coupons = await queryOp<PackageCouponRow>(req, 
       `SELECT * FROM race_package_coupons WHERE package_id = $1`, [id]
     );
 
@@ -217,24 +209,20 @@ router.post('/', authMiddleware, async (req: Request, res: Response<ApiResponse<
     const growthValue = b.growthValue || 0;
     const pointValue = b.pointValue || 0;
 
-    const opId = req.user?.operatorId || await getEffectiveOperatorId(req.user!.userId) || null;
-    if (!opId) {
-      return res.status(400).json({ code: 400, message: '无法确定运营商，请联系管理员', data: null as any });
-    }
-    await execute(
-      `INSERT INTO race_packages (id, operator_id, name, description, price_cents,
+    await executeOp(req, 
+      `INSERT INTO race_packages (id, name, description, price_cents,
                standard_price_cents, discount_price_cents, tag, special_rights,
                growth_value, point_value,
                race_count, valid_days, status, sort_order,
                coupon_reward_min_cents, coupon_reward_max_cents, free_deduction_cents)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
-      [id, opId, body.name, body.description || null, priceCents,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
+      [id, body.name, body.description || null, priceCents,
        standardPriceCents, discountPriceCents, tag, specialRights,
        growthValue, pointValue,
        raceCount, validDays, 'active', sortOrder,
        rewardMinCents, rewardMaxCents, freeDeductionCents]
     );
-    const row = await queryOne<RacePackageRow>('SELECT * FROM race_packages WHERE id = $1', [id]);
+    const row = await queryOpOne<RacePackageRow>(req, 'SELECT * FROM race_packages WHERE id = $1', [id]);
     const created = toRacePackage(row!);
 
     // 如果有礼券区间，自动匹配
@@ -265,7 +253,7 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response<ApiRespons
       return res.status(403).json({ code: 403, message: '仅管理员或运营人员可编辑', data: null as any });
     }
 
-    const existing = await queryOne<{ id: string }>('SELECT id FROM race_packages WHERE id = $1', [id]);
+    const existing = await queryOpOne<{ id: string }>(req, 'SELECT id FROM race_packages WHERE id = $1', [id]);
     if (!existing) {
       return res.status(404).json({ code: 404, message: '参赛包不存在', data: null as any });
     }
@@ -368,15 +356,15 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response<ApiRespons
     values.push(new Date().toISOString());
     values.push(id);
 
-    await execute(
+    await executeOp(req, 
       `UPDATE race_packages SET ${fields.join(', ')} WHERE id = $${paramIdx}`,
       values
     );
-    const row = await queryOne<RacePackageRow>('SELECT * FROM race_packages WHERE id = $1', [id]);
+    const row = await queryOpOne<RacePackageRow>(req, 'SELECT * FROM race_packages WHERE id = $1', [id]);
 
     // 如果更新了礼券区间，重新匹配
     if (body.coupon_reward_min !== undefined || body.coupon_reward_max !== undefined) {
-      const updated = await queryOne<RacePackageRow>('SELECT * FROM race_packages WHERE id = $1', [id]);
+      const updated = await queryOpOne<RacePackageRow>(req, 'SELECT * FROM race_packages WHERE id = $1', [id]);
       if (updated && updated.coupon_reward_max_cents > 0) {
         try {
           await clearAndRematchCoupons(id, updated.coupon_reward_min_cents, updated.coupon_reward_max_cents);
@@ -400,7 +388,7 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response<ApiRespons
 router.post('/:id/match-coupons', authMiddleware, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const pkg = await queryOne<RacePackageRow>('SELECT * FROM race_packages WHERE id = $1', [id]);
+    const pkg = await queryOpOne<RacePackageRow>(req, 'SELECT * FROM race_packages WHERE id = $1', [id]);
     if (!pkg) {
       return res.status(404).json({ code: 404, message: '参赛包不存在', data: null as any });
     }
@@ -429,7 +417,7 @@ router.post('/:id/match-coupons', authMiddleware, async (req: Request, res: Resp
 router.post('/:id/save-matched-coupons', authMiddleware, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const pkg = await queryOne<RacePackageRow>('SELECT * FROM race_packages WHERE id = $1', [id]);
+    const pkg = await queryOpOne<RacePackageRow>(req, 'SELECT * FROM race_packages WHERE id = $1', [id]);
     if (!pkg) {
       return res.status(404).json({ code: 404, message: '参赛包不存在', data: null as any });
     }
@@ -442,7 +430,7 @@ router.post('/:id/save-matched-coupons', authMiddleware, async (req: Request, re
 
     await clearAndRematchCoupons(id, minCents, maxCents);
 
-    const saved = await query<PackageCouponRow>(
+    const saved = await queryOp<PackageCouponRow>(req, 
       `SELECT rpc.*, mc.name as coupon_name, m.merchant_name as merchant_name
        FROM race_package_coupons rpc
        JOIN merchant_coupons mc ON rpc.coupon_id = mc.id
@@ -485,7 +473,7 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response<ApiResp
 
     console.log('[RacePackages] delete request:', id);
 
-    const existing = await queryOne<{ id: string; name: string }>(
+    const existing = await queryOpOne<{ id: string; name: string }>(req, 
       'SELECT id, name FROM race_packages WHERE id = $1', [id]
     );
     if (!existing) {
@@ -496,14 +484,14 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response<ApiResp
 
     // 先删除关联表数据（容错处理）
     try {
-      const r1 = await execute(`DELETE FROM race_package_coupons WHERE package_id = $1`, [id]);
+      const r1 = await executeOp(req, `DELETE FROM race_package_coupons WHERE package_id = $1`, [id]);
       console.log('[RacePackages] delete race_package_coupons:', r1.changes, 'rows');
     } catch (e: any) {
       console.log('[RacePackages] skip race_package_coupons:', e.message);
     }
 
     // 删除参赛包本身
-    const result = await execute(`DELETE FROM race_packages WHERE id = $1`, [id]);
+    const result = await executeOp(req, `DELETE FROM race_packages WHERE id = $1`, [id]);
     console.log('[RacePackages] delete result:', result.changes, 'rows');
 
     return res.json({ code: 0, message: '已删除', data: null });
@@ -524,7 +512,7 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response<ApiRespo
       return res.status(403).json({ code: 403, message: '无权限', data: null as any });
     }
 
-    const existing = await queryOne<{ id: string; status: string }>(
+    const existing = await queryOpOne<{ id: string; status: string }>(req, 
       'SELECT id, status FROM race_packages WHERE id = $1', [id]
     );
     if (!existing) {
@@ -534,10 +522,10 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response<ApiRespo
     const { is_active } = req.body as { is_active?: boolean };
     if (is_active !== undefined) {
       const newStatus = is_active ? 'active' : 'inactive';
-      await query(`UPDATE race_packages SET status = $1, updated_at = $2 WHERE id = $3`,
+      await queryOp(req, `UPDATE race_packages SET status = $1, updated_at = $2 WHERE id = $3`,
         [newStatus, new Date().toISOString(), id]);
 
-      const row = await queryOne<RacePackageRow>('SELECT * FROM race_packages WHERE id = $1', [id]);
+      const row = await queryOpOne<RacePackageRow>(req, 'SELECT * FROM race_packages WHERE id = $1', [id]);
       return res.json({ code: 0, message: is_active ? '已上架' : '已下架', data: toRacePackage(row!) });
     }
 
@@ -563,7 +551,7 @@ async function doMatch(minCents: number, maxCents: number): Promise<{
   message: string;
 }> {
   // 取所有已上架、审核通过、剩余库存>0的券，附带商家名
-  const allCoupons = await query<any>(`
+  const allCoupons = await queryOp<any>(req, `
     SELECT mc.id, mc.name, mc.denomination_cents, mc.coupon_type,
            mc.remain_count, mc.merchant_id, m.merchant_name as merchant_name
     FROM merchant_coupons mc
@@ -650,7 +638,7 @@ async function doMatch(minCents: number, maxCents: number): Promise<{
  */
 async function clearAndRematchCoupons(packageId: string, minCents: number, maxCents: number) {
   // 删除旧的匹配
-  await execute(`DELETE FROM race_package_coupons WHERE package_id = $1`, [packageId]);
+  await executeOp(req, `DELETE FROM race_package_coupons WHERE package_id = $1`, [packageId]);
   // 重新匹配
   await autoMatchCoupons(packageId, minCents, maxCents);
 }
@@ -664,7 +652,7 @@ async function autoMatchCoupons(packageId: string, minCents: number, maxCents: n
 
   for (const m of result.matched) {
     const id = uuidv4();
-    await execute(
+    await executeOp(req, 
       `INSERT INTO race_package_coupons (id, package_id, coupon_id, denomination_cents, coupon_type, merchant_name, coupon_name)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [id, packageId, m.couponId, m.denominationCents, m.couponType, m.merchantName, m.couponName]

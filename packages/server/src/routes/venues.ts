@@ -1,8 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { query, queryOne, execute } from '../config/database';
+import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import { createVenueMiniCode } from '../services/wechat-qrcode';
+import { getOperatorContext } from '../middleware/operator-context';
 import {
   ApiResponse,
   Venue,
@@ -13,14 +14,6 @@ import {
 } from '@robot-race/shared';
 
 const router = Router();
-
-// 辅助：通过 users 表 ID 查找对应的 operators 记录
-const getEffectiveOperatorId = async (userId: string): Promise<string | null> => {
-  const row = await queryOne<{ id: string }>(
-    'SELECT id FROM operators WHERE created_by = $1', [userId]
-  );
-  return row?.id || null;
-};
 
 // ============================================================
 // Venues 路由 — 赛场 CRUD
@@ -49,17 +42,16 @@ router.get('/', async (req: Request, res: Response<ApiResponse<PaginatedResult<V
       params.push(status);
     }
 
-    const countResult = await queryOne<{ count: string }>(
+    const countResult = await queryOpOne<{ count: string }>(req, 
       `SELECT COUNT(*) as count FROM venues ${whereClause}`,
       params
     );
     const total = parseInt(countResult?.count || '0', 10);
 
-    const venues = await query<any>(
+    const venues = await queryOp<any>(req, 
       `SELECT id, name, address, city, district, latitude, longitude, status,
               qrcode_url, checkin_radius_meters, max_queue_size,
-              timeout_seconds, open_time, close_time, description,
-              operator_id, created_at, updated_at
+              timeout_seconds, open_time, close_time, description, created_at, updated_at
        FROM venues ${whereClause}
        ORDER BY created_at DESC
        LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
@@ -92,11 +84,10 @@ router.get('/:id', async (req: Request, res: Response<ApiResponse<Venue>>) => {
   try {
     const { id } = req.params;
 
-    const venue = await queryOne<any>(
+    const venue = await queryOpOne<any>(req, 
       `SELECT id, name, address, city, district, latitude, longitude, status,
               qrcode_url, checkin_radius_meters, max_queue_size,
-              timeout_seconds, open_time, close_time, description,
-              operator_id, created_at, updated_at
+              timeout_seconds, open_time, close_time, description, created_at, updated_at
        FROM venues WHERE id = $1`,
       [id]
     );
@@ -151,30 +142,17 @@ router.post('/', authMiddleware, async (req: Request, res: Response<ApiResponse<
     }
 
     const id = uuidv4();
-    // admin可传入operator_id指定所属运营商，否则从operators表查
-    const operatorId = (body as any).operator_id;
-    const effectiveOperatorId = operatorId || (req.user as any).operatorId || await getEffectiveOperatorId(req.user!.userId);
-    if (!effectiveOperatorId) {
-      return res.status(400).json({ code: 400, message: '无法确定运营商，请联系管理员', data: null as any });
-    }
-    if (operatorId) {
-      const operator = await queryOne<{ id: string }>('SELECT id FROM operators WHERE id = $1', [operatorId]);
-      if (!operator) {
-        return res.status(400).json({ code: 400, message: '运营商不存在，请选择有效的运营商', data: null as any });
-      }
-    }
-
     // 读取系统默认分润比例
     const rateRow = await queryOne<{ value: string }>(
       `SELECT setting_value AS value FROM settings WHERE setting_key = 'default_profit_share_rate'`
     );
     const defaultRate = parseInt(rateRow?.value || '80', 10);
 
-    await execute(
+    await executeOp(req, 
       `INSERT INTO venues (id, name, address, latitude, longitude, status,
         checkin_radius_meters, max_queue_size, timeout_seconds,
-        open_time, close_time, city, district, description, operator_id, profit_share_rate)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+        open_time, close_time, city, district, description, profit_share_rate)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
       [
         id,
         body.name,
@@ -190,15 +168,14 @@ router.post('/', authMiddleware, async (req: Request, res: Response<ApiResponse<
         body.city || '',
         body.district || '',
         body.description || null,
-        effectiveOperatorId,
         defaultRate,
       ]
     );
-    const venue = await queryOne<Venue>(
+    const venue = await queryOpOne<Venue>(req, 
       `SELECT id, name, address, latitude, longitude, status,
               qrcode_url, checkin_radius_meters, max_queue_size,
               timeout_seconds, open_time, close_time, city, district,
-              description, operator_id, profit_share_rate, created_at, updated_at
+              description, profit_share_rate, created_at, updated_at
        FROM venues WHERE id = $1`,
       [id]
     );
@@ -242,7 +219,7 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response<ApiRespons
     } = req.body;
 
     // 检查赛场是否存在
-    const existing = await queryOne<{ id: string }>(
+    const existing = await queryOpOne<{ id: string }>(req, 
       'SELECT id FROM venues WHERE id = $1',
       [id]
     );
@@ -290,15 +267,14 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response<ApiRespons
 
     values.push(id);
 
-    await execute(
+    await executeOp(req, 
       `UPDATE venues SET ${fields.join(', ')} WHERE id = $${paramIdx}`,
       values
     );
-    const venue = await queryOne<Venue>(
+    const venue = await queryOpOne<Venue>(req, 
       `SELECT id, name, address, latitude, longitude, status,
               qrcode_url, checkin_radius_meters, max_queue_size,
-              timeout_seconds, open_time, close_time, description,
-              operator_id, created_at, updated_at
+              timeout_seconds, open_time, close_time, description, created_at, updated_at
        FROM venues WHERE id = $1`,
       [id]
     );
@@ -326,7 +302,7 @@ router.patch('/:id/status', authMiddleware, async (req: Request, res: Response<A
       return res.status(400).json({ code: 400, message: '无效的状态值', data: null });
     }
 
-    const existing = await queryOne<{ id: string }>(
+    const existing = await queryOpOne<{ id: string }>(req, 
       'SELECT id FROM venues WHERE id = $1',
       [id]
     );
@@ -334,7 +310,7 @@ router.patch('/:id/status', authMiddleware, async (req: Request, res: Response<A
       return res.status(404).json({ code: 404, message: '赛场不存在', data: null });
     }
 
-    await query(
+    await queryOp(req, 
       `UPDATE venues SET status = $1, updated_at = $2 WHERE id = $3`,
       [status, new Date().toISOString(), id]
     );
@@ -362,7 +338,7 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response<ApiResp
       return res.status(403).json({ code: 403, message: '仅管理员或运营商可删除赛场', data: null });
     }
 
-    const existing = await queryOne<{ id: string; name: string }>('SELECT id, name FROM venues WHERE id = $1', [id]);
+    const existing = await queryOpOne<{ id: string; name: string }>(req, 'SELECT id, name FROM venues WHERE id = $1', [id]);
     if (!existing) {
       console.log('[Venues] delete: venue not found:', id);
       return res.status(404).json({ code: 404, message: '赛场不存在', data: null });
@@ -389,14 +365,14 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response<ApiResp
 
     // 解绑裁判
     try {
-      const r2 = await execute('UPDATE referees SET venue_id = NULL WHERE venue_id = $1', [id]);
+      const r2 = await executeOp(req, 'UPDATE referees SET venue_id = NULL WHERE venue_id = $1', [id]);
       console.log('[Venues] unbind referees:', r2.changes, 'rows');
     } catch (e: any) {
       console.log('[Venues] skip unbind referees:', e.message);
     }
 
     // 最后删除赛场本身
-    const result = await execute('DELETE FROM venues WHERE id = $1', [id]);
+    const result = await executeOp(req, 'DELETE FROM venues WHERE id = $1', [id]);
     console.log('[Venues] delete result:', result);
 
     if (!result.changes || result.changes === 0) {
@@ -410,7 +386,6 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response<ApiResp
   }
 });
 
-
 /**
  * GET /api/v1/venues/:id/referees
  * 获取绑定到指定赛场的所有裁判员列表
@@ -418,7 +393,7 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response<ApiResp
 router.get('/:id/referees', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const referees = await query<any>(
+    const referees = await queryOp<any>(req, 
       'SELECT id, user_id, cert_status, phone, id_number, created_at, name FROM referees WHERE venue_id = $1',
       [id]
     );
@@ -443,16 +418,12 @@ router.put('/:id/referees', async (req: Request, res: Response) => {
       return res.status(400).json({ code: 400, message: 'referee_ids 必须为数组', data: null });
     }
 
-    // 先查场地 operator_id
-    const venue = await queryOne<{ operator_id: string }>('SELECT operator_id FROM venues WHERE id = $1', [id]);
-    const opId = venue?.operator_id || null;
-
     // 解绑所有已绑定的裁判员
-    await query('UPDATE referees SET venue_id = NULL, operator_id = NULL WHERE venue_id = $1', [id]);
+    await queryOp(req, 'UPDATE referees SET venue_id = NULL WHERE venue_id = $1', [id]);
 
     // 绑定新裁判员
     for (const refId of referee_ids) {
-      await query('UPDATE referees SET venue_id = $1, operator_id = $2 WHERE id = $3', [id, opId, refId]);
+      await queryOp(req, 'UPDATE referees SET venue_id = $1 WHERE id = $2', [id, refId]);
     }
 
     return res.json({ code: 0, message: '裁判绑定成功', data: null });
@@ -474,18 +445,23 @@ router.put('/:id/referees', async (req: Request, res: Response) => {
 router.get('/:id/qrcode', authMiddleware, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const userId = req.user!.userId;
+    
+    // 通过请求上下文获取 operator，而非数据库列
+    const ctx = await getOperatorContext(userId);
+    const operatorId = ctx?.operator_id;
+    if (!operatorId) {
+      return res.status(400).json({ code: 400, message: '无法获取运营商上下文', data: null });
+    }
 
-    const venue = await queryOne<{ id: string; name: string; operator_id: string }>(
-      'SELECT id, name, operator_id FROM venues WHERE id = $1', [id]
+    const venue = await queryOpOne<{ id: string; name: string }>(req, 
+      'SELECT id, name FROM venues WHERE id = $1', [id]
     );
     if (!venue) {
       return res.status(404).json({ code: 404, message: '赛场不存在', data: null });
     }
-    if (!venue.operator_id) {
-      return res.status(400).json({ code: 400, message: '赛场未绑定运营商', data: null });
-    }
 
-    const { imageBase64, contentType } = await createVenueMiniCode(venue.operator_id, venue.id);
+    const { imageBase64, contentType } = await createVenueMiniCode(operatorId, venue.id);
 
     return res.json({
       code: 0,
@@ -493,7 +469,7 @@ router.get('/:id/qrcode', authMiddleware, async (req: Request, res: Response) =>
       data: {
         venueId: venue.id,
         venueName: venue.name,
-        operatorId: venue.operator_id,
+        operatorId,
         imageBase64: `data:${contentType};base64,${imageBase64}`,
       },
     });

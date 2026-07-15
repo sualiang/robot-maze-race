@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { authMiddleware } from '../middleware/auth';
 import { merchantAuthMiddleware } from './merchant-auth';
-import { execute } from '../config/database';
+import { execute, queryOp, queryOpOne, executeOp } from '../config/database';
 
 const router = Router();
 
@@ -55,7 +55,7 @@ router.post('/merchant-logo', merchantAuthMiddleware, async (req: Request, res: 
     // 更新商家 logo_url
     const merchantId = req.merchantAdmin?.merchantId;
     if (merchantId) {
-      await execute(
+      await executeOp(req, 
         `UPDATE merchants SET logo_url = $1, updated_at = NOW() WHERE id = $2`,
         [url, merchantId]
       );
@@ -85,7 +85,7 @@ router.post('/admin-merchant-logo', authMiddleware, async (req: Request, res: Re
       return;
     }
 
-    await execute(
+    await executeOp(req, 
       `UPDATE merchants SET logo_url = $1, updated_at = NOW() WHERE id = $2`,
       [logoUrl, merchantId]
     );

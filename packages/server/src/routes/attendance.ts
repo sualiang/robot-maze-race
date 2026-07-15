@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { query, queryOne } from '../config/database';
+import { query, queryOne, queryOp, queryOpOne, executeOp } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 
 const router = Router();
@@ -34,8 +34,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
       const opId = (req.user as any)?.operatorId || '';
       if (opId) {
         conditions.push('a.operator_id = $' + (params.length + 1));
-        params.push(opId);
-      }
+              }
     }
 
     if (venue_id) {
@@ -57,13 +56,13 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
 
     const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
 
-    const countResult = await queryOne<{ count: string }>(
+    const countResult = await queryOpOne<{ count: string }>(req, 
       `SELECT COUNT(*) as count FROM attendance a ${whereClause}`,
       params.length > 0 ? params : undefined
     );
     const total = parseInt(countResult?.count || '0', 10);
 
-    const records = await query<any>(
+    const records = await queryOp<any>(req, 
       `SELECT a.id, a.referee_id, a.user_id, a.venue_id,
               a.checkin_at, a.checkout_at,
               a.created_at,
@@ -112,23 +111,23 @@ router.get('/stats', authMiddleware, async (req: Request, res: Response) => {
     }
 
     // 总人次
-    const totalRecords = await queryOne<{ count: string }>(
+    const totalRecords = await queryOpOne<{ count: string }>(req, 
       `SELECT COUNT(*) as count FROM attendance a${opFilter}`,
       opParams.length > 0 ? opParams : undefined
     );
 
     // 今日签到人次
-    const todayRecords = await queryOne<{ count: string }>(
+    const todayRecords = await queryOpOne<{ count: string }>(req, 
       `SELECT COUNT(*) as count FROM attendance a WHERE date(a.checkin_at) = CURDATE()${opFilter ? ' AND a.operator_id = $1' : ''}`,
       opParams.length > 0 ? opParams : undefined
     );
 
     // 各赛场分布
-    const venueDistribution = await query<{
+    const venueDistribution = await queryOp<{
       venue_id: string;
       venue_name: string;
       count: number;
-    }>(
+    }>(req, 
       `SELECT a.venue_id, COALESCE(v.name, '未知赛场') as venue_name, COUNT(*) as count
        FROM attendance a
        LEFT JOIN venues v ON v.id = a.venue_id

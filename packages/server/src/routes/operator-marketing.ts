@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { query, queryOne, execute } from '../config/database';
+import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 
 const router = Router();
@@ -27,7 +27,7 @@ router.get('/', authMiddleware, operatorOnly, async (req: Request, res: Response
 
     if (!venue_id) {
       // 统一获取运营商ID：先从 operator_members 查，再回退到 operators
-      const roleMember = await queryOne<{ operator_id: string }>(
+      const roleMember = await queryOpOne<{ operator_id: string }>(req, 
         'SELECT operator_id FROM operator_members WHERE id = $1',
         [req.user!.userId]
       );
@@ -37,7 +37,7 @@ router.get('/', authMiddleware, operatorOnly, async (req: Request, res: Response
       venue_id = 'operator_' + operatorId;
     }
 
-    const configs = await query<{
+    const configs = await queryOp<{
       id: string;
       venue_id: string;
       key: string;
@@ -45,7 +45,7 @@ router.get('/', authMiddleware, operatorOnly, async (req: Request, res: Response
       description: string | null;
       created_at: string;
       updated_at: string;
-    }>(
+    }>(req, 
       `SELECT id, venue_id, \`key\`, value, description, created_at, updated_at
        FROM marketing_config
        WHERE venue_id = $1
@@ -73,17 +73,17 @@ router.put('/', authMiddleware, operatorOnly, async (req: Request, res: Response
       return res.status(400).json({ code: 400, message: 'venue_id, key, value 不能为空', data: null });
     }
 
-    const existing = await queryOne<{ id: string }>(
+    const existing = await queryOpOne<{ id: string }>(req, 
       'SELECT id FROM marketing_config WHERE venue_id = $1 AND `key` = $2',
       [venue_id, key]
     );
 
     if (existing) {
-      await execute(
+      await executeOp(req, 
         'UPDATE marketing_config SET value = $1, description = COALESCE($2, description), updated_at = NOW() WHERE venue_id = $3 AND `key` = $4',
         [value, description || null, venue_id, key]
       );
-      const updated = await queryOne<any>(
+      const updated = await queryOpOne<any>(req, 
         'SELECT id, venue_id, `key`, value, description, created_at, updated_at FROM marketing_config WHERE venue_id = $1 AND `key` = $2',
         [venue_id, key]
       );
@@ -91,18 +91,18 @@ router.put('/', authMiddleware, operatorOnly, async (req: Request, res: Response
     } else {
       const opId = String(venue_id).replace(/^operator_/, '');
       if (opId && String(venue_id).startsWith('operator_')) {
-        await execute(
-          'INSERT IGNORE INTO venues (id, name, operator_id, status) VALUES ($1, $2, $3, \'active\')',
+        await executeOp(req, 
+          'INSERT IGNORE INTO venues (id, name, status) VALUES ($1, $2, $3, \'active\')',
           [String(venue_id), String(venue_id), opId]
         );
       }
 
       const id = uuidv4();
-      await execute(
+      await executeOp(req, 
         'INSERT INTO marketing_config (id, venue_id, `key`, value, description) VALUES ($1, $2, $3, $4, $5)',
         [id, venue_id, key, value, description || null]
       );
-      const created = await queryOne<any>(
+      const created = await queryOpOne<any>(req, 
         'SELECT id, venue_id, `key`, value, description, created_at, updated_at FROM marketing_config WHERE id = $1',
         [id]
       );
@@ -120,16 +120,16 @@ router.post('/', authMiddleware, operatorOnly, async (req: Request, res: Respons
   if (!venue_id || !key || value === undefined || value === null) {
     return res.status(400).json({ code: 400, message: 'venue_id, key, value 不能为空', data: null });
   }
-  const existing = await queryOne<{ id: string }>(
+  const existing = await queryOpOne<{ id: string }>(req, 
     'SELECT id FROM marketing_config WHERE venue_id = $1 AND `key` = $2',
     [venue_id, key]
   );
   if (existing) {
-    await execute(
+    await executeOp(req, 
       'UPDATE marketing_config SET value = $1, description = COALESCE($2, description), updated_at = NOW() WHERE venue_id = $3 AND `key` = $4',
       [value, description || null, venue_id, key]
     );
-    const updated = await queryOne<any>(
+    const updated = await queryOpOne<any>(req, 
       'SELECT id, venue_id, `key`, value, description, created_at, updated_at FROM marketing_config WHERE venue_id = $1 AND `key` = $2',
       [venue_id, key]
     );
@@ -137,17 +137,17 @@ router.post('/', authMiddleware, operatorOnly, async (req: Request, res: Respons
   }
   const opId = String(venue_id).replace(/^operator_/, '');
   if (opId && String(venue_id).startsWith('operator_')) {
-    await execute(
-      'INSERT IGNORE INTO venues (id, name, operator_id, status) VALUES ($1, $2, $3, \'active\')',
+    await executeOp(req, 
+      'INSERT IGNORE INTO venues (id, name, status) VALUES ($1, $2, $3, \'active\')',
       [String(venue_id), String(venue_id), opId]
     );
   }
   const id = uuidv4();
-  await execute(
+  await executeOp(req, 
     'INSERT INTO marketing_config (id, venue_id, `key`, value, description) VALUES ($1, $2, $3, $4, $5)',
     [id, venue_id, key, value, description || null]
   );
-  const created = await queryOne<any>(
+  const created = await queryOpOne<any>(req, 
     'SELECT id, venue_id, `key`, value, description, created_at, updated_at FROM marketing_config WHERE id = $1',
     [id]
   );
@@ -194,7 +194,7 @@ router.post('/batch', authMiddleware, operatorOnly, async (req: Request, res: Re
     // 不传 venue_id 时，统一获取运营商ID；同时获取 operatorId 用于 venue 占位
     let operatorId: string;
     if (!venue_id) {
-      const roleMember = await queryOne<{ operator_id: string }>(
+      const roleMember = await queryOpOne<{ operator_id: string }>(req, 
         'SELECT operator_id FROM operator_members WHERE id = $1',
         [req.user!.userId]
       );
@@ -210,17 +210,17 @@ router.post('/batch', authMiddleware, operatorOnly, async (req: Request, res: Re
     }
 
     // 确保 venue 记录存在（满足 foreign key 约束）
-    await execute(
-      'INSERT IGNORE INTO venues (id, name, operator_id, status) VALUES ($1, $2, $3, \'active\')',
+    await executeOp(req, 
+      'INSERT IGNORE INTO venues (id, name, status) VALUES ($1, $2, $3, \'active\')',
       [venue_id, venue_id, operatorId]
     );
 
     for (const { key, value } of configs) {
-      const existing = await queryOne<{ id: string }>('SELECT id FROM marketing_config WHERE venue_id = $1 AND `key` = $2', [venue_id, key]);
+      const existing = await queryOpOne<{ id: string }>(req, 'SELECT id FROM marketing_config WHERE venue_id = $1 AND `key` = $2', [venue_id, key]);
       if (existing) {
-        await execute("UPDATE marketing_config SET value = $1, updated_at = NOW() WHERE venue_id = $2 AND `key` = $3", [value, venue_id, key]);
+        await executeOp(req, "UPDATE marketing_config SET value = $1, updated_at = NOW() WHERE venue_id = $2 AND `key` = $3", [value, venue_id, key]);
       } else {
-        await execute('INSERT INTO marketing_config (id, venue_id, `key`, value) VALUES ($1, $2, $3, $4)', [uuidv4(), venue_id, key, value]);
+        await executeOp(req, 'INSERT INTO marketing_config (id, venue_id, `key`, value) VALUES ($1, $2, $3, $4)', [uuidv4(), venue_id, key, value]);
       }
     }
 
@@ -237,7 +237,7 @@ router.post('/batch', authMiddleware, operatorOnly, async (req: Request, res: Re
 // ============================================================
 router.get('/check-init', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
-    const roleMember = await queryOne<{ operator_id: string }>(
+    const roleMember = await queryOpOne<{ operator_id: string }>(req, 
       'SELECT operator_id FROM operator_members WHERE id = $1',
       [req.user!.userId]
     );
@@ -246,11 +246,11 @@ router.get('/check-init', authMiddleware, operatorOnly, async (req: Request, res
       req.user!.userId;
     const venue_id = 'operator_' + operatorId;
 
-    const pkgCount = await queryOne<{ cnt: number }>(
+    const pkgCount = await queryOpOne<{ cnt: number }>(req, 
       'SELECT COUNT(*) as cnt FROM race_packages WHERE operator_id = $1',
       [operatorId]
     );
-    const mktCount = await queryOne<{ cnt: number }>(
+    const mktCount = await queryOpOne<{ cnt: number }>(req, 
       'SELECT COUNT(*) as cnt FROM marketing_config WHERE venue_id = $1',
       [venue_id]
     );
@@ -268,7 +268,7 @@ router.get('/check-init', authMiddleware, operatorOnly, async (req: Request, res
 // ============================================================
 router.post('/init-templates', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
-    const roleMember = await queryOne<{ operator_id: string }>(
+    const roleMember = await queryOpOne<{ operator_id: string }>(req, 
       'SELECT operator_id FROM operator_members WHERE id = $1',
       [req.user!.userId]
     );
@@ -278,7 +278,7 @@ router.post('/init-templates', authMiddleware, operatorOnly, async (req: Request
     const venue_id = 'operator_' + operatorId;
 
     // 防重复
-    const pkgCount = await queryOne<{ cnt: number }>(
+    const pkgCount = await queryOpOne<{ cnt: number }>(req, 
       'SELECT COUNT(*) as cnt FROM race_packages WHERE operator_id = $1',
       [operatorId]
     );
@@ -293,16 +293,16 @@ router.post('/init-templates', authMiddleware, operatorOnly, async (req: Request
       { name: '专业参赛包', price: 36800, description: '专业参赛体验，含更多权益' },
     ];
     for (const pkg of packages) {
-      await execute(
-        `INSERT INTO race_packages (id, operator_id, name, price_cents, description, status, created_at, updated_at)
+      await executeOp(req, 
+        `INSERT INTO race_packages (id, name, price_cents, description, status, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, 1, NOW(), NOW())`,
         [uuidv4(), operatorId, pkg.name, pkg.price, pkg.description]
       );
     }
 
     // 确保 venue 记录存在（满足 foreign key 约束）
-    await execute(
-      `INSERT INTO venues (id, name, operator_id, status)
+    await executeOp(req, 
+      `INSERT INTO venues (id, name, status)
        VALUES ($1, $2, $3, 'active')
        ON DUPLICATE KEY UPDATE name = VALUES(name)`,
       [venue_id, venue_id, operatorId]
@@ -317,7 +317,7 @@ router.post('/init-templates', authMiddleware, operatorOnly, async (req: Request
       { key: 'welcome_deduction_cents', value: '500' },
     ];
     for (const cfg of defaultMktConfigs) {
-      await execute(
+      await executeOp(req, 
         `INSERT INTO marketing_config (id, venue_id, \`key\`, value) VALUES ($1, $2, $3, $4)`,
         [uuidv4(), venue_id, cfg.key, cfg.value]
       );
@@ -326,7 +326,7 @@ router.post('/init-templates', authMiddleware, operatorOnly, async (req: Request
     // 测试消费券
     for (let i = 0; i < 3; i++) {
       const amounts = [500, 1000, 1500];
-      await execute(
+      await executeOp(req, 
         `INSERT INTO user_coupons (id, user_id, coupon_id, merchant_id, name, description,
                 denomination_cents, min_consume_cents, status, valid_start, valid_end,
                 coupon_type, extra_data, created_at, updated_at)

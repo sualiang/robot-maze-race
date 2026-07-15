@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { query, queryOne } from '../config/database';
+import { query, queryOne, queryOp, queryOpOne, executeOp } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 
 const router = Router();
@@ -31,15 +31,15 @@ router.get('/', authMiddleware, operatorOnly, async (req: Request, res: Response
        FROM operators WHERE id = $1`,
       [operatorId]
     );
-    const venueCount = await queryOne<{ count: string }>(
+    const venueCount = await queryOpOne<{ count: string }>(req, 
       'SELECT COUNT(*) as count FROM venues WHERE operator_id = $1',
       [operatorId]
     );
-    const settlementStats = await queryOne<{
+    const settlementStats = await queryOpOne<{
       total_amount_cents: number; total_commission_cents: number;
       total_settled_cents: number; total_pending_cents: number;
       settled_count: number; pending_count: number;
-    }>(
+    }>(req, 
       `SELECT
          COALESCE(SUM(amount_cents), 0) as total_amount_cents,
          COALESCE(SUM(commission_cents), 0) as total_commission_cents,
@@ -90,16 +90,16 @@ router.get('/summary', authMiddleware, operatorOnly, async (req: Request, res: R
       [operatorId]
     );
 
-    const venueCount = await queryOne<{ count: string }>(
+    const venueCount = await queryOpOne<{ count: string }>(req, 
       'SELECT COUNT(*) as count FROM venues WHERE operator_id = $1',
       [operatorId]
     );
 
-    const settlementStats = await queryOne<{
+    const settlementStats = await queryOpOne<{
       total_amount_cents: number; total_commission_cents: number;
       total_settled_cents: number; total_pending_cents: number;
       settled_count: number; pending_count: number;
-    }>(
+    }>(req, 
       `SELECT
          COALESCE(SUM(amount_cents), 0) as total_amount_cents,
          COALESCE(SUM(commission_cents), 0) as total_commission_cents,
@@ -142,7 +142,7 @@ router.get('/summary', authMiddleware, operatorOnly, async (req: Request, res: R
 router.get('/export', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
     const operatorId = req.user!.userId;
-    const rows = await query<any>(
+    const rows = await queryOp<any>(req, 
       `SELECT s.created_at, s.order_id, s.amount_cents, s.commission_cents,
               s.status, s.settled_at
        FROM settlements s

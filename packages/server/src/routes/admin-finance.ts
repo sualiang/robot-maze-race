@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { query, queryOne, execute } from '../config/database';
+import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import { checkPermission } from '../middleware/rbac';
 
@@ -37,7 +37,7 @@ router.get('/withdraws', authMiddleware, checkPermission('finance:read'), async 
 
     const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
 
-    const withdraws = await query<any>(
+    const withdraws = await queryOp<any>(req, 
       `SELECT s.id, s.operator_id,
               COALESCE(u.nickname, '未知运营商') as operator_name,
               s.amount_cents as amount,
@@ -93,14 +93,14 @@ router.get('/history-withdraws', authMiddleware, checkPermission('finance:histor
     const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
 
     // 总数
-    const countResult = await queryOne<{ count: number }>(
+    const countResult = await queryOpOne<{ count: number }>(req, 
       `SELECT COUNT(*) as count FROM settlements s ${whereClause}`,
       params.length > 0 ? params : undefined
     );
     const total = countResult?.count || 0;
 
     // 分页数据
-    const withdraws = await query<any>(
+    const withdraws = await queryOp<any>(req, 
       `SELECT s.id, s.order_id, s.operator_id,
               COALESCE(u.nickname, '未知运营商') as operator_name,
               s.amount_cents as amount,
@@ -133,7 +133,7 @@ router.post('/withdraws/:id/approve', authMiddleware, checkPermission('finance:w
   try {
     const { id } = req.params;
 
-    const existing = await queryOne<{ id: string; status: string }>(
+    const existing = await queryOpOne<{ id: string; status: string }>(req, 
       'SELECT id, status FROM settlements WHERE id = $1',
       [id]
     );
@@ -146,7 +146,7 @@ router.post('/withdraws/:id/approve', authMiddleware, checkPermission('finance:w
       return res.status(400).json({ code: 400, message: '该提现申请已处理', data: null });
     }
 
-    await execute(
+    await executeOp(req, 
       "UPDATE settlements SET status = 'approved', settled_at = NOW(), updated_at = NOW() WHERE id = $1",
       [id]
     );
@@ -166,7 +166,7 @@ router.post('/withdraws/:id/reject', authMiddleware, checkPermission('finance:wi
   try {
     const { id } = req.params;
 
-    const existing = await queryOne<{ id: string; status: string }>(
+    const existing = await queryOpOne<{ id: string; status: string }>(req, 
       'SELECT id, status FROM settlements WHERE id = $1',
       [id]
     );
@@ -179,7 +179,7 @@ router.post('/withdraws/:id/reject', authMiddleware, checkPermission('finance:wi
       return res.status(400).json({ code: 400, message: '该提现申请已处理', data: null });
     }
 
-    await execute(
+    await executeOp(req, 
       "UPDATE settlements SET status = 'rejected', settled_at = NOW(), updated_at = NOW() WHERE id = $1",
       [id]
     );
@@ -213,7 +213,7 @@ router.get('/export', authMiddleware, checkPermission('finance:read'), async (re
 
     const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
 
-    const withdrawals = await query<any>(
+    const withdrawals = await queryOp<any>(req, 
       `SELECT s.id, s.operator_id,
               COALESCE(u.nickname, '未知运营商') as operator_name,
               s.amount_cents as amount,

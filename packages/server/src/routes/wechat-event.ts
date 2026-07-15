@@ -9,7 +9,7 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import { config } from '../config';
-import { queryOne, query, execute } from '../config/database';
+import { queryOne, query, execute, queryOp, queryOpOne, executeOp } from '../config/database';
 import { sendRegisterLink } from '../services/wechat-message';
 
 const router = Router();
@@ -166,7 +166,7 @@ router.post('/event', async (req: Request, res: Response) => {
             );
           }
 
-          const refRow = await queryOne<{ venue_id: string; operator_id: string }>(
+          const refRow = await queryOpOne<{ venue_id: string; operator_id: string }>(req, 
             'SELECT venue_id, operator_id FROM referees WHERE user_id = $1 LIMIT 1',
             [userRow.id]
           );
@@ -177,7 +177,7 @@ router.post('/event', async (req: Request, res: Response) => {
           }
 
           const [venueRow, opRow] = await Promise.all([
-            queryOne<{ name: string; address: string }>(
+            queryOpOne<{ name: string; address: string }>(req, 
               'SELECT name, address FROM venues WHERE id = $1', [refRow.venue_id]
             ),
             queryOne<{ company_name: string }>(

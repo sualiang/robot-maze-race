@@ -3,10 +3,9 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config';
-import { query, queryOne, execute, generateSecurePassword } from '../config/database';
+import { query, queryOne, execute, generateSecurePassword, queryOp, queryOpOne, executeOp } from '../config/database';
 import { authMiddleware, AuthPayload } from '../middleware/auth';
 import pcaCodeData from '../pca-code.json';
-
 
 const router = Router();
 
@@ -70,7 +69,7 @@ router.post('/login', async (req: Request, res: Response) => {
     // 获取角色权限 — 先从 operator_members 查，没有则从 operators.role 推算
     let permissions: string[] = ['*'];
     let roleName = '';
-    const member = await queryOne<{ role: string }>(
+    const member = await queryOpOne<{ role: string }>(req, 
       'SELECT role FROM operator_members WHERE operator_id = $1 LIMIT 1',
       [operator.id]
     );
@@ -93,7 +92,7 @@ router.post('/login', async (req: Request, res: Response) => {
     );
 
     // 获取关联的场馆
-    const venue = await queryOne<{ id: string; name: string }>(
+    const venue = await queryOpOne<{ id: string; name: string }>(req, 
       'SELECT id, name FROM venues WHERE operator_id = $1 LIMIT 1',
       [operator.id]
     );
@@ -188,7 +187,7 @@ router.get('/rbac/users', authMiddleware, operatorOnly, async (req: Request, res
     const whereClause = 'WHERE ' + conditions.join(' AND ');
 
     // 总数
-    const countResult = await queryOne<{ count: number }>(
+    const countResult = await queryOpOne<{ count: number }>(req, 
       `SELECT COUNT(*) as count FROM operator_members au ${whereClause}`,
       params
     );
@@ -196,7 +195,7 @@ router.get('/rbac/users', authMiddleware, operatorOnly, async (req: Request, res
 
     // 分页数据（不返回 password）
     // HEX(name) 绕过 mysql2 连接池 encoding 损坏 bug，JS 层 Buffer.from 解码
-    const users = await query<any>(
+    const users = await queryOp<any>(req, 
       `SELECT au.id, HEX(au.name) AS name_hex, au.phone,
               au.role as role_key, COALESCE(arr.label, '') as role_name, au.status, au.created_at
        FROM operator_members au
@@ -258,7 +257,7 @@ router.post('/rbac/users', authMiddleware, operatorOnly, async (req: Request, re
     }
 
     // 手机号唯一性校验
-    const existing = await queryOne<{ id: string }>(
+    const existing = await queryOpOne<{ id: string }>(req, 
       'SELECT id FROM operator_members WHERE phone = ?',
       [phone]
     );
@@ -271,8 +270,8 @@ router.post('/rbac/users', authMiddleware, operatorOnly, async (req: Request, re
     const hashedPassword = bcrypt.hashSync(plainPassword, 10);
     const id = uuidv4();
 
-    await query(
-      `INSERT INTO operator_members (id, name, password_hash, phone, role, operator_id, created_at, updated_at)
+    await queryOp(req, 
+      `INSERT INTO operator_members (id, name, password_hash, phone, role, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [id, phone, hashedPassword, phone, role_key, operatorId]
     );
@@ -317,7 +316,7 @@ router.put('/rbac/users/:id', authMiddleware, operatorOnly, async (req: Request,
     const { phone, role_key, status } = req.body;
 
     // 只能编辑自己运营商下的成员
-    const existing = await queryOne<{ id: string; operator_id: string }>(
+    const existing = await queryOpOne<{ id: string; operator_id: string }>(req, 
       'SELECT id, operator_id FROM operator_members WHERE id = ?',
       [id]
     );
@@ -347,12 +346,12 @@ router.put('/rbac/users/:id', authMiddleware, operatorOnly, async (req: Request,
     sets.push("updated_at = NOW()");
     params.push(id);
 
-    await query(
+    await queryOp(req, 
       `UPDATE operator_members SET ${sets.join(', ')} WHERE id = ?`,
       params
     );
 
-    const updated = await queryOne<any>(
+    const updated = await queryOpOne<any>(req, 
       `SELECT au.id, au.name AS username, au.name AS nickname, au.phone,
               au.role as role_key, COALESCE(arr.label, '') as role_name, au.status, au.created_at
        FROM operator_members au
@@ -385,8 +384,8 @@ router.delete('/rbac/users/:id', authMiddleware, operatorOnly, async (req: Reque
     const operatorId = req.user!.operatorId;
     const { id } = req.params;
 
-    const existing = await queryOne<{ id: string; operator_id: string; role_id: string }>(
-      'SELECT id, operator_id, role FROM operator_members WHERE id = ?' as any,
+    const existing = await queryOpOne<{ id: string; operator_id: string; role_id: string }>(req, 
+      'SELECT id, role FROM operator_members WHERE id = ?' as any,
       [id]
     );
     if (!existing || existing.operator_id !== operatorId) {
@@ -395,7 +394,7 @@ router.delete('/rbac/users/:id', authMiddleware, operatorOnly, async (req: Reque
 
     // 不允许删除最后一个总管理员
     if ((existing as any).role === 'op_super_admin') {
-      const adminCount = await queryOne<{ count: number }>(
+      const adminCount = await queryOpOne<{ count: number }>(req, 
         'SELECT COUNT(*) as count FROM operator_members WHERE role = ? AND operator_id = ?',
         ['op_super_admin', operatorId]
       );
@@ -404,7 +403,7 @@ router.delete('/rbac/users/:id', authMiddleware, operatorOnly, async (req: Reque
       }
     }
 
-    await query('DELETE FROM operator_members WHERE id = ?', [id]);
+    await queryOp(req, 'DELETE FROM operator_members WHERE id = ?', [id]);
 
     return res.json({ code: 0, message: '成员已删除', data: null });
   } catch (error: any) {
@@ -422,8 +421,8 @@ router.post('/rbac/users/:id/reset-password', authMiddleware, operatorOnly, asyn
     const operatorId = req.user!.operatorId;
     const { id } = req.params;
 
-    const existing = await queryOne<{ id: string; operator_id: string; phone: string; username: string }>(
-      'SELECT id, operator_id, phone, name FROM operator_members WHERE id = ?',
+    const existing = await queryOpOne<{ id: string; operator_id: string; phone: string; username: string }>(req, 
+      'SELECT id, phone, name FROM operator_members WHERE id = ?',
       [id]
     );
     if (!existing || existing.operator_id !== operatorId) {
@@ -432,7 +431,7 @@ router.post('/rbac/users/:id/reset-password', authMiddleware, operatorOnly, asyn
 
     const plainPassword = generateSecurePassword();
     const hashed = bcrypt.hashSync(plainPassword, 10);
-    await query(
+    await queryOp(req, 
       `UPDATE operator_members SET password_hash = ?, updated_at = NOW() WHERE id = ?`,
       [hashed, id]
     );
@@ -463,12 +462,12 @@ router.get('/dashboard', authMiddleware, operatorOnly, async (req: Request, res:
     }
 
     // 获取场馆信息
-    const venue = await queryOne<{
+    const venue = await queryOpOne<{
       id: string;
       name: string;
       address: string;
       status: string;
-    }>(
+    }>(req, 
       'SELECT id, name, address, status FROM venues WHERE id = $1',
       [venueId]
     );
@@ -476,7 +475,7 @@ router.get('/dashboard', authMiddleware, operatorOnly, async (req: Request, res:
     // 获取今日统计数据
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
-    const todayPlayers = await queryOne<{ count: string }>(
+    const todayPlayers = await queryOpOne<{ count: string }>(req, 
       `SELECT COUNT(DISTINCT ra.player_id) as count
        FROM race_attendance ra
        JOIN races r ON r.id = ra.race_id
@@ -484,11 +483,11 @@ router.get('/dashboard', authMiddleware, operatorOnly, async (req: Request, res:
       [venueId, today]
     );
 
-    const raceStats = await queryOne<{
+    const raceStats = await queryOpOne<{
       total: number;
       completed: number;
       total_score: number;
-    }>(
+    }>(req, 
       `SELECT
          COUNT(*) as total,
          SUM(CASE WHEN rr.status = 'finished' THEN 1 ELSE 0 END) as completed,
@@ -585,7 +584,7 @@ router.get('/venues', authMiddleware, operatorOnly, async (req: Request, res: Re
   try {
     const operatorId = req.user!.operatorId;
 
-    const rows = await query<any>(
+    const rows = await queryOp<any>(req, 
       `SELECT id, name, address, city, district, status, open_time, close_time,
               max_queue_size as max_capacity, city, district
        FROM venues WHERE operator_id = $1
@@ -621,7 +620,7 @@ router.get('/venue/:id', authMiddleware, operatorOnly, async (req: Request, res:
   try {
     const venueId = req.params.id;
 
-    const venue = await queryOne<any>(
+    const venue = await queryOpOne<any>(req, 
       `SELECT id, name, address, city, district, status, open_time, close_time,
               max_queue_size as max_capacity, description, maze_config, created_at, updated_at
        FROM venues WHERE id = $1`,
@@ -660,7 +659,7 @@ router.put('/venue/:id', authMiddleware, operatorOnly, async (req: Request, res:
     const venueId = req.params.id;
     const { name, address, mazeConfig } = req.body;
 
-    const existing = await queryOne<{ id: string }>(
+    const existing = await queryOpOne<{ id: string }>(req, 
       'SELECT id FROM venues WHERE id = $1',
       [venueId]
     );
@@ -669,7 +668,7 @@ router.put('/venue/:id', authMiddleware, operatorOnly, async (req: Request, res:
       return res.status(404).json({ code: 404, message: '场馆不存在', data: null });
     }
 
-    await query(
+    await queryOp(req, 
       `UPDATE venues SET
         name = COALESCE($1, name),
         address = COALESCE($2, address),
@@ -703,7 +702,7 @@ router.put('/venue/:id/status', authMiddleware, operatorOnly, async (req: Reques
       return res.status(400).json({ code: 400, message: '无效的状态值', data: null });
     }
 
-    const existing = await queryOne<{ id: string }>(
+    const existing = await queryOpOne<{ id: string }>(req, 
       'SELECT id FROM venues WHERE id = $1',
       [venueId]
     );
@@ -712,7 +711,7 @@ router.put('/venue/:id/status', authMiddleware, operatorOnly, async (req: Reques
       return res.status(404).json({ code: 404, message: '场馆不存在', data: null });
     }
 
-    await query(
+    await queryOp(req, 
       `UPDATE venues SET status = $1, updated_at = $2 WHERE id = $3`,
       [status, new Date().toISOString(), venueId]
     );
@@ -742,7 +741,7 @@ router.get('/finance/revenue', authMiddleware, operatorOnly, async (req: Request
     const { start_date, end_date } = req.query as { start_date?: string; end_date?: string };
 
     // 查询该运营商下的每日营收统计
-    const rows = await query<any>(
+    const rows = await queryOp<any>(req, 
       `SELECT
          DATE(o.created_at) as date,
          COUNT(DISTINCT o.id) as order_count,
@@ -781,7 +780,7 @@ router.get('/finance/settlements', authMiddleware, operatorOnly, async (req: Req
   try {
     const operatorId = req.user!.operatorId;
 
-    const rows = await query<any>(
+    const rows = await queryOp<any>(req, 
       `SELECT id, order_id, amount_cents as amount, commission_cents, status, settled_at, created_at
        FROM settlements WHERE operator_id = $1
        ORDER BY created_at DESC`,
@@ -819,7 +818,7 @@ router.get('/finance/payments', authMiddleware, operatorOnly, async (req: Reques
     const operatorId = req.user!.operatorId;
     const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string, 10) || 20));
 
-    const rows = await query<any>(
+    const rows = await queryOp<any>(req, 
       `SELECT o.id, o.order_no, o.amount_cents as amount, o.payment_method, o.status, o.paid_at, o.created_at
        FROM orders o
        WHERE o.operator_id = $1
@@ -863,7 +862,7 @@ router.post('/finance/withdraw', authMiddleware, operatorOnly, async (req: Reque
     }
 
     // 汇总待结算金额检查
-    const pending = await queryOne<{ total: number }>(
+    const pending = await queryOpOne<{ total: number }>(req, 
       `SELECT COALESCE(SUM(amount_cents), 0) as total
        FROM settlements WHERE operator_id = $1 AND status = 'settled'`,
       [operatorId]
@@ -878,7 +877,7 @@ router.post('/finance/withdraw', authMiddleware, operatorOnly, async (req: Reque
     }
 
     // 创建提现记录
-    await query(
+    await queryOp(req, 
       `UPDATE settlements SET status = 'withdrawn', settled_at = $1
        WHERE operator_id = $2 AND status = 'settled'
        AND amount_cents <= $3`,
@@ -904,7 +903,7 @@ router.get('/finance/export', authMiddleware, operatorOnly, async (req: Request,
   try {
     const operatorId = req.user!.operatorId;
 
-    const rows = await query<any>(
+    const rows = await queryOp<any>(req, 
       `SELECT
          DATE(rr.created_at) as date,
          v.name as venue_name,

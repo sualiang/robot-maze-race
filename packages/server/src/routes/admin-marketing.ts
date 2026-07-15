@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { query, queryOne, execute } from '../config/database';
+import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import { checkPermission } from '../middleware/rbac';
 
@@ -105,7 +105,7 @@ router.get('/operators', authMiddleware, checkPermission('marketing:read'), asyn
     );
     const result = [];
     for (const op of operators) {
-      const venues = await query<{ id: string }>(
+      const venues = await queryOp<{ id: string }>(req, 
         'SELECT id FROM venues WHERE operator_id = $1',
         [op.id]
       );
@@ -118,7 +118,7 @@ router.get('/operators', authMiddleware, checkPermission('marketing:read'), asyn
       if (venues.length > 0) {
         const venueIds = venues.map((v: any) => v.id);
         const placeholders = venueIds.map((_: any, i: number) => `$${i + 1}`).join(',');
-        const mcRows = await query<{ key: string; value: string; updated_at: string }>(
+        const mcRows = await queryOp<{ key: string; value: string; updated_at: string }>(req, 
           `SELECT \`key\`, value, updated_at FROM marketing_config
            WHERE venue_id IN (${placeholders}) AND \`key\` IN ('help_enabled', 'help_required_count', 'help_reward_count')`,
           venueIds

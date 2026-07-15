@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config';
-import { query, queryOne, execute } from '../config/database';
+import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../config/database';
 
 const router = Router();
 
@@ -102,7 +102,7 @@ router.post('/register', async (req: Request, res: Response) => {
     }
 
     // 校验邀请码
-    const invite = await queryOne<any>(
+    const invite = await queryOpOne<any>(req, 
       `SELECT * FROM merchant_invite_codes WHERE code = $1 AND used = 0`,
       [inviteCode]
     );
@@ -113,7 +113,7 @@ router.post('/register', async (req: Request, res: Response) => {
     }
 
     // 检查用户名是否已存在
-    const existing = await queryOne<any>(
+    const existing = await queryOpOne<any>(req, 
       `SELECT id FROM merchant_admin WHERE username = $1`,
       [username]
     );
@@ -126,14 +126,14 @@ router.post('/register', async (req: Request, res: Response) => {
     // 创建商家子账号
     const id = uuidv4();
     const passwordHash = hashPassword(password);
-    await execute(
+    await executeOp(req, 
       `INSERT INTO merchant_admin (id, merchant_id, username, password_hash, phone, real_name, status, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, 1, NOW(), NOW())`,
       [id, invite.merchant_id, username, passwordHash, phone || '', realName || '']
     );
 
     // 标记邀请码已使用
-    await execute(
+    await executeOp(req, 
       `UPDATE merchant_invite_codes SET used = 1, used_by = $1, used_at = NOW() WHERE id = $2`,
       [id, invite.id]
     );
@@ -162,7 +162,7 @@ router.post('/login', async (req: Request, res: Response) => {
       return;
     }
 
-    const admin = await queryOne<any>(
+    const admin = await queryOpOne<any>(req, 
       `SELECT ma.*, m.merchant_name
        FROM merchant_admin ma
        LEFT JOIN merchants m ON ma.merchant_id = m.id
@@ -187,7 +187,7 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     // 更新最后登录时间
-    await execute(
+    await executeOp(req, 
       `UPDATE merchant_admin SET last_login_time = NOW(), updated_at = NOW() WHERE id = $1`,
       [admin.id]
     );
@@ -243,7 +243,7 @@ router.post('/change-password', merchantAuthMiddleware, async (req: Request, res
     }
 
     // 查询当前密码
-    const admin = await queryOne<any>(
+    const admin = await queryOpOne<any>(req, 
       `SELECT password_hash FROM merchant_admin WHERE id = $1`,
       [adminId]
     );
@@ -259,7 +259,7 @@ router.post('/change-password', merchantAuthMiddleware, async (req: Request, res
     }
 
     const newHash = hashPassword(newPassword);
-    await execute(
+    await executeOp(req, 
       `UPDATE merchant_admin SET password_hash = $1, first_login = 0, updated_at = NOW() WHERE id = $2`,
       [newHash, adminId]
     );
@@ -279,7 +279,7 @@ router.get('/profile', merchantAuthMiddleware, async (req: Request, res: Respons
   try {
     const adminId = req.merchantAdmin!.merchantAdminId;
 
-    const admin = await queryOne<any>(
+    const admin = await queryOpOne<any>(req, 
       `SELECT ma.id, ma.username, ma.phone, ma.real_name, ma.status, ma.last_login_time, ma.created_at,
               m.id as merchant_id, m.merchant_name, m.merchant_address, m.contact_phone, m.qrcode_url,
               m.region, m.business_hours, m.audit_status,
@@ -346,7 +346,7 @@ router.put('/profile', merchantAuthMiddleware, async (req: Request, res: Respons
     if (adminUpdates.length > 0) {
       adminUpdates.push(`updated_at = NOW()`);
       adminParams.push(adminId);
-      updatePromises.push(execute(
+      updatePromises.push(executeOp(req, 
         `UPDATE merchant_admin SET ${adminUpdates.join(', ')} WHERE id = $${aIdx}`,
         adminParams
       ));
@@ -365,7 +365,7 @@ router.put('/profile', merchantAuthMiddleware, async (req: Request, res: Respons
     if (merchantUpdates.length > 0) {
       merchantUpdates.push(`updated_at = NOW()`);
       merchantParams.push(req.merchantAdmin!.merchantId);
-      updatePromises.push(execute(
+      updatePromises.push(executeOp(req, 
         `UPDATE merchants SET ${merchantUpdates.join(', ')} WHERE id = $${mIdx}`,
         merchantParams
       ));

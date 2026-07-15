@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { query, queryOne } from '../config/database';
+import { query, queryOne , queryOp, queryOpOne, executeOp} from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 
 const router = Router();
@@ -33,7 +33,6 @@ router.get('/', authMiddleware, adminOnly, async (req: Request, res: Response) =
     const {
       start_date,
       end_date,
-      operator_id,
       venue_id,
       page: pageStr = '1',
       pageSize: pageSizeStr = '20',
@@ -65,7 +64,7 @@ router.get('/', authMiddleware, adminOnly, async (req: Request, res: Response) =
 
     const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
 
-    const countResult = await queryOne<{ count: number }>(
+    const countResult = await queryOpOne<{ count: number }>(req, 
       `SELECT COUNT(*) as count
        FROM attendance a
        LEFT JOIN venues v ON v.id = a.venue_id
@@ -74,7 +73,7 @@ router.get('/', authMiddleware, adminOnly, async (req: Request, res: Response) =
     );
     const total = countResult?.count || 0;
 
-    const records = await query<any>(
+    const records = await queryOp<any>(req, 
       `SELECT
          a.id,
          COALESCE(u.nickname, rf.id, '未知') as name,
@@ -124,7 +123,7 @@ router.get('/', authMiddleware, adminOnly, async (req: Request, res: Response) =
  */
 router.get('/export', authMiddleware, adminOnly, async (req: Request, res: Response) => {
   try {
-    const { start_date, end_date, operator_id, venue_id } = req.query;
+    const { start_date, end_date, venue_id } = req.query;
 
     const conditions: string[] = [];
     const params: any[] = [];
@@ -148,7 +147,7 @@ router.get('/export', authMiddleware, adminOnly, async (req: Request, res: Respo
 
     const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
 
-    const records = await query<any>(
+    const records = await queryOp<any>(req, 
       `SELECT
          a.id,
          COALESCE(u.nickname, rf.id, '未知') as name,

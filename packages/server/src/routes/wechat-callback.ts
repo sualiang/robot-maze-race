@@ -277,7 +277,7 @@ router.get('/callback', async (req: Request, res: Response) => {
       console.log('[WechatCallback] openid=' + openid);
 
       // Check if this openid is already a referee
-      const existingReferee = await queryOne<{ id: string; name: string }>(
+      const existingReferee = await queryOpOne<{ id: string; name: string }>(req, 
         'SELECT r.id, r.name FROM referees r INNER JOIN users u ON r.user_id = u.id WHERE u.openid = $1 LIMIT 1',
         [openid]
       );
@@ -307,7 +307,7 @@ router.get('/callback', async (req: Request, res: Response) => {
       // __login__ flow (service account menu silent OAuth)
       console.log('[WechatCallback] __login__: openid=' + openid);
       // Check if this openid is a referee
-      const ref = await queryOne<{ id: string }>(
+      const ref = await queryOpOne<{ id: string }>(req, 
         'SELECT r.id FROM referees r INNER JOIN users u ON r.user_id = u.id WHERE u.openid = $1 LIMIT 1',
         [openid]
       );

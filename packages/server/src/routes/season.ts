@@ -1,10 +1,9 @@
 import { Router, Request, Response } from 'express';
-import { query, queryOne, execute } from '../config/database';
+import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import { getConfig, getConfigInt } from '../config/utils';
 import { v4 as uuidv4 } from 'uuid';
 
-import { getOperatorContext } from '../middleware/operator-context';
 
 const router = Router();
 
@@ -251,19 +250,16 @@ router.get('/config', async (_req: Request, res: Response) => {
  */
 router.get('/qualifier/assessment', authMiddleware, async (req: Request, res: Response) => {
   const userId = req.user!.userId;
-  let opId = '';
-  try { const ctx = await getOperatorContext(userId); opId = ctx?.operator_id || ''; } catch {}
-
   try {
     // 查询最近比赛成绩
-    const recentRaces = await query<any>(
+    const recentRaces = await queryOp<any>(req, 
       `SELECT rr.score_ms, rr.status, rr.finished_at, v.name as venue_name
        FROM race_results rr
        LEFT JOIN venues v ON rr.venue_id = v.id
-       WHERE rr.user_id = $1 AND rr.status = 'completed' AND rr.operator_id = $2
+       WHERE rr.user_id = $1 AND rr.status = 'completed'
        ORDER BY rr.finished_at DESC
        LIMIT 10`,
-      [userId, opId]
+      [userId,]
     );
 
     // 计算平均成绩
@@ -306,9 +302,6 @@ router.get('/qualifier/assessment', authMiddleware, async (req: Request, res: Re
  * 每个等级终身仅发放一次
  */
 async function grantLevelUpReward(userId: string, level: number): Promise<void> {
-  let opId = '';
-  try { const ctx = await getOperatorContext(userId); opId = ctx?.operator_id || ''; } catch {}
-
   try {
     if (level < 2 || level > 6) return;
 
@@ -316,11 +309,11 @@ async function grantLevelUpReward(userId: string, level: number): Promise<void> 
     const grantOnceKey = `season_reward_level_${level}_grant_once`;
     const grantOnce = await getConfig(grantOnceKey, 'true');
     if (grantOnce === 'true') {
-      const existing = await queryOne<{ id: string }>(
+      const existing = await queryOpOne<{ id: string }>(req, 
         `SELECT uc.id FROM user_coupons uc
-         WHERE uc.user_id = $1 AND uc.coupon_type = 20 AND uc.extra_data LIKE $2 AND uc.operator_id = $3
+         WHERE uc.user_id = $1 AND uc.coupon_type = 20 AND uc.extra_data LIKE $2 
          LIMIT 1`,
-        [userId, `%"levelUpReward":${level}%`, opId]
+        [userId, `%"levelUpReward":${level}%`]
       );
       if (existing) {
         console.log('[Season] level', level, 'reward already granted to user', userId);
@@ -347,17 +340,15 @@ async function grantLevelUpReward(userId: string, level: number): Promise<void> 
 
     if (couponCents > 0) {
       const couponId = uuidv4();
-      await execute(
-        `INSERT INTO user_coupons (id, user_id, coupon_id, merchant_id, name, description, denomination_cents, min_consume_cents, status, valid_start, valid_end, coupon_type, extra_data, operator_id)
+      await executeOp(req, 
+        `INSERT INTO user_coupons (id, user_id, coupon_id, merchant_id, name, description, denomination_cents, min_consume_cents, status, valid_start, valid_end, coupon_type, extra_data)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, $9, $10, 20, $11, $12)`,
         [
           couponId, userId, couponId, 'platform',
           couponName,
           `升到${levelNames[level] || level}级奖励参赛抵扣卡`, couponCents, 0,
           new Date().toISOString(), validEnd,
-          JSON.stringify({ levelUpReward: level }),
-          opId
-        ]
+          JSON.stringify({ levelUpReward: level }),]
       );
       console.log('[Season] granted coupon', couponId, 'to user', userId, 'for level', level);
     }

@@ -1,21 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { query, queryOne, execute } from '../config/database';
+import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../config/database';
 import { getConfigInt } from '../config/utils';
 import { authMiddleware } from '../middleware/auth';
-import { getOperatorContext } from '../middleware/operator-context';
 
-/**
- * 获取当前用户的 operator_id（无 context 时返回 null，不抛错）
- */
-async function getEffectiveOperatorId(userId: string): Promise<string | null> {
-  try {
-    const ctx = await getOperatorContext(userId);
-    return ctx?.operator_id || null;
-  } catch {
-    return null;
-  }
-}
 import { autoAssignMerchantCoupons } from '../services/coupon-service';
 import { rateLimiter } from '../middleware/rateLimiter';
 
@@ -60,25 +48,15 @@ function getTierInfo(priceCents: number) {
 }
 
 router.get('/packages', authMiddleware, async (req: Request, res: Response) => {
-  const userId = req.user!.userId;
-  const operatorId = await getEffectiveOperatorId(userId);
-
-  // 无 operator 上下文 → 返回空列表
-  if (!operatorId) {
-    res.json({ code: 0, data: [] });
-    return;
-  }
-
   try {
-    const rows = await query<any>(
+    const rows = await queryOp<any>(req, 
       `SELECT * FROM race_packages
-       WHERE status = 'active' AND (operator_id = $1 OR operator_id IS NULL OR operator_id = '')
-       ORDER BY sort_order ASC, price_cents ASC`,
-      [operatorId]
+       WHERE status = 'active'
+       ORDER BY sort_order ASC, price_cents ASC`
     );
 
     const result = await Promise.all((rows || []).map(async (row: any) => {
-      const coupons = await query<any>(
+      const coupons = await queryOp<any>(req, 
         `SELECT * FROM race_package_coupons WHERE package_id = $1`,
         [row.id]
       );
@@ -154,7 +132,7 @@ router.get('/leaderboard', (req: Request, res: Response) => {
 router.get('/checkin/current', authMiddleware, async (req: Request, res: Response) => {
   const userId = req.user!.userId;
   try {
-    const record = await queryOne<any>(
+    const record = await queryOpOne<any>(req, 
       `SELECT c.id, c.venue_id, c.queue_number, c.status, c.checked_in_at,
               v.name as venue_name, v.address as venue_address
        FROM checkins c
@@ -210,7 +188,7 @@ router.post('/checkin/validate', authMiddleware, async (req: Request, res: Respo
   }
 
   try {
-    const venue = await queryOne<any>(
+    const venue = await queryOpOne<any>(req, 
       `SELECT id, name, address, latitude, longitude, status FROM venues WHERE id = $1`,
       [venueId]
     );
@@ -226,7 +204,7 @@ router.post('/checkin/validate', authMiddleware, async (req: Request, res: Respo
     }
 
     // 检查用户是否已在该赛场签到（防止重复签到）
-    const existing = await queryOne<{ id: string }>(
+    const existing = await queryOpOne<{ id: string }>(req, 
       `SELECT id FROM checkins
        WHERE user_id = $1 AND venue_id = $2 AND status NOT IN ('cancelled', 'completed')`,
       [userId, venueId]
@@ -264,13 +242,6 @@ router.post('/checkin', authMiddleware, async (req: Request, res: Response) => {
     return;
   }
 
-  // 获取当前 operator 上下文
-  const operatorId = await getEffectiveOperatorId(userId);
-  if (!operatorId) {
-    res.json({ code: 400, message: '请先通过赛场小程序码进入，获取运营商上下文', data: null });
-    return;
-  }
-
   // 从 code 提取 venue_id
   let venueId: string = code;
   const match = code.match(/robotmaze:\/\/venue\/([\w-]+)/);
@@ -280,8 +251,8 @@ router.post('/checkin', authMiddleware, async (req: Request, res: Response) => {
 
   try {
     // 验证赛场存在
-    const venue = await queryOne<any>(
-      `SELECT id, name, status, operator_id FROM venues WHERE id = $1`,
+    const venue = await queryOpOne<any>(req, 
+      `SELECT id, name, status FROM venues WHERE id = $1`,
       [venueId]
     );
     if (!venue) {
@@ -294,14 +265,14 @@ router.post('/checkin', authMiddleware, async (req: Request, res: Response) => {
     }
 
     // 检查剩余参赛次数（跨赛场核销：同一 operator 下任意订单 remaining_times > 0 即可）
-    const remainingRaces = await getUserRemainingRaces(userId, operatorId);
+    const remainingRaces = await getUserRemainingRaces(userId, req);
     if (remainingRaces <= 0) {
       res.json({ code: 400, message: '您没有剩余参赛次数，请购买参赛包或发起好友助力', data: null });
       return;
     }
 
     // 检查是否已经在排队
-    const existing = await queryOne<{ id: string }>(
+    const existing = await queryOpOne<{ id: string }>(req, 
       `SELECT id FROM checkins
        WHERE user_id = $1 AND venue_id = $2 AND status NOT IN ('cancelled', 'completed')`,
       [userId, venueId]
@@ -312,7 +283,7 @@ router.post('/checkin', authMiddleware, async (req: Request, res: Response) => {
     }
 
     // 计算排队号
-    const maxQueue = await queryOne<{ max_q: number }>(
+    const maxQueue = await queryOpOne<{ max_q: number }>(req, 
       `SELECT COALESCE(MAX(queue_number), 0) as max_q FROM checkins WHERE venue_id = $1 AND status NOT IN ('cancelled', 'completed')`,
       [venueId]
     );
@@ -320,11 +291,11 @@ router.post('/checkin', authMiddleware, async (req: Request, res: Response) => {
 
     // 创建签到记录
     const checkinId = uuidv4();
-    const venueOperatorId = venue?.operator_id || '';
-    await query(
-      `INSERT INTO checkins (id, user_id, venue_id, queue_number, status, checked_in_at, created_at, updated_at, operator_id)
-       VALUES ($1, $2, $3, $4, 'queued', NOW(), NOW(), NOW(), $5)`,
-      [checkinId, userId, venueId, queueNumber, venueOperatorId]
+
+    await queryOp(req, 
+      `INSERT INTO checkins (id, user_id, venue_id, queue_number, status, checked_in_at, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, 'queued', NOW(), NOW(), NOW())`,
+      [checkinId, userId, venueId, queueNumber]
     );
 
     // 成长值发放：从已购且还有剩余次数的参赛包中，按包扣减
@@ -357,7 +328,7 @@ router.get('/checkin/queue', authMiddleware, async (req: Request, res: Response)
   const userId = req.user!.userId;
 
   try {
-    const record = await queryOne<any>(
+    const record = await queryOpOne<any>(req, 
       `SELECT c.id, c.venue_id, c.queue_number, c.status, c.checked_in_at,
               v.name as venue_name
        FROM checkins c
@@ -374,7 +345,7 @@ router.get('/checkin/queue', authMiddleware, async (req: Request, res: Response)
     }
 
     // 计算前面还有多少人
-    const aheadRow = await queryOne<{ cnt: number }>(
+    const aheadRow = await queryOpOne<{ cnt: number }>(req, 
       `SELECT COUNT(*) as cnt FROM checkins
        WHERE venue_id = $1 AND status = 'queued' AND queue_number < $2`,
       [record.venue_id, record.queue_number]
@@ -411,28 +382,20 @@ router.get('/checkin/queue', authMiddleware, async (req: Request, res: Response)
  */
 router.get('/me/profile-check', authMiddleware, async (req: Request, res: Response) => {
   const userId = req.user!.userId;
-  let opId = '';
-  try {
-    const ctx = await getOperatorContext(userId);
-    opId = ctx?.operator_id || '';
-  } catch { /* ignore */ }
-
   try {
     const user = await queryOne<{ nickname: string; phone: string; gender: string; race_count: number }>(
       `SELECT nickname, phone, gender, race_count FROM users WHERE id = $1`,
       [userId]
     );
 
-    // 查询可用抵扣金余额（按 operator_id 过滤）
+    // 查询可用抵扣金余额（通过物理隔离自动按运营商过滤）
     let availableDeductionCents = 0;
     try {
-      if (opId) {
-        const deductionRow = await queryOne<{ total: number }>(
-          `SELECT COALESCE(SUM(amount_cents), 0) as total FROM entry_deductions WHERE user_id = $1 AND status = 'available' AND operator_id = $2`,
-          [userId, opId]
-        );
-        availableDeductionCents = deductionRow?.total || 0;
-      }
+      const deductionRow = await queryOpOne<{ total: number }>(req, 
+        `SELECT COALESCE(SUM(amount_cents), 0) as total FROM entry_deductions WHERE user_id = $1 AND status = 'available'`,
+        [userId]
+      );
+      availableDeductionCents = deductionRow?.total || 0;
     } catch (deductionErr) {
       console.error('[profile-check] 查询参赛抵扣卡失败:', (deductionErr as Error)?.message);
     }
@@ -440,13 +403,11 @@ router.get('/me/profile-check', authMiddleware, async (req: Request, res: Respon
     // 查询消费券总额（按 operator_id 过滤）
     let couponTotalCents = 0;
     try {
-      if (opId) {
-        const couponRow = await queryOne<{ total: number }>(
-          `SELECT COALESCE(SUM(denomination_cents), 0) as total FROM user_coupons WHERE user_id = $1 AND status = 1 AND (valid_end IS NULL OR valid_end >= NOW()) AND operator_id = $2`,
-          [userId, opId]
-        );
-        couponTotalCents = couponRow?.total || 0;
-      }
+      const couponRow = await queryOpOne<{ total: number }>(req, 
+        `SELECT COALESCE(SUM(denomination_cents), 0) as total FROM user_coupons WHERE user_id = $1 AND status = 1 AND (valid_end IS NULL OR valid_end >= NOW())`,
+        [userId]
+      );
+      couponTotalCents = couponRow?.total || 0;
     } catch (couponErr) {
       console.error('[profile-check] 查询消费券失败:', (couponErr as Error)?.message);
     }
@@ -464,7 +425,7 @@ router.get('/me/profile-check', authMiddleware, async (req: Request, res: Respon
     }
 
     const needPhone = !user || !user.nickname || !user.phone;
-    const remainCount = await getUserRemainingRaces(userId);
+    const remainCount = await getUserRemainingRaces(userId, req);
     res.json({
       code: 0,
       data: {
@@ -543,7 +504,7 @@ router.get('/me/stats', authMiddleware, async (req: Request, res: Response) => {
   const userId = req.user!.userId;
 
   try {
-    const remainingRaces = await getUserRemainingRaces(userId);
+    const remainingRaces = await getUserRemainingRaces(userId, req);
 
     const helpRow = await queryOne<{ cnt: number }>(
       `SELECT COUNT(*) as cnt FROM helps WHERE initiator_id = $1`,
@@ -580,19 +541,17 @@ router.get('/me/stats', authMiddleware, async (req: Request, res: Response) => {
  */
 router.get('/me/race-records', authMiddleware, async (req: Request, res: Response) => {
   const userId = req.user!.userId;
-  let opId = '';
-  try { const ctx = await getOperatorContext(userId); opId = ctx?.operator_id || ''; } catch {}
 
   try {
-    const records = await query<any>(
+    const records = await queryOp<any>(req, 
       `SELECT rr.id, rr.score_ms, rr.rank, rr.status, rr.finished_at, rr.created_at,
               v.name as venue_name
        FROM race_results rr
        LEFT JOIN venues v ON rr.venue_id = v.id
-       WHERE rr.user_id = $1 AND rr.operator_id = $2
+       WHERE rr.user_id = $1
        ORDER BY rr.created_at DESC
        LIMIT 50`,
-      [userId, opId]
+      [userId]
     );
 
     const result = (records || []).map((r: any) => ({
@@ -619,22 +578,15 @@ router.get('/me/race-records', authMiddleware, async (req: Request, res: Respons
  */
 router.get('/deductions', authMiddleware, async (req: Request, res: Response) => {
   const userId = req.user!.userId;
-  const operatorId = await getEffectiveOperatorId(userId);
-
-  // 无 operator 上下文 → 返回空列表
-  if (!operatorId) {
-    res.json({ code: 0, data: { list: [] } });
-    return;
-  }
 
   try {
-    const deductions = await query<any>(
+    const deductions = await queryOp<any>(req, 
       `SELECT id, amount_cents, amount_cents as used_cents, source, status, order_id,
               race_package_id, expires_at, created_at
        FROM entry_deductions
-       WHERE user_id = $1 AND operator_id = $2
+       WHERE user_id = $1
        ORDER BY created_at DESC`,
-      [userId, operatorId]
+      [userId]
     );
     const list = (deductions || []).map((d: any) => ({
       id: d.id,
@@ -662,25 +614,11 @@ router.get('/deductions', authMiddleware, async (req: Request, res: Response) =>
  */
 router.get('/coupons', authMiddleware, async (req: Request, res: Response) => {
   const userId = req.user!.userId;
-  const operatorId = await getEffectiveOperatorId(userId);
-
-  // 无 operator 上下文 → 返回空列表
-  if (!operatorId) {
-    res.json({
-      code: 0,
-      data: {
-        list: [], type1: [], type3: [], type4: [],
-        totalCount: 0, totalDenominationCents: 0, totalDenominationYuan: 0
-      }
-    });
-    return;
-  }
-
   const { type, status } = req.query;
 
   try {
-    let whereClause = 'WHERE uc.user_id = $1 AND uc.operator_id = $2';
-    const params: any[] = [userId, operatorId];
+    let whereClause = 'WHERE uc.user_id = $1';
+    const params: any[] = [userId];
 
     // 按 coupon_type 筛选
     if (type) {
@@ -700,7 +638,7 @@ router.get('/coupons', authMiddleware, async (req: Request, res: Response) => {
       }
     }
 
-    const coupons = await query<any>(
+    const coupons = await queryOp<any>(req, 
       `SELECT uc.id, uc.user_id, uc.coupon_id, uc.merchant_id,
               uc.name, uc.description, uc.denomination_cents,
               uc.min_consume_cents, uc.status, uc.used_at,
@@ -790,7 +728,7 @@ router.get('/coupons', authMiddleware, async (req: Request, res: Response) => {
 router.get('/orders', authMiddleware, async (req: Request, res: Response) => {
   const userId = req.user!.userId;
   try {
-    const orders = await query<any>(
+    const orders = await queryOp<any>(req, 
       `SELECT o.id, o.order_no, o.package_id, rp.name as package_name, o.amount_cents, o.discount_cents,
               o.status, o.paid_at, o.created_at
        FROM orders o
@@ -821,8 +759,8 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
 
   try {
     // 查询参赛包（含新字段）
-    const pkg = await queryOne<{ id: string; name: string; price_cents: number; race_count: number; growth_value: number; point_value: number; free_deduction_cents: number; operator_id: string }>(
-      `SELECT id, name, price_cents, race_count, growth_value, point_value, free_deduction_cents, operator_id FROM race_packages WHERE id = $1 AND status = 'active'`,
+    const pkg = await queryOpOne<{ id: string; name: string; price_cents: number; race_count: number; growth_value: number; point_value: number; free_deduction_cents: number }>(req, 
+      `SELECT id, name, price_cents, race_count, growth_value, point_value, free_deduction_cents FROM race_packages WHERE id = $1 AND status = 'active'`,
       [packageId]
     );
 
@@ -833,14 +771,13 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
 
     const orderId = uuidv4();
     const orderNo = 'ORD_' + Date.now() + '_' + userId.substring(0, 8);
-    const pkgOpId = pkg?.operator_id || '';
-
+    
     // 自动使用可用参赛抵扣金
     let deductionCents = 0;
     let deductionRecordIds: string[] = [];
     try {
       // 查询用户所有可用抵扣金（按创建时间升序）
-      const deductions = await query<{ id: any; amount_cents: number }>(
+      const deductions = await queryOp<{ id: any; amount_cents: number }>(req, 
         `SELECT id, amount_cents FROM entry_deductions
          WHERE user_id = $1 AND status = 'available'
          ORDER BY created_at ASC`,
@@ -857,7 +794,7 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
           remainingPrice -= useAmount;
 
           // 标记已使用的抵扣金
-          await execute(
+          await executeOp(req, 
             `UPDATE entry_deductions
              SET status = 'used', order_id = $1, used_at = NOW()
              WHERE id = $2`,
@@ -885,7 +822,7 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
     const finalPriceCents = Math.max(0, pkg.price_cents - deductionCents);
 
     // 创建订单（记录 remaining_times / remaining_growth 作为签到发成长值的依据）
-    await query(
+    await queryOp(req, 
       `INSERT INTO orders (id, order_no, user_id, package_id, amount_cents, discount_cents,
                remaining_times, remaining_growth, status, paid_at, created_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'paid', NOW(), NOW())`,
@@ -911,7 +848,7 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
     if (freeDeductionCents > 0) {
       try {
         const deductionId = uuidv4();
-        await query(
+        await queryOp(req, 
           `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
            VALUES ($1, $2, $3, 'order_purchase', 'available', $4, $5, DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
           [deductionId, userId, freeDeductionCents, orderId, packageId]
@@ -937,7 +874,7 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
     // 其他包包根据 tag 发放对应的参赛抵扣卡
     try {
       // 查询参赛包的 tag
-      const pkgTag = await queryOne<{ tag: string }>(
+      const pkgTag = await queryOpOne<{ tag: string }>(req, 
         `SELECT tag FROM race_packages WHERE id = $1`,
         [packageId]
       );
@@ -947,7 +884,7 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
         // 专业包：发3张20元参赛抵扣卡到 entry_deductions
         for (let i = 0; i < 3; i++) {
           const dedId = uuidv4();
-          await execute(
+          await executeOp(req, 
             `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
              VALUES ($1, $2, $3, 'order_purchase_pro', 'available', $4, $5, DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
             [dedId, userId, 2000, orderId, packageId]
@@ -957,7 +894,7 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
       } else if (tag === 'standard') {
         // 标准包：发1张1500分参赛抵扣卡
         const dedId = uuidv4();
-        await execute(
+        await executeOp(req, 
           `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
            VALUES ($1, $2, $3, 'order_purchase', 'available', $4, $5, DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
           [dedId, userId, 1500, orderId, packageId]
@@ -966,7 +903,7 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
       } else if (tag === 'basic') {
         // 基础包：发1张500分参赛抵扣卡
         const dedId = uuidv4();
-        await execute(
+        await executeOp(req, 
           `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
            VALUES ($1, $2, $3, 'order_purchase', 'available', $4, $5, DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
           [dedId, userId, 500, orderId, packageId]
@@ -1060,674 +997,19 @@ async function getSystemConfig(key: string, defaultVal: string): Promise<string>
  *
  * race_count 同步：由 issueRaceCountRewardForCompletion 写入，本函数一起统计
  *
- * @param operatorId 可选，传入时只统计属于该运营商的参赛包订单
  */
-async function getUserRemainingRaces(userId: string, operatorId?: string): Promise<number> {
+async function getUserRemainingRaces(userId: string, req: Request): Promise<number> {
   try {
-    if (operatorId) {
-      // 跨赛场核销：同一 operator 下任意订单 remaining_times > 0 即可
-      const row = await queryOne<{ total: number }>(
-        `SELECT COALESCE(SUM(o.remaining_times), 0) as total
-         FROM orders o
-         JOIN race_packages rp ON o.package_id = rp.id
-         WHERE o.user_id = $1 AND o.status = 'paid' AND o.remaining_times > 0
-           AND (rp.operator_id = $2 OR rp.operator_id IS NULL OR rp.operator_id = '')`,
-        [userId, operatorId]
-      );
-      return row?.total ?? 0;
-    }
-
-    // 从 orders.remaining_times 统计剩余可用参赛次数
-    const row = await queryOne<{ total: number }>(
-      `SELECT COALESCE(SUM(remaining_times), 0) as total FROM orders
+    const row = await queryOpOne<{ total: number }>(req,
+      `SELECT COALESCE(SUM(remaining_times), 0) as total
+       FROM orders
        WHERE user_id = $1 AND status = 'paid' AND remaining_times > 0`,
       [userId]
     );
-    return row?.total ?? 0;
-  } catch {
+    return row?.total || 0;
+  } catch (e: any) {
+    console.error('[Player] getUserRemainingRaces error:', e?.message || e);
     return 0;
-  }
-}
-
-/**
- * 签到发放成长值（exp）
- * 从用户已购订单中找 remaining_times > 0 的订单，按包扣减一次
- * 每次发放额 = remaining_growth / original_game_times = growth_value / race_count
- * 点数 = point_value / race_count
- */
-async function grantGrowthOnCheckin(userId: string, checkinId: string): Promise<void> {
-  try {
-    // 找到用户 remaining_times > 0 的订单（最早购买的优先消耗）
-    const order = await queryOne<any>(
-      `SELECT o.id, o.remaining_times, o.remaining_growth, rp.race_count, rp.growth_value, rp.point_value
-       FROM orders o
-       JOIN race_packages rp ON o.package_id = rp.id
-       WHERE o.user_id = $1 AND o.status = 'paid' AND o.remaining_times > 0
-       ORDER BY o.paid_at ASC
-       LIMIT 1`,
-      [userId]
-    );
-
-    if (!order) {
-      console.log('[成长值发放] 用户', userId, '无可用参赛包剩余次数');
-      return;
-    }
-
-    const raceCount = order.race_count || 1;
-    const perCheckinGrowth = Math.floor((order.growth_value || 0) / raceCount);
-    const perCheckinPoints = Math.floor((order.point_value || 0) / raceCount);
-
-    if (perCheckinGrowth > 0) {
-      // 发放成长值到 season_user_info
-      const season = await queryOne<{ id: string }>(
-        `SELECT id FROM seasons WHERE status = 1 ORDER BY created_at DESC LIMIT 1`
-      );
-      if (season) {
-        const existingSeasonUser = await queryOne<{ id: string; exp: number; points: number }>(
-          `SELECT id, exp, points FROM season_user_info WHERE user_id = $1 AND season_id = $2`,
-          [userId, season.id]
-        );
-        if (existingSeasonUser) {
-          await execute(
-            `UPDATE season_user_info SET exp = exp + $1, points = points + $2, updated_at = NOW() WHERE id = $3`,
-            [perCheckinGrowth, perCheckinPoints, existingSeasonUser.id]
-          );
-        } else {
-          await query(
-            `INSERT INTO season_user_info (id, user_id, season_id, level, exp, points)
-             VALUES ($1, $2, $3, 1, $4, $5)`,
-            [uuidv4(), userId, season.id, perCheckinGrowth, perCheckinPoints]
-          );
-        }
-      }
-
-      // 同时更新 users 表的 exp/points（供非赛季场景使用）
-      await execute(
-        `UPDATE users SET exp = COALESCE(exp, 0) + $1, points = COALESCE(points, 0) + $2, updated_at = NOW() WHERE id = $3`,
-        [perCheckinGrowth, perCheckinPoints, userId]
-      );
-
-      console.log('[成长值发放] 用户', userId, '签到获得成长值:', perCheckinGrowth, '积分:', perCheckinPoints);
-    }
-
-    // 扣减订单的剩余次数和剩余成长值
-    await execute(
-      `UPDATE orders SET remaining_times = remaining_times - 1, updated_at = NOW() WHERE id = $1 AND remaining_times > 0`,
-      [order.id]
-    );
-  } catch (err: any) {
-    console.error('[成长值发放] 失败:', err?.message || err);
-  }
-}
-
-/** 查询用户是否有已支付的订单（是否购买过参赛包） */
-async function hasPurchasedPackage(userId: string): Promise<boolean> {
-  try {
-    const row = await queryOne<{ cnt: number }>(
-      `SELECT COUNT(*) as cnt FROM orders WHERE user_id = $1 AND status = 'paid'`,
-      [userId]
-    );
-    return (row?.cnt ?? 0) > 0;
-  } catch {
-    return false;
-  }
-}
-
-/** 查询设备（deviceId）已助力次数 */
-async function getDeviceHelpCount(deviceId: string): Promise<number> {
-  try {
-    const row = await queryOne<{ cnt: number }>(
-      `SELECT COUNT(*) as cnt FROM help_helpers WHERE device_id = $1`,
-      [deviceId]
-    );
-    return row?.cnt ?? 0;
-  } catch {
-    return 0;
-  }
-}
-
-/** 查询用户已助力了几个不同的发起者 */
-async function getUserHelpedInitiatorCount(helperUserId: string): Promise<number> {
-  try {
-    const row = await queryOne<{ cnt: number }>(
-      `SELECT COUNT(DISTINCT initiator_id) as cnt FROM helps WHERE helper_id = $1`,
-      [helperUserId]
-    );
-    return row?.cnt ?? 0;
-  } catch {
-    return 0;
-  }
-}
-
-/**
- * 幂等性辅助：查找已有 key 并返回缓存结果
- * @returns true=命中缓存已发送响应，false=继续正常处理
- */
-async function checkIdempotency(key: string | undefined, res: Response): Promise<boolean> {
-  if (!key) return false;
-  try {
-    const existing = await queryOne<{ response: string }>(
-      `SELECT response FROM idempotency_keys WHERE \`key\` = $1`,
-      [key]
-    );
-    if (existing) {
-      const cached = JSON.parse(existing.response);
-      res.json(cached);
-      return true;
-    }
-  } catch (e: any) {
-    console.error('[幂等] 查找失败:', e?.message || e);
-  }
-  return false;
-}
-
-/** 缓存幂等性结果 */
-async function saveIdempotency(key: string | undefined, result: any): Promise<void> {
-  if (!key) return;
-  try {
-    await query(
-      `INSERT INTO idempotency_keys (id, \`key\`, response, created_at) VALUES ($1, $2, $3, NOW())`,
-      [uuidv4(), key, JSON.stringify(result)]
-    );
-  } catch (e: any) {
-    console.error('[幂等] 缓存失败:', e?.message || e);
-  }
-}
-
-/** 查询用户发起中的助力活动数量 */
-async function getUserActiveHelpCount(userId: string): Promise<number> {
-  try {
-    const row = await queryOne<{ cnt: number }>(
-      `SELECT COUNT(*) as cnt FROM helps WHERE initiator_id = $1 AND status = 'active' AND (expires_at IS NULL OR expires_at > NOW())`,
-      [userId]
-    );
-    return row?.cnt ?? 0;
-  } catch {
-    return 0;
-  }
-}
-
-// ---------- API 端点 ----------
-
-/**
- * GET /me/help-activities
- * 获取当前用户的助力记录（发起 + 参与）
- */
-router.get('/me/help-activities', authMiddleware, async (req: Request, res: Response) => {
-  const userId = req.user!.userId;
-
-  try {
-    // 发起的活动
-    const initiated = await query<any>(
-      `SELECT id, initiator_id, target_package_id, status, required_help_count, current_help_count,
-              initiated_at, expires_at, created_at
-       FROM helps
-       WHERE initiator_id = $1
-       ORDER BY created_at DESC
-       LIMIT 20`,
-      [userId]
-    );
-
-    // 参与助力的活动
-    const assisted = await query<any>(
-      `SELECT h.id, h.initiator_id, h.status, h.required_help_count, h.current_help_count,
-              h.initiated_at, h.helped_at
-       FROM helps h
-       WHERE h.helper_id = $1
-       ORDER BY h.helped_at DESC
-       LIMIT 20`,
-      [userId]
-    );
-
-    res.json({ code: 0, data: { initiated, assisted } });
-  } catch (e: any) {
-    console.error('[帮助] 查询助力记录失败:', e?.message || e);
-    res.json({ code: 0, data: { initiated: [], assisted: [] } });
-  }
-});
-
-/**
- * GET /me/help-status
- * 查询当前用户是否可以发起助力（用于个人中心入口显示）
- */
-router.get('/me/help-status', authMiddleware, async (req: Request, res: Response) => {
-  const userId = req.user!.userId;
-
-  try {
-    const hasPurchased = await hasPurchasedPackage(userId);
-    const remainingRaces = await getUserRemainingRaces(userId);
-    const activeHelpCount = await getUserActiveHelpCount(userId);
-    res.json({
-      code: 0,
-      data: {
-        canHelp: remainingRaces <= 0 && activeHelpCount === 0,
-        hasPurchased,
-        remainingRaces,
-        activeHelpCount,
-        reason: remainingRaces > 0
-          ? '您还有剩余参赛次数，用完后再来吧'
-          : activeHelpCount > 0
-            ? '您已有一个正在进行中的助力活动'
-            : '可以发起助力'
-      }
-    });
-  } catch (e: any) {
-    console.error('[帮助] 查询助力状态失败:', e?.message || e);
-    res.json({ code: 0, data: { canHelp: false, reason: '查询失败' } });
-  }
-});
-
-/**
- * GET /player/me/profile
- * 获取完整用户资料（含 V2 赛季字段）
- */
-router.get('/me/profile', authMiddleware, async (req: Request, res: Response) => {
-  const userId = req.user!.userId;
-  try {
-    const user = await queryOne<any>(
-      `SELECT id, nickname, avatar_url, phone, gender, age, role, level, exp, points, race_count, first_login, created_at
-       FROM users WHERE id = $1`,
-      [userId]
-    );
-    if (!user) {
-      res.json({ code: 404, message: '用户不存在', data: null });
-      return;
-    }
-    res.json({
-      code: 0,
-      data: {
-        id: user.id,
-        nickname: user.nickname || '',
-        avatarUrl: user.avatar_url || '',
-        phone: user.phone || '',
-        gender: user.gender || '',
-        age: user.age || 0,
-        role: user.role || 'player',
-        level: user.level || 1,
-        exp: user.exp || 0,
-        points: user.points || 0,
-        raceCount: user.race_count || 0,
-        firstLogin: !!user.first_login,
-        createdAt: user.created_at,
-      }
-    });
-  } catch (e: any) {
-    console.error('[玩家] 查询资料失败:', e?.message || e);
-    res.json({ code: 500, message: '查询失败', data: null });
-  }
-});
-
-/**
- * POST /help/create
- * 创建助力活动
- *
- * 校验（R1, R2）：
- *   - 必须已购买过参赛包
- *   - 剩余参赛次数为 0
- *   - 当前没有进行中的助力活动
- */
-router.post('/help/create', authMiddleware, rateLimiter(), async (req: Request, res: Response) => {
-  const userId = req.user!.userId;
-  const idempotencyKey = req.headers['idempotency-key'] as string | undefined;
-
-  // R20: 幂等性校验 — 命中缓存则直接返回
-  if (await checkIdempotency(idempotencyKey, res)) return;
-
-  // R1（新规则）: 无需购买参赛包即可发起助力，只需满足剩余次数为0
-  // R2: 剩余参赛次数为 0
-  const remainingRaces = await getUserRemainingRaces(userId);
-  if (remainingRaces > 0) {
-    res.json({ code: 400, message: '您还有 ' + remainingRaces + ' 次参赛次数，用完后再来发起助力', data: null });
-    return;
-  }
-
-  // 检查当前是否有进行中的助力活动
-  const activeCount = await getUserActiveHelpCount(userId);
-  if (activeCount > 0) {
-    res.json({ code: 400, message: '您已有一个进行中的助力活动，请先完成它', data: null });
-    return;
-  }
-
-  // R8: 读取系统配置中的助力人数要求（默认 5）
-  const requiredHelpStr = await getSystemConfig('help_required_count', '5');
-  const requiredHelpCount = parseInt(requiredHelpStr, 10) || 5;
-
-  // 读取活动有效期（默认 7 天）
-  const helpValidDaysStr = await getSystemConfig('help_valid_days', '7');
-  const helpValidDays = parseInt(helpValidDaysStr, 10) || 7;
-
-  const helpId = uuidv4();
-
-  // 写入 helps 表
-  try {
-    await query(
-      `INSERT INTO helps (id, initiator_id, required_help_count, current_help_count, status, initiated_at, expires_at, created_at)
-       VALUES ($1, $2, $3, 0, 'active', NOW(), DATE_ADD(NOW(), INTERVAL CAST($4 AS SIGNED) DAY), NOW())`,
-      [helpId, userId, requiredHelpCount, helpValidDays]
-    );
-  } catch (e: any) {
-    console.error('[帮助] 创建助力失败:', e?.message || e);
-    res.json({ code: 500, message: '创建助力活动失败', data: null });
-    return;
-  }
-
-  // 读取用户昵称
-  const user = await queryOne<{ nickname: string; avatar_url: string }>(
-    `SELECT nickname, avatar_url FROM users WHERE id = $1`,
-    [userId]
-  );
-
-  const result = {
-    code: 0,
-    data: {
-      id: helpId,
-      initiatorId: userId,
-      initiatorName: user?.nickname || '玩家',
-      initiatorAvatar: user?.avatar_url || '',
-      requiredHelpCount,
-      currentHelpCount: 0,
-      helpers: [],
-      createdAt: Date.now(),
-      expiredAt: Date.now() + helpValidDays * 86400000,
-      status: 'active'
-    }
-  };
-
-  // R20: 缓存幂等性结果
-  await saveIdempotency(idempotencyKey, result);
-
-  res.json(result);
-});
-
-/**
- * GET /help/detail
- * 获取助力活动详情（可公开访问，用于分享页）
- */
-router.get('/help/detail', async (req: Request, res: Response) => {
-  const { helpId } = req.query;
-  if (!helpId || typeof helpId !== 'string') {
-    res.json({ code: 400, message: '缺少助力活动ID', data: null });
-    return;
-  }
-
-  try {
-    const help = await queryOne<any>(
-      `SELECT id, initiator_id, target_package_id, required_help_count, current_help_count,
-              status, initiated_at, expires_at, created_at
-       FROM helps WHERE id = $1`,
-      [helpId]
-    );
-
-    if (!help) {
-      res.json({ code: 404, message: '助力活动不存在', data: null });
-      return;
-    }
-
-    // 检查是否过期
-    const now = new Date().toISOString();
-    if (help.status === 'active' && help.expires_at && help.expires_at < now) {
-      // 自动标记过期（静默更新）
-      try {
-        await query(`UPDATE helps SET status = 'expired' WHERE id = $1 AND status = 'active' AND expires_at < NOW()`, [helpId]);
-      } catch {}
-      help.status = 'expired';
-    }
-
-    // 查询发起者信息
-    const initiator = await queryOne<{ nickname: string; avatar_url: string }>(
-      `SELECT nickname, avatar_url FROM users WHERE id = $1`,
-      [help.initiator_id]
-    );
-
-    // 查询已助力的好友列表
-    const helpers = await query<any>(
-      `SELECT h.helped_at, u.nickname as helper_nickname, u.avatar_url as helper_avatar
-       FROM helps h
-       LEFT JOIN users u ON h.helper_id = u.id
-       WHERE h.id = $1 AND h.helper_id IS NOT NULL
-       ORDER BY h.helped_at ASC`,
-      [helpId]
-    );
-
-    const currentHelpCount = help.current_help_count || 0;
-    const requiredHelpCount = help.required_help_count || 5;
-    const isExpired = help.status === 'expired';
-    const isCompleted = help.status === 'completed';
-    const canHelp = help.status === 'active' && currentHelpCount < requiredHelpCount;
-
-    res.json({
-      code: 0,
-      data: {
-        activity: {
-          id: help.id,
-          initiatorId: help.initiator_id,
-          initiatorName: initiator?.nickname || '玩家',
-          initiatorAvatar: initiator?.avatar_url || '',
-          targetPackageId: help.target_package_id || '',
-          requiredHelpCount,
-          currentHelpCount,
-          helpers: helpers.map((h: any) => ({
-            helperNickname: h.helper_nickname || '热心网友',
-            helpedAt: new Date(h.helped_at).getTime()
-          })),
-          createdAt: new Date(help.initiated_at).getTime(),
-          expiredAt: help.expires_at ? new Date(help.expires_at).getTime() : null,
-          status: help.status,
-          progressPercent: requiredHelpCount > 0 ? Math.round(currentHelpCount / requiredHelpCount * 100) : 0,
-          isExpired,
-          isCompleted
-        },
-        canHelp
-      }
-    });
-  } catch (e: any) {
-    console.error('[帮助] 查询助力详情失败:', e?.message || e);
-    res.json({ code: 500, message: '查询助力详情失败', data: null });
-  }
-});
-
-/**
- * POST /help/assist
- * 为好友助力
- *
- * 校验：
- *   R3/R7 — 不能给自己助力
- *   R4 — 必须登录（authMiddleware）
- *   R5 — 同一设备永久最多助力 3 次
- *   R6 — 同一用户永久最多为 1 人助力
- */
-router.post('/help/assist', authMiddleware, rateLimiter(), async (req: Request, res: Response) => {
-  const helperUserId = req.user!.userId;
-  const { helpId, deviceId } = req.body;
-  const idempotencyKey = req.headers['idempotency-key'] as string | undefined;
-
-  if (!helpId) {
-    res.json({ code: 400, message: '缺少助力活动ID', data: null });
-    return;
-  }
-
-  // R20: 幂等性校验
-  if (await checkIdempotency(idempotencyKey, res)) return;
-
-  try {
-    // 查询助力活动
-    const help = await queryOne<any>(
-      `SELECT id, initiator_id, status, required_help_count, current_help_count, expires_at
-       FROM helps WHERE id = $1`,
-      [helpId]
-    );
-
-    if (!help) {
-      res.json({ code: 404, message: '助力活动不存在', data: null });
-      return;
-    }
-
-    // R3/R7: 不能给自己助力
-    if (help.initiator_id === helperUserId) {
-      res.json({ code: 400, message: '不能为自己助力', data: null });
-      return;
-    }
-
-    // 检查活动状态
-    if (help.status === 'completed') {
-      res.json({ code: 400, message: '该助力活动已满额', data: null });
-      return;
-    }
-
-    if (help.status === 'expired') {
-      res.json({ code: 400, message: '该助力活动已过期', data: null });
-      return;
-    }
-
-    // 检查是否过期（双重校验）
-    if (help.expires_at && new Date(help.expires_at).toISOString() < new Date().toISOString()) {
-      // 自动过期
-      await query(`UPDATE helps SET status = 'expired' WHERE id = $1 AND status = 'active'`, [helpId]);
-      res.json({ code: 400, message: '该助力活动已过期', data: null });
-      return;
-    }
-
-    // 检查是否已满
-    if ((help.current_help_count || 0) >= (help.required_help_count || 5)) {
-      // 自动标记完成
-      await query(`UPDATE helps SET status = 'completed' WHERE id = $1 AND status = 'active'`, [helpId]);
-      res.json({ code: 400, message: '该助力活动已满额', data: null });
-      return;
-    }
-
-    // R6（新规则）: 已参与过助力的用户（含发起者和助力者），永久不能再助力别人
-    // 用 help_helpers 表查询用户是否曾作为助力者参与过
-    const helpedAnywhere = await queryOne<{ cnt: number }>(
-      `SELECT COUNT(*) as cnt FROM help_helpers WHERE user_id = $1`,
-      [helperUserId]
-    );
-    if ((helpedAnywhere?.cnt ?? 0) > 0) {
-      res.json({ code: 400, message: '您已经参与过助力，不能再助力别人', data: null });
-      return;
-    }
-
-    // 检查是否已经为这个发起者助力过（防止重复助力）
-    const alreadyHelped = await queryOne<{ cnt: number }>(
-      `SELECT COUNT(*) as cnt FROM help_helpers WHERE user_id = $1 AND help_id IN (SELECT id FROM helps WHERE initiator_id = $2)`,
-      [helperUserId, help.initiator_id]
-    );
-    if ((alreadyHelped?.cnt ?? 0) > 0) {
-      res.json({ code: 400, message: '您已经为TA助力过了', data: null });
-      return;
-    }
-
-    // R6-附: 已发起过助力的用户也不能再助力别人（只能当发起者）
-    const hasInitiated = await queryOne<{ cnt: number }>(
-      `SELECT COUNT(*) as cnt FROM helps WHERE initiator_id = $1`,
-      [helperUserId]
-    );
-    if ((hasInitiated?.cnt ?? 0) > 0) {
-      res.json({ code: 400, message: '您已经发起过助力，不能再助力别人', data: null });
-      return;
-    }
-
-    // R5: 同一设备永久最多助力 3 次
-    if (deviceId) {
-      const deviceHelpCount = await getDeviceHelpCount(deviceId);
-      if (deviceHelpCount >= 3) {
-        res.json({ code: 400, message: '该设备已达助力上限（3次）', data: null });
-        return;
-      }
-    }
-
-    // ---- 助力成功 ----
-
-    // 更新 current_help_count
-    const newCount = (help.current_help_count || 0) + 1;
-    const isComplete = newCount >= (help.required_help_count || 5);
-
-    // 构建 UPDATE 语句，有 deviceId 时写入 helper_device_id
-    let sql: string;
-    let sqlParams: any[];
-
-    if (deviceId) {
-      if (isComplete) {
-        sql = `UPDATE helps SET current_help_count = $1, status = 'completed', helper_id = $2, helped_at = NOW(), helper_device_id = $3 WHERE id = $4`;
-        sqlParams = [newCount, helperUserId, deviceId, helpId];
-      } else {
-        sql = `UPDATE helps SET current_help_count = $1, helper_id = $2, helped_at = NOW(), helper_device_id = $3 WHERE id = $4 AND current_help_count = $5`;
-        sqlParams = [newCount, helperUserId, deviceId, helpId, help.current_help_count];
-      }
-    } else {
-      if (isComplete) {
-        sql = `UPDATE helps SET current_help_count = $1, status = 'completed', helper_id = $2, helped_at = NOW() WHERE id = $3`;
-        sqlParams = [newCount, helperUserId, helpId];
-      } else {
-        sql = `UPDATE helps SET current_help_count = $1, helper_id = $2, helped_at = NOW() WHERE id = $3 AND current_help_count = $4`;
-        sqlParams = [newCount, helperUserId, helpId, help.current_help_count];
-      }
-    }
-
-    await query(sql, sqlParams);
-
-    // 将本次助力关系写入 help_helpers 表（用于 R6 校验和记录）
-    const helpHelperId = uuidv4();
-    await query(
-      `INSERT INTO help_helpers (id, help_id, user_id, device_id, helped_at)
-       VALUES ($1, $2, $3, $4, NOW())`,
-      [helpHelperId, helpId, helperUserId, deviceId || null]
-    );
-
-    if (isComplete) {
-      // 助力完成：给发起者奖励参赛次数
-      await issueRaceCountRewardForCompletion(help.initiator_id, helpId);
-    }
-
-    // 查询发起者昵称
-    const initiator = await queryOne<{ nickname: string }>(
-      `SELECT nickname FROM users WHERE id = $1`,
-      [help.initiator_id]
-    );
-
-    const result = {
-      code: 0,
-      data: {
-        activity: {
-          id: help.id,
-          currentHelpCount: newCount,
-          requiredHelpCount: help.required_help_count || 5,
-          helpers: [{ helperNickname: '我', helpedAt: Date.now() }]
-        },
-        isComplete,
-        initiatorName: initiator?.nickname || '玩家'
-      }
-    };
-
-    // R20: 缓存幂等性结果
-    await saveIdempotency(idempotencyKey, result);
-
-    res.json(result);
-  } catch (e: any) {
-    console.error('[帮助] 助力失败:', e?.message || e);
-    res.json({ code: 500, message: '助力失败，请稍后再试', data: null });
-  }
-});
-
-// ---------- 参赛次数奖励 ----------
-
-/**
- * 助力完成时，给发起者奖励参赛次数（直接加到用户 race_count）
- */
-async function issueRaceCountRewardForCompletion(initiatorId: string, helpId: string): Promise<void> {
-  try {
-    // 读取运营商配置的发起者奖励次数（默认 1）
-    const rewardStr = await getSystemConfig('help_initiator_reward_count', '1');
-    const rewardCount = parseInt(rewardStr, 10) || 1;
-
-    // 直接给用户加参赛次数
-    await query(
-      `UPDATE users SET race_count = race_count + $1, updated_at = NOW() WHERE id = $2`,
-      [rewardCount, initiatorId]
-    );
-
-    console.log(`[帮助] 发起者 ${initiatorId} 助力完成，奖励 ${rewardCount} 次参赛次数`);
-  } catch (e: any) {
-    console.error('[帮助] 发放发起者奖励失败:', e?.message || e);
   }
 }
 

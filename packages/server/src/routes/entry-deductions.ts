@@ -1,7 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { queryOne } from '../config/database';
+import { queryOpOne } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
-import { getOperatorContext } from '../middleware/operator-context';
 
 const router = Router();
 
@@ -12,11 +11,9 @@ const router = Router();
 router.get('/balance', authMiddleware, async (req: Request, res: Response) => {
   const userId = req.user!.userId;
   try {
-    const ctx = await getOperatorContext(userId);
-    const opId = ctx?.operator_id || '';
-    const row = await queryOne<{ total: number }>(
-      `SELECT COALESCE(SUM(amount_cents), 0) as total FROM entry_deductions WHERE user_id = $1 AND status = 'available' AND operator_id = $2`,
-      [userId, opId]
+    const row = await queryOpOne<{ total: number }>(req, 
+      `SELECT COALESCE(SUM(amount_cents), 0) as total FROM entry_deductions WHERE user_id = $1 AND status = 'available'`,
+      [userId]
     );
     const availableCents = row?.total || 0;
     res.json({ code: 0, data: { availableCents } });

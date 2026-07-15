@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { query, queryOne } from '../config/database';
+import { query, queryOne, queryOp, queryOpOne, executeOp } from '../config/database';
 import { authMiddleware, AuthPayload } from '../middleware/auth';
 
 const router = Router();
@@ -29,38 +29,32 @@ function operatorOnly(req: Request, res: Response, next: Function): void {
 router.post('/races', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
     const { venueId, name, maxParticipants, startTime, endTime, entryFee, venueName } = req.body;
-    const operatorId = req.user?.operatorId || null;
 
     if (!venueId || !name) {
       return res.status(400).json({ code: 400, message: '缺少必填参数（venueId, name）', data: null });
     }
 
-    // 验证场馆属于该运营商
-    const venue = await queryOne<{ id: string; operator_id: string }>(
-      'SELECT id, operator_id FROM venues WHERE id = $1',
+    // 验证场馆存在（物理隔离：此数据库只含该运营商的场馆）
+    const venue = await queryOpOne<{ id: string }>(req, 
+      'SELECT id FROM venues WHERE id = $1',
       [venueId]
     );
     if (!venue) {
       return res.status(404).json({ code: 404, message: '场馆不存在', data: null });
     }
-    if (venue.operator_id !== req.user?.operatorId) {
-      return res.status(403).json({ code: 403, message: '无权操作该场馆', data: null });
-    }
 
     const raceId = require('uuid').v4();
     const now = new Date().toISOString();
 
-    await query(
-      `INSERT INTO races (id, venue_id, name, status, max_participants, entry_fee, start_time, end_time, venue_name, operator_id, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+    await queryOp(req, 
+      `INSERT INTO races (id, venue_id, name, status, max_participants, entry_fee, start_time, end_time, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
       [
         raceId, venueId, name, 'pending',
         maxParticipants || 20,
         entryFee || 0,
         startTime || now,
         endTime || now,
-        venueName || null,
-        operatorId || null,
         now, now
       ]
     );
@@ -109,13 +103,13 @@ router.get('/races', authMiddleware, operatorOnly, async (req: Request, res: Res
 
     const whereClause = `WHERE ${conditions.join(' AND ')}`;
 
-    const countResult = await queryOne<{ count: string }>(
+    const countResult = await queryOpOne<{ count: string }>(req, 
       `SELECT COUNT(*) as count FROM races ${whereClause}`,
       params
     );
     const total = parseInt(countResult?.count || '0', 10);
 
-    const rows = await query<any>(
+    const rows = await queryOp<any>(req, 
       `SELECT id, name, status, start_time, end_time,
               created_at, updated_at
        FROM races ${whereClause}
@@ -150,7 +144,7 @@ router.get('/races/:id', authMiddleware, operatorOnly, async (req: Request, res:
   try {
     const { id } = req.params;
 
-    const race = await queryOne<any>(
+    const race = await queryOpOne<any>(req, 
       `SELECT id, name, status, start_time, end_time
        FROM races WHERE id = $1`,
       [id]
@@ -190,7 +184,7 @@ router.get('/races/:id/players', authMiddleware, operatorOnly, async (req: Reque
     const offset = (page - 1) * pageSize;
 
     // 检查赛事是否存在
-    const race = await queryOne<{ id: string }>(
+    const race = await queryOpOne<{ id: string }>(req, 
       'SELECT id FROM races WHERE id = $1',
       [raceId]
     );
@@ -198,13 +192,13 @@ router.get('/races/:id/players', authMiddleware, operatorOnly, async (req: Reque
       return res.status(404).json({ code: 404, message: '赛事不存在', data: { list: [], total: 0 } });
     }
 
-    const countResult = await queryOne<{ count: string }>(
+    const countResult = await queryOpOne<{ count: string }>(req, 
       `SELECT COUNT(*) as count FROM race_records WHERE race_id = $1`,
       [raceId]
     );
     const total = parseInt(countResult?.count || '0', 10);
 
-    const rows = await query<any>(
+    const rows = await queryOp<any>(req, 
       `SELECT rr.id, rr.user_id, rr.score_ms, rr.rank, rr.status, rr.finished,
               u.nickname, u.avatar_url
        FROM race_records rr
@@ -258,7 +252,7 @@ router.put('/races/:id/status', authMiddleware, operatorOnly, async (req: Reques
     }
 
     // 检查赛事是否存在
-    const race = await queryOne<{ id: string; status: string }>(
+    const race = await queryOpOne<{ id: string; status: string }>(req, 
       'SELECT id, status FROM races WHERE id = $1',
       [raceId]
     );
@@ -277,7 +271,7 @@ router.put('/races/:id/status', authMiddleware, operatorOnly, async (req: Reques
       return res.status(400).json({ code: 400, message: '赛事已结束', data: null });
     }
 
-    await query(
+    await queryOp(req, 
       `UPDATE races SET status = $1, updated_at = $2 WHERE id = $3`,
       [newStatus, new Date().toISOString(), raceId]
     );

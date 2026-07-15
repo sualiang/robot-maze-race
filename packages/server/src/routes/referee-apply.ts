@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { query, queryOne, execute } from '../config/database';
+import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../config/database';
 
 const router = Router();
 
@@ -29,7 +29,7 @@ router.post('/apply', async (req: Request, res: Response) => {
     }
 
     // 检查手机号是否已被注册
-    const existing = await queryOne<{ id: string; status: string }>(
+    const existing = await queryOpOne<{ id: string; status: string }>(req, 
       'SELECT id, status FROM referees WHERE phone = ?',
       [phone]
     );
@@ -50,8 +50,8 @@ router.post('/apply', async (req: Request, res: Response) => {
 
     // 创建 referees 记录（直接 approved）
     const refereeId = uuidv4();
-    await execute(
-      `INSERT INTO referees (id, user_id, name, phone, status, operator_id, created_at, updated_at)
+    await executeOp(req, 
+      `INSERT INTO referees (id, user_id, name, phone, status, created_at, updated_at)
        VALUES (?, ?, ?, ?, 'approved', ?, NOW(), NOW())`,
       [refereeId, userId, name, phone, operatorId || null]
     );

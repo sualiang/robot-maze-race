@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { query, queryOne, execute } from '../config/database';
+import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 
 const router = Router();
@@ -14,7 +14,7 @@ router.get('/coupons', authMiddleware, async (req: Request, res: Response) => {
   const status = parseInt(req.query.status as string, 10) || 1; // 默认查未使用
 
   try {
-    const coupons = await query<any>(
+    const coupons = await queryOp<any>(req, 
       `SELECT uc.id, uc.coupon_id, uc.merchant_id, uc.name, uc.description,
               uc.denomination_cents, uc.min_consume_cents, uc.status,
               uc.used_at, uc.valid_start, uc.valid_end, uc.created_at,
@@ -74,7 +74,7 @@ router.post('/coupon/use', authMiddleware, async (req: Request, res: Response) =
 
   try {
     // 查询优惠券
-    const coupon = await queryOne<any>(
+    const coupon = await queryOpOne<any>(req, 
       `SELECT * FROM user_coupons WHERE id = $1 AND user_id = $2`,
       [couponId, userId]
     );
@@ -91,7 +91,7 @@ router.post('/coupon/use', authMiddleware, async (req: Request, res: Response) =
 
     // 检查有效期
     if (coupon.valid_end && new Date(coupon.valid_end) < new Date()) {
-      await execute(
+      await executeOp(req, 
         `UPDATE user_coupons SET status = 3, updated_at = NOW() WHERE id = $1`,
         [couponId]
       );
@@ -100,13 +100,13 @@ router.post('/coupon/use', authMiddleware, async (req: Request, res: Response) =
     }
 
     // 标记为已使用
-    await execute(
+    await executeOp(req, 
       `UPDATE user_coupons SET status = 2, used_at = NOW(), updated_at = NOW() WHERE id = $1 AND status = 1`,
       [couponId]
     );
 
     // 扣减商家优惠券库存
-    await execute(
+    await executeOp(req, 
       `UPDATE merchant_coupons SET remain_count = remain_count - 1 WHERE id = $1 AND remain_count > 0`,
       [coupon.coupon_id]
     );
@@ -133,7 +133,7 @@ router.post('/coupon/use', authMiddleware, async (req: Request, res: Response) =
  */
 router.get('/list', async (req: Request, res: Response) => {
   try {
-    const merchants = await query<any>(
+    const merchants = await queryOp<any>(req, 
       `SELECT id, merchant_name, merchant_address, longitude, latitude,
               contact_phone, logo_url, region, business_hours, qrcode_url
        FROM merchants
@@ -169,7 +169,7 @@ router.get('/list', async (req: Request, res: Response) => {
 router.get('/detail/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const merchant = await queryOne<any>(
+    const merchant = await queryOpOne<any>(req, 
       `SELECT id, merchant_name, merchant_address, longitude, latitude,
               contact_phone, logo_url, region, business_hours, qrcode_url
        FROM merchants

@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { query, queryOne } from '../config/database';
+import { query, queryOne, queryOp, queryOpOne, executeOp } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import { checkPermission } from '../middleware/rbac';
 
@@ -57,8 +57,7 @@ router.get('/', authMiddleware, checkPermission('players:list'), async (req: Req
       conditions.push('u.subscribe_venue_id IS NOT NULL');
       if (operatorId) {
         conditions.push('v.operator_id = $' + (params.length + 1));
-        params.push(operatorId);
-      }
+              }
     }
 
     // 关键字搜索（昵称或手机号）

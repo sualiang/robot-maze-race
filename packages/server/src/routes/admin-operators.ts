@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
-import { query, queryOne, transaction, generateSecurePassword } from '../config/database';
+import { query, queryOne, transaction, generateSecurePassword, queryOp, queryOpOne, executeOp } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import { checkPermission } from '../middleware/rbac';
 
@@ -202,7 +202,7 @@ router.post('/', authMiddleware, checkPermission('operators:create'), async (req
     const operatorAdminRoleId = 'role-admin';
     const adminUserId = uuidv4();
     await query(
-      `INSERT INTO admin_users (id, username, password, nickname, phone, role_id, operator_id, status, first_login)
+      `INSERT INTO admin_users (id, username, password, nickname, phone, role_id, status, first_login)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [
         adminUserId,
@@ -439,31 +439,31 @@ router.delete('/:id', authMiddleware, checkPermission('operators:delete'), async
       // 删除会话和日志（auth_sessions / client_logs 表可能不存在或缺少 operator_id 列）
       try { await tx.query('DELETE FROM auth_sessions WHERE operator_id = $1', [id]); } catch { /* ignore if table not exists */ }
       try { await tx.query('DELETE FROM client_logs WHERE operator_id = $1', [id]); } catch { /* ignore if column not exists */ }
-      await tx.query('DELETE FROM operator_members WHERE operator_id = $1', [id]);
-      await tx.query('DELETE FROM operator_sessions WHERE operator_id = $1', [id]);
+      await tx.queryOp(req, 'DELETE FROM operator_members WHERE operator_id = $1', [id]);
+      await tx.queryOp(req, 'DELETE FROM operator_sessions WHERE operator_id = $1', [id]);
 
       // 删除场馆及相关数据
-      const venuesRs = await tx.query('SELECT id FROM venues WHERE operator_id = $1', [id]);
+      const venuesRs = await tx.queryOp(req, 'SELECT id FROM venues WHERE operator_id = $1', [id]);
       const venueIds = (venuesRs || []).map((r: any) => r.id);
       for (const vid of venueIds) {
-        await tx.query('UPDATE referees SET venue_id = NULL WHERE venue_id = $1', [vid]);
-        await tx.query('DELETE FROM races WHERE venue_id = $1', [vid]);
-        await tx.query('DELETE FROM race_records WHERE venue_id = $1', [vid]);
-        await tx.query('DELETE FROM race_attendance WHERE venue_id = $1', [vid]);
+        await tx.queryOp(req, 'UPDATE referees SET venue_id = NULL WHERE venue_id = $1', [vid]);
+        await tx.queryOp(req, 'DELETE FROM races WHERE venue_id = $1', [vid]);
+        await tx.queryOp(req, 'DELETE FROM race_records WHERE venue_id = $1', [vid]);
+        await tx.queryOp(req, 'DELETE FROM race_attendance WHERE venue_id = $1', [vid]);
       }
-      await tx.query('DELETE FROM venues WHERE operator_id = $1', [id]);
+      await tx.queryOp(req, 'DELETE FROM venues WHERE operator_id = $1', [id]);
 
       // 删除裁判关联（保留 users 记录但置空 role）
-      const refRs = await tx.query('SELECT user_id FROM referees WHERE operator_id = $1', [id]);
+      const refRs = await tx.queryOp(req, 'SELECT user_id FROM referees WHERE operator_id = $1', [id]);
       const refereeUserIds = (refRs || []).map((r: any) => r.user_id);
-      await tx.query('DELETE FROM referees WHERE operator_id = $1', [id]);
+      await tx.queryOp(req, 'DELETE FROM referees WHERE operator_id = $1', [id]);
       for (const uid of refereeUserIds) {
         await tx.query('UPDATE users SET role = NULL WHERE id = $1', [uid]);
       }
 
       // 删除参赛包
-      await tx.query('DELETE FROM race_packages WHERE operator_id = $1', [id]);
-      await tx.query('DELETE FROM ticket_redemptions WHERE operator_id = $1', [id]);
+      await tx.queryOp(req, 'DELETE FROM race_packages WHERE operator_id = $1', [id]);
+      await tx.queryOp(req, 'DELETE FROM ticket_redemptions WHERE operator_id = $1', [id]);
 
       // 最后删除运营商本身
       const result = await tx.query('DELETE FROM operators WHERE id = $1', [id]);

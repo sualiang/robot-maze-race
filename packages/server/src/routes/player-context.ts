@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { getOperatorContext, setOperatorContext } from '../middleware/operator-context';
-import { queryOne } from '../config/database';
+import { queryOne, queryOp, queryOpOne, executeOp } from '../config/database';
 
 const router = Router();
 
@@ -76,7 +76,7 @@ router.get('/player/context/current', authMiddleware, async (req: Request, res: 
     let venueName: string | null = null;
     if (venueId) {
       try {
-        const v = await queryOne<{ name: string }>(
+        const v = await queryOpOne<{ name: string }>(req, 
           `SELECT name FROM venues WHERE id = $1`,
           [venueId]
         );

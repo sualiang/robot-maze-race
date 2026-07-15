@@ -14,7 +14,7 @@ import jwt from 'jsonwebtoken';
 import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config';
-import { query, queryOne, execute } from '../config/database';
+import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../config/database';
 import {
   ApiResponse,
   WxMpLoginRequest,
@@ -370,7 +370,7 @@ async function grantFreeEntryDeduction(userId: string): Promise<void> {
     }
 
     const deductionId = uuidv4();
-    await execute(
+    await executeOp(req, 
       `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, expires_at, created_at)
        VALUES ($1, $2, $3, 'register_reward', 'available', DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
       [deductionId, userId, deductionCents]

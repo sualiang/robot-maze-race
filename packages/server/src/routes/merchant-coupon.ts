@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { query, queryOne, execute } from '../config/database';
+import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../config/database';
 import { merchantAuthMiddleware } from './merchant-auth';
 
 const router = Router();
@@ -50,7 +50,7 @@ router.post('/create', async (req: Request, res: Response) => {
     }
 
     const id = uuidv4();
-    await execute(
+    await executeOp(req, 
       `INSERT INTO merchant_coupons (
         id, merchant_id, name, description,
         denomination_cents, min_consume_cents,
@@ -84,7 +84,7 @@ router.post('/:id/submit-audit', async (req: Request, res: Response) => {
     const merchantId = req.merchantAdmin!.merchantId;
     const { id } = req.params;
 
-    const existing = await queryOne<any>(
+    const existing = await queryOpOne<any>(req, 
       `SELECT * FROM merchant_coupons WHERE id = $1 AND merchant_id = $2`,
       [id, merchantId]
     );
@@ -97,7 +97,7 @@ router.post('/:id/submit-audit', async (req: Request, res: Response) => {
     if (!existing.name) { res.json({ code: 400, message: '请先填写优惠券名称', data: null }); return; }
     if (!existing.total_count || existing.total_count <= 0) { res.json({ code: 400, message: '请先设置库存数量', data: null }); return; }
 
-    await execute(
+    await executeOp(req, 
       `UPDATE merchant_coupons SET audit_status = 1, updated_at = NOW() WHERE id = $1`,
       [id]
     );
@@ -118,7 +118,7 @@ router.post('/:id/request-offline', async (req: Request, res: Response) => {
     const merchantId = req.merchantAdmin!.merchantId;
     const { id } = req.params;
 
-    const existing = await queryOne<any>(
+    const existing = await queryOpOne<any>(req, 
       `SELECT * FROM merchant_coupons WHERE id = $1 AND merchant_id = $2`,
       [id, merchantId]
     );
@@ -128,7 +128,7 @@ router.post('/:id/request-offline', async (req: Request, res: Response) => {
       return;
     }
 
-    await execute(
+    await executeOp(req, 
       `UPDATE merchant_coupons SET audit_status = 1, offline_request = 1, updated_at = NOW() WHERE id = $1`,
       [id]
     );
@@ -149,7 +149,7 @@ router.post('/:id/cancel-offline', async (req: Request, res: Response) => {
     const merchantId = req.merchantAdmin!.merchantId;
     const { id } = req.params;
 
-    const existing = await queryOne<any>(
+    const existing = await queryOpOne<any>(req, 
       `SELECT * FROM merchant_coupons WHERE id = $1 AND merchant_id = $2`,
       [id, merchantId]
     );
@@ -159,7 +159,7 @@ router.post('/:id/cancel-offline', async (req: Request, res: Response) => {
       return;
     }
 
-    await execute(
+    await executeOp(req, 
       `UPDATE merchant_coupons SET audit_status = 2, offline_request = 0, updated_at = NOW() WHERE id = $1`,
       [id]
     );
@@ -182,7 +182,7 @@ router.post('/:id/online', async (req: Request, res: Response) => {
     const merchantId = req.merchantAdmin!.merchantId;
     const { id } = req.params;
 
-    const existing = await queryOne<any>(
+    const existing = await queryOpOne<any>(req, 
       `SELECT * FROM merchant_coupons WHERE id = $1 AND merchant_id = $2`,
       [id, merchantId]
     );
@@ -196,7 +196,7 @@ router.post('/:id/online', async (req: Request, res: Response) => {
       return;
     }
 
-    await execute(
+    await executeOp(req, 
       `UPDATE merchant_coupons SET status = 1, updated_at = NOW() WHERE id = $1`,
       [id]
     );
@@ -221,7 +221,7 @@ router.put('/:id', async (req: Request, res: Response) => {
     const merchantId = req.merchantAdmin!.merchantId;
     const { id } = req.params;
 
-    const existing = await queryOne<any>(
+    const existing = await queryOpOne<any>(req, 
       `SELECT * FROM merchant_coupons WHERE id = $1 AND merchant_id = $2`,
       [id, merchantId]
     );
@@ -283,7 +283,7 @@ router.put('/:id', async (req: Request, res: Response) => {
     updates.push(`updated_at = NOW()`);
 
     params.push(id);
-    await execute(
+    await executeOp(req, 
       `UPDATE merchant_coupons SET ${updates.join(', ')} WHERE id = $${idx}`,
       params
     );
@@ -308,7 +308,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
     const merchantId = req.merchantAdmin!.merchantId;
     const { id } = req.params;
 
-    const existing = await queryOne<any>(
+    const existing = await queryOpOne<any>(req, 
       `SELECT * FROM merchant_coupons WHERE id = $1 AND merchant_id = $2`,
       [id, merchantId]
     );
@@ -327,7 +327,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
       return;
     }
 
-    await execute(`DELETE FROM merchant_coupons WHERE id = $1 AND merchant_id = $2`, [id, merchantId]);
+    await executeOp(req, `DELETE FROM merchant_coupons WHERE id = $1 AND merchant_id = $2`, [id, merchantId]);
     res.json({ code: 0, message: '已删除' });
   } catch (e: any) {
     console.error('[MerchantCoupon] delete error:', e?.message || e);
@@ -346,12 +346,12 @@ router.get('/list', async (req: Request, res: Response) => {
     const pageSize = Math.min(Math.max(parseInt(req.query.pageSize as string, 10) || 100, 1), 200);
     const offset = (page - 1) * pageSize;
 
-    const countRow = await queryOne<{ total: number }>(
+    const countRow = await queryOpOne<{ total: number }>(req, 
       `SELECT COUNT(*) as total FROM merchant_coupons WHERE merchant_id = $1`,
       [merchantId]
     );
 
-    const coupons = await query<any>(
+    const coupons = await queryOp<any>(req, 
       `SELECT * FROM merchant_coupons WHERE merchant_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
       [merchantId, pageSize, offset]
     );
@@ -394,7 +394,7 @@ router.get('/detail/:id', async (req: Request, res: Response) => {
     const merchantId = req.merchantAdmin!.merchantId;
     const { id } = req.params;
 
-    const c = await queryOne<any>(
+    const c = await queryOpOne<any>(req, 
       `SELECT * FROM merchant_coupons WHERE id = $1 AND merchant_id = $2`,
       [id, merchantId]
     );
@@ -428,16 +428,16 @@ router.get('/detail/:id', async (req: Request, res: Response) => {
 router.get('/stats', async (req: Request, res: Response) => {
   try {
     const merchantId = req.merchantAdmin!.merchantId;
-    const createdRow = await queryOne<{ total: number }>(
+    const createdRow = await queryOpOne<{ total: number }>(req, 
       `SELECT COUNT(*) as total FROM merchant_coupons WHERE merchant_id = $1`, [merchantId]
     );
-    const onlineRow = await queryOne<{ total: number }>(
+    const onlineRow = await queryOpOne<{ total: number }>(req, 
       `SELECT COUNT(*) as total FROM merchant_coupons WHERE merchant_id = $1 AND status = 1 AND audit_status = 2`, [merchantId]
     );
-    const claimedRow = await queryOne<{ total: number }>(
+    const claimedRow = await queryOpOne<{ total: number }>(req, 
       `SELECT COUNT(*) as total FROM user_coupons WHERE merchant_id = $1`, [merchantId]
     );
-    const verifiedRow = await queryOne<{ total: number }>(
+    const verifiedRow = await queryOpOne<{ total: number }>(req, 
       `SELECT COUNT(*) as total FROM user_coupons WHERE merchant_id = $1 AND status = 2`, [merchantId]
     );
 

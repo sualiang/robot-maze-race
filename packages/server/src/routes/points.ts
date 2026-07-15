@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { query, queryOne, execute } from '../config/database';
+import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import { grantExchangeCoupon } from '../services/coupon-service';
 
@@ -184,7 +184,7 @@ router.post('/mall/exchange', authMiddleware, async (req: Request, res: Response
     if (item.category === 1) {
       // 参赛抵扣 → 发放参赛抵扣券
       const couponId = uuidv4();
-      await execute(
+      await executeOp(req, 
         `INSERT INTO user_coupons (id, user_id, coupon_id, merchant_id, name, description,
                 denomination_cents, min_consume_cents, status, valid_start, valid_end,
                 coupon_type, created_at, updated_at)
@@ -199,7 +199,7 @@ router.post('/mall/exchange', authMiddleware, async (req: Request, res: Response
     } else if (item.category === 2) {
       // 到店满减券
       const couponId = uuidv4();
-      await execute(
+      await executeOp(req, 
         `INSERT INTO user_coupons (id, user_id, coupon_id, merchant_id, name, description,
                 denomination_cents, min_consume_cents, status, valid_start, valid_end,
                 coupon_type, created_at, updated_at)
@@ -214,7 +214,7 @@ router.post('/mall/exchange', authMiddleware, async (req: Request, res: Response
     } else if (item.category === 3) {
       // 实物兑换 → 创建兑换记录
       try {
-        await execute(
+        await executeOp(req, 
           `INSERT INTO ticket_redemptions (id, user_id, item_name, item_type, points_cost, status, created_at)
            VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
           [uuidv4(), userId, item.name, 'product', item.pointsCost, 'pending']
@@ -227,7 +227,7 @@ router.post('/mall/exchange', authMiddleware, async (req: Request, res: Response
     } else if (item.category === 4) {
       // 周边礼品 → 同实物兑换逻辑
       try {
-        await execute(
+        await executeOp(req, 
           `INSERT INTO ticket_redemptions (id, user_id, item_name, item_type, points_cost, status, created_at)
            VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
           [uuidv4(), userId, item.name, 'gift', item.pointsCost, 'pending']
@@ -271,7 +271,7 @@ router.post('/mall/exchange', authMiddleware, async (req: Request, res: Response
  */
 router.get('/shop', async (_req: Request, res: Response) => {
   try {
-    const items = await query<any>(
+    const items = await queryOp<any>(req, 
       `SELECT id, item_type, item_id, name, description, need_points,
               exchange_limit, sort_weight, status
        FROM point_shop
@@ -320,13 +320,13 @@ router.post('/redeem', authMiddleware, async (req: Request, res: Response) => {
 
     if (item_type === 'platform_coupon') {
       // item_id 是 point_shop 表的行 ID
-      item = await queryOne<any>(
+      item = await queryOpOne<any>(req, 
         `SELECT * FROM point_shop WHERE id = $1 AND item_type = 'platform_coupon' AND status = 1`,
         [item_id]
       );
     } else if (item_type === 'merchant_coupon') {
       // item_id 是 point_shop 表的行 ID
-      item = await queryOne<any>(
+      item = await queryOpOne<any>(req, 
         `SELECT * FROM point_shop WHERE id = $1 AND item_type = 'merchant_coupon' AND status = 1`,
         [item_id]
       );
@@ -416,7 +416,7 @@ router.post('/redeem', authMiddleware, async (req: Request, res: Response) => {
       // 商家消费券
       if (item.item_id) {
         // item_id 指向 merchant_coupons 表的记录 ID
-        const merchantCoupon = await queryOne<any>(
+        const merchantCoupon = await queryOpOne<any>(req, 
           `SELECT * FROM merchant_coupons WHERE id = $1 AND status = 1 AND audit_status = 2 AND remain_count > 0`,
           [item.item_id]
         );
@@ -432,7 +432,7 @@ router.post('/redeem', authMiddleware, async (req: Request, res: Response) => {
         }
 
         // 扣减商家券库存
-        await execute(
+        await executeOp(req, 
           `UPDATE merchant_coupons SET remain_count = remain_count - 1, updated_at = NOW()
            WHERE id = $1 AND remain_count > 0`,
           [merchantCoupon.id]
@@ -450,7 +450,7 @@ router.post('/redeem', authMiddleware, async (req: Request, res: Response) => {
           ? new Date(merchantCoupon.valid_end).toISOString()
           : new Date(Date.now() + 180 * 86400000).toISOString();
 
-        await execute(
+        await executeOp(req, 
           `INSERT INTO user_coupons (id, user_id, coupon_id, merchant_id, name, description,
                   denomination_cents, min_consume_cents, status, valid_start, valid_end,
                   coupon_type, extra_data, created_at, updated_at)
@@ -498,7 +498,7 @@ router.post('/redeem', authMiddleware, async (req: Request, res: Response) => {
  */
 router.get('/shop/merchant-coupons', async (_req: Request, res: Response) => {
   try {
-    const items = await query<any>(
+    const items = await queryOp<any>(req, 
       `SELECT ps.id, ps.name, ps.description, ps.need_points,
               ps.exchange_limit, ps.sort_weight, ps.status,
               mc.merchant_id, m.merchant_name, mc.denomination_cents,

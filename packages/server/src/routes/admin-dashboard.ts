@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { query, queryOne } from '../config/database';
+import { query, queryOne, queryOp, queryOpOne, executeOp } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import { checkPermission } from '../middleware/rbac';
 
@@ -16,31 +16,31 @@ const router = Router();
 router.get('/stats', authMiddleware, checkPermission('dashboard:read'), async (req: Request, res: Response) => {
   try {
     // 全平台营收
-    const revenueResult = await queryOne<{ total: string }>(
+    const revenueResult = await queryOpOne<{ total: string }>(req, 
       `SELECT COALESCE(SUM(amount_cents), 0) as total FROM payments WHERE status = 'paid'`
     );
     const totalRevenue = parseInt(revenueResult?.total || '0', 10);
 
     // 全平台订单数
-    const orderResult = await queryOne<{ total: string }>(
+    const orderResult = await queryOpOne<{ total: string }>(req, 
       `SELECT COUNT(*) as total FROM orders`
     );
     const totalOrders = parseInt(orderResult?.total || '0', 10);
 
     // 平台利润（所有结算的 commission 之和）
-    const profitResult = await queryOne<{ total: string }>(
+    const profitResult = await queryOpOne<{ total: string }>(req, 
       `SELECT COALESCE(SUM(commission_cents), 0) as total FROM settlements WHERE status = 'settled'`
     );
     const platformProfit = parseInt(profitResult?.total || '0', 10);
 
     // 待审核提现总额
-    const pendingResult = await queryOne<{ total: string }>(
+    const pendingResult = await queryOpOne<{ total: string }>(req, 
       `SELECT COALESCE(SUM(amount_cents), 0) as total FROM settlements WHERE status = 'pending'`
     );
     const pendingWithdraw = parseInt(pendingResult?.total || '0', 10);
 
     // 已提现总额
-    const withdrawnResult = await queryOne<{ total: string }>(
+    const withdrawnResult = await queryOpOne<{ total: string }>(req, 
       `SELECT COALESCE(SUM(amount_cents), 0) as total FROM settlements WHERE status = 'settled'`
     );
     const totalWithdrawn = parseInt(withdrawnResult?.total || '0', 10);
@@ -68,7 +68,7 @@ router.get('/stats', authMiddleware, checkPermission('dashboard:read'), async (r
 // ============================================================
 router.get('/revenue-breakdown', authMiddleware, checkPermission('dashboard:read'), async (req: Request, res: Response) => {
   try {
-    const breakdown = await query<any>(
+    const breakdown = await queryOp<any>(req, 
       `SELECT
          o.id as operator_id,
          o.name as operator_name,
@@ -108,7 +108,7 @@ router.get('/revenue-by-region', authMiddleware, checkPermission('dashboard:read
     const lastMonthEnd = lastOfLastMonth.toISOString().slice(0, 10);
 
     // 按运营商中的省字段分组
-    const regions = await query<any>(
+    const regions = await queryOp<any>(req, 
       `SELECT
          COALESCE(o.province, '未知') as province,
          COALESCE(SUM(CASE WHEN date(s.created_at) = $1 THEN s.amount_cents ELSE 0 END), 0) as yesterday_revenue,
@@ -135,7 +135,7 @@ router.get('/revenue-by-province/:province', authMiddleware, checkPermission('da
   try {
     const { province } = req.params;
 
-    const cities = await query<any>(
+    const cities = await queryOp<any>(req, 
       `SELECT
          COALESCE(o.city, '未知') as city,
          COALESCE(SUM(s.amount_cents), 0) as revenue,
@@ -164,7 +164,7 @@ router.get('/revenue-by-city/:city', authMiddleware, checkPermission('dashboard:
   try {
     const { city } = req.params;
 
-    const districts = await query<any>(
+    const districts = await queryOp<any>(req, 
       `SELECT
          COALESCE(o.district, '未知') as district,
          COALESCE(SUM(s.amount_cents), 0) as revenue,
@@ -209,7 +209,7 @@ router.get('/operator-detail/:operatorId', authMiddleware, checkPermission('dash
     }
 
     // 管理的赛场列表
-    const venues = await query<any>(
+    const venues = await queryOp<any>(req, 
       `SELECT id, name, address, status, created_at
        FROM venues WHERE operator_id = $1
        ORDER BY created_at DESC`,
@@ -217,7 +217,7 @@ router.get('/operator-detail/:operatorId', authMiddleware, checkPermission('dash
     );
 
     // 各赛场营收数据
-    const venueRevenue = await query<any>(
+    const venueRevenue = await queryOp<any>(req, 
       `SELECT
          v.id as venue_id,
          v.name as venue_name,
@@ -289,7 +289,7 @@ router.get('/top-operators', authMiddleware, checkPermission('dashboard:list'), 
       dateEnd = `${year}-${monthStr}-${lastDay}`;
     }
 
-    const countResult = await queryOne<{ count: number }>(
+    const countResult = await queryOpOne<{ count: number }>(req, 
       `SELECT COUNT(DISTINCT o.id) as count
        FROM operators o
        LEFT JOIN settlements s ON s.operator_id = o.id AND date(s.created_at) >= $1 AND date(s.created_at) <= $2`,
@@ -297,7 +297,7 @@ router.get('/top-operators', authMiddleware, checkPermission('dashboard:list'), 
     );
     const total = countResult?.count || 0;
 
-    const operators = await query<any>(
+    const operators = await queryOp<any>(req, 
       `SELECT
          o.id, o.name, o.phone, o.email, o.company_name,
          o.status, o.profit_share_rate, o.venue_count,
@@ -348,7 +348,7 @@ router.get('/region-revenue', authMiddleware, checkPermission('dashboard:read'),
 
     if (level === 'province') {
       // 按省份汇总运营商数量 + 营收统计（从 orders 聚合）
-      const rows = await query(
+      const rows = await queryOp(req, 
         `SELECT
            o.province as name,
            COUNT(*) as operator_count,
@@ -376,7 +376,7 @@ router.get('/region-revenue', authMiddleware, checkPermission('dashboard:read'),
       if (!province) {
         return res.status(400).json({ code: 400, message: '缺少 province 参数', data: null });
       }
-      const rows = await query(
+      const rows = await queryOp(req, 
         `SELECT
            o.city as name,
            COUNT(*) as operator_count,
@@ -405,7 +405,7 @@ router.get('/region-revenue', authMiddleware, checkPermission('dashboard:read'),
       if (!city) {
         return res.status(400).json({ code: 400, message: '缺少 city 参数', data: null });
       }
-      const rows = await query(
+      const rows = await queryOp(req, 
         `SELECT
            o.district as name,
            COUNT(*) as operator_count,
@@ -450,7 +450,7 @@ router.get('/region-revenue', authMiddleware, checkPermission('dashboard:read'),
         return res.status(400).json({ code: 400, message: '缺少 operator_id 参数', data: null });
       }
       // 查询该运营商旗下所有场馆产生的订单（待有订单数据后完善）
-      const rows = await query(
+      const rows = await queryOp(req, 
         `SELECT DATE(o.used_at) as date, COUNT(*) as order_count,
                 COALESCE(SUM(o.amount_cents), 0) as revenue_cents
          FROM orders o
