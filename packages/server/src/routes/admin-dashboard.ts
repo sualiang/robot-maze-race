@@ -472,4 +472,50 @@ router.get('/region-revenue', authMiddleware, checkPermission('dashboard:read'),
   }
 });
 
+// ============================================================
+// GET /api/v1/admin/dashboard/export
+// 数据导出（CSV/Excel）— dashboard:read
+// ============================================================
+router.get('/export', authMiddleware, checkPermission('dashboard:read'), async (req: Request, res: Response) => {
+  try {
+    const format = (req.query.format as string) || 'csv';
+
+    // 汇总统计
+    const revenueRow = await queryOpOne<{ total: string }>(req,
+      `SELECT COALESCE(SUM(amount_cents), 0) as total FROM payments WHERE status = 'paid'`
+    );
+    const orderRow = await queryOpOne<{ total: string }>(req,
+      `SELECT COUNT(*) as total FROM orders`
+    );
+    const profitRow = await queryOpOne<{ total: string }>(req,
+      `SELECT COALESCE(SUM(commission_cents), 0) as total FROM settlements WHERE status = 'settled'`
+    );
+
+    const totalRevenue = parseInt(revenueRow?.total || '0', 10);
+    const totalOrders = parseInt(orderRow?.total || '0', 10);
+    const platformProfit = parseInt(profitRow?.total || '0', 10);
+
+    if (format === 'csv') {
+      const csv = [
+        '指标,值',
+        `全平台营收(分),${totalRevenue}`,
+        `总订单数,${totalOrders}`,
+        `平台利润(分),${platformProfit}`,
+      ].join('\n');
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="dashboard-${new Date().toISOString().slice(0, 10)}.csv"`);
+      return res.send(csv);
+    }
+
+    return res.json({
+      code: 0,
+      message: 'ok',
+      data: { total_revenue: totalRevenue, total_orders: totalOrders, platform_profit: platformProfit },
+    });
+  } catch (error: any) {
+    console.error('[AdminDashboard] export error:', error.message);
+    return res.status(500).json({ code: 500, message: '导出失败', data: null });
+  }
+});
+
 export default router;

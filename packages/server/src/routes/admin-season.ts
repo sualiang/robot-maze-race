@@ -22,7 +22,7 @@ function adminMiddleware(req: Request, res: Response, next: Function): void {
  * GET /api/v1/admin/season/season
  * 获取赛季列表配置
  */
-router.get('/season', authMiddleware, adminMiddleware, async (_req: Request, res: Response) => {
+router.get('/', authMiddleware, adminMiddleware, async (_req: Request, res: Response) => {
   try {
     const seasons = await query<any>(
       `SELECT * FROM seasons ORDER BY sort_order ASC, created_at DESC`
@@ -54,7 +54,7 @@ router.get('/season', authMiddleware, adminMiddleware, async (_req: Request, res
  * POST /api/v1/admin/season/season
  * 创建赛季
  */
-router.post('/season', authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
+router.post('/', authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
   const { name, description, startTime, endTime, sortOrder } = req.body;
 
   if (!name) {
@@ -84,7 +84,7 @@ router.post('/season', authMiddleware, adminMiddleware, async (req: Request, res
  * PUT /api/v1/admin/season/season/:id
  * 更新赛季
  */
-router.put('/season/:id', authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
+router.put('/:id', authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
   const { id } = req.params;
   const { name, description, startTime, endTime, sortOrder, status } = req.body;
 
@@ -130,7 +130,7 @@ router.put('/season/:id', authMiddleware, adminMiddleware, async (req: Request, 
  * POST /api/v1/admin/season/season/:id/toggle
  * 开启/关闭赛季
  */
-router.post('/season/:id/toggle', authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
+router.post('/:id/activate', authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
   const { id } = req.params;
 
   try {

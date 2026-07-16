@@ -131,9 +131,9 @@ app.use('/api/v1/player', merchantRoutes);
 app.use('/api/v1/merchant/verify', merchantVerifyRoutes);
 app.use('/api/v1/operator', operatorMerchantRoutes);
 app.use('/api/v1/task', taskRoutes);
-app.use('/api/v1/admin/season', adminSeasonRoutes);
+app.use('/api/v1/admin/seasons', adminSeasonRoutes);
 app.use('/api/v1/admin/merchant', adminMerchantRoutes);
-app.use('/api/v1/admin/task', adminTaskRoutes);
+app.use('/api/v1/admin/tasks', adminTaskRoutes);
 
 // 参赛抵扣金
 import entryDeductionsRoutes from './routes/entry-deductions';

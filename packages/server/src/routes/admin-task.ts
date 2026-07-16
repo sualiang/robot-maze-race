@@ -21,7 +21,7 @@ function adminMiddleware(req: Request, res: Response, next: Function): void {
  * GET /api/v1/admin/task/list
  * 任务模板列表
  */
-router.get('/task/list', authMiddleware, adminMiddleware, async (_req: Request, res: Response) => {
+router.get('/', authMiddleware, adminMiddleware, async (_req: Request, res: Response) => {
   try {
     const tasks = await query<any>(
       `SELECT * FROM tasks ORDER BY sort_order ASC, created_at DESC`
@@ -55,7 +55,7 @@ router.get('/task/list', authMiddleware, adminMiddleware, async (_req: Request, 
  * POST /api/v1/admin/task/task
  * 新增任务模板
  */
-router.post('/task', authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
+router.post('/', authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
   const { name, description, taskType, targetValue, rewardType, rewardValue, sortOrder } = req.body;
 
   if (!name || !taskType || !rewardType) {
@@ -94,7 +94,7 @@ router.post('/task', authMiddleware, adminMiddleware, async (req: Request, res: 
  * PUT /api/v1/admin/task/task/:id
  * 编辑任务模板
  */
-router.put('/task/:id', authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
+router.put('/:id', authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
   const { id } = req.params;
   const { name, description, taskType, targetValue, rewardType, rewardValue, sortOrder, status } = req.body;
 
