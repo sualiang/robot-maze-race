@@ -903,28 +903,39 @@ router.get('/finance/export', authMiddleware, operatorOnly, async (req: Request,
   try {
     const operatorId = req.user!.operatorId;
 
+    // Step 1: queryOp 查 operator 库数据（不含 users JOIN）
     const rows = await queryOp<any>(req, 
       `SELECT
          DATE(rr.created_at) as date,
          v.name as venue_name,
          r.name as race_name,
-         u.nickname as player_name,
+         rr.player_id,
          o.amount_cents as amount,
          o.status
        FROM venues v
        JOIN races r ON r.venue_id = v.id
        JOIN race_records rr ON rr.race_id = r.id
-       JOIN users u ON rr.player_id = u.id
        LEFT JOIN orders o ON o.user_id = rr.player_id
        WHERE v.operator_id = $1
        ORDER BY rr.created_at DESC`,
       [operatorId]
     );
 
+    // Step 2: 从 common 库批量查 users 获取昵称
+    const userIds = [...new Set(rows.map((r: any) => r.player_id).filter(Boolean))];
+    const userMap = new Map<string, string>();
+    if (userIds.length > 0) {
+      const users = await query<any>(
+        `SELECT id, nickname FROM users WHERE id IN (${userIds.map((_, i) => '$' + (i + 1)).join(',')})`,
+        userIds
+      );
+      for (const u of users) userMap.set(u.id, u.nickname || '未知玩家');
+    }
+
     // Build CSV
     const header = 'Date,Venue,Race,Player,Amount,Status\n';
     const csvRows = rows.map((r: any) =>
-      `${r.date || ''},${r.venue_name || ''},${r.race_name || ''},${r.player_name || ''},${r.amount || 0},${r.status || ''}`
+      `${r.date || ''},${r.venue_name || ''},${r.race_name || ''},${userMap.get(r.player_id) || '未知玩家'},${r.amount || 0},${r.status || ''}`
     ).join('\n');
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');

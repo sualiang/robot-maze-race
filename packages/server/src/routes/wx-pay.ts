@@ -397,23 +397,21 @@ router.post('/notify', async (req: Request, res: Response) => {
         return res.json({ code: 'SUCCESS', message: 'OK' });
       }
 
-      await dbTransaction(async (tx: any) => {
-        // 更新订单状态
-        await tx.executeOp(req, 
-          `UPDATE orders SET status = 'paid', transaction_id = ?, paid_at = NOW(), updated_at = NOW() WHERE id = ? AND status = 'pending'`,
-          [transaction.transaction_id, order.id]
-        );
+      // 更新订单状态（operator 库，事务外）
+      await executeOp(req, 
+        `UPDATE orders SET status = 'paid', transaction_id = $1, paid_at = NOW(), updated_at = NOW() WHERE id = $2 AND status = 'pending'`,
+        [transaction.transaction_id, order.id]
+      );
 
-        // 记录支付流水
-        await tx.executeOp(req, 
-          `INSERT INTO payment_transactions (id, order_id, user_id, amount, transaction_id, payment_method, status, created_at)
-           VALUES (?, ?, (SELECT user_id FROM orders WHERE id = ?), ?, ?, 'wechat_pay', 'success', NOW())`,
-          [uuidv4(), order.id, order.id, order.amount, transaction.transaction_id]
-        );
+      // 记录支付流水（operator 库，事务外）
+      await executeOp(req, 
+        `INSERT INTO payment_transactions (id, order_id, user_id, amount, transaction_id, payment_method, status, created_at)
+         VALUES ($1, $2, (SELECT user_id FROM orders WHERE id = $3), $4, $5, 'wechat_pay', 'success', NOW())`,
+        [uuidv4(), order.id, order.id, order.amount, transaction.transaction_id]
+      );
 
-        // 处理参赛包发放（已有逻辑由原有 order 模块处理，此处只记录）
-        console.log('[WxPay] 支付成功:', outTradeNo, 'transaction_id:', transaction.transaction_id);
-      });
+      // 处理参赛包发放（已有逻辑由原有 order 模块处理，此处只记录）
+      console.log('[WxPay] 支付成功:', outTradeNo, 'transaction_id:', transaction.transaction_id);
     } else if (['CLOSED', 'PAYERROR', 'REVOKED'].includes(tradeState)) {
       await executeOp(req, 
         `UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = ? AND status = 'pending'`,
