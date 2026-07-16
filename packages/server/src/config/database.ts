@@ -65,7 +65,7 @@ function getCommonPool(): mysql.Pool {
   return commonPool;
 }
 
-function getOperatorPool(dbName: string): mysql.Pool {
+export function getOperatorPool(dbName: string): mysql.Pool {
   let pool = operatorPools.get(dbName);
   if (!pool) {
     pool = mysql.createPool({ ...getBaseOptions(), database: dbName });

@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import jwt from 'jsonwebtoken';
-import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../config/database';
+import { query, queryOne, execute, queryOp, queryOpOne, executeOp, getOperatorPool } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import { config } from '../config';
 import { createRefereeQRCode } from '../services/wechat-qrcode';
@@ -26,10 +26,8 @@ router.post('/invite', authMiddleware, async (req: Request, res: Response) => {
     const { phone, venue_id, note } = req.body;
     let operatorId = '';
     if (role === 'operator') {
-      const member = await queryOne<{ operator_id: string }>(
-        'SELECT operator_id FROM operator_members WHERE id = $1', [req.user!.userId]
-      );
-      operatorId = member?.operator_id || (req.user as any).operatorId || req.user!.userId;
+      // JWT 中 userId 和 operatorId 都是 operators.id
+      operatorId = (req.user as any).operatorId || req.user!.userId;
     }
     const inviteToken = uuidv4();
     const inviteId = uuidv4();
@@ -87,11 +85,11 @@ router.get('/invite/:inviteId', async (req: Request, res: Response) => {
     const param = req.params.inviteId;
     // Try invite_id first, then token (backward compat)
     let invite = await queryOne<{ id: string; operator_id: string; venue_id: string; status: string; expires_at: string; note: string }>(
-      'SELECT id, venue_id, status, expires_at, note FROM referee_invites WHERE id = $1', [param]
+      'SELECT id, operator_id, venue_id, status, expires_at, note FROM referee_invites WHERE id = $1', [param]
     );
     if (!invite) {
       invite = await queryOne<{ id: string; operator_id: string; venue_id: string; status: string; expires_at: string; note: string }>(
-        'SELECT id, venue_id, status, expires_at, note FROM referee_invites WHERE token = $1', [param]
+        'SELECT id, operator_id, venue_id, status, expires_at, note FROM referee_invites WHERE token = $1', [param]
       );
     }
     if (!invite) return res.status(404).json({ code: 404, message: '邀请链接无效', data: null });
@@ -162,10 +160,19 @@ router.post('/register', async (req: Request, res: Response) => {
         [userId, openid, name, phone, 'referee', nowStr, nowStr]);
     }
 
-    await executeOp(req, 
-      'INSERT INTO referees (id, user_id, name, phone, status, venue_id, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
-      [refereeId, userId, name, phone, 'approved', invite.venue_id || null, invite.operator_id || null, nowStr, nowStr]
+    // 注册路由无 auth，不能用 executeOp（需要 req 里有 operator context）
+    // 手动查 DB 名 → 获取 operator pool → 直接写入
+    const opDbName = invite.operator_id
+      ? (await queryOne<{ db_name: string }>('SELECT db_name FROM operators_registry WHERE operator_id = $1', [invite.operator_id]))?.db_name
+      : null;
+    if (!opDbName) return res.status(500).json({ code: 500, message: '运营商信息不完整', data: null });
+
+    const opPool = getOperatorPool(opDbName);
+    const [result] = await opPool.execute(
+      `INSERT INTO referees (id, operator_id, user_id, name, phone, status, venue_id, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)`,
+      [refereeId, invite.operator_id, userId, name, phone, 'approved', invite.venue_id || null, nowStr, nowStr]
     );
+    console.log('[RefereeInvite] INSERT referees result:', result);
     await execute('UPDATE referee_invites SET status=$1,updated_at=NOW() WHERE id=$2', ['used', invite.id]);
 
     // 签发 JWT token
