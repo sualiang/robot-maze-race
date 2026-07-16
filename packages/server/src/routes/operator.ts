@@ -58,7 +58,7 @@ router.post('/login', async (req: Request, res: Response) => {
 
     // 使用 bcrypt 验证密码
     const operator2 = await queryOne<{ password: string }>(
-      'SELECT operator_password as password FROM operators WHERE id = $1',
+      'SELECT operator_password_hash as password FROM operators WHERE id = $1',
       [operator.id]
     );
     const bcrypt = require('bcryptjs');
@@ -963,10 +963,10 @@ router.post('/profile/change-password', authMiddleware, async (req: Request, res
     // 查出运营商账号
     const operator = await queryOne<{
       id: string;
-      operator_password: string;
+      operator_password_hash: string;
       password_change_required: number;
     }>(
-      'SELECT id, operator_password, password_change_required FROM operators WHERE id = $1',
+      'SELECT id, operator_password_hash, password_change_required FROM operators WHERE id = $1',
       [userId]
     );
 
@@ -975,8 +975,8 @@ router.post('/profile/change-password', authMiddleware, async (req: Request, res
     }
 
     // 验证旧密码
-    if (operator.operator_password) {
-      if (!bcrypt.compareSync(oldPassword, operator.operator_password)) {
+    if (operator.operator_password_hash) {
+      if (!bcrypt.compareSync(oldPassword, operator.operator_password_hash)) {
         return res.status(401).json({ code: 401, message: '旧密码错误', data: null });
       }
     }
@@ -984,7 +984,7 @@ router.post('/profile/change-password', authMiddleware, async (req: Request, res
     // 更新密码
     const newHash = bcrypt.hashSync(newPassword, 10);
     await query(
-      `UPDATE operators SET operator_password = $1, password_change_required = 0,
+      `UPDATE operators SET operator_password_hash = $1, password_change_required = 0,
        updated_at = NOW() WHERE id = $2`,
       [newHash, userId]
     );
@@ -1036,10 +1036,10 @@ router.post('/change-password', authMiddleware, async (req: Request, res: Respon
     // 查出运营商账号
     const operator = await queryOne<{
       id: string;
-      operator_password: string;
+      operator_password_hash: string;
       password_change_required: number;
     }>(
-      'SELECT id, operator_password, password_change_required FROM operators WHERE id = $1',
+      'SELECT id, operator_password_hash, password_change_required FROM operators WHERE id = $1',
       [userId]
     );
 
@@ -1048,8 +1048,8 @@ router.post('/change-password', authMiddleware, async (req: Request, res: Respon
     }
 
     // 验证旧密码
-    if (operator.operator_password) {
-      if (!bcrypt.compareSync(oldPassword, operator.operator_password)) {
+    if (operator.operator_password_hash) {
+      if (!bcrypt.compareSync(oldPassword, operator.operator_password_hash)) {
         return res.status(401).json({ code: 401, message: '旧密码错误', data: null });
       }
     }
@@ -1057,7 +1057,7 @@ router.post('/change-password', authMiddleware, async (req: Request, res: Respon
     // 更新密码
     const newHash = bcrypt.hashSync(newPassword, 10);
     await query(
-      `UPDATE operators SET operator_password = $1, password_change_required = 0,
+      `UPDATE operators SET operator_password_hash = $1, password_change_required = 0,
        updated_at = NOW() WHERE id = $2`,
       [newHash, userId]
     );
