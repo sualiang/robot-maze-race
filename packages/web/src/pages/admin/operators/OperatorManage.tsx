@@ -495,7 +495,6 @@ export default function OperatorManage() {
             <Form.Item name="profit_share_rate" label="分润比例(%)" rules={[{ required: true }, { type: 'number', min: 0, max: 100, message: '分润比例应在0-100之间' }]}>
               <Select style={{ width: 160 }}
                 options={[50, 60, 70, 75, 80, 85, 90].map(v => ({ value: v, label: `${v}%` }))}
-                disabled
               />
             </Form.Item>
             {/* 状态字段已移除：新建时默认为 active */}
