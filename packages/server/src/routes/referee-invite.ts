@@ -27,7 +27,7 @@ router.post('/invite', authMiddleware, async (req: Request, res: Response) => {
     let operatorId = '';
     if (role === 'operator') {
       const member = await queryOne<{ operator_id: string }>(
-        'SELECT operator_id FROM operator_members WHERE id = ?', [req.user!.userId]
+        'SELECT operator_id FROM operator_members WHERE id = $1', [req.user!.userId]
       );
       operatorId = member?.operator_id || (req.user as any).operatorId || req.user!.userId;
     }
@@ -52,10 +52,10 @@ router.post('/invite', authMiddleware, async (req: Request, res: Response) => {
     }
 
     await execute(
-      `INSERT INTO referee_invites (id, phone, venue_id, token, note, status, scene_str, ticket, expires_at, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,'active',$7,$8,$9,$10,$11)`,
+      `INSERT INTO referee_invites (id, phone, venue_id, token, note, status, ticket, expires_at, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,'active',$7,$8,$9,$10)`,
       [inviteId, operatorId, phone || null, venue_id || null, inviteToken, note || null,
-       sceneStr || null, ticket || null, toStr(expiresAt), toStr(now), toStr(now)]
+       ticket || null, toStr(expiresAt), toStr(now), toStr(now)]
     );
 
     const baseUrl = process.env.BASE_URL || `https://${req.get('host')}`;
@@ -68,7 +68,7 @@ router.post('/invite', authMiddleware, async (req: Request, res: Response) => {
         token: inviteToken,
         invite_url: inviteUrl,
         qrcode_url: qrcodeUrl,
-        scene_str: sceneStr,
+
         expires_at: toStr(expiresAt),
       },
     });
@@ -101,8 +101,8 @@ router.get('/invite/:inviteId', async (req: Request, res: Response) => {
     }
     if (invite.status === 'used') return res.json({ code: 0, message: '邀请已被使用', data: { status: 'used', operator_name: '', venue_name: '', expires_at: invite.expires_at } });
     let operatorName = '', venueName = '';
-    if (invite.operator_id) { const op = await queryOne<{ name: string }>('SELECT name FROM operators WHERE id = ?', [invite.operator_id]); operatorName = op?.name || ''; }
-    if (invite.venue_id) { const v = await queryOpOne<{ name: string }>(req, 'SELECT name FROM venues WHERE id = ?', [invite.venue_id]); venueName = v?.name || ''; }
+    if (invite.operator_id) { const op = await queryOne<{ name: string }>('SELECT name FROM operators WHERE id = $1', [invite.operator_id]); operatorName = op?.name || ''; }
+    if (invite.venue_id) { const v = await queryOpOne<{ name: string }>(req, 'SELECT name FROM venues WHERE id = $1', [invite.venue_id]); venueName = v?.name || ''; }
     return res.json({ code: 0, message: 'ok', data: { id: invite.id, operator_id: invite.operator_id, operator_name: operatorName, venue_name: venueName, status: invite.status, expires_at: invite.expires_at, note: invite.note || '' } });
   } catch (error: any) {
     console.error('[RefereeInvite] get error:', error.message);
@@ -123,12 +123,12 @@ router.post('/register', async (req: Request, res: Response) => {
     if (!/^\d{11}$/.test(phone)) return res.status(400).json({ code: 400, message: '手机号格式不正确', data: null });
 
     // 支持 invite_id 或 token 查找邀请记录
-    let invite = await queryOne<{ id: string; operator_id: string; venue_id: string; status: string; expires_at: string; openid: string }>(
-      'SELECT id, venue_id, status, expires_at, openid FROM referee_invites WHERE id = $1', [lookupId]
+    let invite = await queryOne<{ id: string; operator_id: string; venue_id: string; status: string; expires_at: string }>(
+      'SELECT id, venue_id, status, expires_at FROM referee_invites WHERE id = $1', [lookupId]
     );
     if (!invite) {
-      invite = await queryOne<{ id: string; operator_id: string; venue_id: string; status: string; expires_at: string; openid: string }>(
-        'SELECT id, venue_id, status, expires_at, openid FROM referee_invites WHERE token = $1', [lookupId]
+      invite = await queryOne<{ id: string; operator_id: string; venue_id: string; status: string; expires_at: string }>(
+        'SELECT id, venue_id, status, expires_at FROM referee_invites WHERE token = $1', [lookupId]
       );
     }
     if (!invite) return res.status(400).json({ code: 400, message: '邀请链接无效', data: null });
@@ -139,18 +139,17 @@ router.post('/register', async (req: Request, res: Response) => {
     }
     if (invite.status === 'used') return res.status(400).json({ code: 400, message: '邀请链接已被使用', data: null });
 
-    // 同时查 referees 和 users 表（删除裁判后 users 表可能残留记录）
-    const existingReferee = await queryOpOne<{ id: string }>(req, 
-      `SELECT r.id FROM referees r WHERE r.phone = $1
-       UNION ALL
-       SELECT u.id FROM users u WHERE u.phone = $1 AND u.role = 'referee'`,
-      [phone]
-    );
-    if (existingReferee) return res.status(400).json({ code: 400, message: '该手机号已被注册为裁判', data: null });
+    // 查 referees 表（运营商库）和 users 表（公共库）
+    let existingRef = await queryOpOne<{ id: string }>(req, 'SELECT id FROM referees WHERE phone = $1', [phone]);
+    if (!existingRef) {
+      const existingUser = await queryOne<{ id: string }>('SELECT id FROM users WHERE phone = $1 AND role = $2', [phone, 'referee']);
+      if (existingUser) existingRef = existingUser;
+    }
+    if (existingRef) return res.status(400).json({ code: 400, message: '该手机号已被注册为裁判', data: null });
 
     const nowStr = now.toISOString().replace('T', ' ').substring(0, 19);
     const refereeId = uuidv4();
-    const openid = invite.openid || ('ref_invite_' + phone);
+    const openid = 'ref_invite_' + phone;
 
     let userId: string;
     const existingUser = await queryOne<{ id: string }>('SELECT id FROM users WHERE openid = $1', [openid]);
@@ -171,7 +170,7 @@ router.post('/register', async (req: Request, res: Response) => {
 
     // 签发 JWT token
     const token = jwt.sign(
-      { userId, openid: invite.openid || openid, role: 'referee' },
+      { userId, openid: openid, role: 'referee' },
       config.jwt.secret,
       { expiresIn: config.jwt.expiresIn as any }
     );
@@ -200,7 +199,7 @@ router.get('/invitations', authMiddleware, async (req: Request, res: Response) =
     const conditions: string[] = [];
     const params: any[] = [];
     if (role === 'operator') {
-      const m = await queryOne<{ operator_id: string }>('SELECT operator_id FROM operator_members WHERE id=?', [req.user!.userId]);
+      const m = await queryOne<{ operator_id: string }>('SELECT operator_id FROM operator_members WHERE id=$1', [req.user!.userId]);
       const opId = m?.operator_id || (req.user as any).operatorId || req.user!.userId;
             conditions.push(`operator_id = $${params.length}`);
     }
@@ -208,7 +207,7 @@ router.get('/invitations', authMiddleware, async (req: Request, res: Response) =
     const cnt = await queryOne<{ count: number }>(`SELECT COUNT(*) as count FROM referee_invites ${where}`, params);
     const total = cnt?.count || 0;
     const list = await query<any>(
-      `SELECT id, phone, venue_id, token, note, status, openid, scene_str, ticket, expires_at, created_at, updated_at FROM referee_invites ${where} ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      `SELECT id, phone, venue_id, token, note, status, ticket, expires_at, created_at, updated_at FROM referee_invites ${where} ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
       [...params, pageSize, offset]
     );
     const enriched = list.map((inv: any) => {
