@@ -375,6 +375,36 @@ CREATE TABLE IF NOT EXISTS merchants (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE INDEX idx_merchants_status ON merchants(status);
 
+-- ==================== 商家子账号表 ====================
+CREATE TABLE IF NOT EXISTS merchant_admin (
+  id VARCHAR(36) PRIMARY KEY,
+  merchant_id VARCHAR(36) NOT NULL,
+  username VARCHAR(64) NOT NULL,
+  password_hash VARCHAR(256) NOT NULL,
+  phone VARCHAR(20) DEFAULT '',
+  real_name VARCHAR(64) DEFAULT '',
+  status INT NOT NULL DEFAULT 1,
+  first_login INT NOT NULL DEFAULT 1,
+  last_login_time DATETIME,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX idx_merchant_admin_username ON merchant_admin(username);
+CREATE INDEX idx_merchant_admin_merchant ON merchant_admin(merchant_id);
+
+-- ==================== 商家邀请码表 ====================
+CREATE TABLE IF NOT EXISTS merchant_invite_codes (
+  id VARCHAR(36) PRIMARY KEY,
+  code VARCHAR(32) NOT NULL,
+  merchant_id VARCHAR(36) NOT NULL,
+  used INT NOT NULL DEFAULT 0,
+  used_by VARCHAR(36) DEFAULT '',
+  used_at DATETIME,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX idx_merchant_invite_codes_code ON merchant_invite_codes(code);
+CREATE INDEX idx_merchant_invite_codes_merchant ON merchant_invite_codes(merchant_id);
+
 -- ==================== 参赛抵扣金表 ====================
 CREATE TABLE IF NOT EXISTS entry_deductions (
   id VARCHAR(36) PRIMARY KEY,
