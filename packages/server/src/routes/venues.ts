@@ -148,9 +148,8 @@ router.post('/', authMiddleware, async (req: Request, res: Response<ApiResponse<
     );
     const defaultRate = parseInt(rateRow?.value || '80', 10);
 
-    // 获取 operator_id
-    const ctx = await getOperatorContext(req.user?.userId || '');
-    const operatorId = ctx?.operator_id || '';
+    // 获取 operator_id：优先从 req.user 的 JWT 中取，回退到 Redis
+    const operatorId = (req.user as any)?.operatorId || '';
 
     await executeOp(req, 
       `INSERT INTO venues (id, name, address, latitude, longitude, status,
@@ -452,9 +451,8 @@ router.get('/:id/qrcode', authMiddleware, async (req: Request, res: Response) =>
     const { id } = req.params;
     const userId = req.user!.userId;
     
-    // 通过请求上下文获取 operator，而非数据库列
-    const ctx = await getOperatorContext(userId);
-    const operatorId = ctx?.operator_id;
+    // 优先从 JWT 获取 operatorId，回退到 Redis
+    const operatorId = (req.user as any)?.operatorId || (await getOperatorContext(userId))?.operator_id;
     if (!operatorId) {
       return res.status(400).json({ code: 400, message: '无法获取运营商上下文', data: null });
     }

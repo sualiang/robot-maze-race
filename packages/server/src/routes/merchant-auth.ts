@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import * as bcrypt from 'bcryptjs';
+import { compareSync, hashSync } from '../config/bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config';
 import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../config/database';
@@ -29,11 +29,11 @@ declare global {
  * bcrypt 密码哈希 — 与 auth.ts / operator.ts 保持一致
  */
 function hashPassword(password: string): string {
-  return bcrypt.hashSync(password, 10);
+  return hashSync(password, 10);
 }
 
 function verifyPassword(password: string, hash: string): boolean {
-  return bcrypt.compareSync(password, hash);
+  return compareSync(password, hash);
 }
 
 /**

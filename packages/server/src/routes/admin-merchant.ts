@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import bcrypt from 'bcryptjs';
+import { hashSync } from '../config/bcrypt';
 import { query, queryOne, execute, generateSecurePassword, queryOp, queryOpOne, executeOp } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 
@@ -164,7 +164,7 @@ router.post('/', authMiddleware, anyPermissionMiddleware, async (req: Request, r
     console.log('[AdminMerchant] adminPhone:', adminPhone);
     if (adminPhone) {
       adminId = uuidv4();
-      const passwordHash = bcrypt.hashSync(adminPassword, 10);
+      const passwordHash = hashSync(adminPassword, 10);
       await executeOp(req, 
         `INSERT INTO merchant_admin (id, merchant_id, username, password_hash, phone, real_name, status, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, '', 1, NOW(), NOW())`,
@@ -419,7 +419,7 @@ router.post('/:id/reset-password', authMiddleware, operatorMiddleware, async (re
 
     // 生成新密码
     const newPassword = generateSecurePassword();
-    const passwordHash = bcrypt.hashSync(newPassword, 10);
+    const passwordHash = hashSync(newPassword, 10);
 
     if (!admin) {
       // 没有管理员：自动创建

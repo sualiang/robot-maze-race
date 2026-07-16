@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import * as bcrypt from 'bcryptjs';
+import { hashSync } from '../config/bcrypt';
 import { query, queryOne, generateSecurePassword } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 
@@ -139,7 +139,7 @@ router.post('/users', authMiddleware, async (req: Request, res: Response) => {
 
     // 生成随机密码 8位
     const plainPassword = generateSecurePassword();
-    const hashedPassword = bcrypt.hashSync(plainPassword, 10);
+    const hashedPassword = hashSync(plainPassword, 10);
     const id = uuidv4();
 
     await query(
@@ -199,7 +199,7 @@ router.put('/users/:id', authMiddleware, async (req: Request, res: Response) => 
     if (role_id !== undefined) { sets.push('role_id = $' + (params.length + 1)); params.push(role_id); }
     if (status !== undefined) { sets.push('status = $' + (params.length + 1)); params.push(status); }
     if (password) {
-      const hashed = bcrypt.hashSync(password, 10);
+      const hashed = hashSync(password, 10);
       sets.push('password = $' + (params.length + 1));
       params.push(hashed);
     }
@@ -295,7 +295,7 @@ router.post('/users/:id/reset-password', authMiddleware, async (req: Request, re
     }
 
     const plainPassword = generateSecurePassword();
-    const hashed = bcrypt.hashSync(plainPassword, 10);
+    const hashed = hashSync(plainPassword, 10);
     console.log('[AdminRBAC] reset password:', { id, username: existing.username });
     await query(
       `UPDATE admin_users SET password = $1, first_login = 1, updated_at = NOW() WHERE id = $2`,

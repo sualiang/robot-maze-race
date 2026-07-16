@@ -199,24 +199,10 @@ router.post('/', authMiddleware, checkPermission('operators:create'), async (req
       ]
     );
 
-    // 同步创建 admin_users 账号（运营商角色的 admin 角色）
-    const operatorAdminRoleId = 'role-admin';
-    const adminUserId = uuidv4();
-    await query(
-      `INSERT INTO admin_users (id, username, password, nickname, phone, role_id, operator_id, status, first_login)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [
-        adminUserId,
-        operatorUsername,
-        passwordHash,
-        name,
-        phone,
-        operatorAdminRoleId,
-        id,
-        'active',
-        0,
-      ]
-    );
+    // 运营商管理后台登录使用的是运营商端（operator login），不应该在 admin_users 中创建记录
+    // 之前这里错误地为运营商创建了 role-admin 权限的 admin_users 账号，
+    // 导致运营商可以用自己的手机号直接登录总部后台——严重安全漏洞
+    // 已删除此段代码（2026-07-17）
 
     // Card 4: 自动创建独立数据库 + 执行 schema
     const dbName = `op_${id}`;
@@ -485,7 +471,19 @@ router.delete('/:id', authMiddleware, checkPermission('operators:delete'), async
       await tx.query('DELETE FROM operators WHERE id = $1', [id]);
     });
 
-    // 4) 删除 operators_registry 记录 + DROP 运营商独立库（事务外）
+    // 4) 先读 registry 获取 db_name（删前快照），再删除 registry + DROP 运营商独立库（事务外）
+    let dbName = `op_${id}`; // fallback
+    try {
+      const regRow = await queryOne<{ db_name: string }>(
+        'SELECT db_name FROM operators_registry WHERE operator_id = $1',
+        [id]
+      );
+      if (regRow && regRow.db_name) {
+        dbName = regRow.db_name;
+      }
+    } catch (e: any) {
+      console.error('[AdminOperators] DROP: failed to read db_name from registry:', e.message);
+    }
     try {
       await execute('DELETE FROM operators_registry WHERE operator_id = $1', [id]);
     } catch (e: any) {
@@ -493,7 +491,6 @@ router.delete('/:id', authMiddleware, checkPermission('operators:delete'), async
     }
 
     // DROP DATABASE（raw connection，事务外，失败不影响主流程）
-    const dbName = `op_${id}`;
     try {
       const baseOpts = getBaseOptions();
       const adminConn = await mysql.createConnection({

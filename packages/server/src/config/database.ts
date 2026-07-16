@@ -76,6 +76,16 @@ function getOperatorPool(dbName: string): mysql.Pool {
 }
 
 export async function resolveOperatorDb(req: Request): Promise<string | null> {
+  // 优先从 JWT 获取 operatorId
+  const jwtOperatorId = (req.user as any)?.operatorId;
+  if (jwtOperatorId) {
+    const pool = getCommonPool();
+    const [rows] = await pool.query<any[]>(
+      `SELECT db_name FROM operators_registry WHERE operator_id = ?`, [jwtOperatorId]
+    );
+    return (rows && rows.length > 0 && rows[0].db_name) ? rows[0].db_name : null;
+  }
+  // 回退：从 Redis 获取
   const userId = req.user?.userId;
   if (!userId) return null;
   try {
@@ -233,12 +243,11 @@ export async function initSchema(): Promise<void> {
     const adminRoles = [
       ['role-super-admin', '超级管理员', '["*"]', 'admin'],
       ['role-admin', '总管理员', '["operators:read","operators:list","operators:create","operators:edit","operators:delete","players:list","dashboard:read","dashboard:list","marketing:read","finance:read","finance:withdraw","finance:history"]', 'admin'],
-      ['ops_admin', '运营管理员', '["operators:read","operators:create","operators:edit","players:list","dashboard:read","dashboard:list"]', 'admin'],
-      ['finance_admin', '财务管理员', '["finance:read","finance:withdraw","finance:history"]', 'admin'],
+      ['role-ops-admin', '运营管理', '["operators:read","operators:create","operators:edit","players:list","dashboard:read","dashboard:list"]', 'admin'],
+      ['role-finance-admin', '财务管理', '["finance:read","finance:withdraw","finance:history"]', 'admin'],
       ['op_super_admin', '运营商超管', '["*"]', 'operator'],
       ['op_admin', '运营', '["venues:read","venues:create","venues:edit","referees:read","referees:create","referees:edit","packages:read","packages:create","packages:edit","marketing:read","marketing:create","marketing:edit","players:read","dashboard:read"]', 'operator'],
       ['op_finance', '财务', '["finance:read","finance:withdraw","finance:history","dashboard:read"]', 'operator'],
-      ['op_support', '客服', '["players:read","referees:read","venues:read","marketing:read","dashboard:read","rbac:read"]', 'operator'],
     ];
     for (const [name, label, permissions, scope] of adminRoles) {
       await conn.execute(
@@ -283,35 +292,35 @@ export async function initSchema(): Promise<void> {
         }
       }
     }
+  } catch (e: any) {
+    console.warn('[DB] Auto-heal warning:', e.message?.substring(0, 100));
+  }
 
-    // 修正 ebf89164 的库名：下划线 → 连字符
-    const [badRows] = await conn.execute<any[]>(
-      `SELECT id, db_name FROM operators_registry WHERE db_name LIKE '%op_%' AND db_name LIKE '%\\_%' AND db_name NOT LIKE '%-%'`
-    );
-    for (const row of badRows || []) {
-      const fixed = row.db_name.replace(/_/g, '-');
-      // 检查新库名是否已存在
-      const [existing] = await conn.execute<any[]>(
-        `SELECT id FROM operators_registry WHERE db_name = ?`,
-        [fixed]
+  // ===== 补全现有运营商库中缺失的表（re-run operator.sql） =====
+  try {
+    const schemaPath = path.join(__dirname, '../db/operator.sql');
+    if (!fs.existsSync(schemaPath)) {
+      console.warn('[DB] operator.sql not found, skipping table completeness check');
+    } else {
+      const [allRegistry] = await conn.execute<any[]>(
+        `SELECT db_name, operator_id FROM operators_registry WHERE db_name IS NOT NULL`
       );
-      if (existing && (existing as any[]).length === 0) {
-        // DROP union 的下划线孤儿库
-        try {
-          const baseOpts = getBaseOptions();
-          const adminConn = await mysql.createConnection({ host: baseOpts.host, port: baseOpts.port, user: baseOpts.user, password: baseOpts.password, charset: baseOpts.charset });
-          await adminConn.execute(`DROP DATABASE IF EXISTS \`${row.db_name}\``);
-          await adminConn.end();
-          console.log(`[DB]  Dropped orphan DB: ${row.db_name}`);
-        } catch (e: any) {
-          console.warn(`[DB]  Could not drop old DB ${row.db_name}:`, e.message);
+      if (allRegistry && allRegistry.length > 0) {
+        console.log(`[DB] Checking ${allRegistry.length} operator DB(s) for missing tables...`);
+        let fixedCount = 0;
+        for (const reg of allRegistry) {
+          try {
+            const pool = getOperatorPool(reg.db_name);
+            await runSqlFile(pool, schemaPath);
+          } catch (e: any) {
+            console.warn(`[DB]  Table completeness check failed for ${reg.db_name}:`, e.message?.substring(0, 100));
+          }
         }
-        await conn.execute(`UPDATE operators_registry SET db_name = ? WHERE id = ?`, [fixed, row.id]);
-        console.log(`[DB]  Fixed db_name: ${row.db_name} → ${fixed}`);
+        if (fixedCount > 0) console.log(`[DB]  Table completeness check done`);
       }
     }
   } catch (e: any) {
-    console.warn('[DB] Auto-heal warning:', e.message?.substring(0, 100));
+    console.warn('[DB] Table completeness check warning:', e.message?.substring(0, 100));
   }
 
   // ===== 补全现有运营商库中缺失的表（re-run operator.sql） =====

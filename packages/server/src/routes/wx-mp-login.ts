@@ -11,7 +11,7 @@
  */
 import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import * as bcrypt from 'bcryptjs';
+import { compareSync, hashSync } from '../config/bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config';
 import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../config/database';

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
+import { compareSync, hashSync } from '../config/bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config';
 import { query, queryOne, execute, generateSecurePassword, queryOp, queryOpOne, executeOp } from '../config/database';
@@ -61,8 +61,8 @@ router.post('/login', async (req: Request, res: Response) => {
       'SELECT operator_password_hash as password FROM operators WHERE id = $1',
       [operator.id]
     );
-    const bcrypt = require('bcryptjs');
-    if (!operator2 || !operator2.password || !bcrypt.compareSync(password, operator2.password)) {
+    const { compareSync } = require('../config/bcrypt');
+    if (!operator2 || !operator2.password || !compareSync(password, operator2.password)) {
       return res.status(401).json({ code: 401, message: '手机号或密码错误', data: null });
     }
 
@@ -129,7 +129,7 @@ router.post('/login', async (req: Request, res: Response) => {
  * 定义运营商预置角色
  */
 // 运营商角色列表（启动时从数据库加载）
-let OPERATOR_ROLES: Array<{ key: string; name: string; permissions: string[] }> = [];
+let OPERATOR_ROLES: Array<{ key: string; name: string; label: string; permissions: string[] }> = [];
 
 /**
  * GET /api/v1/operator/rbac/roles
@@ -137,18 +137,16 @@ let OPERATOR_ROLES: Array<{ key: string; name: string; permissions: string[] }> 
  */
 router.get('/rbac/roles', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
-    // 运营商后台看到其可分配的角色：scope='operator' 或 scope='admin' 中非 super_admin 的角色
-    // HEX(name/label) 绕过 mysql2 连接池 encoding 损坏 bug，JS 层 Buffer.from 解码
     const rows = await query<any>(
-      `SELECT id AS \`key\`, HEX(name) AS name_hex, HEX(label) AS label_hex, permissions FROM admin_roles WHERE scope = 'operator' ORDER BY name ASC`
+      `SELECT id AS \`key\`, name, label, permissions FROM admin_roles WHERE scope = 'operator' ORDER BY name ASC`
     );
     const result = rows.map((r: any) => {
       let perms: string[] = [];
       try { perms = typeof r.permissions === 'object' ? r.permissions : JSON.parse(r.permissions); } catch(e) { perms = []; }
       return {
         key: r.key,
-        name: r.name_hex ? Buffer.from(r.name_hex, 'hex').toString('utf8') : '',
-        label: r.label_hex ? Buffer.from(r.label_hex, 'hex').toString('utf8') : '',
+        name: r.name || '',
+        label: r.label || '',
         permissions: perms,
       };
     });
@@ -194,9 +192,8 @@ router.get('/rbac/users', authMiddleware, operatorOnly, async (req: Request, res
     const total = countResult?.count || 0;
 
     // 分页数据（不返回 password）
-    // HEX(name) 绕过 mysql2 连接池 encoding 损坏 bug，JS 层 Buffer.from 解码
     const users = await query<any>(
-      `SELECT au.id, HEX(au.nickname) AS name_hex, au.phone,
+      `SELECT au.id, au.nickname, au.phone,
               au.role_id as role_key, COALESCE(arr.label, '') as role_name, au.status, au.created_at
        FROM operator_members au
        LEFT JOIN admin_roles arr ON au.role_id = arr.name
@@ -209,23 +206,14 @@ router.get('/rbac/users', authMiddleware, operatorOnly, async (req: Request, res
     // 映射角色名
     const roleMap: Record<string, string> = {};
     for (const r of OPERATOR_ROLES) {
-      roleMap[r.key] = r.name;
+      roleMap[r.key] = r.label || r.name;
     }
 
-    const list = users.map((u: any) => {
-      let nameStr = '';
-      try {
-        if (u.name_hex) {
-          nameStr = Buffer.from(u.name_hex, 'hex').toString('utf8');
-        }
-      } catch { nameStr = u.name_hex || ''; }
-      return {
-        ...u,
-        username: nameStr,
-        nickname: nameStr,
-        role_name: roleMap[u.role_key] || u.role_key,
-      };
-    });
+    const list = users.map((u: any) => ({
+      ...u,
+      username: u.nickname || '',
+      role_name: roleMap[u.role_key] || u.role_key,
+    }));
 
     return res.json({ code: 0, message: 'ok', data: { list, total, page, pageSize } });
   } catch (error: any) {
@@ -267,7 +255,7 @@ router.post('/rbac/users', authMiddleware, operatorOnly, async (req: Request, re
 
     // 生成随机密码（含大写、小写、数字，10位）
     const plainPassword = generateSecurePassword();
-    const hashedPassword = bcrypt.hashSync(plainPassword, 10);
+    const hashedPassword = hashSync(plainPassword, 10);
     const id = uuidv4();
 
     await execute(
@@ -280,11 +268,9 @@ router.post('/rbac/users', authMiddleware, operatorOnly, async (req: Request, re
     let roleLabel = '';
     let rolePermissions: string[] = [];
     try {
-      const roleInfo = await queryOne<any>('SELECT name, HEX(label) AS label_hex, permissions FROM admin_roles WHERE id = $1', [role_key]);
+      const roleInfo = await queryOne<any>('SELECT name, label, permissions FROM admin_roles WHERE id = $1', [role_key]);
       if (roleInfo) {
-        const label = roleInfo.label_hex ? Buffer.from(roleInfo.label_hex, 'hex').toString('utf8') : '';
-        const labelShort: Record<string, string> = { ops_admin: '运营', finance_admin: '财务' };
-        roleLabel = labelShort[roleInfo.name] || label || '';
+        roleLabel = roleInfo.label || roleInfo.name || '';
         rolePermissions = roleInfo.permissions || [];
       }
     } catch {}
@@ -430,7 +416,7 @@ router.post('/rbac/users/:id/reset-password', authMiddleware, operatorOnly, asyn
     }
 
     const plainPassword = generateSecurePassword();
-    const hashed = bcrypt.hashSync(plainPassword, 10);
+    const hashed = hashSync(plainPassword, 10);
     await execute(
       `UPDATE operator_members SET password = $1, updated_at = NOW() WHERE id = $2`,
       [hashed, id]
@@ -987,13 +973,13 @@ router.post('/profile/change-password', authMiddleware, async (req: Request, res
 
     // 验证旧密码
     if (operator.operator_password_hash) {
-      if (!bcrypt.compareSync(oldPassword, operator.operator_password_hash)) {
+      if (!compareSync(oldPassword, operator.operator_password_hash)) {
         return res.status(401).json({ code: 401, message: '旧密码错误', data: null });
       }
     }
 
     // 更新密码
-    const newHash = bcrypt.hashSync(newPassword, 10);
+    const newHash = hashSync(newPassword, 10);
     await query(
       `UPDATE operators SET operator_password_hash = $1, password_change_required = 0,
        updated_at = NOW() WHERE id = $2`,
@@ -1060,13 +1046,13 @@ router.post('/change-password', authMiddleware, async (req: Request, res: Respon
 
     // 验证旧密码
     if (operator.operator_password_hash) {
-      if (!bcrypt.compareSync(oldPassword, operator.operator_password_hash)) {
+      if (!compareSync(oldPassword, operator.operator_password_hash)) {
         return res.status(401).json({ code: 401, message: '旧密码错误', data: null });
       }
     }
 
     // 更新密码
-    const newHash = bcrypt.hashSync(newPassword, 10);
+    const newHash = hashSync(newPassword, 10);
     await query(
       `UPDATE operators SET operator_password_hash = $1, password_change_required = 0,
        updated_at = NOW() WHERE id = $2`,
@@ -1147,14 +1133,13 @@ router.get('/settings', authMiddleware, async (req: Request, res: Response) => {
 // 初始化：从数据库加载运营商角色列表
 async function initOperatorRoles() {
   try {
-    // HEX 绕过 mysql2 encoding 损坏 bug
     const rows = await query<any>(
-      `SELECT id AS \`key\`, HEX(label) AS name_hex, HEX(label) AS label_hex, permissions FROM admin_roles WHERE scope = 'operator' ORDER BY name ASC`
+      `SELECT id AS \`key\`, name, label, permissions FROM admin_roles WHERE scope = 'operator' ORDER BY name ASC`
     );
     OPERATOR_ROLES = rows.map((r: any) => ({
       key: r.key,
-      name: r.name_hex ? Buffer.from(r.name_hex, 'hex').toString('utf8') : '',
-      label: r.label_hex ? Buffer.from(r.label_hex, 'hex').toString('utf8') : '',
+      name: r.name || '',
+      label: r.label || '',
       permissions: (() => { try { return typeof r.permissions === 'object' ? r.permissions : JSON.parse(r.permissions); } catch(e) { return []; } })()
     }));
     console.log('[Operator] 已加载', OPERATOR_ROLES.length, '个运营商角色');

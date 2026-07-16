@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import * as bcrypt from 'bcryptjs';
+import { compareSync, hashSync } from '../config/bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config';
 import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../config/database';
@@ -233,7 +233,10 @@ router.post('/admin-login', async (req: Request, res: Response) => {
 
     // 使用 bcrypt 验证密码
     console.log('[AUTH-D] body password:', JSON.stringify(password), 'type:', typeof password, 'len:', password.length);
-    if (!bcrypt.compareSync(password, user.password)) {
+    console.log('[AUTH-D] db password hash:', user.password?.substring(0, 15), '... len:', user.password?.length, 'starts2b:', user.password?.startsWith?.('$2b$'));
+    const cmpResult = compareSync(password, user.password);
+    console.log('[AUTH-D] compareSync result:', cmpResult);
+    if (!cmpResult) {
       return res.status(401).json({ code: 401, message: '用户名或密码错误', data: null });
     }
 
@@ -354,7 +357,7 @@ router.post('/operator-login', async (req: Request, res: Response) => {
       return res.status(403).json({ code: 403, message: '账号已被禁用', data: null });
     }
 
-    if (!bcrypt.compareSync(password, member.password)) {
+    if (!compareSync(password, member.password)) {
       return res.status(401).json({ code: 401, message: '手机号或密码错误', data: null });
     }
 
@@ -461,7 +464,7 @@ router.post('/login', async (req: Request, res: Response) => {
         return res.status(401).json({ code: 401, message: '密码未设置，请联系管理员', data: null });
       }
 
-      if (!bcrypt.compareSync(password, operator.operator_password_hash)) {
+      if (!compareSync(password, operator.operator_password_hash)) {
         return res.status(401).json({ code: 401, message: '用户名或密码错误', data: null });
       }
 
@@ -539,7 +542,7 @@ router.post('/login', async (req: Request, res: Response) => {
         return res.status(403).json({ code: 403, message: '账号已被禁用', data: null });
       }
 
-      if (!bcrypt.compareSync(password, member.password)) {
+      if (!compareSync(password, member.password)) {
         return res.status(401).json({ code: 401, message: '手机号或密码错误', data: null });
       }
 
@@ -997,12 +1000,12 @@ router.post('/admin/change-password', authMiddleware, async (req: Request, res: 
       }
 
       // 验证旧密码
-      if (!bcrypt.compareSync(oldPassword, userRecord.password)) {
+      if (!compareSync(oldPassword, userRecord.password)) {
         return res.status(401).json({ code: 401, message: '旧密码错误', data: null });
       }
 
       // 更新密码，清除首次登录标记
-      const hashedPassword = bcrypt.hashSync(newPassword, 10);
+      const hashedPassword = hashSync(newPassword, 10);
       const now2 = new Date();
       const mysqlDt2 = now2.getFullYear() + '-' +
         String(now2.getMonth() + 1).padStart(2, '0') + '-' +
@@ -1029,12 +1032,12 @@ router.post('/admin/change-password', authMiddleware, async (req: Request, res: 
     }
 
     // 验证旧密码
-    if (!bcrypt.compareSync(oldPassword, admin.password)) {
+    if (!compareSync(oldPassword, admin.password)) {
       return res.status(401).json({ code: 401, message: '旧密码错误', data: null });
     }
 
     // 更新密码，并清除首次登录标记
-    const hashedPassword = bcrypt.hashSync(newPassword, 10);
+    const hashedPassword = hashSync(newPassword, 10);
     const now = new Date();
     const mysqlDatetime = now.getFullYear() + '-' +
       String(now.getMonth() + 1).padStart(2, '0') + '-' +
@@ -1127,7 +1130,7 @@ router.post('/admin/first-login-setup', authMiddleware, async (req: Request, res
       params.push(username);
     }
     if (password) {
-      const hashed = bcrypt.hashSync(password, 10);
+      const hashed = hashSync(password, 10);
       sets.push('password = $' + (params.length + 1));
       params.push(hashed);
     }
@@ -1188,11 +1191,11 @@ router.post('/member/change-password', authMiddleware, async (req: Request, res:
       isOperatorSuperAdmin = true;
     }
 
-    if (!bcrypt.compareSync(oldPassword, user.password)) {
+    if (!compareSync(oldPassword, user.password)) {
       return res.status(401).json({ code: 401, message: '旧密码错误', data: null });
     }
 
-    const hashedPassword = bcrypt.hashSync(newPassword, 10);
+    const hashedPassword = hashSync(newPassword, 10);
 
     if (isOperatorSuperAdmin) {
       // 运营商超管 → 更新 operators 表
@@ -1295,7 +1298,7 @@ router.post('/register', async (req: Request, res: Response) => {
     }
 
     const userId = uuidv4();
-    const hash = password ? bcrypt.hashSync(password, 10) : '';
+    const hash = password ? hashSync(password, 10) : '';
     const displayName = nickname || '玩家_' + phone.slice(-4);
 
     await query(
