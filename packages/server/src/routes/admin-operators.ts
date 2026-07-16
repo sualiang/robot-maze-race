@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
-import { query, queryOne, queryOp, queryOpOne, executeOp, execute, transaction, generateSecurePassword, createOperatorDatabase, getBaseOptions } from '../config/database';
+import { query, queryOne, queryOp, queryOpOne, executeOp, execute, transaction, generateSecurePassword, createOperatorDatabase, getBaseOptions, closeOperatorPool } from '../config/database';
 import mysql from 'mysql2/promise';
 import { authMiddleware } from '../middleware/auth';
 import { checkPermission } from '../middleware/rbac';
@@ -493,6 +493,7 @@ router.delete('/:id', authMiddleware, checkPermission('operators:delete'), async
     }
 
     // DROP DATABASE（raw connection，事务外，失败不影响主流程）
+    const dbName = `op_${id}`;
     try {
       const baseOpts = getBaseOptions();
       const adminConn = await mysql.createConnection({
@@ -503,11 +504,13 @@ router.delete('/:id', authMiddleware, checkPermission('operators:delete'), async
         charset: baseOpts.charset,
       });
       try {
-        await adminConn.execute(`DROP DATABASE IF EXISTS \`op_${id}\``);
-        console.log(`[AdminOperators] Dropped operator DB: op_${id}`);
+        await adminConn.execute(`DROP DATABASE IF EXISTS \`${dbName}\``);
+        console.log(`[AdminOperators] Dropped operator DB: ${dbName}`);
       } finally {
         await adminConn.end();
       }
+      // 关闭连接池
+      await closeOperatorPool(dbName);
     } catch (e: any) {
       console.error('[AdminOperators] DROP DATABASE error (operator data already deleted):', e.message);
     }

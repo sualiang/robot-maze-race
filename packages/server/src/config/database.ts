@@ -313,6 +313,33 @@ export async function initSchema(): Promise<void> {
   } catch (e: any) {
     console.warn('[DB] Auto-heal warning:', e.message?.substring(0, 100));
   }
+
+  // ===== 补全现有运营商库中缺失的表（re-run operator.sql） =====
+  try {
+    const schemaPath = path.join(__dirname, '../db/operator.sql');
+    if (!fs.existsSync(schemaPath)) {
+      console.warn('[DB] operator.sql not found, skipping table completeness check');
+    } else {
+      const [allRegistry] = await conn.execute<any[]>(
+        `SELECT db_name, operator_id FROM operators_registry WHERE db_name IS NOT NULL`
+      );
+      if (allRegistry && allRegistry.length > 0) {
+        console.log(`[DB] Checking ${allRegistry.length} operator DB(s) for missing tables...`);
+        let fixedCount = 0;
+        for (const reg of allRegistry) {
+          try {
+            const pool = getOperatorPool(reg.db_name);
+            await runSqlFile(pool, schemaPath);
+          } catch (e: any) {
+            console.warn(`[DB]  Table completeness check failed for ${reg.db_name}:`, e.message?.substring(0, 100));
+          }
+        }
+        if (fixedCount > 0) console.log(`[DB]  Table completeness check done`);
+      }
+    }
+  } catch (e: any) {
+    console.warn('[DB] Table completeness check warning:', e.message?.substring(0, 100));
+  }
 }
 
 async function runSqlFile(pool: mysql.Pool, filePath: string): Promise<void> {
@@ -323,7 +350,10 @@ async function runSqlFile(pool: mysql.Pool, filePath: string): Promise<void> {
   const stmts = sql.split(';').map(s => s.trim()).filter(s => s.length > 0 && !s.startsWith('/*'));
   for (const stmt of stmts) {
     try { await pool.execute(stmt); }
-    catch (e: any) { if (!e.message?.includes('already exists')) console.warn('[DB] Schema warning:', e.message?.substring(0, 120)); }
+    catch (e: any) {
+      const short = stmt.substring(0, 80).replace(/\s+/g, ' ');
+      console.error(`[DB] SQL error in ${path.basename(filePath)} at "${short}...":`, e.message?.substring(0, 150));
+    }
   }
 }
 
@@ -346,6 +376,16 @@ export async function closeAllPools(): Promise<void> {
   if (commonPool) { await commonPool.end(); commonPool = null; }
   for (const [n, p] of operatorPools) { await p.end(); }
   operatorPools.clear();
+}
+
+/** 关闭并移除单个运营商的连接池 */
+export async function closeOperatorPool(dbName: string): Promise<void> {
+  const pool = operatorPools.get(dbName);
+  if (pool) {
+    try { await pool.end(); } catch { /* ignore */ }
+    operatorPools.delete(dbName);
+    console.log('[DB] Operator pool closed:', dbName);
+  }
 }
 
 export function generateSecurePassword(length = 12): string {
