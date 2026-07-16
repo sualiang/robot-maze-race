@@ -599,8 +599,8 @@ router.post('/login', async (req: Request, res: Response) => {
       return res.status(400).json({ code: 400, message: '缺少手机号或密码', data: null });
     }
 
-    // 检查是否是裁判手机号
-    const refereePhone = await queryOne<{ id: string; phone: string; nickname: string }>( 
+    // 检查是否是裁判手机号（referees 在 operator 库）
+    const refereePhone = await queryOpOne<{ id: string; phone: string; nickname: string }>(req,
       'SELECT id, phone, name FROM referees WHERE phone = $1',
       [phone]
     );

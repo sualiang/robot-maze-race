@@ -160,7 +160,7 @@ function escapeCsvField(value: any): string {
  */
 router.get('/export', authMiddleware, checkPermission('players:list'), async (req: Request, res: Response) => {
   try {
-    const players = await queryOp<any>(req, 
+    const players = await query<any>(
       `SELECT p.* FROM player_profiles p ORDER BY p.created_at DESC LIMIT 5000`
     );
     // Render simple CSV and return

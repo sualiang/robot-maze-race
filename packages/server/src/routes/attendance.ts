@@ -29,12 +29,13 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
     const conditions: string[] = [];
     const params: any[] = [];
 
-    // Operator isolation: non-admin sees only own data
+    // Operator isolation
     if (req.user?.role !== 'admin') {
       const opId = (req.user as any)?.operatorId || '';
       if (opId) {
         conditions.push('a.operator_id = $' + (params.length + 1));
-              }
+        params.push(opId);
+      }
     }
 
     if (venue_id) {
@@ -56,6 +57,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
 
     const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
 
+    // Step 1: operator 库查 attendance + venues
     const countResult = await queryOpOne<{ count: string }>(req, 
       `SELECT COUNT(*) as count FROM attendance a ${whereClause}`,
       params.length > 0 ? params : undefined
@@ -66,10 +68,8 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
       `SELECT a.id, a.referee_id, a.user_id, a.venue_id,
               a.checkin_at, a.checkout_at,
               a.created_at,
-              u.nickname as user_nickname,
               v.name as venue_name
        FROM attendance a
-       LEFT JOIN users u ON u.id = a.user_id
        LEFT JOIN venues v ON v.id = a.venue_id
        ${whereClause}
        ORDER BY a.checkin_at DESC
@@ -77,15 +77,26 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
       [...params, pageSize, offset]
     );
 
+    // Step 2: common 库补查 users
+    const userIds = [...new Set(records.map((r: any) => r.user_id).filter(Boolean))];
+    const userMap = new Map<string, string>();
+    if (userIds.length > 0) {
+      const users = await query<any>(
+        `SELECT id, nickname FROM users WHERE id IN (${userIds.map((_, i) => '$' + (i + 1)).join(',')})`,
+        userIds
+      );
+      for (const u of users) userMap.set(u.id, u.nickname || '');
+    }
+
+    const list = records.map((r: any) => ({
+      ...r,
+      user_nickname: userMap.get(r.user_id) || '',
+    }));
+
     return res.json({
       code: 0,
       message: 'ok',
-      data: {
-        list: records,
-        total,
-        page,
-        pageSize,
-      },
+      data: { list, total, page, pageSize },
     });
   } catch (error: any) {
     console.error('[Attendance] list error:', error.message);
@@ -99,7 +110,6 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
  */
 router.get('/stats', authMiddleware, async (req: Request, res: Response) => {
   try {
-    // Operator filter
     let opFilter = '';
     let opParams: any[] = [];
     if (req.user?.role !== 'admin') {
@@ -110,19 +120,16 @@ router.get('/stats', authMiddleware, async (req: Request, res: Response) => {
       }
     }
 
-    // 总人次
     const totalRecords = await queryOpOne<{ count: string }>(req, 
       `SELECT COUNT(*) as count FROM attendance a${opFilter}`,
       opParams.length > 0 ? opParams : undefined
     );
 
-    // 今日签到人次
     const todayRecords = await queryOpOne<{ count: string }>(req, 
       `SELECT COUNT(*) as count FROM attendance a WHERE date(a.checkin_at) = CURDATE()${opFilter ? ' AND a.operator_id = $1' : ''}`,
       opParams.length > 0 ? opParams : undefined
     );
 
-    // 各赛场分布
     const venueDistribution = await queryOp<{
       venue_id: string;
       venue_name: string;
