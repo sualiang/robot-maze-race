@@ -407,7 +407,7 @@ router.post('/:id/reset-password', authMiddleware, async (req: Request, res: Res
 
     // 尝试更新 admin_users（可能没有 operator_id 关联，改用 operator_username 匹配）
     const adminUser = await queryOne<{ id: string }>(
-      'SELECT id FROM admin_users WHERE operator_id = ? OR username = $2 ORDER BY created_at ASC LIMIT 1',
+      'SELECT id FROM admin_users WHERE operator_id = $1 OR username = $2 ORDER BY created_at ASC LIMIT 1',
       [id, operator.operator_username]
     );
     if (adminUser) {
