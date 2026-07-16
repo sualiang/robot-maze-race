@@ -889,6 +889,18 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
        (req.user as any)?.operatorId || '']
     );
 
+    // P0: 下单成功后自动创建结算记录
+    const operatorId = (req.user as any)?.operatorId || '';
+    try {
+      await queryOp(req,
+        `INSERT INTO settlements (id, operator_id, order_id, amount_cents, commission_cents, status, created_at)
+         VALUES ($1, $2, $3, $4, 0, 'pending', NOW())`,
+        [uuidv4(), operatorId, orderId, pkg.price_cents]
+      );
+    } catch (e: any) {
+      console.warn('[订单] settlements创建失败:', e.message?.substring(0, 100));
+    }
+
     // 购买参赛包后，更新用户参赛次数
     if (pkg.race_count > 0) {
       try {
