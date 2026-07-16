@@ -256,4 +256,50 @@ router.get('/export', authMiddleware, checkPermission('finance:read'), async (re
   }
 });
 
+/**
+ * GET /api/v1/admin/finance/orders
+ * 平台订单列表 — finance:read
+ */
+router.get('/orders', authMiddleware, checkPermission('finance:read'), async (req: Request, res: Response) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+    const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string, 10) || 20));
+    const offset = (page - 1) * pageSize;
+    const countRow = await queryOpOne<{ count: string }>(req, 'SELECT COUNT(*) as count FROM orders');
+    const total = parseInt(countRow?.count || '0', 10);
+    const rows = await queryOp<any>(req,
+      'SELECT o.*, p.nickname FROM orders o LEFT JOIN player_profiles p ON o.user_id = p.user_id ORDER BY o.created_at DESC LIMIT $1 OFFSET $2',
+      [pageSize, offset]
+    );
+    return res.json({ code: 0, message: 'ok', data: { list: rows, total, page, pageSize } });
+  } catch (error: any) {
+    console.error('[AdminFinance] orders error:', error.message);
+    return res.status(500).json({ code: 500, message: '获取订单列表失败', data: null });
+  }
+});
+
+/**
+ * GET /api/v1/admin/finance/pending
+ * 待处理提现列表 — finance:withdraw
+ */
+router.get('/pending', authMiddleware, checkPermission('finance:withdraw'), async (req: Request, res: Response) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+    const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string, 10) || 20));
+    const offset = (page - 1) * pageSize;
+    const countRow = await queryOpOne<{ count: string }>(req,
+      'SELECT COUNT(*) as count FROM settlements WHERE status = $1', ['pending']
+    );
+    const total = parseInt(countRow?.count || '0', 10);
+    const rows = await queryOp<any>(req,
+      'SELECT * FROM settlements WHERE status = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3',
+      ['pending', pageSize, offset]
+    );
+    return res.json({ code: 0, message: 'ok', data: { list: rows, total, page, pageSize } });
+  } catch (error: any) {
+    console.error('[AdminFinance] pending error:', error.message);
+    return res.status(500).json({ code: 500, message: '获取待处理列表失败', data: null });
+  }
+});
+
 export default router;

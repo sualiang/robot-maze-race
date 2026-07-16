@@ -1154,4 +1154,67 @@ async function initOperatorRoles() {
 initOperatorRoles();
 
 // ============================================================
+// GET /orders — 运营商订单列表
+// ============================================================
+router.get('/orders', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+    const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string, 10) || 20));
+    const offset = (page - 1) * pageSize;
+    const countRow = await queryOpOne<{ count: string }>(req, 'SELECT COUNT(*) as count FROM orders');
+    const total = parseInt(countRow?.count || '0', 10);
+    const rows = await queryOp<any>(req,
+      'SELECT * FROM orders ORDER BY created_at DESC LIMIT $1 OFFSET $2',
+      [pageSize, offset]
+    );
+    return res.json({ code: 0, message: 'ok', data: { list: rows, total, page, pageSize } });
+  } catch (error: any) {
+    console.error('[Operator] orders error:', error.message);
+    return res.status(500).json({ code: 500, message: '获取订单列表失败', data: null });
+  }
+});
+
+// ============================================================
+// GET /checkins — 运营商签到记录
+// ============================================================
+router.get('/checkins', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+    const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string, 10) || 20));
+    const offset = (page - 1) * pageSize;
+    const countRow = await queryOpOne<{ count: string }>(req, 'SELECT COUNT(*) as count FROM checkins');
+    const total = parseInt(countRow?.count || '0', 10);
+    const rows = await queryOp<any>(req,
+      'SELECT * FROM checkins ORDER BY created_at DESC LIMIT $1 OFFSET $2',
+      [pageSize, offset]
+    );
+    return res.json({ code: 0, message: 'ok', data: { list: rows, total, page, pageSize } });
+  } catch (error: any) {
+    console.error('[Operator] checkins error:', error.message);
+    return res.status(500).json({ code: 500, message: '获取签到列表失败', data: null });
+  }
+});
+
+// ============================================================
+// GET /merchants — 运营商商家列表
+// ============================================================
+router.get('/merchants', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+    const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string, 10) || 20));
+    const offset = (page - 1) * pageSize;
+    const countRow = await queryOpOne<{ count: string }>(req, 'SELECT COUNT(*) as count FROM merchants');
+    const total = parseInt(countRow?.count || '0', 10);
+    const rows = await queryOp<any>(req,
+      'SELECT * FROM merchants ORDER BY created_at DESC LIMIT $1 OFFSET $2',
+      [pageSize, offset]
+    );
+    return res.json({ code: 0, message: 'ok', data: { list: rows, total, page, pageSize } });
+  } catch (error: any) {
+    console.error('[Operator] merchants error:', error.message);
+    return res.status(500).json({ code: 500, message: '获取商家列表失败', data: null });
+  }
+});
+
+// ============================================================
 export default router;

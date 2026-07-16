@@ -181,34 +181,57 @@ router.get('/', authMiddleware, async (req: Request, res: Response<ApiResponse<P
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
+    // COUNT: only from operator DB (no cross-DB JOIN on users)
     const countResult = await queryOpOne<{ count: string }>(req, 
-      `SELECT COUNT(*) as count
-       FROM referees r
-       JOIN users u ON r.user_id = u.id
-       LEFT JOIN venues v ON r.venue_id = v.id
-       ${whereClause}`,
+      `SELECT COUNT(*) as count FROM referees r ${whereClause}`,
       params
     );
     const total = parseInt(countResult?.count || '0', 10);
 
-    const list = await queryOp<RefereeWithUser>(req, 
+    // 1) 从运营商库查 referees + venues
+    const rows = await queryOp<any>(req, 
       `SELECT r.id, r.user_id, r.venue_id, r.status,
               r.name,
               r.phone, r.id_number, r.cert_image,
               r.last_checkin_at, r.created_at, r.updated_at,
               r.apply_remark, r.review_remark, r.reviewed_at, r.operator_id,
-              u.nickname, u.avatar_url,
-              v.name as venue_name,
-              o.name as operator_name
+              v.name as venue_name
        FROM referees r
-       JOIN users u ON r.user_id = u.id
        LEFT JOIN venues v ON r.venue_id = v.id
-       LEFT JOIN operators o ON r.operator_id = o.id
        ${whereClause}
        ORDER BY r.created_at DESC
        LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
       [...params, pageSize, offset]
     );
+
+    // 2) 收集 user_id 和 operator_id，批量查公共库的 users 和 operators
+    const userIds = [...new Set(rows.map((r: any) => r.user_id).filter(Boolean))];
+    const opIds = [...new Set(rows.map((r: any) => r.operator_id).filter(Boolean))];
+    const userMap: Record<string, any> = {};
+    const opMap: Record<string, any> = {};
+
+    if (userIds.length > 0) {
+      const userPlaceholders = userIds.map((_, i) => `$${i + 1}`).join(', ');
+      try {
+        const users = await query<any>(`SELECT id, nickname, avatar_url FROM users WHERE id IN (${userPlaceholders})`, userIds);
+        users.forEach((u: any) => { userMap[u.id] = u; });
+      } catch { /* ignore if users query fails */ }
+    }
+    if (opIds.length > 0) {
+      const opPlaceholders = opIds.map((_, i) => `$${i + 1}`).join(', ');
+      try {
+        const ops = await query<any>(`SELECT id, name FROM operators WHERE id IN (${opPlaceholders})`, opIds);
+        ops.forEach((o: any) => { opMap[o.id] = o; });
+      } catch { /* ignore if operators query fails */ }
+    }
+
+    // 3) JS 层组装
+    const list: RefereeWithUser[] = rows.map((r: any) => ({
+      ...r,
+      nickname: userMap[r.user_id]?.nickname || null,
+      avatar_url: userMap[r.user_id]?.avatar_url || null,
+      operator_name: opMap[r.operator_id]?.name || null,
+    }));
 
     return res.json({
       code: 0,
@@ -269,23 +292,40 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response<ApiRespons
   try {
     const { id } = req.params;
 
-    const referee = await queryOpOne<RefereeWithUser>(req, 
+    const row = await queryOpOne<any>(req, 
       `SELECT r.id, r.user_id, r.venue_id, r.status,
               r.name,
               r.phone, r.id_number, r.cert_image,
               r.last_checkin_at, r.created_at, r.updated_at,
-              r.name,
-              u.nickname, u.avatar_url,
+              r.apply_remark, r.review_remark, r.reviewed_at, r.operator_id,
               v.name as venue_name
        FROM referees r
-       JOIN users u ON r.user_id = u.id
        LEFT JOIN venues v ON r.venue_id = v.id
        WHERE r.id = $1`,
       [id]
     );
 
-    if (!referee) {
+    if (!row) {
       return res.status(404).json({ code: 404, message: '裁判记录不存在', data: null as any });
+    }
+
+    // Separate queries to common DB for user + operator info (no cross-DB JOIN)
+    const referee: RefereeWithUser = { ...row };
+    if (row.user_id) {
+      try {
+        const u = await queryOne<{ nickname: string; avatar_url: string }>(
+          'SELECT nickname, avatar_url FROM users WHERE id = $1', [row.user_id]
+        );
+        if (u) { referee.nickname = u.nickname; referee.avatar_url = u.avatar_url; }
+      } catch { /* ignore */ }
+    }
+    if (row.operator_id) {
+      try {
+        const o = await queryOne<{ name: string }>(
+          'SELECT name FROM operators WHERE id = $1', [row.operator_id]
+        );
+        if (o) { referee.operator_name = o.name; }
+      } catch { /* ignore */ }
     }
 
     return res.json({ code: 0, message: 'ok', data: referee });

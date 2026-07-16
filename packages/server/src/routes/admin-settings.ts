@@ -197,4 +197,23 @@ router.put('/:key', authMiddleware, superAdminOnly, async (req: Request, res: Re
   }
 });
 
+/**
+ * GET /api/v1/admin/settings/config
+ * 获取系统配置（别名，等同 GET /）
+ */
+router.get('/config', authMiddleware, superAdminOnly, async (req: Request, res: Response) => {
+  try {
+    for (const [key, value] of Object.entries(defaultSettings)) {
+      await ensureSettingKey(key, value);
+    }
+    const rows = await query<{ key: string; value: string }>('SELECT `key`, `value` FROM system_config ORDER BY `key`');
+    const config: Record<string, string> = {};
+    rows.forEach((r) => { config[r.key] = r.value; });
+    return res.json({ code: 0, message: 'ok', data: config });
+  } catch (error: any) {
+    console.error('[AdminSettings] config error:', error.message);
+    return res.status(500).json({ code: 500, message: '获取系统配置失败', data: null });
+  }
+});
+
 export default router;

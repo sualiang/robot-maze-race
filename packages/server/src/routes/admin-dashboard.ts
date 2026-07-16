@@ -10,6 +10,18 @@ const router = Router();
 // ============================================================
 
 // ============================================================
+// GET /api/v1/admin/dashboard
+// 仪表盘主页 — dashboard:read
+// ============================================================
+router.get('/', authMiddleware, checkPermission('dashboard:read'), async (req: Request, res: Response) => {
+  try {
+    return res.json({ code: 0, message: 'ok', data: { routes: ['/stats', '/revenue-breakdown', '/revenue-by-region', '/top-operators', '/export'] } });
+  } catch (error: any) {
+    return res.status(500).json({ code: 500, message: error.message, data: null });
+  }
+});
+
+// ============================================================
 // GET /api/v1/admin/dashboard/stats
 // 全平台统计总览 — dashboard:read
 // ============================================================

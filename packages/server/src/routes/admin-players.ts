@@ -154,4 +154,27 @@ function escapeCsvField(value: any): string {
   return str;
 }
 
+/**
+ * GET /api/v1/admin/players/export
+ * 导出玩家列表为 CSV — players:list
+ */
+router.get('/export', authMiddleware, checkPermission('players:list'), async (req: Request, res: Response) => {
+  try {
+    const players = await queryOp<any>(req, 
+      `SELECT p.* FROM player_profiles p ORDER BY p.created_at DESC LIMIT 5000`
+    );
+    // Render simple CSV and return
+    let csv = 'id,user_id,nickname,level,points,balance,status,created_at\n';
+    for (const p of players) {
+      csv += `${p.id},${p.user_id},${p.nickname || ''},${p.level},${p.points},${p.balance},${p.status},${p.created_at}\n`;
+    }
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="players-${new Date().toISOString().slice(0, 10)}.csv"`);
+    return res.send(csv);
+  } catch (error: any) {
+    console.error('[AdminPlayers] export error:', error.message);
+    return res.status(500).json({ code: 500, message: '导出失败', data: null });
+  }
+});
+
 export default router;
