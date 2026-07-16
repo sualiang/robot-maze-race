@@ -259,7 +259,60 @@ export async function initSchema(): Promise<void> {
     console.warn('[DB] Seed warning (may already exist):', e.message?.substring(0, 100));
   }
 
-  console.log('[DB] Common schema initialized');
+  // ===== 自动补全历史运营商独立库 =====
+  try {
+    // 找出 operators 表中有但 operators_registry 中没有的
+    const [missingRows] = await conn.execute<any[]>(
+      `SELECT o.id, o.name FROM operators o
+       LEFT JOIN operators_registry r ON r.operator_id = o.id
+       WHERE r.operator_id IS NULL`
+    );
+    if (missingRows && missingRows.length > 0) {
+      console.log(`[DB] Found ${missingRows.length} operator(s) without registry, auto-creating databases...`);
+      for (const op of missingRows) {
+        try {
+          const dbName = `op_${op.id}`;
+          await createOperatorDatabase(dbName);
+          await conn.execute(
+            `INSERT IGNORE INTO operators_registry (id, operator_id, db_name, operator_name) VALUES (?, ?, ?, ?)`,
+            [uuidv4(), op.id, dbName, op.name || '']
+          );
+          console.log(`[DB]  ✓ Auto-created DB: ${dbName} for operator ${op.name || op.id}`);
+        } catch (e: any) {
+          console.error(`[DB]  ✗ Failed to auto-create DB for operator ${op.id}:`, e.message);
+        }
+      }
+    }
+
+    // 修正 ebf89164 的库名：下划线 → 连字符
+    const [badRows] = await conn.execute<any[]>(
+      `SELECT id, db_name FROM operators_registry WHERE db_name LIKE '%op_%' AND db_name LIKE '%\\_%' AND db_name NOT LIKE '%-%'`
+    );
+    for (const row of badRows || []) {
+      const fixed = row.db_name.replace(/_/g, '-');
+      // 检查新库名是否已存在
+      const [existing] = await conn.execute<any[]>(
+        `SELECT id FROM operators_registry WHERE db_name = ?`,
+        [fixed]
+      );
+      if (existing && (existing as any[]).length === 0) {
+        // DROP union 的下划线孤儿库
+        try {
+          const baseOpts = getBaseOptions();
+          const adminConn = await mysql.createConnection({ host: baseOpts.host, port: baseOpts.port, user: baseOpts.user, password: baseOpts.password, charset: baseOpts.charset });
+          await adminConn.execute(`DROP DATABASE IF EXISTS \`${row.db_name}\``);
+          await adminConn.end();
+          console.log(`[DB]  Dropped orphan DB: ${row.db_name}`);
+        } catch (e: any) {
+          console.warn(`[DB]  Could not drop old DB ${row.db_name}:`, e.message);
+        }
+        await conn.execute(`UPDATE operators_registry SET db_name = ? WHERE id = ?`, [fixed, row.id]);
+        console.log(`[DB]  Fixed db_name: ${row.db_name} → ${fixed}`);
+      }
+    }
+  } catch (e: any) {
+    console.warn('[DB] Auto-heal warning:', e.message?.substring(0, 100));
+  }
 }
 
 async function runSqlFile(pool: mysql.Pool, filePath: string): Promise<void> {

@@ -219,6 +219,7 @@ router.post('/', authMiddleware, checkPermission('operators:create'), async (req
 
     // Card 4: 自动创建独立数据库 + 执行 schema
     const dbName = `op_${id}`;
+    let createDbWarning: string | undefined;
     try {
       await createOperatorDatabase(dbName);
       // 注册到 operators_registry（公共库）
@@ -229,11 +230,11 @@ router.post('/', authMiddleware, checkPermission('operators:create'), async (req
       );
       console.log(`[AdminOp] Operator DB created: ${dbName}`);
     } catch (dbErr: any) {
-      console.error('[AdminOp] Failed to create operator DB:', dbErr?.message);
-      // 不阻止创建流程 — operator 已创建，可后续手动修复
+      console.warn('[AdminOp] Failed to create operator DB, operator will still work but needs manual DB setup:', dbErr?.message);
+      createDbWarning = '独立数据库创建失败，运营商基本功能不受影响，请通知管理员手动建库';
     }
 
-    return res.status(201).json({
+    const response: any = {
       code: 0,
       message: '运营商创建成功',
       data: {
@@ -241,7 +242,12 @@ router.post('/', authMiddleware, checkPermission('operators:create'), async (req
         password: plainPassword,
         operator_id: id,
       },
-    });
+    };
+    if (createDbWarning) {
+      response.warning = createDbWarning;
+    }
+
+    return res.status(201).json(response);
   } catch (error: any) {
     console.error('[AdminOperators] create error:', error.message);
     return res.status(500).json({ code: 500, message: '创建运营商失败', data: null });
