@@ -328,9 +328,9 @@ router.post('/operator-login', async (req: Request, res: Response) => {
               o.name as operator_name, o.company_name,
               m.first_login
        FROM operator_members m
-       LEFT JOIN admin_roles ar ON ar.name = m.role_id_id
+       LEFT JOIN admin_roles ar ON ar.name = m.role_id
        LEFT JOIN operators o ON o.id = m.operator_id
-       WHERE m.phone = $1`,
+       WHERE m.phone = ?`,
       [phone]
     );
 
@@ -502,9 +502,9 @@ router.post('/login', async (req: Request, res: Response) => {
                 o.name as operator_name, o.company_name,
                 m.first_login
          FROM operator_members m
-         LEFT JOIN admin_roles ar ON ar.name = m.role_id_id
+         LEFT JOIN admin_roles ar ON ar.name = m.role_id
          LEFT JOIN operators o ON o.id = m.operator_id
-         WHERE m.phone = $1`,
+         WHERE m.phone = ?`,
         [phone]
       );
 
