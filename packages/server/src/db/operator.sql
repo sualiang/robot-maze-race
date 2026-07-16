@@ -398,6 +398,8 @@ CREATE TABLE IF NOT EXISTS point_shop (
   item_id VARCHAR(36) NOT NULL,
   name VARCHAR(128) NOT NULL,
   description TEXT,
+  image VARCHAR(512) DEFAULT NULL COMMENT '图片',
+  stock INT NOT NULL DEFAULT 0 COMMENT '库存',
   need_points INT NOT NULL DEFAULT 0,
   sort_weight INT DEFAULT 0,
   status INT NOT NULL DEFAULT 1,

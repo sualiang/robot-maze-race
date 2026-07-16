@@ -312,6 +312,8 @@ export async function initSchema(): Promise<void> {
           ['settlements', 'operator_id', "VARCHAR(36) NOT NULL DEFAULT ''"],
           ['race_results', 'operator_id', "VARCHAR(36) NOT NULL DEFAULT ''"],
           ['points_transactions', 'operator_id', "VARCHAR(36) NOT NULL DEFAULT ''"],
+          ['point_shop', 'image', 'VARCHAR(512) DEFAULT NULL'],
+          ['point_shop', 'stock', 'INT NOT NULL DEFAULT 0'],
         ];
         for (const reg of allRegistry) {
           try {
