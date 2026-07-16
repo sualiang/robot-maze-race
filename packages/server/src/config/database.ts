@@ -306,6 +306,32 @@ export async function initSchema(): Promise<void> {
         `SELECT db_name, operator_id FROM operators_registry WHERE db_name IS NOT NULL`
       );
       if (allRegistry && allRegistry.length > 0) {
+        // 1. ALTER TABLE 补缺列
+        const alterCols: [string, string, string][] = [
+          ['orders', 'operator_id', "VARCHAR(36) NOT NULL DEFAULT ''"],
+          ['settlements', 'operator_id', "VARCHAR(36) NOT NULL DEFAULT ''"],
+          ['race_results', 'operator_id', "VARCHAR(36) NOT NULL DEFAULT ''"],
+          ['points_transactions', 'operator_id', "VARCHAR(36) NOT NULL DEFAULT ''"],
+        ];
+        for (const reg of allRegistry) {
+          try {
+            const pool = getOperatorPool(reg.db_name);
+            for (const [tbl, col, typ] of alterCols) {
+              try {
+                const [cols] = await pool.execute<any>(
+                  `SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+                  [reg.db_name, tbl, col]
+                );
+                if ((cols as any[]).length === 0) {
+                  await pool.execute(`ALTER TABLE \`${tbl}\` ADD COLUMN \`${col}\` ${typ}`);
+                  console.log(`[DB]  Added ${tbl}.${col} for ${reg.db_name}`);
+                }
+              } catch {}
+            }
+          } catch {}
+        }
+
+        // 2. Re-run operator.sql for missing tables
         console.log(`[DB] Checking ${allRegistry.length} operator DB(s) for missing tables...`);
         let fixedCount = 0;
         for (const reg of allRegistry) {
@@ -316,7 +342,6 @@ export async function initSchema(): Promise<void> {
             console.warn(`[DB]  Table completeness check failed for ${reg.db_name}:`, e.message?.substring(0, 100));
           }
         }
-        if (fixedCount > 0) console.log(`[DB]  Table completeness check done`);
       }
     }
   } catch (e: any) {

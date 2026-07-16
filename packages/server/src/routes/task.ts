@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { query, queryOne, execute } from '../config/database';
+import { query, queryOne, execute, queryOp, executeOp } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 
 const router = Router();
@@ -102,9 +102,11 @@ router.post('/reward', authMiddleware, async (req: Request, res: Response) => {
         [rewardValue, userId]
       );
     } else if (rewardType === 'points') {
-      await execute(
-        `UPDATE users SET points = points + $1, updated_at = NOW() WHERE id = $2`,
-        [rewardValue, userId]
+      const opId = (req.user as any)?.operatorId || '';
+      await executeOp(req,
+        `INSERT INTO points_transactions (id, user_id, operator_id, points, type, remark)
+         VALUES ($1, $2, $3, $4, 'task_reward', '任务奖励')`,
+        [uuidv4(), userId, opId, rewardValue]
       );
     } else if (rewardType === 'race_count') {
       await execute(

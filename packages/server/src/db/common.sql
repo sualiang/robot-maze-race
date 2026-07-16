@@ -191,17 +191,8 @@ CREATE TABLE IF NOT EXISTS combat_power (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE INDEX IF NOT EXISTS idx_combat_power_user ON combat_power(user_id);
 
--- ==================== 积分交易记录表 ====================
-CREATE TABLE IF NOT EXISTS points_transactions (
-  id VARCHAR(36) PRIMARY KEY,
-  user_id VARCHAR(36) NOT NULL,
-  points INT NOT NULL,
-  type VARCHAR(32) NOT NULL,
-  remark TEXT DEFAULT '',
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX IF NOT EXISTS idx_points_transactions_user ON points_transactions(user_id);
-CREATE INDEX IF NOT EXISTS idx_points_transactions_created ON points_transactions(created_at);
+-- ==================== 积分交易记录表（已移入 operator.sql，每运营商独立） ====================
+-- points_transactions 表已从 common DB 移除，改为每运营商独立数据库
 
 -- ==================== 助力记录表 ====================
 CREATE TABLE IF NOT EXISTS helps (

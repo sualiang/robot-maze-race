@@ -355,17 +355,13 @@ async function grantLevelUpReward(req: Request, userId: string, level: number): 
     }
 
     if (rewardPoints > 0) {
-      // 加积分
-      await execute(
-        `UPDATE users SET points = COALESCE(points, 0) + $1 WHERE id = $2`,
-        [rewardPoints, userId]
-      );
-      // 记积分流水
+      // 加积分（按运营商隔离）
+      const opId = (req.user as any)?.operatorId || '';
       const txnId = uuidv4();
-      await execute(
-        `INSERT INTO points_transactions (id, user_id, points, type, remark)
-         VALUES ($1, $2, $3, 'level_up_reward', $4)`,
-        [txnId, userId, rewardPoints, `升级奖励·${levelNames[level] || level}级`]
+      await executeOp(req,
+        `INSERT INTO points_transactions (id, user_id, operator_id, points, type, remark)
+         VALUES ($1, $2, $3, $4, 'level_up_reward', $5)`,
+        [txnId, userId, opId, rewardPoints, `升级奖励·${levelNames[level] || level}级`]
       );
       console.log('[Season] granted', rewardPoints, 'points to user', userId, 'for level', level);
     }

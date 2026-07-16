@@ -257,10 +257,12 @@ router.post('/points-shop/exchange', authMiddleware, async (req: Request, res: R
       }
     }
 
-    // 4. 扣减积分（原子操作）
-    await execute(
-      `UPDATE users SET points = points - $1 WHERE id = $2 AND points >= $1`,
-      [needPoints, userId]
+    // 4. 扣减积分（原子操作，按运营商隔离）
+    const opId = (req.user as any)?.operatorId || '';
+    await executeOp(req,
+      `INSERT INTO points_transactions (id, user_id, operator_id, points, type, remark, created_at)
+       VALUES ($1, $2, $3, $4, 'point_shop_exchange', $5, NOW())`,
+      [uuidv4(), userId, opId, -needPoints, `积分商城兑换·${item.name}`]
     );
 
     // 5. 根据商品类型发放对应奖励
@@ -313,10 +315,12 @@ router.post('/points-shop/exchange', authMiddleware, async (req: Request, res: R
       );
       console.log('[PointsShop] 兑换平台券:', userId, 'item:', item.name, 'coupon_type:', couponType);
     } else {
-      // 未知类型，回滚积分
-      await execute(
-        `UPDATE users SET points = points + $1 WHERE id = $2`,
-        [needPoints, userId]
+      // 未知类型，回滚积分（按运营商隔离）
+      const opId2 = (req.user as any)?.operatorId || '';
+      await executeOp(req,
+        `INSERT INTO points_transactions (id, user_id, operator_id, points, type, remark, created_at)
+         VALUES ($1, $2, $3, $4, 'refund', $5, NOW())`,
+        [uuidv4(), userId, opId2, needPoints, `不支持的商品类型退款·${item.name}`]
       );
       res.json({ code: 400, message: '不支持的商品类型', data: null });
       return;
@@ -345,27 +349,22 @@ router.post('/points-shop/exchange', authMiddleware, async (req: Request, res: R
       );
     } catch { /* ignore */ }
 
-    // 7. 记积分流水
-    try {
-      const txnId = uuidv4();
-      await execute(
-        `INSERT INTO points_transactions (id, user_id, points, type, remark)
-         VALUES ($1, $2, $3, 'point_shop_exchange', $4)`,
-        [txnId, userId, -needPoints, `积分商城兑换·${item.name}`]
-      );
-    } catch { /* ignore */ }
-
     res.json({
       code: 0,
       data: { exchangeId, itemName: item.name, itemType, needPoints },
     });
   } catch (e: any) {
     console.error('[PointsShop] exchange error:', e?.message || e);
-    // 尝试回滚积分和库存
+    // 尝试回滚积分
     try {
+      const opId = (req.user as any)?.operatorId || '';
       const item = await queryOpOne<any>(req, `SELECT need_points FROM point_shop WHERE id = $1`, [itemId]);
       if (item) {
-        await execute(`UPDATE users SET points = points + $1 WHERE id = $2`, [item.need_points, userId]);
+        await executeOp(req,
+          `INSERT INTO points_transactions (id, user_id, operator_id, points, type, remark, created_at)
+           VALUES ($1, $2, $3, $4, 'refund', $5, NOW())`,
+          [uuidv4(), userId, opId, item.need_points, `兑换失败退款·${item.name || ''}`]
+        );
       }
       // 回滚库存（+1）
       await executeOp(req, `UPDATE point_shop SET stock = stock + 1 WHERE id = $1`, [itemId]);

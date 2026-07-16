@@ -12,11 +12,13 @@ const router = Router();
  */
 router.get('/balance', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const user = await queryOne<{ points: number }>(
-      `SELECT points FROM users WHERE id = $1`,
-      [req.user!.userId]
+    const userId = req.user!.userId;
+    const opId = (req.user as any)?.operatorId || '';
+    const row = await queryOpOne<{ balance: string }>(req,
+      `SELECT COALESCE(SUM(points), 0) as balance FROM points_transactions WHERE user_id = $1 AND operator_id = $2`,
+      [userId, opId]
     );
-    res.json({ code: 0, data: { points: user?.points || 0 } });
+    res.json({ code: 0, data: { points: parseInt(row?.balance || '0', 10) } });
   } catch (e: any) {
     res.json({ code: 500, message: '查询积分失败', data: null });
   }
@@ -148,13 +150,14 @@ router.post('/mall/exchange', authMiddleware, async (req: Request, res: Response
       return;
     }
 
-    // 查询用户积分
-    const user = await queryOne<{ points: number }>(
-      `SELECT points FROM users WHERE id = $1`,
-      [userId]
+    // 查询用户积分（按运营商隔离）
+    const opId = (req.user as any)?.operatorId || '';
+    const row = await queryOpOne<{ balance: string }>(req,
+      `SELECT COALESCE(SUM(points), 0) as balance FROM points_transactions WHERE user_id = $1 AND operator_id = $2`,
+      [userId, opId]
     );
 
-    const userPoints = user?.points || 0;
+    const userPoints = parseInt(row?.balance || '0', 10);
     if (userPoints < item.pointsCost) {
       res.json({
         code: 400,
@@ -164,18 +167,12 @@ router.post('/mall/exchange', authMiddleware, async (req: Request, res: Response
       return;
     }
 
-    // 扣减积分
-    await execute(
-      `UPDATE users SET points = points - $1, updated_at = NOW() WHERE id = $2`,
-      [item.pointsCost, userId]
-    );
-
-    // 记录积分流水
+    // 扣减积分（记录流水）
     const txId = uuidv4();
-    await execute(
-      `INSERT INTO points_transactions (id, user_id, points, type, remark, created_at)
-       VALUES ($1, $2, $3, $4, $5, NOW())`,
-      [txId, userId, -item.pointsCost, 'exchange', `兑换 ${item.name}`]
+    await executeOp(req,
+      `INSERT INTO points_transactions (id, user_id, operator_id, points, type, remark, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+      [txId, userId, opId, -item.pointsCost, 'exchange', `兑换 ${item.name}`]
     );
 
     // 根据分类发放对应券
@@ -239,10 +236,10 @@ router.post('/mall/exchange', authMiddleware, async (req: Request, res: Response
       exchangeResult.status = 'pending';
     }
 
-    // 查询剩余积分
-    const updatedUser = await queryOne<{ points: number }>(
-      `SELECT points FROM users WHERE id = $1`,
-      [userId]
+    // 查询剩余积分（按运营商隔离）
+    const updatedRow = await queryOpOne<{ balance: string }>(req,
+      `SELECT COALESCE(SUM(points), 0) as balance FROM points_transactions WHERE user_id = $1 AND operator_id = $2`,
+      [userId, opId]
     );
 
     res.json({
@@ -251,7 +248,7 @@ router.post('/mall/exchange', authMiddleware, async (req: Request, res: Response
         success: true,
         itemName: item.name,
         pointsCost: item.pointsCost,
-        remainingPoints: updatedUser?.points || 0,
+        remainingPoints: parseInt(updatedRow?.balance || '0', 10),
         ...exchangeResult,
       },
     });
@@ -342,13 +339,14 @@ router.post('/redeem', authMiddleware, async (req: Request, res: Response) => {
 
     const needPoints = item.need_points;
 
-    // 检查用户积分
-    const user = await queryOne<{ points: number }>(
-      `SELECT points FROM users WHERE id = $1`,
-      [userId]
+    // 检查用户积分（按运营商隔离）
+    const opId = (req.user as any)?.operatorId || '';
+    const row = await queryOpOne<{ balance: string }>(req,
+      `SELECT COALESCE(SUM(points), 0) as balance FROM points_transactions WHERE user_id = $1 AND operator_id = $2`,
+      [userId, opId]
     );
 
-    const userPoints = user?.points || 0;
+    const userPoints = parseInt(row?.balance || '0', 10);
     if (userPoints < needPoints) {
       res.json({
         code: 400,
@@ -360,10 +358,10 @@ router.post('/redeem', authMiddleware, async (req: Request, res: Response) => {
 
     // 检查兑换次数限制
     if (item.exchange_limit && item.exchange_limit > 0) {
-      const exchangeCount = await queryOne<{ cnt: number }>(
+      const exchangeCount = await queryOpOne<{ cnt: number }>(req,
         `SELECT COUNT(*) as cnt FROM points_transactions
-         WHERE user_id = $1 AND type = 'exchange' AND remark = $2`,
-        [userId, `兑换 ${item.name}`]
+         WHERE user_id = $1 AND type = 'exchange' AND remark = $2 AND operator_id = $3`,
+        [userId, `兑换 ${item.name}`, opId]
       );
       if ((exchangeCount?.cnt || 0) >= item.exchange_limit) {
         res.json({
@@ -375,18 +373,12 @@ router.post('/redeem', authMiddleware, async (req: Request, res: Response) => {
       }
     }
 
-    // 扣减积分
-    await execute(
-      `UPDATE users SET points = points - $1, updated_at = NOW() WHERE id = $2`,
-      [needPoints, userId]
-    );
-
-    // 记录积分流水
+    // 扣减积分（记录流水）
     const txId = uuidv4();
-    await execute(
-      `INSERT INTO points_transactions (id, user_id, points, type, remark, created_at)
-       VALUES ($1, $2, $3, $4, $5, NOW())`,
-      [txId, userId, -needPoints, 'exchange', `兑换 ${item.name}`]
+    await executeOp(req,
+      `INSERT INTO points_transactions (id, user_id, operator_id, points, type, remark, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+      [txId, userId, opId, -needPoints, 'exchange', `兑换 ${item.name}`]
     );
 
     let exchangeResult: any = { exchangeId: txId };
@@ -423,9 +415,10 @@ router.post('/redeem', authMiddleware, async (req: Request, res: Response) => {
 
         if (!merchantCoupon) {
           // 券已用完或下架，退款积分
-          await execute(
-            `UPDATE users SET points = points + $1, updated_at = NOW() WHERE id = $2`,
-            [needPoints, userId]
+          await executeOp(req,
+            `INSERT INTO points_transactions (id, user_id, operator_id, points, type, remark, created_at)
+             VALUES ($1, $2, $3, $4, 'refund', $5, NOW())`,
+            [uuidv4(), userId, opId, needPoints, `退款·${item.name}已兑完`]
           );
           res.json({ code: 400, message: '该商家券已兑完，积分已退回', data: null });
           return;
@@ -470,10 +463,10 @@ router.post('/redeem', authMiddleware, async (req: Request, res: Response) => {
       }
     }
 
-    // 查询剩余积分
-    const updatedUser = await queryOne<{ points: number }>(
-      `SELECT points FROM users WHERE id = $1`,
-      [userId]
+    // 查询剩余积分（按运营商隔离）
+    const updatedRow = await queryOpOne<{ balance: string }>(req,
+      `SELECT COALESCE(SUM(points), 0) as balance FROM points_transactions WHERE user_id = $1 AND operator_id = $2`,
+      [userId, opId]
     );
 
     res.json({
@@ -482,7 +475,7 @@ router.post('/redeem', authMiddleware, async (req: Request, res: Response) => {
         success: true,
         itemName: item.name,
         pointsCost: needPoints,
-        remainingPoints: updatedUser?.points || 0,
+        remainingPoints: parseInt(updatedRow?.balance || '0', 10),
         ...exchangeResult,
       },
     });

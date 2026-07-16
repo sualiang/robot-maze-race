@@ -416,3 +416,17 @@ CREATE TABLE IF NOT EXISTS points_exchange_log (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_points_exchange_user (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ==================== 积分交易记录表（每运营商独立） ====================
+CREATE TABLE IF NOT EXISTS points_transactions (
+  id VARCHAR(36) PRIMARY KEY,
+  user_id VARCHAR(36) NOT NULL,
+  operator_id VARCHAR(36) NOT NULL DEFAULT '',
+  points INT NOT NULL,
+  type VARCHAR(32) NOT NULL,
+  remark TEXT DEFAULT '',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_pt_user (user_id),
+  INDEX idx_pt_operator (operator_id),
+  INDEX idx_pt_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
