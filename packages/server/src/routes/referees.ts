@@ -1239,9 +1239,7 @@ let cachedVenueId = '';
 let cachedVenueStatus = 'inactive';
 
 /** venues 表在运营商独立库中，启动时无法解析 req context，直接使用默认值 */
-export async function initVenueCache(): Promise<void> {
-  // 无操作：venues 在运营商独立库，启动时无 req 无法路由
-}
+export async function initVenueCache(): Promise<void> { return; }
 
 export function getCurrentScreenData() {
   const leaderboard = getLeaderboard();
