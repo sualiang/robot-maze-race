@@ -101,8 +101,8 @@ router.get('/invite/:inviteId', async (req: Request, res: Response) => {
     }
     if (invite.status === 'used') return res.json({ code: 0, message: '邀请已被使用', data: { status: 'used', operator_name: '', venue_name: '', expires_at: invite.expires_at } });
     let operatorName = '', venueName = '';
-    if (invite.operator_id) { const op = await queryOne<{ name: string }>('SELECT name FROM operators WHERE id=$1', [invite.operator_id]); operatorName = op?.name || ''; }
-    if (invite.venue_id) { const v = await queryOpOne<{ name: string }>(req, 'SELECT name FROM venues WHERE id=$1', [invite.venue_id]); venueName = v?.name || ''; }
+    if (invite.operator_id) { const op = await queryOne<{ name: string }>('SELECT name FROM operators WHERE id = ?', [invite.operator_id]); operatorName = op?.name || ''; }
+    if (invite.venue_id) { const v = await queryOpOne<{ name: string }>(req, 'SELECT name FROM venues WHERE id = ?', [invite.venue_id]); venueName = v?.name || ''; }
     return res.json({ code: 0, message: 'ok', data: { id: invite.id, operator_id: invite.operator_id, operator_name: operatorName, venue_name: venueName, status: invite.status, expires_at: invite.expires_at, note: invite.note || '' } });
   } catch (error: any) {
     console.error('[RefereeInvite] get error:', error.message);
@@ -200,7 +200,7 @@ router.get('/invitations', authMiddleware, async (req: Request, res: Response) =
     const conditions: string[] = [];
     const params: any[] = [];
     if (role === 'operator') {
-      const m = await queryOne<{ operator_id: string }>('SELECT operator_id FROM operator_members WHERE id=$1', [req.user!.userId]);
+      const m = await queryOne<{ operator_id: string }>('SELECT operator_id FROM operator_members WHERE id=?', [req.user!.userId]);
       const opId = m?.operator_id || (req.user as any).operatorId || req.user!.userId;
             conditions.push(`operator_id = $${params.length}`);
     }

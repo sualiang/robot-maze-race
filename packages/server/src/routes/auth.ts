@@ -698,7 +698,7 @@ router.get('/me', authMiddleware, async (req: Request, res: Response<ApiResponse
                 o.name as operator_name, o.company_name
          FROM operator_members om
          LEFT JOIN operators o ON o.id = om.operator_id
-         WHERE om.id = $1`,
+         WHERE om.id = ?`,
         [userId]
       );
       if (member && (member.status === 1 || member.status === 'active')) {
@@ -841,7 +841,7 @@ router.post('/refresh', authMiddleware, async (req: Request, res: Response<ApiRe
                 m.first_login
          FROM operator_members m
          LEFT JOIN admin_roles ar ON ar.name = m.role_id
-         WHERE m.id = $1`,
+         WHERE m.id = ?`,
         [userId]
       );
       if (member) {

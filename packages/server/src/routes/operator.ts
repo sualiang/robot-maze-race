@@ -70,12 +70,12 @@ router.post('/login', async (req: Request, res: Response) => {
     let permissions: string[] = ['*'];
     let roleName = '';
     const member = await queryOne<{ role_id: string }>(
-      'SELECT role_id FROM operator_members WHERE operator_id = $1 LIMIT 1',
+      'SELECT role_id FROM operator_members WHERE operator_id = ? LIMIT 1',
       [operator.id]
     );
     if (member && member.role_id) {
       const roleRec = await queryOne<{ permissions: string; name: string; label: string }>(
-        'SELECT permissions, name, label FROM admin_roles WHERE name = $1',
+        'SELECT permissions, name, label FROM admin_roles WHERE name = ?',
         [member.role_id]
       );
       if (roleRec) {
