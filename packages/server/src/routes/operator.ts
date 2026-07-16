@@ -422,7 +422,7 @@ router.post('/rbac/users/:id/reset-password', authMiddleware, operatorOnly, asyn
     const { id } = req.params;
 
     const existing = await queryOne<{ id: string; operator_id: string; phone: string; nickname: string }>(
-      'SELECT id, phone, nickname FROM operator_members WHERE id = ?',
+      'SELECT id, operator_id, phone, nickname FROM operator_members WHERE id = $1',
       [id]
     );
     if (!existing || existing.operator_id !== operatorId) {
@@ -432,7 +432,7 @@ router.post('/rbac/users/:id/reset-password', authMiddleware, operatorOnly, asyn
     const plainPassword = generateSecurePassword();
     const hashed = bcrypt.hashSync(plainPassword, 10);
     await execute(
-      `UPDATE operator_members SET password = ?, updated_at = NOW() WHERE id = ?`,
+      `UPDATE operator_members SET password = $1, updated_at = NOW() WHERE id = $2`,
       [hashed, id]
     );
 
