@@ -27,7 +27,7 @@ const router = Router();
  * @query pageSize - 每页数量，默认 20，最大 100
  * @returns { list: Venue[], total: number, page: number, pageSize: number }
  */
-router.get('/', async (req: Request, res: Response<ApiResponse<PaginatedResult<Venue>>>) => {
+router.get('/', authMiddleware, async (req: Request, res: Response<ApiResponse<PaginatedResult<Venue>>>) => {
   try {
     const { status, page: pageStr = '1', pageSize: pageSizeStr = '20' } = req.query;
     const page = Math.max(1, parseInt(pageStr as string, 10) || 1);
@@ -80,7 +80,7 @@ router.get('/', async (req: Request, res: Response<ApiResponse<PaginatedResult<V
  * @param id - 赛场 UUID
  * @returns Venue 完整信息
  */
-router.get('/:id', async (req: Request, res: Response<ApiResponse<Venue>>) => {
+router.get('/:id', authMiddleware, async (req: Request, res: Response<ApiResponse<Venue>>) => {
   try {
     const { id } = req.params;
 
@@ -395,7 +395,7 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response<ApiResp
  * GET /api/v1/venues/:id/referees
  * 获取绑定到指定赛场的所有裁判员列表
  */
-router.get('/:id/referees', async (req: Request, res: Response) => {
+router.get('/:id/referees', authMiddleware, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const referees = await queryOp<any>(req, 

@@ -25,11 +25,15 @@ import fs from 'fs';
 import { Request } from 'express';
 import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
+import dotenv from 'dotenv';
 import { getOperatorContext } from '../middleware/operator-context';
 
 // ==================== 连接配置 ====================
 
-const DATABASE_URL = process.env.DATABASE_URL || 'mysql://root:AmberBot2026!Root@localhost:3308/robot_maze_race';
+// Load .env for CLI/debug; in production PM2 provides DATABASE_URL via env
+dotenv.config({ path: path.resolve(__dirname, '../../.env'), override: false });
+
+const DATABASE_URL = process.env.DATABASE_URL || 'mysql://root:IronDog2026!Root@127.0.0.1:3308/robot_maze_race';
 const COMMON_DB_NAME = process.env.COMMON_DB_NAME || 'robot_maze_race_common';
 
 let commonPool: mysql.Pool | null = null;

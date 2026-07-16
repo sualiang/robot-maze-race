@@ -52,9 +52,9 @@ router.post('/invite', authMiddleware, async (req: Request, res: Response) => {
     }
 
     await execute(
-      `INSERT INTO referee_invites (id, phone, venue_id, token, note, status, ticket, expires_at, created_at, updated_at)
+      `INSERT INTO referee_invites (id, operator_id, phone, venue_id, token, note, status, ticket, expires_at, created_at, updated_at)
        VALUES ($1,$2,$3,$4,$5,$6,'active',$7,$8,$9,$10)`,
-      [inviteId, operatorId, phone || null, venue_id || null, inviteToken, note || null,
+      [inviteId, operatorId || '', phone || null, venue_id || null, inviteToken, note || null,
        ticket || null, toStr(expiresAt), toStr(now), toStr(now)]
     );
 
@@ -201,7 +201,8 @@ router.get('/invitations', authMiddleware, async (req: Request, res: Response) =
     if (role === 'operator') {
       const m = await queryOne<{ operator_id: string }>('SELECT operator_id FROM operator_members WHERE id=$1', [req.user!.userId]);
       const opId = m?.operator_id || (req.user as any).operatorId || req.user!.userId;
-            conditions.push(`operator_id = $${params.length}`);
+      conditions.push(`operator_id = $1`);
+      params.push(opId);
     }
     const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
     const cnt = await queryOne<{ count: number }>(`SELECT COUNT(*) as count FROM referee_invites ${where}`, params);
