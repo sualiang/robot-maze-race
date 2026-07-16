@@ -178,12 +178,24 @@ router.post('/callback', async (req: Request, res: Response) => {
               'UPDATE referee_invites SET openid=$1, updated_at=NOW() WHERE id=$2 AND openid IS NULL',
               [fromUserName, inviteId]
             );
-            // 推送客服消息
+            // 推送客服消息 + 降级为被动文本回复
+            let linkSent = false;
             try {
               await sendRegisterLink(fromUserName, inviteId, invite.operator_id);
+              linkSent = true;
               console.log(`[WechatCallback] 已推送注册链接: inviteId=${inviteId}`);
             } catch (e: any) {
-              console.error('[WechatCallback] 客服消息推送失败:', e.message);
+              console.error('[WechatCallback] 客服消息推送失败，降级为被动回复:', e.message);
+            }
+
+            if (!linkSent) {
+              const appId = config.wechatMp.appId;
+              const redirectUri = `https://dog.amberrobot.com.cn/referee/register?invite_id=${encodeURIComponent(inviteId)}&operator_id=${encodeURIComponent(invite.operator_id)}`;
+              const registerUrl = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=snsapi_userinfo&state=register#wechat_redirect`;
+              const replyContent = `欢迎申请铁甲快狗裁判资格，请点击下方链接完成注册：\n\n👉 <a href="${registerUrl}">点此完成裁判注册</a>\n\n注册后可从公众号底部菜单随时进入系统。`;
+              return res
+                .type('application/xml')
+                .send(buildTextReply(fromUserName, toUserName, replyContent));
             }
           } else {
             console.log(`[WechatCallback] 未找到邀请记录: inviteId=${inviteId}`);

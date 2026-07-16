@@ -131,11 +131,22 @@ router.post('/event', async (req: Request, res: Response) => {
           [fromUser, inviteId]
         );
 
-        // 推送客服消息
+        // 推送客服消息 + 降级为被动文本回复
+        let sent = false;
         try {
           await sendRegisterLink(fromUser, inviteId, invite.operator_id);
+          sent = true;
         } catch (e: any) {
-          console.error('[WechatEvent] 推送失败:', e.message);
+          console.error('[WechatEvent] 客服消息推送失败，降级为被动回复:', e.message);
+        }
+
+        if (!sent) {
+          const config = require('../config').config;
+          const appId = config.wechatMp.appId;
+          const redirectUri = `https://dog.amberrobot.com.cn/referee/register?invite_id=${encodeURIComponent(inviteId)}&operator_id=${encodeURIComponent(invite.operator_id)}`;
+          const registerUrl = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=snsapi_userinfo&state=register#wechat_redirect`;
+          const content = `欢迎申请铁甲快狗裁判资格，请点击下方链接完成注册：\n\n👉 <a href="${registerUrl}">点此完成裁判注册</a>\n\n注册后可从公众号底部菜单随时进入系统。`;
+          return res.type('application/xml').send(buildTextReply(fromUser, toUser, content));
         }
       } else {
         // 普通关注（无邀请场景）
