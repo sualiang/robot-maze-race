@@ -1002,7 +1002,9 @@
    ======================================================================= */
 .referee-login-page {
   min-height: 100vh;
-  width: 100vw;
+  min-height: 100dvh;
+  width: 100%;
+  max-width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1013,8 +1015,12 @@
   position: fixed;
   top: 0;
   left: 0;
-  overflow: hidden;
+  right: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 16px;
+  box-sizing: border-box;
 }
 
 .referee-login-glow-1 {
