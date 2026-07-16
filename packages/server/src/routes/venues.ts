@@ -51,7 +51,7 @@ router.get('/', async (req: Request, res: Response<ApiResponse<PaginatedResult<V
     const venues = await queryOp<any>(req, 
       `SELECT id, name, address, city, district, latitude, longitude, status,
               qrcode_url, checkin_radius_meters, max_queue_size,
-              timeout_seconds, open_time, close_time, description, created_at, updated_at
+              timeout_seconds, open_time, close_time, description, operator_id, created_at, updated_at
        FROM venues ${whereClause}
        ORDER BY created_at DESC
        LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
@@ -87,7 +87,7 @@ router.get('/:id', async (req: Request, res: Response<ApiResponse<Venue>>) => {
     const venue = await queryOpOne<any>(req, 
       `SELECT id, name, address, city, district, latitude, longitude, status,
               qrcode_url, checkin_radius_meters, max_queue_size,
-              timeout_seconds, open_time, close_time, description, created_at, updated_at
+              timeout_seconds, open_time, close_time, description, operator_id, created_at, updated_at
        FROM venues WHERE id = $1`,
       [id]
     );
@@ -148,11 +148,15 @@ router.post('/', authMiddleware, async (req: Request, res: Response<ApiResponse<
     );
     const defaultRate = parseInt(rateRow?.value || '80', 10);
 
+    // 获取 operator_id
+    const ctx = await getOperatorContext(req.user?.userId || '');
+    const operatorId = ctx?.operator_id || '';
+
     await executeOp(req, 
       `INSERT INTO venues (id, name, address, latitude, longitude, status,
         checkin_radius_meters, max_queue_size, timeout_seconds,
-        open_time, close_time, city, district, description, profit_share_rate)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+        open_time, close_time, city, district, description, profit_share_rate, operator_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
       [
         id,
         body.name,
@@ -169,13 +173,14 @@ router.post('/', authMiddleware, async (req: Request, res: Response<ApiResponse<
         body.district || '',
         body.description || null,
         defaultRate,
+        operatorId,
       ]
     );
     const venue = await queryOpOne<Venue>(req, 
       `SELECT id, name, address, latitude, longitude, status,
               qrcode_url, checkin_radius_meters, max_queue_size,
               timeout_seconds, open_time, close_time, city, district,
-              description, profit_share_rate, created_at, updated_at
+              description, profit_share_rate, operator_id, created_at, updated_at
        FROM venues WHERE id = $1`,
       [id]
     );
@@ -274,7 +279,7 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response<ApiRespons
     const venue = await queryOpOne<Venue>(req, 
       `SELECT id, name, address, latitude, longitude, status,
               qrcode_url, checkin_radius_meters, max_queue_size,
-              timeout_seconds, open_time, close_time, description, created_at, updated_at
+              timeout_seconds, open_time, close_time, description, operator_id, created_at, updated_at
        FROM venues WHERE id = $1`,
       [id]
     );
