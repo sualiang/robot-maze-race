@@ -324,7 +324,7 @@ router.post('/operator-login', async (req: Request, res: Response) => {
     // 分两步查：先查 operator_members（公共库），再补查 admin_roles 和 operators
     const member = await queryOne<any>(
       `SELECT id, password, nickname, phone, role_id, status, operator_id, first_login
-       FROM operator_members WHERE phone = ?`,
+       FROM operator_members WHERE phone = $1`,
       [phone]
     );
 
@@ -334,7 +334,7 @@ router.post('/operator-login', async (req: Request, res: Response) => {
 
     // 补查角色信息
     const roleRow = member.role_id
-      ? await queryOne<any>(`SELECT label as role_name, name as admin_role_name, permissions FROM admin_roles WHERE name = ?`, [member.role_id])
+      ? await queryOne<any>(`SELECT label as role_name, name as admin_role_name, permissions FROM admin_roles WHERE name = $1`, [member.role_id])
       : null;
     if (roleRow) {
       member.role_name = roleRow.role_name;
@@ -343,7 +343,7 @@ router.post('/operator-login', async (req: Request, res: Response) => {
     }
     // 补查运营商信息
     const opRow = member.operator_id
-      ? await queryOne<any>(`SELECT name as operator_name, company_name FROM operators WHERE id = ?`, [member.operator_id])
+      ? await queryOne<any>(`SELECT name as operator_name, company_name FROM operators WHERE id = $1`, [member.operator_id])
       : null;
     if (opRow) {
       member.operator_name = opRow.operator_name;
@@ -509,7 +509,7 @@ router.post('/login', async (req: Request, res: Response) => {
 
       const member = await queryOne<any>(
         `SELECT id, password, nickname, phone, role_id, status, operator_id, first_login
-         FROM operator_members WHERE phone = ?`,
+         FROM operator_members WHERE phone = $1`,
         [phone]
       );
 
@@ -519,7 +519,7 @@ router.post('/login', async (req: Request, res: Response) => {
 
       // 补查角色信息
       const roleRow2 = member.role_id
-        ? await queryOne<any>(`SELECT label as role_name, name as admin_role_name, permissions FROM admin_roles WHERE name = ?`, [member.role_id])
+        ? await queryOne<any>(`SELECT label as role_name, name as admin_role_name, permissions FROM admin_roles WHERE name = $1`, [member.role_id])
         : null;
       if (roleRow2) {
         member.role_name = roleRow2.role_name;
@@ -528,7 +528,7 @@ router.post('/login', async (req: Request, res: Response) => {
       }
       // 补查运营商信息
       const opRow2 = member.operator_id
-        ? await queryOne<any>(`SELECT name as operator_name, company_name FROM operators WHERE id = ?`, [member.operator_id])
+        ? await queryOne<any>(`SELECT name as operator_name, company_name FROM operators WHERE id = $1`, [member.operator_id])
         : null;
       if (opRow2) {
         member.operator_name = opRow2.operator_name;
@@ -721,7 +721,7 @@ router.get('/me', authMiddleware, async (req: Request, res: Response<ApiResponse
                 o.name as operator_name, o.company_name
          FROM operator_members om
          LEFT JOIN operators o ON o.id = om.operator_id
-         WHERE om.id = ?`,
+         WHERE om.id = $1`,
         [userId]
       );
       if (member && (member.status === 1 || member.status === 'active')) {
@@ -864,7 +864,7 @@ router.post('/refresh', authMiddleware, async (req: Request, res: Response<ApiRe
                 m.first_login
          FROM operator_members m
          LEFT JOIN admin_roles ar ON ar.name = m.role_id
-         WHERE m.id = ?`,
+         WHERE m.id = $1`,
         [userId]
       );
       if (member) {
@@ -1169,7 +1169,7 @@ router.post('/member/change-password', authMiddleware, async (req: Request, res:
 
     // 先查 operator_members 表（总部管理员和运营商角色成员）
     let user = await queryOne<{ id: string; password: string }>(
-      'SELECT id, password FROM operator_members WHERE id = ?',
+      'SELECT id, password FROM operator_members WHERE id = $1',
       [userId]
     );
     let isOperatorSuperAdmin = false;
@@ -1202,7 +1202,7 @@ router.post('/member/change-password', authMiddleware, async (req: Request, res:
     } else {
       // 运营商角色成员 → 更新 operator_members 表
       await execute(
-        "UPDATE operator_members SET password = ?, first_login = 0, updated_at = NOW() WHERE id = ?",
+        "UPDATE operator_members SET password = $1, first_login = 0, updated_at = NOW() WHERE id = $2",
         [hashedPassword, userId]
       );
     }
@@ -1245,7 +1245,7 @@ router.post('/member/change-password', authMiddleware, async (req: Request, res:
         `SELECT m.id, m.operator_id, m.phone, m.nickname as nickname, m.status, ar.label as role_name, ar.permissions
          FROM operator_members m
          LEFT JOIN admin_roles ar ON ar.name = m.role_id
-         WHERE m.id = ?`,
+         WHERE m.id = $1`,
         [userId]
       );
       if (m) {
