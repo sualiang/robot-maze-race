@@ -17,7 +17,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config';
-import { query, queryOne, execute, transaction as dbTransaction, queryOp, queryOpOne, executeOp } from '../config/database';
+import { query, queryOne, execute, transaction as dbTransaction, queryOp, queryOpOne, executeOp, getOperatorPool } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import {
   ApiResponse,
@@ -283,7 +283,7 @@ router.post('/unified-order', authMiddleware, async (req: Request, res: Response
         payer: {
           openid: req.user!.openid,
         },
-        attach: JSON.stringify({ order_id }),
+        attach: JSON.stringify({ order_id, operatorId: (req.user as any)?.operatorId || '' }),
       });
 
       // 5. 保存 prepay_id
@@ -364,13 +364,34 @@ router.post('/notify', async (req: Request, res: Response) => {
     const outTradeNo = transaction.out_trade_no;
     const tradeState = transaction.trade_state;
 
+    // 从 attach 解析 operatorId（WeChat 回调无 auth）
+    let attachOperatorId = '';
+    try {
+      const attach = transaction.attach ? JSON.parse(transaction.attach) : {};
+      attachOperatorId = attach.operatorId || '';
+    } catch { /* 兼容旧 attach 格式 */ }
+
+    // 无 auth 回调：从 attach 或 DB 获取 operatorId → 手动 pool
+    let opPool: any = null;
+    if (attachOperatorId) {
+      const opDbName = (await queryOne<{ db_name: string }>(
+        'SELECT db_name FROM operators_registry WHERE operator_id = $1', [attachOperatorId]
+      ))?.db_name;
+      if (opDbName) opPool = getOperatorPool(opDbName);
+    }
+    if (!opPool) {
+      console.error('[WxPay] 无法定位运营商 pool:', outTradeNo);
+      return res.json({ code: 'SUCCESS', message: 'no operator found' });
+    }
+
     console.log('[WxPay] 支付回调:', outTradeNo, 'state:', tradeState, 'amount:', transaction.amount?.total);
 
-    // 3. 查询订单
-    const order = await queryOpOne<{ id: string; status: string; amount: number }>(req, 
+    // 3. 查询订单（手动 pool，无 auth）
+    const [orderRow] = await opPool.execute(
       `SELECT id, status, amount_cents as amount FROM orders WHERE order_no = ?`,
       [outTradeNo]
     );
+    const order = orderRow as any;
 
     if (!order) {
       console.error('[WxPay] 回调订单不存在:', outTradeNo);
@@ -389,49 +410,46 @@ router.post('/notify', async (req: Request, res: Response) => {
       const paidAmount = transaction.amount?.total;
       if (paidAmount && paidAmount !== order.amount) {
         console.error('[WxPay] 支付金额不匹配! order:', order.amount, 'paid:', paidAmount, outTradeNo);
-        // 标记异常待人工处理
-        await executeOp(req, 
+        await opPool.execute(
           `UPDATE orders SET status = 'abnormal', payment_remark = ? WHERE id = ?`,
           [`金额不匹配: 订单${order.amount}分, 实付${paidAmount}分`, order.id]
         );
         return res.json({ code: 'SUCCESS', message: 'OK' });
       }
 
-      // 更新订单状态（operator 库，事务外）
-      await executeOp(req, 
-        `UPDATE orders SET status = 'paid', transaction_id = $1, paid_at = NOW(), updated_at = NOW() WHERE id = $2 AND status = 'pending'`,
+      // 更新订单状态
+      await opPool.execute(
+        `UPDATE orders SET status = 'paid', transaction_id = ?, paid_at = NOW(), updated_at = NOW() WHERE id = ? AND status = 'pending'`,
         [transaction.transaction_id, order.id]
       );
 
-      // 记录支付流水（operator 库，事务外）
-      await executeOp(req, 
+      // 记录支付流水
+      await opPool.execute(
         `INSERT INTO payment_transactions (id, order_id, user_id, amount, transaction_id, payment_method, status, created_at)
-         VALUES ($1, $2, (SELECT user_id FROM orders WHERE id = $3), $4, $5, 'wechat_pay', 'success', NOW())`,
+         VALUES (?, ?, (SELECT user_id FROM orders WHERE id = ?), ?, ?, 'wechat_pay', 'success', NOW())`,
         [uuidv4(), order.id, order.id, order.amount, transaction.transaction_id]
       );
 
-      // P0-14: 幂等创建结算记录（player.ts可能已创建，先查再插）
+      // P0-14: 幂等创建结算记录
       try {
-        const opId = (req as any).operatorId || (req.user as any)?.operatorId || '';
-        const existing = await queryOp<any[]>(req,
-          `SELECT id FROM settlements WHERE order_id = $1 LIMIT 1`,
+        const [stlRows] = await opPool.execute(
+          `SELECT id FROM settlements WHERE order_id = ? LIMIT 1`,
           [order.id]
         );
-        if (!existing || existing.length === 0) {
-          await executeOp(req,
+        if (!stlRows || (Array.isArray(stlRows) && stlRows.length === 0)) {
+          await opPool.execute(
             `INSERT INTO settlements (id, order_id, amount_cents, commission_cents, operator_id, status, created_at)
-             VALUES ($1, $2, $3, 0, $4, 'pending', NOW())`,
-            [uuidv4(), order.id, order.amount, opId]
+             VALUES (?, ?, ?, 0, ?, 'pending', NOW())`,
+            [uuidv4(), order.id, order.amount, attachOperatorId]
           );
         }
       } catch (e: any) {
         console.warn('[WxPay] settlements idempotent insert warning:', e.message?.substring(0, 100));
       }
 
-      // 处理参赛包发放（已有逻辑由原有 order 模块处理，此处只记录）
       console.log('[WxPay] 支付成功:', outTradeNo, 'transaction_id:', transaction.transaction_id);
     } else if (['CLOSED', 'PAYERROR', 'REVOKED'].includes(tradeState)) {
-      await executeOp(req, 
+      await opPool.execute(
         `UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = ? AND status = 'pending'`,
         [order.id]
       );
@@ -650,18 +668,29 @@ router.post('/notify-refund', async (req: Request, res: Response) => {
     console.log('[WxPay] 退款回调:', refundResult.out_trade_no, 'status:', refundResult.refund_status);
 
     if (refundResult.refund_status === 'SUCCESS') {
-      await executeOp(req, 
-        `UPDATE orders SET status = 'refunded', refunded_at = NOW(), updated_at = NOW()
-         WHERE order_no = ? AND status = 'refunding'`,
-        [refundResult.out_trade_no]
-      );
-
-      // 更新支付流水
-      await executeOp(req, 
-        `UPDATE payment_transactions SET status = 'refunded', refund_id = ?, updated_at = NOW()
-         WHERE transaction_id = ?`,
-        [refundResult.refund_id, refundResult.transaction_id]
-      );
+      // 退款回调无 auth：遍历 registry 查找订单所属运营商
+      let refOpPool: any = null;
+      const allOps = await query<any>('SELECT operator_id, db_name FROM operators_registry');
+      for (const opReg of allOps) {
+        if (!opReg.db_name) continue;
+        const p = getOperatorPool(opReg.db_name);
+        const [chk] = await p.execute('SELECT id FROM orders WHERE order_no = ? LIMIT 1', [refundResult.out_trade_no]);
+        if (chk) { refOpPool = p; break; }
+      }
+      if (refOpPool) {
+        await refOpPool.execute(
+          `UPDATE orders SET status = 'refunded', refunded_at = NOW(), updated_at = NOW()
+           WHERE order_no = ? AND status = 'refunding'`,
+          [refundResult.out_trade_no]
+        );
+        await refOpPool.execute(
+          `UPDATE payment_transactions SET status = 'refunded', refund_id = ?, updated_at = NOW()
+           WHERE transaction_id = ?`,
+          [refundResult.refund_id, refundResult.transaction_id]
+        );
+      } else {
+        console.error('[WxPay] notify-refund 未找到订单:', refundResult.out_trade_no);
+      }
     } else if (refundResult.refund_status === 'ABNORMAL') {
       console.error('[WxPay] 退款异常:', refundResult.out_trade_no, refundResult.refund_id);
     }

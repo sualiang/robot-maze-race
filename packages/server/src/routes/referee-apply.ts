@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../config/database';
+import { query, queryOne, execute, queryOp, queryOpOne, executeOp, getOperatorPool } from '../config/database';
 
 const router = Router();
 
@@ -29,13 +29,21 @@ router.post('/apply', async (req: Request, res: Response) => {
     }
 
     // 检查手机号是否已被注册
-    const existing = await queryOpOne<{ id: string; status: string }>(req, 
+    // 无 auth，不能直接用 queryOp（依赖 req.operatorId）
+    // 手动查 DB 名 → getOperatorPool → pool.execute()
+    const opDbName = operatorId
+      ? (await queryOne<{ db_name: string }>('SELECT db_name FROM operators_registry WHERE operator_id = $1', [operatorId]))?.db_name
+      : null;
+    if (!opDbName) return res.status(500).json({ code: 500, message: '运营商信息不完整', data: null });
+
+    const opPool = getOperatorPool(opDbName);
+    const [existing] = await opPool.execute(
       'SELECT id, status FROM referees WHERE phone = ?',
       [phone]
     );
     if (existing) {
-      const label = existing.status === 'approved' ? '已注册' :
-        existing.status === 'pending' ? '正在审核中' : '已被驳回';
+      const label = (existing as any).status === 'approved' ? '已注册' :
+        (existing as any).status === 'pending' ? '正在审核中' : '已被驳回';
       return res.status(400).json({ code: 400, message: `该手机号已有注册（${label}）`, data: null });
     }
 
@@ -50,10 +58,11 @@ router.post('/apply', async (req: Request, res: Response) => {
 
     // 创建 referees 记录（直接 approved）
     const refereeId = uuidv4();
-    await executeOp(req, 
-      `INSERT INTO referees (id, user_id, name, phone, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'approved', ?, NOW(), NOW())`,
-      [refereeId, userId, name, phone, operatorId || null]
+    const nowStr = new Date().toISOString().replace('T', ' ').replace('Z', '');
+    await opPool.execute(
+      `INSERT INTO referees (id, operator_id, user_id, name, phone, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 'approved', ?, ?)`,
+      [refereeId, operatorId, userId, name, phone, nowStr, nowStr]
     );
 
     return res.status(201).json({

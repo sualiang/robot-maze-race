@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { compareSync, hashSync } from '../config/bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config';
-import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../config/database';
+import { query, queryOne, execute, getOperatorPool } from '../config/database';
 
 const router = Router();
 
@@ -14,6 +14,7 @@ export interface MerchantAuthPayload {
   merchantAdminId: string;
   merchantId: string;
   merchantName: string;
+  operatorId: string;
   role: 'merchant_admin';
 }
 
@@ -37,8 +38,22 @@ function verifyPassword(password: string, hash: string): boolean {
 }
 
 /**
+ * 获取运营商 operator pool（用于无 auth 或独立认证的公开路由）
+ */
+async function resolveMerchantOpPool(req: Request): Promise<any> {
+  // 优先从 merchantAdmin 取 operatorId（登录后路由）
+  const opId = req.merchantAdmin?.operatorId || req.body.operatorId;
+  if (!opId) return null;
+  const row = await queryOne<{ db_name: string }>(
+    'SELECT db_name FROM operators_registry WHERE operator_id = $1', [opId]
+  );
+  if (!row) return null;
+  return getOperatorPool(row.db_name);
+}
+
+/**
  * 商家认证中间件
- * 验证 JWT 且 role 必须为 merchant_admin
+ * 验证 JWT — 返回 401 未登录
  */
 export function merchantAuthMiddleware(req: Request, res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization;
@@ -86,13 +101,18 @@ export function merchantAuthMiddleware(req: Request, res: Response, next: NextFu
 /**
  * POST /api/v1/merchant/auth/register
  * 商家子账号注册（需要邀请码，绑定到指定 merchant_id）
+ * @body operatorId — 运营商ID（必填，用于确定 DB）
  */
 router.post('/register', async (req: Request, res: Response) => {
   try {
-    const { username, password, inviteCode, phone, realName } = req.body;
+    const { username, password, inviteCode, phone, realName, operatorId } = req.body;
 
     if (!username || !password || !inviteCode) {
       res.json({ code: 400, message: '用户名、密码和邀请码不能为空', data: null });
+      return;
+    }
+    if (!operatorId) {
+      res.json({ code: 400, message: '缺少运营商信息', data: null });
       return;
     }
 
@@ -101,23 +121,31 @@ router.post('/register', async (req: Request, res: Response) => {
       return;
     }
 
+    // 手动查 DB 名 → 获取 operator pool
+    const opDbName = (await queryOne<{ db_name: string }>(
+      'SELECT db_name FROM operators_registry WHERE operator_id = $1', [operatorId]
+    ))?.db_name;
+    if (!opDbName) {
+      res.json({ code: 500, message: '运营商信息不完整', data: null });
+      return;
+    }
+    const pool = getOperatorPool(opDbName);
+
     // 校验邀请码
-    const invite = await queryOpOne<any>(req, 
-      `SELECT * FROM merchant_invite_codes WHERE code = $1 AND used = 0`,
+    const [invite] = await pool.execute(
+      `SELECT * FROM merchant_invite_codes WHERE code = ? AND used = 0`,
       [inviteCode]
     );
-
     if (!invite) {
       res.json({ code: 400, message: '邀请码无效或已使用', data: null });
       return;
     }
 
     // 检查用户名是否已存在
-    const existing = await queryOpOne<any>(req, 
-      `SELECT id FROM merchant_admin WHERE username = $1`,
+    const [existing] = await pool.execute(
+      `SELECT id FROM merchant_admin WHERE username = ?`,
       [username]
     );
-
     if (existing) {
       res.json({ code: 400, message: '用户名已存在', data: null });
       return;
@@ -126,16 +154,16 @@ router.post('/register', async (req: Request, res: Response) => {
     // 创建商家子账号
     const id = uuidv4();
     const passwordHash = hashPassword(password);
-    await executeOp(req, 
+    await pool.execute(
       `INSERT INTO merchant_admin (id, merchant_id, username, password_hash, phone, real_name, status, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, 1, NOW(), NOW())`,
-      [id, invite.merchant_id, username, passwordHash, phone || '', realName || '']
+       VALUES (?, ?, ?, ?, ?, ?, 1, NOW(), NOW())`,
+      [id, (invite as any).merchant_id, username, passwordHash, phone || '', realName || '']
     );
 
     // 标记邀请码已使用
-    await executeOp(req, 
-      `UPDATE merchant_invite_codes SET used = 1, used_by = $1, used_at = NOW() WHERE id = $2`,
-      [id, invite.id]
+    await pool.execute(
+      `UPDATE merchant_invite_codes SET used = 1, used_by = ?, used_at = NOW() WHERE id = ?`,
+      [id, (invite as any).id]
     );
 
     res.json({
@@ -151,52 +179,68 @@ router.post('/register', async (req: Request, res: Response) => {
 
 /**
  * POST /api/v1/merchant/auth/login
- * 商家登录（用户名 + 密码，返回 JWT）
+ * 商家登录（用户名 + 密码 + operatorId，返回 JWT）
+ * @body operatorId — 运营商ID（必填，用于确定 DB）
  */
 router.post('/login', async (req: Request, res: Response) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, operatorId } = req.body;
 
     if (!username || !password) {
       res.json({ code: 400, message: '用户名和密码不能为空', data: null });
       return;
     }
+    if (!operatorId) {
+      res.json({ code: 400, message: '缺少运营商信息', data: null });
+      return;
+    }
 
-    const admin = await queryOpOne<any>(req, 
+    const opDbName = (await queryOne<{ db_name: string }>(
+      'SELECT db_name FROM operators_registry WHERE operator_id = $1', [operatorId]
+    ))?.db_name;
+    if (!opDbName) {
+      res.json({ code: 500, message: '运营商信息不完整', data: null });
+      return;
+    }
+    const pool = getOperatorPool(opDbName);
+
+    const [admin] = await pool.execute(
       `SELECT ma.*, m.merchant_name
        FROM merchant_admin ma
        LEFT JOIN merchants m ON ma.merchant_id = m.id
-       WHERE ma.username = $1`,
+       WHERE ma.username = ?`,
       [username]
     );
+    const adminRow = admin as any;
 
-    if (!admin) {
+    if (!adminRow) {
       res.json({ code: 401, message: '用户名或密码错误', data: null });
       return;
     }
 
-    if (admin.status !== 1) {
+    if (adminRow.status !== 1) {
       res.json({ code: 403, message: '账号已被禁用', data: null });
       return;
     }
 
     // 验证密码
-    if (!verifyPassword(password, admin.password_hash)) {
+    if (!verifyPassword(password, adminRow.password_hash)) {
       res.json({ code: 401, message: '用户名或密码错误', data: null });
       return;
     }
 
     // 更新最后登录时间
-    await executeOp(req, 
-      `UPDATE merchant_admin SET last_login_time = NOW(), updated_at = NOW() WHERE id = $1`,
-      [admin.id]
+    await pool.execute(
+      `UPDATE merchant_admin SET last_login_time = NOW(), updated_at = NOW() WHERE id = ?`,
+      [adminRow.id]
     );
 
-    // 生成 JWT
+    // 生成 JWT（携带 operatorId 以便后续请求可获取 DB）
     const payload: MerchantAuthPayload = {
-      merchantAdminId: admin.id,
-      merchantId: admin.merchant_id,
-      merchantName: admin.merchant_name || '',
+      merchantAdminId: adminRow.id,
+      merchantId: adminRow.merchant_id,
+      merchantName: adminRow.merchant_name || '',
+      operatorId: operatorId,
       role: 'merchant_admin',
     };
     const token = jwt.sign(payload, config.jwt.secret, { expiresIn: config.jwt.expiresIn as any });
@@ -206,14 +250,14 @@ router.post('/login', async (req: Request, res: Response) => {
       message: '登录成功',
       data: {
         token,
-        firstLogin: admin.first_login === 1,
+        firstLogin: adminRow.first_login === 1,
         admin: {
-          id: admin.id,
-          username: admin.username,
-          phone: admin.phone || '',
-          realName: admin.real_name || '',
-          merchantId: admin.merchant_id,
-          merchantName: admin.merchant_name || '',
+          id: adminRow.id,
+          username: adminRow.username,
+          phone: adminRow.phone || '',
+          realName: adminRow.real_name || '',
+          merchantId: adminRow.merchant_id,
+          merchantName: adminRow.merchant_name || '',
         },
       },
     });
@@ -242,25 +286,29 @@ router.post('/change-password', merchantAuthMiddleware, async (req: Request, res
       return;
     }
 
+    const pool = await resolveMerchantOpPool(req);
+    if (!pool) { res.json({ code: 500, message: '运营商信息不完整', data: null }); return; }
+
     // 查询当前密码
-    const admin = await queryOpOne<any>(req, 
-      `SELECT password_hash FROM merchant_admin WHERE id = $1`,
+    const [admin] = await pool.execute(
+      `SELECT password_hash FROM merchant_admin WHERE id = ?`,
       [adminId]
     );
+    const adminRow = admin as any;
 
-    if (!admin) {
+    if (!adminRow) {
       res.json({ code: 404, message: '账号不存在', data: null });
       return;
     }
 
-    if (!verifyPassword(oldPassword, admin.password_hash)) {
+    if (!verifyPassword(oldPassword, adminRow.password_hash)) {
       res.json({ code: 401, message: '旧密码错误', data: null });
       return;
     }
 
     const newHash = hashPassword(newPassword);
-    await executeOp(req, 
-      `UPDATE merchant_admin SET password_hash = $1, first_login = 0, updated_at = NOW() WHERE id = $2`,
+    await pool.execute(
+      `UPDATE merchant_admin SET password_hash = ?, first_login = 0, updated_at = NOW() WHERE id = ?`,
       [newHash, adminId]
     );
 
@@ -279,18 +327,22 @@ router.get('/profile', merchantAuthMiddleware, async (req: Request, res: Respons
   try {
     const adminId = req.merchantAdmin!.merchantAdminId;
 
-    const admin = await queryOpOne<any>(req, 
+    const pool = await resolveMerchantOpPool(req);
+    if (!pool) { res.json({ code: 500, message: '运营商信息不完整', data: null }); return; }
+
+    const [admin] = await pool.execute(
       `SELECT ma.id, ma.username, ma.phone, ma.real_name, ma.status, ma.last_login_time, ma.created_at,
               m.id as merchant_id, m.merchant_name, m.merchant_address, m.contact_phone, m.qrcode_url,
               m.region, m.business_hours, m.audit_status,
               m.operator_id
        FROM merchant_admin ma
        LEFT JOIN merchants m ON ma.merchant_id = m.id
-       WHERE ma.id = $1`,
+       WHERE ma.id = ?`,
       [adminId]
     );
+    const adminRow = admin as any;
 
-    if (!admin) {
+    if (!adminRow) {
       res.json({ code: 404, message: '账号不存在', data: null });
       return;
     }
@@ -298,23 +350,23 @@ router.get('/profile', merchantAuthMiddleware, async (req: Request, res: Respons
     res.json({
       code: 0,
       data: {
-        id: admin.id,
-        username: admin.username,
-        phone: admin.phone || '',
-        realName: admin.real_name || '',
-        status: admin.status,
-        lastLoginTime: admin.last_login_time,
-        createdAt: admin.created_at,
+        id: adminRow.id,
+        username: adminRow.username,
+        phone: adminRow.phone || '',
+        realName: adminRow.real_name || '',
+        status: adminRow.status,
+        lastLoginTime: adminRow.last_login_time,
+        createdAt: adminRow.created_at,
         merchant: {
-          id: admin.merchant_id,
-          name: admin.merchant_name || '',
-          address: admin.merchant_address || '',
-          contactPhone: admin.contact_phone || '',
-          region: admin.region || '',
-          businessHours: admin.business_hours || '',
-          qrcodeUrl: admin.qrcode_url || '',
-          auditStatus: admin.audit_status || 0,
-          operatorId: admin.operator_id || '',
+          id: adminRow.merchant_id,
+          name: adminRow.merchant_name || '',
+          address: adminRow.merchant_address || '',
+          contactPhone: adminRow.contact_phone || '',
+          region: adminRow.region || '',
+          businessHours: adminRow.business_hours || '',
+          qrcodeUrl: adminRow.qrcode_url || '',
+          auditStatus: adminRow.audit_status || 0,
+          operatorId: adminRow.operator_id || '',
         },
       },
     });
@@ -333,21 +385,23 @@ router.put('/profile', merchantAuthMiddleware, async (req: Request, res: Respons
     const adminId = req.merchantAdmin!.merchantAdminId;
     const { phone, realName, merchantName, merchantAddress, contactPhone, businessHours } = req.body;
 
+    const pool = await resolveMerchantOpPool(req);
+    if (!pool) { res.json({ code: 500, message: '运营商信息不完整', data: null }); return; }
+
     const updatePromises: Promise<any>[] = [];
 
     // 更新 merchant_admin 表
     const adminUpdates: string[] = [];
     const adminParams: any[] = [];
-    let aIdx = 1;
 
-    if (phone !== undefined) { adminUpdates.push(`phone = $${aIdx++}`); adminParams.push(phone); }
-    if (realName !== undefined) { adminUpdates.push(`real_name = $${aIdx++}`); adminParams.push(realName); }
+    if (phone !== undefined) { adminUpdates.push(`phone = ?`); adminParams.push(phone); }
+    if (realName !== undefined) { adminUpdates.push(`real_name = ?`); adminParams.push(realName); }
 
     if (adminUpdates.length > 0) {
       adminUpdates.push(`updated_at = NOW()`);
       adminParams.push(adminId);
-      updatePromises.push(executeOp(req, 
-        `UPDATE merchant_admin SET ${adminUpdates.join(', ')} WHERE id = $${aIdx}`,
+      updatePromises.push(pool.execute(
+        `UPDATE merchant_admin SET ${adminUpdates.join(', ')} WHERE id = ?`,
         adminParams
       ));
     }
@@ -355,18 +409,17 @@ router.put('/profile', merchantAuthMiddleware, async (req: Request, res: Respons
     // 更新 merchants 表（商家信息）
     const merchantUpdates: string[] = [];
     const merchantParams: any[] = [];
-    let mIdx = 1;
 
-    if (merchantName !== undefined) { merchantUpdates.push(`merchant_name = $${mIdx++}`); merchantParams.push(merchantName); }
-    if (merchantAddress !== undefined) { merchantUpdates.push(`merchant_address = $${mIdx++}`); merchantParams.push(merchantAddress); }
-    if (contactPhone !== undefined) { merchantUpdates.push(`contact_phone = $${mIdx++}`); merchantParams.push(contactPhone); }
-    if (businessHours !== undefined) { merchantUpdates.push(`business_hours = $${mIdx++}`); merchantParams.push(businessHours); }
+    if (merchantName !== undefined) { merchantUpdates.push(`merchant_name = ?`); merchantParams.push(merchantName); }
+    if (merchantAddress !== undefined) { merchantUpdates.push(`merchant_address = ?`); merchantParams.push(merchantAddress); }
+    if (contactPhone !== undefined) { merchantUpdates.push(`contact_phone = ?`); merchantParams.push(contactPhone); }
+    if (businessHours !== undefined) { merchantUpdates.push(`business_hours = ?`); merchantParams.push(businessHours); }
 
     if (merchantUpdates.length > 0) {
       merchantUpdates.push(`updated_at = NOW()`);
       merchantParams.push(req.merchantAdmin!.merchantId);
-      updatePromises.push(executeOp(req, 
-        `UPDATE merchants SET ${merchantUpdates.join(', ')} WHERE id = $${mIdx}`,
+      updatePromises.push(pool.execute(
+        `UPDATE merchants SET ${merchantUpdates.join(', ')} WHERE id = ?`,
         merchantParams
       ));
     }

@@ -77,7 +77,8 @@ export function getOperatorPool(dbName: string): mysql.Pool {
 
 export async function resolveOperatorDb(req: Request): Promise<string | null> {
   // 优先从 JWT 获取 operatorId
-  const jwtOperatorId = (req.user as any)?.operatorId;
+  const jwtOperatorId = (req.user as any)?.operatorId
+    || (req.merchantAdmin as any)?.operatorId;
   if (jwtOperatorId) {
     const pool = getCommonPool();
     const [rows] = await pool.query<any[]>(
