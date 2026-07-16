@@ -80,7 +80,7 @@ async function doVerify(
   await executeOp(req, 
     `INSERT INTO coupon_verify_log (
       id, user_coupon_id, merchant_id, verifier_id, verifier_name,
-      user_id, coupon_name, denomination_cents, verify_type, verify_time, created_at) VALUES (
+      user_id, coupon_name, denomination_cents, verify_type, verify_time, created_at, operator_id) VALUES (
       $1, $2, $3, $4, $5,
       $6, $7, $8, $9, NOW(), NOW(), $10
     )`,
@@ -94,7 +94,7 @@ async function doVerify(
       coupon.name || coupon.mc_name || '',
       coupon.denomination_cents || coupon.mc_denomination || 0,
       verifyType,
-      mOpId
+      (req.user as any)?.operatorId || ''
     ]
   );
 

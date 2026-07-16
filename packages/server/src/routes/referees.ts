@@ -71,7 +71,7 @@ router.post('/create-by-operator', authMiddleware, async (req: Request, res: Res
 
     const refereeId = uuidv4();
     await executeOp(req, 
-      `INSERT INTO referees (id, user_id, phone, venue_id, name)
+      `INSERT INTO referees (id, user_id, phone, venue_id, name, operator_id)
        VALUES ($1, $2, $3, $4, $5, $6)`,
       [refereeId, userId, phone, venue_id || null, name, req.user?.operatorId || null]
     );

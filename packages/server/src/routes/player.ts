@@ -350,9 +350,9 @@ router.post('/checkin', authMiddleware, async (req: Request, res: Response) => {
     const checkinId = uuidv4();
 
     await queryOp(req, 
-      `INSERT INTO checkins (id, user_id, venue_id, queue_number, status, checked_in_at, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, 'queued', NOW(), NOW(), NOW())`,
-      [checkinId, userId, venueId, queueNumber]
+      `INSERT INTO checkins (id, user_id, venue_id, queue_number, status, checked_in_at, created_at, updated_at, operator_id)
+       VALUES ($1, $2, $3, $4, 'queued', NOW(), NOW(), NOW(), $5)`,
+      [checkinId, userId, venueId, queueNumber, (req.user as any)?.operatorId || '']
     );
 
     // 成长值发放：从已购且还有剩余次数的参赛包中，按包扣减
@@ -881,10 +881,11 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
     // 创建订单（记录 remaining_times / remaining_growth 作为签到发成长值的依据）
     await queryOp(req, 
       `INSERT INTO orders (id, order_no, user_id, package_id, amount_cents, discount_cents,
-               remaining_times, remaining_growth, status, paid_at, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'paid', NOW(), NOW())`,
+               remaining_times, remaining_growth, status, paid_at, created_at, operator_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'paid', NOW(), NOW(), $9)`,
       [orderId, orderNo, userId, packageId, pkg.price_cents, deductionCents,
-       remainingTimes, remainingGrowth]
+       remainingTimes, remainingGrowth,
+       (req.user as any)?.operatorId || '']
     );
 
     // 购买参赛包后，更新用户参赛次数

@@ -58,13 +58,14 @@ router.post('/create', async (req: Request, res: Response) => {
         valid_start, valid_end,
         status, sort_order, coupon_type,
         max_per_user, put_channels,
-        audit_status, version, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8, $9, 1, 0, $10, $11, $12, 0, 1, NOW(), NOW())`,
+        audit_status, version, created_at, updated_at, operator_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8, $9, 1, 0, $10, $11, $12, 0, 1, NOW(), NOW(), $13)`,
       [
         id, merchantId, name, description || '',
         denominationCents || 0, minConsumeCents || 0,
         totalCount, validStart || null, validEnd || null,
         couponType || 1, maxPerUser || 1, putChannels || '{}',
+        (req.user as any)?.operatorId || ''
       ]
     );
 

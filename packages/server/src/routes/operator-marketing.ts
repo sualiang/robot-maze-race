@@ -294,15 +294,15 @@ router.post('/init-templates', authMiddleware, operatorOnly, async (req: Request
     ];
     for (const pkg of packages) {
       await executeOp(req, 
-        `INSERT INTO race_packages (id, name, price_cents, description, status, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, 1, NOW(), NOW())`,
-        [uuidv4(), operatorId, pkg.name, pkg.price, pkg.description]
+        `INSERT INTO race_packages (id, name, price_cents, description, status, created_at, updated_at, operator_id)
+         VALUES ($1, $2, $3, $4, 'active', NOW(), NOW(), $5)`,
+        [uuidv4(), pkg.name, pkg.price, pkg.description, operatorId]
       );
     }
 
     // 确保 venue 记录存在（满足 foreign key 约束）
     await executeOp(req, 
-      `INSERT INTO venues (id, name, status)
+      `INSERT INTO venues (id, name, operator_id, status)
        VALUES ($1, $2, $3, 'active')
        ON DUPLICATE KEY UPDATE name = VALUES(name)`,
       [venue_id, venue_id, operatorId]
@@ -329,9 +329,9 @@ router.post('/init-templates', authMiddleware, operatorOnly, async (req: Request
       await executeOp(req, 
         `INSERT INTO user_coupons (id, user_id, coupon_id, merchant_id, name, description,
                 denomination_cents, min_consume_cents, status, valid_start, valid_end,
-                coupon_type, extra_data, created_at, updated_at)
-         VALUES ($1, '', '', 'platform', $2, $3, $4, 0, 1, NOW(), '2070-01-01 00:00:00', 20, '{}', NOW(), NOW())`,
-        [uuidv4(), `测试消费券${i + 1}号`, `初始化模板·${amounts[i] / 100}元消费券`, amounts[i]]
+                coupon_type, extra_data, created_at, updated_at, operator_id)
+         VALUES ($1, '', '', 'platform', $2, $3, $4, 0, 1, NOW(), '2070-01-01 00:00:00', 20, '{}', NOW(), NOW(), $5)`,
+        [uuidv4(), `测试消费券${i + 1}号`, `初始化模板·${amounts[i] / 100}元消费券`, amounts[i], operatorId]
       );
     }
 

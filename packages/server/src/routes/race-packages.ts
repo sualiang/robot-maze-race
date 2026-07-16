@@ -214,13 +214,14 @@ router.post('/', authMiddleware, async (req: Request, res: Response<ApiResponse<
                standard_price_cents, discount_price_cents, tag, special_rights,
                growth_value, point_value,
                race_count, valid_days, status, sort_order,
-               coupon_reward_min_cents, coupon_reward_max_cents, free_deduction_cents)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
+               coupon_reward_min_cents, coupon_reward_max_cents, free_deduction_cents, operator_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
       [id, body.name, body.description || null, priceCents,
        standardPriceCents, discountPriceCents, tag, specialRights,
        growthValue, pointValue,
        raceCount, validDays, 'active', sortOrder,
-       rewardMinCents, rewardMaxCents, freeDeductionCents]
+       rewardMinCents, rewardMaxCents, freeDeductionCents,
+       (req.user as any)?.operatorId || '']
     );
     const row = await queryOpOne<RacePackageRow>(req, 'SELECT * FROM race_packages WHERE id = $1', [id]);
     const created = toRacePackage(row!);

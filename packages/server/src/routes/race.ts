@@ -47,15 +47,16 @@ router.post('/races', authMiddleware, operatorOnly, async (req: Request, res: Re
     const now = new Date().toISOString();
 
     await queryOp(req, 
-      `INSERT INTO races (id, venue_id, name, status, max_participants, entry_fee, start_time, end_time, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      `INSERT INTO races (id, venue_id, name, status, max_participants, entry_fee, start_time, end_time, created_at, updated_at, operator_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
       [
         raceId, venueId, name, 'pending',
         maxParticipants || 20,
         entryFee || 0,
         startTime || now,
         endTime || now,
-        now, now
+        now, now,
+        (req.user as any)?.operatorId || ''
       ]
     );
 
