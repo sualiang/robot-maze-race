@@ -234,19 +234,6 @@ CREATE TABLE IF NOT EXISTS marketing_config (
   UNIQUE(venue_id, `key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- ==================== 运营商成员表 ====================
-CREATE TABLE IF NOT EXISTS operator_members (
-  id VARCHAR(36) PRIMARY KEY,
-  name VARCHAR(64),
-  phone VARCHAR(20),
-  password_hash VARCHAR(256),
-  role VARCHAR(32) DEFAULT 'member',
-  status VARCHAR(20) DEFAULT 'active',
-  first_login INT DEFAULT 1,
-  created_at DATETIME,
-  updated_at DATETIME
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
 -- ==================== 运营商会话表 ====================
 CREATE TABLE IF NOT EXISTS operator_sessions (
   id VARCHAR(36) PRIMARY KEY,

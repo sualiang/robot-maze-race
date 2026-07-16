@@ -200,7 +200,7 @@ router.get('/invitations', authMiddleware, async (req: Request, res: Response) =
     const conditions: string[] = [];
     const params: any[] = [];
     if (role === 'operator') {
-      const m = await queryOpOne<{ operator_id: string }>(req, 'SELECT operator_id FROM operator_members WHERE id=$1', [req.user!.userId]);
+      const m = await queryOne<{ operator_id: string }>('SELECT operator_id FROM operator_members WHERE id=$1', [req.user!.userId]);
       const opId = m?.operator_id || (req.user as any).operatorId || req.user!.userId;
             conditions.push(`operator_id = $${params.length}`);
     }

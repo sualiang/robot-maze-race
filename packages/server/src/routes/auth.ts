@@ -320,14 +320,15 @@ router.post('/operator-login', async (req: Request, res: Response) => {
   }
 
   try {
-    const member = await queryOpOne<any>(req, 
-      `SELECT m.id, m.password_hash as password, m.name as nickname, m.phone,
-              m.role, m.status, ar.label as role_name, ar.name as admin_role_name, ar.permissions,
+    // operator_members 已迁至公共库，用 queryOne 查询
+    const member = await queryOne<any>(
+      `SELECT m.id, m.password as password, m.nickname as nickname, m.phone,
+              m.role_id, m.status, ar.label as role_name, ar.name as admin_role_name, ar.permissions,
               m.operator_id,
               o.name as operator_name, o.company_name,
               m.first_login
        FROM operator_members m
-       LEFT JOIN admin_roles ar ON ar.name = m.role
+       LEFT JOIN admin_roles ar ON ar.name = m.role_id_id
        LEFT JOIN operators o ON o.id = m.operator_id
        WHERE m.phone = $1`,
       [phone]
@@ -357,7 +358,7 @@ router.post('/operator-login', async (req: Request, res: Response) => {
       permissions = [];
     }
 
-    if (member.role === 'op_super_admin') {
+    if (member.role_id === 'op_super_admin') {
       permissions = ['*'];
     }
 
@@ -383,7 +384,7 @@ router.post('/operator-login', async (req: Request, res: Response) => {
           id: member.id,
           nickname: member.nickname,
           phone: member.phone,
-          role_id: member.role,
+          role_id: member.role_id,
           role_name: member.role_name,
           permissions,
           operator_id: member.operator_id,
@@ -494,14 +495,14 @@ router.post('/login', async (req: Request, res: Response) => {
         return res.status(400).json({ code: 400, message: '缺少手机号或密码', data: null });
       }
 
-      const member = await queryOpOne<any>(req, 
-        `SELECT m.id, m.password_hash as password, m.name as nickname, m.phone,
-                m.role, m.status, ar.label as role_name, ar.name as admin_role_name, ar.permissions,
+      const member = await queryOne<any>(
+        `SELECT m.id, m.password as password, m.nickname as nickname, m.phone,
+                m.role_id, m.status, ar.label as role_name, ar.name as admin_role_name, ar.permissions,
                 m.operator_id,
                 o.name as operator_name, o.company_name,
                 m.first_login
          FROM operator_members m
-         LEFT JOIN admin_roles ar ON ar.name = m.role
+         LEFT JOIN admin_roles ar ON ar.name = m.role_id_id
          LEFT JOIN operators o ON o.id = m.operator_id
          WHERE m.phone = $1`,
         [phone]
@@ -532,7 +533,7 @@ router.post('/login', async (req: Request, res: Response) => {
       }
 
       // 运营商超管（op_super_admin）自动给全权限
-      if (member.role === 'op_super_admin') {
+      if (member.role_id === 'op_super_admin') {
         permissions = ['*'];
       }
 
@@ -558,7 +559,7 @@ router.post('/login', async (req: Request, res: Response) => {
             id: member.id,
             nickname: member.nickname,
             phone: member.phone,
-            role_id: member.role,
+            role_id: member.role_id,
             role_name: member.role_name,
             permissions,
             operator_id: member.operator_id,
@@ -576,7 +577,7 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     // 检查是否是裁判手机号
-    const refereePhone = await queryOpOne<{ id: string; phone: string; name: string }>(req, 
+    const refereePhone = await queryOne<{ id: string; phone: string; nickname: string }>( 
       'SELECT id, phone, name FROM referees WHERE phone = $1',
       [phone]
     );
@@ -690,10 +691,10 @@ router.get('/me', authMiddleware, async (req: Request, res: Response<ApiResponse
       });
     }
 
-    // 运营商成员：从 operator_members 表查询
+    // 运营商成员：从 operator_members 表查询（已迁至公共库）
     if (userRole === 'operator') {
-      const member = await queryOpOne<any>(req, 
-        `SELECT om.id, om.operator_id, om.phone, om.name, om.role, om.status,
+      const member = await queryOne<any>(
+        `SELECT om.id, om.operator_id, om.phone, om.nickname as name, om.role_id, om.status,
                 o.name as operator_name, o.company_name
          FROM operator_members om
          LEFT JOIN operators o ON o.id = om.operator_id
@@ -703,13 +704,13 @@ router.get('/me', authMiddleware, async (req: Request, res: Response<ApiResponse
       if (member && (member.status === 1 || member.status === 'active')) {
         // 超管自动给全权限，普通成员从 admin_roles 查
         let permissions: string[] = [];
-        if (member.role === 'op_super_admin') {
+        if (member.role_id === 'op_super_admin') {
           permissions = ['*'];
         } else {
           try {
             const roleResult = await queryOne<any>(
               `SELECT permissions FROM admin_roles WHERE name = $1`,
-              [member.role]
+              [member.role_id]
             );
             if (roleResult?.permissions) {
               permissions = typeof roleResult.permissions === 'object'
@@ -726,8 +727,8 @@ router.get('/me', authMiddleware, async (req: Request, res: Response<ApiResponse
             username: member.name,
             nickname: member.name,
             phone: member.phone,
-            role_name: member.role === 'op_super_admin' ? '运营商超管' : (member.role || '成员'),
-            admin_role_name: member.role,
+            role_name: member.role_id === 'op_super_admin' ? '运营商超管' : (member.role_id || '成员'),
+            admin_role_name: member.role_id,
             operator_name: member.operator_name || '',
             company_name: member.company_name || null,
             role: 'operator',
@@ -834,12 +835,12 @@ router.post('/refresh', authMiddleware, async (req: Request, res: Response<ApiRe
 
     // 运营商成员：从 operator_members 表查询
     if (userRole === 'operator' && (payload as any).operatorId) {
-      const member = await queryOpOne<any>(req, 
-        `SELECT m.id, m.phone, m.name, m.role, m.status, m.operator_id,
+      const member = await queryOne<any>(
+        `SELECT m.id, m.phone, m.nickname, m.role_id, m.status, m.operator_id,
                 ar.label as role_name, ar.name as admin_role_name, ar.permissions,
                 m.first_login
          FROM operator_members m
-         LEFT JOIN admin_roles ar ON ar.name = m.role
+         LEFT JOIN admin_roles ar ON ar.name = m.role_id
          WHERE m.id = $1`,
         [userId]
       );
@@ -853,7 +854,7 @@ router.post('/refresh', authMiddleware, async (req: Request, res: Response<ApiRe
             openid: '',
             role: 'operator',
             operatorId: member.operator_id,
-            admin_role_id: member.role,
+            admin_role_id: member.role_id,
             admin_role_name: member.admin_role_name || member.role_name,
             permissions,
             passwordChangeRequired,
@@ -1143,9 +1144,9 @@ router.post('/member/change-password', authMiddleware, async (req: Request, res:
       return res.status(400).json({ code: 400, message: '密码需至少8位，包含大小写字母和数字', data: null });
     }
 
-    // 先查 admin_users 表（总部管理员和运营商角色成员）
-    let user = await queryOpOne<{ id: string; password: string }>(req, 
-      'SELECT id, password_hash as password FROM operator_members WHERE id = $1',
+    // 先查 operator_members 表（总部管理员和运营商角色成员）
+    let user = await queryOne<{ id: string; password: string }>(
+      'SELECT id, password FROM operator_members WHERE id = ?',
       [userId]
     );
     let isOperatorSuperAdmin = false;
@@ -1177,8 +1178,8 @@ router.post('/member/change-password', authMiddleware, async (req: Request, res:
       );
     } else {
       // 运营商角色成员 → 更新 operator_members 表
-      await queryOp(req, 
-        "UPDATE operator_members SET password_hash = $1, first_login = 0, updated_at = NOW() WHERE id = $2",
+      await execute(
+        "UPDATE operator_members SET password = ?, first_login = 0, updated_at = NOW() WHERE id = ?",
         [hashedPassword, userId]
       );
     }
@@ -1217,11 +1218,11 @@ router.post('/member/change-password', authMiddleware, async (req: Request, res:
         };
       }
     } else {
-      const m = await queryOpOne<any>(req, 
-        `SELECT m.id, m.operator_id, m.phone, m.name as nickname, m.status, ar.label as role_name, ar.permissions
+      const m = await queryOne<any>(
+        `SELECT m.id, m.operator_id, m.phone, m.nickname as nickname, m.status, ar.label as role_name, ar.permissions
          FROM operator_members m
-         LEFT JOIN admin_roles ar ON ar.name = m.role
-         WHERE m.id = $1`,
+         LEFT JOIN admin_roles ar ON ar.name = m.role_id
+         WHERE m.id = ?`,
         [userId]
       );
       if (m) {

@@ -455,7 +455,7 @@ router.delete('/:id', authMiddleware, checkPermission('operators:delete'), async
       // 删除会话和日志（auth_sessions / client_logs 表可能不存在或缺少 operator_id 列）
       try { await tx.query('DELETE FROM auth_sessions WHERE operator_id = $1', [id]); } catch { /* ignore if table not exists */ }
       try { await tx.query('DELETE FROM client_logs WHERE operator_id = $1', [id]); } catch { /* ignore if column not exists */ }
-      await tx.queryOp(req, 'DELETE FROM operator_members WHERE operator_id = $1', [id]);
+      await tx.execute('DELETE FROM operator_members WHERE operator_id = $1', [id]);
       await tx.queryOp(req, 'DELETE FROM operator_sessions WHERE operator_id = $1', [id]);
 
       // 删除场馆及相关数据

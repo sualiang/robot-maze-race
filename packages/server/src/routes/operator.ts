@@ -57,30 +57,30 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     // 使用 bcrypt 验证密码
-    const operator2 = await queryOne<{ password_hash: string }>(
-      'SELECT operator_password_hash as password_hash FROM operators WHERE id = $1',
+    const operator2 = await queryOne<{ password: string }>(
+      'SELECT operator_password as password FROM operators WHERE id = $1',
       [operator.id]
     );
     const bcrypt = require('bcryptjs');
-    if (!operator2 || !operator2.password_hash || !bcrypt.compareSync(password, operator2.password_hash)) {
+    if (!operator2 || !operator2.password || !bcrypt.compareSync(password, operator2.password)) {
       return res.status(401).json({ code: 401, message: '手机号或密码错误', data: null });
     }
 
-    // 获取角色权限 — 先从 operator_members 查，没有则从 operators.role 推算
+    // 获取角色权限 — operator_members 已迁至公共库
     let permissions: string[] = ['*'];
     let roleName = '';
-    const member = await queryOpOne<{ role: string }>(req, 
-      'SELECT role FROM operator_members WHERE operator_id = $1 LIMIT 1',
+    const member = await queryOne<{ role_id: string }>(
+      'SELECT role_id FROM operator_members WHERE operator_id = $1 LIMIT 1',
       [operator.id]
     );
-    if (member && member.role) {
-      const roleRec = await queryOne<{ permissions: string; role_name: string }>(
-        'SELECT permissions, role_name FROM admin_roles WHERE name = $1',
-        [member.role]
+    if (member && member.role_id) {
+      const roleRec = await queryOne<{ permissions: string; name: string; label: string }>(
+        'SELECT permissions, name, label FROM admin_roles WHERE name = $1',
+        [member.role_id]
       );
       if (roleRec) {
         permissions = typeof roleRec.permissions === 'object' ? roleRec.permissions : JSON.parse(roleRec.permissions);
-        roleName = roleRec.role_name;
+        roleName = roleRec.label || roleRec.name;
       }
     }
 
@@ -111,7 +111,7 @@ router.post('/login', async (req: Request, res: Response) => {
           venueName: venue?.name || null,
           permissions,
           role_name: roleName,
-          role_id: member?.role || '',
+          role_id: member?.role_id || '',
         },
       },
     });
@@ -180,14 +180,14 @@ router.get('/rbac/users', authMiddleware, operatorOnly, async (req: Request, res
     const params: any[] = [operatorId];
 
     if (search) {
-      conditions.push(`(au.name LIKE ?)`);
+      conditions.push(`(au.nickname LIKE ?)`);
       params.push(`%${search}%`, `%${search}%`);
     }
 
     const whereClause = 'WHERE ' + conditions.join(' AND ');
 
     // 总数
-    const countResult = await queryOpOne<{ count: number }>(req, 
+    const countResult = await queryOne<{ count: number }>(
       `SELECT COUNT(*) as count FROM operator_members au ${whereClause}`,
       params
     );
@@ -195,11 +195,11 @@ router.get('/rbac/users', authMiddleware, operatorOnly, async (req: Request, res
 
     // 分页数据（不返回 password）
     // HEX(name) 绕过 mysql2 连接池 encoding 损坏 bug，JS 层 Buffer.from 解码
-    const users = await queryOp<any>(req, 
-      `SELECT au.id, HEX(au.name) AS name_hex, au.phone,
-              au.role as role_key, COALESCE(arr.label, '') as role_name, au.status, au.created_at
+    const users = await query<any>(
+      `SELECT au.id, HEX(au.nickname) AS name_hex, au.phone,
+              au.role_id as role_key, COALESCE(arr.label, '') as role_name, au.status, au.created_at
        FROM operator_members au
-       LEFT JOIN admin_roles arr ON au.role = arr.name
+       LEFT JOIN admin_roles arr ON au.role_id = arr.name
        ${whereClause}
        ORDER BY au.created_at ASC
        LIMIT ? OFFSET ?`,
@@ -257,7 +257,7 @@ router.post('/rbac/users', authMiddleware, operatorOnly, async (req: Request, re
     }
 
     // 手机号唯一性校验
-    const existing = await queryOpOne<{ id: string }>(req, 
+    const existing = await queryOne<{ id: string }>(
       'SELECT id FROM operator_members WHERE phone = ?',
       [phone]
     );
@@ -270,8 +270,8 @@ router.post('/rbac/users', authMiddleware, operatorOnly, async (req: Request, re
     const hashedPassword = bcrypt.hashSync(plainPassword, 10);
     const id = uuidv4();
 
-    await queryOp(req, 
-      `INSERT INTO operator_members (id, name, password_hash, phone, role, created_at, updated_at)
+    await execute(
+      `INSERT INTO operator_members (id, nickname, password, phone, role_id, operator_id, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [id, phone, hashedPassword, phone, role_key, operatorId]
     );
@@ -316,7 +316,7 @@ router.put('/rbac/users/:id', authMiddleware, operatorOnly, async (req: Request,
     const { phone, role_key, status } = req.body;
 
     // 只能编辑自己运营商下的成员
-    const existing = await queryOpOne<{ id: string; operator_id: string }>(req, 
+    const existing = await queryOne<{ id: string; operator_id: string }>(
       'SELECT id, operator_id FROM operator_members WHERE id = ?',
       [id]
     );
@@ -336,7 +336,7 @@ router.put('/rbac/users/:id', authMiddleware, operatorOnly, async (req: Request,
     const params: any[] = [];
 
     if (phone !== undefined) { sets.push('phone = ?'); params.push(phone); }
-    if (role_key !== undefined) { sets.push('role = ?'); params.push(role_key); }
+    if (role_key !== undefined) { sets.push('role_id = ?'); params.push(role_key); }
     if (status !== undefined) { sets.push('status = ?'); params.push(status); }
 
     if (sets.length === 0) {
@@ -346,16 +346,16 @@ router.put('/rbac/users/:id', authMiddleware, operatorOnly, async (req: Request,
     sets.push("updated_at = NOW()");
     params.push(id);
 
-    await queryOp(req, 
+    await execute(
       `UPDATE operator_members SET ${sets.join(', ')} WHERE id = ?`,
       params
     );
 
-    const updated = await queryOpOne<any>(req, 
-      `SELECT au.id, au.name AS username, au.name AS nickname, au.phone,
-              au.role as role_key, COALESCE(arr.label, '') as role_name, au.status, au.created_at
+    const updated = await queryOne<any>(
+      `SELECT au.id, au.nickname AS username, au.nickname AS nickname, au.phone,
+              au.role_id as role_key, COALESCE(arr.label, '') as role_name, au.status, au.created_at
        FROM operator_members au
-       LEFT JOIN admin_roles arr ON au.role = arr.name
+       LEFT JOIN admin_roles arr ON au.role_id = arr.name
        WHERE au.id = ?`,
       [id]
     );
@@ -384,8 +384,8 @@ router.delete('/rbac/users/:id', authMiddleware, operatorOnly, async (req: Reque
     const operatorId = req.user!.operatorId;
     const { id } = req.params;
 
-    const existing = await queryOpOne<{ id: string; operator_id: string; role_id: string }>(req, 
-      'SELECT id, role FROM operator_members WHERE id = ?' as any,
+    const existing = await queryOne<{ id: string; operator_id: string; role_id: string }>(
+      'SELECT id, role_id FROM operator_members WHERE id = ?',
       [id]
     );
     if (!existing || existing.operator_id !== operatorId) {
@@ -393,9 +393,9 @@ router.delete('/rbac/users/:id', authMiddleware, operatorOnly, async (req: Reque
     }
 
     // 不允许删除最后一个总管理员
-    if ((existing as any).role === 'op_super_admin') {
-      const adminCount = await queryOpOne<{ count: number }>(req, 
-        'SELECT COUNT(*) as count FROM operator_members WHERE role = ? AND operator_id = ?',
+    if (existing.role_id === 'op_super_admin') {
+      const adminCount = await queryOne<{ count: number }>(
+        'SELECT COUNT(*) as count FROM operator_members WHERE role_id = ? AND operator_id = ?',
         ['op_super_admin', operatorId]
       );
       if (adminCount && adminCount.count <= 1) {
@@ -403,7 +403,7 @@ router.delete('/rbac/users/:id', authMiddleware, operatorOnly, async (req: Reque
       }
     }
 
-    await queryOp(req, 'DELETE FROM operator_members WHERE id = ?', [id]);
+    await execute('DELETE FROM operator_members WHERE id = ?', [id]);
 
     return res.json({ code: 0, message: '成员已删除', data: null });
   } catch (error: any) {
@@ -421,8 +421,8 @@ router.post('/rbac/users/:id/reset-password', authMiddleware, operatorOnly, asyn
     const operatorId = req.user!.operatorId;
     const { id } = req.params;
 
-    const existing = await queryOpOne<{ id: string; operator_id: string; phone: string; username: string }>(req, 
-      'SELECT id, phone, name FROM operator_members WHERE id = ?',
+    const existing = await queryOne<{ id: string; operator_id: string; phone: string; nickname: string }>(
+      'SELECT id, phone, nickname FROM operator_members WHERE id = ?',
       [id]
     );
     if (!existing || existing.operator_id !== operatorId) {
@@ -431,8 +431,8 @@ router.post('/rbac/users/:id/reset-password', authMiddleware, operatorOnly, asyn
 
     const plainPassword = generateSecurePassword();
     const hashed = bcrypt.hashSync(plainPassword, 10);
-    await queryOp(req, 
-      `UPDATE operator_members SET password_hash = ?, updated_at = NOW() WHERE id = ?`,
+    await execute(
+      `UPDATE operator_members SET password = ?, updated_at = NOW() WHERE id = ?`,
       [hashed, id]
     );
 
@@ -659,7 +659,7 @@ router.put('/venue/:id', authMiddleware, operatorOnly, async (req: Request, res:
     const venueId = req.params.id;
     const { name, address, mazeConfig } = req.body;
 
-    const existing = await queryOpOne<{ id: string }>(req, 
+    const existing = await queryOne<{ id: string }>( 
       'SELECT id FROM venues WHERE id = $1',
       [venueId]
     );
@@ -668,7 +668,7 @@ router.put('/venue/:id', authMiddleware, operatorOnly, async (req: Request, res:
       return res.status(404).json({ code: 404, message: '场馆不存在', data: null });
     }
 
-    await queryOp(req, 
+    await execute(
       `UPDATE venues SET
         name = COALESCE($1, name),
         address = COALESCE($2, address),
@@ -702,7 +702,7 @@ router.put('/venue/:id/status', authMiddleware, operatorOnly, async (req: Reques
       return res.status(400).json({ code: 400, message: '无效的状态值', data: null });
     }
 
-    const existing = await queryOpOne<{ id: string }>(req, 
+    const existing = await queryOne<{ id: string }>( 
       'SELECT id FROM venues WHERE id = $1',
       [venueId]
     );
@@ -711,7 +711,7 @@ router.put('/venue/:id/status', authMiddleware, operatorOnly, async (req: Reques
       return res.status(404).json({ code: 404, message: '场馆不存在', data: null });
     }
 
-    await queryOp(req, 
+    await execute(
       `UPDATE venues SET status = $1, updated_at = $2 WHERE id = $3`,
       [status, new Date().toISOString(), venueId]
     );
@@ -877,7 +877,7 @@ router.post('/finance/withdraw', authMiddleware, operatorOnly, async (req: Reque
     }
 
     // 创建提现记录
-    await queryOp(req, 
+    await execute(
       `UPDATE settlements SET status = 'withdrawn', settled_at = $1
        WHERE operator_id = $2 AND status = 'settled'
        AND amount_cents <= $3`,
@@ -963,10 +963,10 @@ router.post('/profile/change-password', authMiddleware, async (req: Request, res
     // 查出运营商账号
     const operator = await queryOne<{
       id: string;
-      operator_password_hash: string;
+      operator_password: string;
       password_change_required: number;
     }>(
-      'SELECT id, operator_password_hash, password_change_required FROM operators WHERE id = $1',
+      'SELECT id, operator_password, password_change_required FROM operators WHERE id = $1',
       [userId]
     );
 
@@ -975,8 +975,8 @@ router.post('/profile/change-password', authMiddleware, async (req: Request, res
     }
 
     // 验证旧密码
-    if (operator.operator_password_hash) {
-      if (!bcrypt.compareSync(oldPassword, operator.operator_password_hash)) {
+    if (operator.operator_password) {
+      if (!bcrypt.compareSync(oldPassword, operator.operator_password)) {
         return res.status(401).json({ code: 401, message: '旧密码错误', data: null });
       }
     }
@@ -984,7 +984,7 @@ router.post('/profile/change-password', authMiddleware, async (req: Request, res
     // 更新密码
     const newHash = bcrypt.hashSync(newPassword, 10);
     await query(
-      `UPDATE operators SET operator_password_hash = $1, password_change_required = 0,
+      `UPDATE operators SET operator_password = $1, password_change_required = 0,
        updated_at = NOW() WHERE id = $2`,
       [newHash, userId]
     );
@@ -1036,10 +1036,10 @@ router.post('/change-password', authMiddleware, async (req: Request, res: Respon
     // 查出运营商账号
     const operator = await queryOne<{
       id: string;
-      operator_password_hash: string;
+      operator_password: string;
       password_change_required: number;
     }>(
-      'SELECT id, operator_password_hash, password_change_required FROM operators WHERE id = $1',
+      'SELECT id, operator_password, password_change_required FROM operators WHERE id = $1',
       [userId]
     );
 
@@ -1048,8 +1048,8 @@ router.post('/change-password', authMiddleware, async (req: Request, res: Respon
     }
 
     // 验证旧密码
-    if (operator.operator_password_hash) {
-      if (!bcrypt.compareSync(oldPassword, operator.operator_password_hash)) {
+    if (operator.operator_password) {
+      if (!bcrypt.compareSync(oldPassword, operator.operator_password)) {
         return res.status(401).json({ code: 401, message: '旧密码错误', data: null });
       }
     }
@@ -1057,7 +1057,7 @@ router.post('/change-password', authMiddleware, async (req: Request, res: Respon
     // 更新密码
     const newHash = bcrypt.hashSync(newPassword, 10);
     await query(
-      `UPDATE operators SET operator_password_hash = $1, password_change_required = 0,
+      `UPDATE operators SET operator_password = $1, password_change_required = 0,
        updated_at = NOW() WHERE id = $2`,
       [newHash, userId]
     );

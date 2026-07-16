@@ -27,8 +27,8 @@ router.get('/', authMiddleware, operatorOnly, async (req: Request, res: Response
 
     if (!venue_id) {
       // 统一获取运营商ID：先从 operator_members 查，再回退到 operators
-      const roleMember = await queryOpOne<{ operator_id: string }>(req, 
-        'SELECT operator_id FROM operator_members WHERE id = $1',
+      const roleMember = await queryOne<{ operator_id: string }>(
+        'SELECT operator_id FROM operator_members WHERE id = ?',
         [req.user!.userId]
       );
       const operatorId = roleMember?.operator_id || 
@@ -194,8 +194,8 @@ router.post('/batch', authMiddleware, operatorOnly, async (req: Request, res: Re
     // 不传 venue_id 时，统一获取运营商ID；同时获取 operatorId 用于 venue 占位
     let operatorId: string;
     if (!venue_id) {
-      const roleMember = await queryOpOne<{ operator_id: string }>(req, 
-        'SELECT operator_id FROM operator_members WHERE id = $1',
+      const roleMember = await queryOne<{ operator_id: string }>(
+        'SELECT operator_id FROM operator_members WHERE id = ?',
         [req.user!.userId]
       );
       operatorId = roleMember?.operator_id || 
@@ -237,8 +237,8 @@ router.post('/batch', authMiddleware, operatorOnly, async (req: Request, res: Re
 // ============================================================
 router.get('/check-init', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
-    const roleMember = await queryOpOne<{ operator_id: string }>(req, 
-      'SELECT operator_id FROM operator_members WHERE id = $1',
+    const roleMember = await queryOne<{ operator_id: string }>(
+      'SELECT operator_id FROM operator_members WHERE id = ?',
       [req.user!.userId]
     );
     const operatorId = roleMember?.operator_id ||
@@ -268,8 +268,8 @@ router.get('/check-init', authMiddleware, operatorOnly, async (req: Request, res
 // ============================================================
 router.post('/init-templates', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
-    const roleMember = await queryOpOne<{ operator_id: string }>(req, 
-      'SELECT operator_id FROM operator_members WHERE id = $1',
+    const roleMember = await queryOne<{ operator_id: string }>(
+      'SELECT operator_id FROM operator_members WHERE id = ?',
       [req.user!.userId]
     );
     const operatorId = roleMember?.operator_id ||

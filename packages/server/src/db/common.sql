@@ -281,6 +281,23 @@ CREATE INDEX IF NOT EXISTS idx_notification_logs_scene ON notification_logs(scen
 CREATE INDEX IF NOT EXISTS idx_notification_logs_user ON notification_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_notification_logs_created ON notification_logs(created_at);
 
+-- ==================== 运营商成员表 ====================
+-- 放在公共库，因为登录时需要按手机号查找成员，无法提前知道运营商 DB
+CREATE TABLE IF NOT EXISTS operator_members (
+  id VARCHAR(36) PRIMARY KEY,
+  nickname VARCHAR(64),
+  phone VARCHAR(20),
+  password VARCHAR(256),
+  role_id VARCHAR(32),
+  operator_id VARCHAR(36) NOT NULL,
+  status VARCHAR(20) DEFAULT 'active',
+  first_login INT DEFAULT 1,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX IF NOT EXISTS idx_operator_members_operator ON operator_members(operator_id);
+CREATE INDEX IF NOT EXISTS idx_operator_members_phone ON operator_members(phone);
+
 -- ==================== 裁判邀请表 ====================
 CREATE TABLE IF NOT EXISTS referee_invites (
   id VARCHAR(36) PRIMARY KEY,

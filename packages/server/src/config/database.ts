@@ -222,6 +222,35 @@ export async function initSchema(): Promise<void> {
       if ((cols as any[]).length === 0) await conn.execute(`ALTER TABLE \`${table}\` ADD COLUMN \`${col}\` ${type}`);
     } catch {}
   }
+
+  // ===== 种子数据: 默认角色和超管账号 =====
+  try {
+    // 添加默认管理员角色
+    const adminRoles = [
+      ['role-super-admin', '超级管理员', '["*"]', 'admin'],
+      ['ops_admin', '运营', '["venue_manage","race_manage","package_manage","order_manage","coupon_manage","member_manage","referee_manage","marketing_manage","dashboard","checkin","data_export","report"]', 'operator'],
+      ['finance_admin', '财务', '["order_manage","settlement","data_export","report","dashboard"]', 'operator'],
+      ['op_super_admin', '运营商超管', '["*"]', 'operator'],
+    ];
+    for (const [name, label, permissions, scope] of adminRoles) {
+      await conn.execute(
+        'INSERT IGNORE INTO admin_roles (id, name, label, permissions, scope) VALUES (?, ?, ?, ?, ?)',
+        [uuidv4(), name, label, permissions, scope]
+      );
+    }
+    console.log('[DB] Seed admin_roles inserted');
+
+    // 添加默认超管账号 (admin / admin123)
+    const adminPassword = bcrypt.hashSync('admin123', 10);
+    await conn.execute(
+      'INSERT IGNORE INTO admin_users (id, username, password, nickname, role_id, status) VALUES (?, ?, ?, ?, ?, ?)',
+      [uuidv4(), 'admin', adminPassword, 'Admin', 'role-super-admin', 'active']
+    );
+    console.log('[DB] Seed admin user inserted');
+  } catch (e: any) {
+    console.warn('[DB] Seed warning (may already exist):', e.message?.substring(0, 100));
+  }
+
   console.log('[DB] Common schema initialized');
 }
 
