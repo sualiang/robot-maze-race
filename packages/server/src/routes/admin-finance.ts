@@ -318,12 +318,13 @@ router.get('/orders', authMiddleware, checkPermission('finance:read'), async (re
     const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string, 10) || 20));
     const offset = (page - 1) * pageSize;
 
-    // operator 库查 orders
-    const countRow = await queryOpOne<{ count: string }>(req, 'SELECT COUNT(*) as count FROM orders');
+    // operator 库查 orders（带 operator_id 过滤）
+    const opId = (req.user as any)?.operatorId || '';
+    const countRow = await queryOpOne<{ count: string }>(req, 'SELECT COUNT(*) as count FROM orders WHERE operator_id = $1', [opId]);
     const total = parseInt(countRow?.count || '0', 10);
     const rows = await queryOp<any>(req,
-      'SELECT o.* FROM orders o ORDER BY o.created_at DESC LIMIT $1 OFFSET $2',
-      [pageSize, offset]
+      'SELECT o.* FROM orders o WHERE o.operator_id = $1 ORDER BY o.created_at DESC LIMIT $2 OFFSET $3',
+      [opId, pageSize, offset]
     );
 
     // common 库补查 player_profiles nickname

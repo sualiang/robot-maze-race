@@ -600,15 +600,16 @@ router.get('/me/race-records', authMiddleware, async (req: Request, res: Respons
   const userId = req.user!.userId;
 
   try {
+    const opId = (req.user as any)?.operatorId || '';
     const records = await queryOp<any>(req, 
       `SELECT rr.id, rr.score_ms, rr.rank, rr.status, rr.finished_at, rr.created_at,
               v.name as venue_name
        FROM race_results rr
        LEFT JOIN venues v ON rr.venue_id = v.id
-       WHERE rr.user_id = $1
+       WHERE rr.user_id = $1 AND rr.operator_id = $2
        ORDER BY rr.created_at DESC
        LIMIT 50`,
-      [userId]
+      [userId, opId]
     );
 
     const result = (records || []).map((r: any) => ({

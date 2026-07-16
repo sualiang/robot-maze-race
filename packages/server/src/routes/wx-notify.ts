@@ -171,12 +171,13 @@ router.post('/race-reminder', authMiddleware, async (req: Request, res: Response
     }
 
     // 查询所有参赛选手
+    const opId = (req.user as any)?.operatorId || '';
     const players = await queryOp<{ user_id: string; openid: string; nickname: string }>(req, 
       `SELECT rr.user_id, u.openid, u.nickname
        FROM race_results rr
        JOIN users u ON u.id = rr.user_id
-       WHERE rr.race_id = ? AND u.openid IS NOT NULL AND u.openid != ''`,
-      [race_id]
+       WHERE rr.race_id = $1 AND rr.operator_id = $2 AND u.openid IS NOT NULL AND u.openid != ''`,
+      [race_id, opId]
     );
 
     if (players.length === 0) {

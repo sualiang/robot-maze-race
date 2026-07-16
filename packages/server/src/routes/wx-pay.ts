@@ -410,6 +410,18 @@ router.post('/notify', async (req: Request, res: Response) => {
         [uuidv4(), order.id, order.id, order.amount, transaction.transaction_id]
       );
 
+      // 自动创建结算记录（支付成功即创建，待后续人工确认结算）
+      try {
+        const opId = (req as any).operatorId || (req.user as any)?.operatorId || '';
+        await executeOp(req,
+          `INSERT INTO settlements (id, order_id, amount_cents, commission_cents, operator_id, status, created_at)
+           VALUES ($1, $2, $3, 0, $4, 'pending', NOW())`,
+          [uuidv4(), order.id, order.amount, opId]
+        );
+      } catch (e: any) {
+        console.warn('[WxPay] settlements insert warning:', e.message?.substring(0, 100));
+      }
+
       // 处理参赛包发放（已有逻辑由原有 order 模块处理，此处只记录）
       console.log('[WxPay] 支付成功:', outTradeNo, 'transaction_id:', transaction.transaction_id);
     } else if (['CLOSED', 'PAYERROR', 'REVOKED'].includes(tradeState)) {

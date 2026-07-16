@@ -322,33 +322,6 @@ export async function initSchema(): Promise<void> {
   } catch (e: any) {
     console.warn('[DB] Table completeness check warning:', e.message?.substring(0, 100));
   }
-
-  // ===== 补全现有运营商库中缺失的表（re-run operator.sql） =====
-  try {
-    const schemaPath = path.join(__dirname, '../db/operator.sql');
-    if (!fs.existsSync(schemaPath)) {
-      console.warn('[DB] operator.sql not found, skipping table completeness check');
-    } else {
-      const [allRegistry] = await conn.execute<any[]>(
-        `SELECT db_name, operator_id FROM operators_registry WHERE db_name IS NOT NULL`
-      );
-      if (allRegistry && allRegistry.length > 0) {
-        console.log(`[DB] Checking ${allRegistry.length} operator DB(s) for missing tables...`);
-        let fixedCount = 0;
-        for (const reg of allRegistry) {
-          try {
-            const pool = getOperatorPool(reg.db_name);
-            await runSqlFile(pool, schemaPath);
-          } catch (e: any) {
-            console.warn(`[DB]  Table completeness check failed for ${reg.db_name}:`, e.message?.substring(0, 100));
-          }
-        }
-        if (fixedCount > 0) console.log(`[DB]  Table completeness check done`);
-      }
-    }
-  } catch (e: any) {
-    console.warn('[DB] Table completeness check warning:', e.message?.substring(0, 100));
-  }
 }
 
 async function runSqlFile(pool: mysql.Pool, filePath: string): Promise<void> {

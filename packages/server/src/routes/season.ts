@@ -252,14 +252,15 @@ router.get('/qualifier/assessment', authMiddleware, async (req: Request, res: Re
   const userId = req.user!.userId;
   try {
     // 查询最近比赛成绩
+    const opId = (req.user as any)?.operatorId || '';
     const recentRaces = await queryOp<any>(req, 
       `SELECT rr.score_ms, rr.status, rr.finished_at, v.name as venue_name
        FROM race_results rr
        LEFT JOIN venues v ON rr.venue_id = v.id
-       WHERE rr.user_id = $1 AND rr.status = 'completed'
+       WHERE rr.user_id = $1 AND rr.status = 'completed' AND rr.operator_id = $2
        ORDER BY rr.finished_at DESC
        LIMIT 10`,
-      [userId,]
+      [userId, opId]
     );
 
     // 计算平均成绩
