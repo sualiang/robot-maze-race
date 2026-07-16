@@ -55,9 +55,6 @@ router.get('/', authMiddleware, checkPermission('players:list'), async (req: Req
       conditions.push('u.subscribe_venue_id IS NULL');
     } else if (scope === 'operator') {
       conditions.push('u.subscribe_venue_id IS NOT NULL');
-      if (operatorId) {
-        conditions.push('v.operator_id = $' + (params.length + 1));
-              }
     }
 
     // 关键字搜索（昵称或手机号）
@@ -69,10 +66,8 @@ router.get('/', authMiddleware, checkPermission('players:list'), async (req: Req
 
     const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
 
-    // 构建基础查询
-    const fromClause = `FROM users u
-      LEFT JOIN venues v ON u.subscribe_venue_id = v.id
-      LEFT JOIN operators o ON v.operator_id = o.id`;
+    // 构建基础查询（不 JOIN 跨库表，venue_name/operator_name 返回 NULL）
+    const fromClause = `FROM users u`;
 
     // 计数
     const countResult = await queryOne<{ total: number }>(
@@ -81,12 +76,12 @@ router.get('/', authMiddleware, checkPermission('players:list'), async (req: Req
     );
     const total = countResult?.total || 0;
 
-    // 查询字段
+    // 查询字段（不 JOIN 跨库表，venue_name/operator_name 置 NULL）
     const selectFields = `u.id, u.nickname, u.phone, u.gender, u.age, u.avatar_url,
       u.subscribe_venue_id,
-      v.name AS subscribe_venue_name,
-      v.operator_id,
-      o.name AS operator_name,
+      NULL AS subscribe_venue_name,
+      NULL AS operator_id,
+      NULL AS operator_name,
       u.race_count, u.best_score_ms, u.created_at`;
 
     // CSV 导出
