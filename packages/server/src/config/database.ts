@@ -228,9 +228,13 @@ export async function initSchema(): Promise<void> {
     // 添加默认管理员角色
     const adminRoles = [
       ['role-super-admin', '超级管理员', '["*"]', 'admin'],
-      ['ops_admin', '运营', '["venue_manage","race_manage","package_manage","order_manage","coupon_manage","member_manage","referee_manage","marketing_manage","dashboard","checkin","data_export","report"]', 'operator'],
-      ['finance_admin', '财务', '["order_manage","settlement","data_export","report","dashboard"]', 'operator'],
+      ['role-admin', '总管理员', '["operators:read","operators:list","operators:create","operators:edit","operators:delete","players:list","dashboard:read","dashboard:list","marketing:read","finance:read","finance:withdraw","finance:history"]', 'admin'],
+      ['ops_admin', '运营管理员', '["operators:read","operators:create","operators:edit","players:list","dashboard:read","dashboard:list"]', 'admin'],
+      ['finance_admin', '财务管理员', '["finance:read","finance:withdraw","finance:history"]', 'admin'],
       ['op_super_admin', '运营商超管', '["*"]', 'operator'],
+      ['op_admin', '运营', '["venues:read","venues:create","venues:edit","referees:read","referees:create","referees:edit","packages:read","packages:create","packages:edit","marketing:read","marketing:create","marketing:edit","players:read","dashboard:read"]', 'operator'],
+      ['op_finance', '财务', '["finance:read","finance:withdraw","finance:history","dashboard:read"]', 'operator'],
+      ['op_support', '客服', '["players:read","referees:read","venues:read","marketing:read","dashboard:read","rbac:read"]', 'operator'],
     ];
     for (const [name, label, permissions, scope] of adminRoles) {
       await conn.execute(

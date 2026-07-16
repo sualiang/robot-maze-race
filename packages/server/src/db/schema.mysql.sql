@@ -713,3 +713,23 @@ CREATE TABLE IF NOT EXISTS help_helpers (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE INDEX IF NOT EXISTS idx_help_helpers_help ON help_helpers(help_id);
 CREATE INDEX IF NOT EXISTS idx_help_helpers_user ON help_helpers(user_id);
+
+-- ==================== 种子数据 ====================
+
+-- 运营商角色（scope='operator'）
+INSERT IGNORE INTO admin_roles (id, name, label, permissions, scope) VALUES
+  (UUID(), 'op_super_admin', '运营商超管', '["*"]', 'operator'),
+  (UUID(), 'op_admin', '运营', '["venues:read","venues:create","venues:edit","referees:read","referees:create","referees:edit","packages:read","packages:create","packages:edit","marketing:read","marketing:create","marketing:edit","players:read","dashboard:read"]', 'operator'),
+  (UUID(), 'op_finance', '财务', '["finance:read","finance:withdraw","finance:history","dashboard:read"]', 'operator'),
+  (UUID(), 'op_support', '客服', '["players:read","referees:read","venues:read","marketing:read","dashboard:read","rbac:read"]', 'operator');
+
+-- 总部角色（scope='admin'）
+INSERT IGNORE INTO admin_roles (id, name, label, permissions, scope) VALUES
+  (UUID(), 'role-super-admin', '超级管理员', '["*"]', 'admin'),
+  (UUID(), 'role-admin', '总管理员', '["operators:read","operators:list","operators:create","operators:edit","operators:delete","players:list","dashboard:read","dashboard:list","marketing:read","finance:read","finance:withdraw","finance:history"]', 'admin'),
+  (UUID(), 'ops_admin', '运营管理员', '["operators:read","operators:create","operators:edit","players:list","dashboard:read","dashboard:list"]', 'admin'),
+  (UUID(), 'finance_admin', '财务管理员', '["finance:read","finance:withdraw","finance:history"]', 'admin');
+
+-- 默认超管账号 (admin / admin123)
+INSERT IGNORE INTO admin_users (id, username, password, nickname, role_id, first_login, status) VALUES
+  (UUID(), 'admin', '$2b$10$8K1p/a0dL1LXMIgoEDFrwOfMQkf9NcyhLrf2FxoH5dR4PWvP5FhKC', '超级管理员', 'role-super-admin', 0, 'active');

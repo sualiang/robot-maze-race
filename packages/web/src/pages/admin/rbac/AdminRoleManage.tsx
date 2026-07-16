@@ -14,8 +14,10 @@ const PERMISSION_LABELS: Record<string, string> = {
   'operators:read': '运营商管理',
   'operators:create': '运营商管理',
   'operators:edit': '运营商管理',
-  'dashboard:read': '运营商数据看板',
-  'dashboard:list': '运营商数据看板',
+  'operators:delete': '运营商管理',
+  'players:list': '玩家列表',
+  'dashboard:read': '数据看板',
+  'dashboard:list': '数据看板',
   'marketing:read': '营销配置',
   'marketing:edit': '营销配置',
   'finance:read': '财务中心',
@@ -33,11 +35,11 @@ function getPermissionTags(permissions: string[]): { label: string; color: strin
   const tags: { label: string; color: string }[] = [];
   const colorMap: Record<string, string> = {
     '运营商管理': 'blue',
-    '运营商数据看板': 'cyan',
+    '数据看板': 'cyan',
+    '玩家列表': 'green',
     '营销配置': 'purple',
     '财务中心': 'gold',
     '系统设置': 'geekblue',
-    '个人中心': 'green',
   };
 
   for (const perm of permissions) {
