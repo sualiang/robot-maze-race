@@ -155,8 +155,8 @@ router.get('/', authMiddleware, async (req: Request, res: Response<ApiResponse<P
     // operator 可看自己管理的赛场下的裁判 + 未绑定赛场的裁判（自己创建的）
     if (req.user!.role === 'operator') {
       // 统一获取运营商ID：先查 operator_members 表再回退
-      const roleMember = await queryOpOne<{ operator_id: string }>(req, 
-        'SELECT operator_id FROM operator_members WHERE id = $1',
+      const roleMember = await queryOne<{ operator_id: string }>(
+          'SELECT operator_id FROM operator_members WHERE id = ?',
         [req.user!.userId]
       );
       const opUserId = roleMember?.operator_id || 

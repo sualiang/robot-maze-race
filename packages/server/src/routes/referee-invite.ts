@@ -26,8 +26,8 @@ router.post('/invite', authMiddleware, async (req: Request, res: Response) => {
     const { phone, venue_id, note } = req.body;
     let operatorId = '';
     if (role === 'operator') {
-      const member = await queryOpOne<{ operator_id: string }>(req, 
-        'SELECT operator_id FROM operator_members WHERE id = $1', [req.user!.userId]
+      const member = await queryOne<{ operator_id: string }>(
+        'SELECT operator_id FROM operator_members WHERE id = ?', [req.user!.userId]
       );
       operatorId = member?.operator_id || (req.user as any).operatorId || req.user!.userId;
     }
