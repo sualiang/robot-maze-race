@@ -202,8 +202,8 @@ router.post('/', authMiddleware, checkPermission('operators:create'), async (req
     const operatorAdminRoleId = 'role-admin';
     const adminUserId = uuidv4();
     await query(
-      `INSERT INTO admin_users (id, username, password, nickname, phone, role_id, status, first_login)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      `INSERT INTO admin_users (id, username, password, nickname, phone, role_id, operator_id, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
         adminUserId,
         operatorUsername,
@@ -213,7 +213,6 @@ router.post('/', authMiddleware, checkPermission('operators:create'), async (req
         operatorAdminRoleId,
         id,
         'active',
-        1,
       ]
     );
 

@@ -4,6 +4,7 @@ import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config';
 import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../config/database';
+import { queryCommonOne } from '../db/router';
 import { authMiddleware, optionalAuth, AuthPayload } from '../middleware/auth';
 import { getAccessToken } from '../services/wechat-token';
 import {
