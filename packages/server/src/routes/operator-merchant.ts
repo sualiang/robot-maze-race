@@ -49,13 +49,25 @@ router.get('/merchant/pending', authMiddleware, operatorOnly, async (req: Reques
     );
 
     const merchants = await queryOp<any>(req, 
-      `SELECT m.*, op.name as operator_name
-       FROM merchants m
-       LEFT JOIN operators op ON m.operator_id = op.id
+      `SELECT m.* FROM merchants m
        ${whereClause}
-       ORDER BY m.created_at ASC LIMIT ? OFFSET ?`,
+       ORDER BY m.created_at ASC LIMIT $1 OFFSET $2`,
       [...params, pageSize, offset]
     );
+
+    // 跨库查运营商名称（operators 在公共库，merchants 在运营商库）
+    let opNameMap = new Map<string, string>();
+    if ((merchants || []).length > 0) {
+      const opIds = [...new Set(merchants.map((m: any) => m.operator_id).filter(Boolean))];
+      if (opIds.length > 0) {
+        const placeholders = opIds.map((_, i) => '$' + (i + 1)).join(', ');
+        const opRows = await query<{ id: string; name: string }>(
+          `SELECT id, name FROM operators WHERE id IN (${placeholders})`,
+          opIds
+        );
+        (opRows || []).forEach((o: any) => opNameMap.set(o.id, o.name));
+      }
+    }
 
     res.json({
       code: 0,
@@ -73,7 +85,7 @@ router.get('/merchant/pending', authMiddleware, operatorOnly, async (req: Reques
           description: m.description || '',
           auditStatus: m.audit_status,
           operatorId: m.operator_id || '',
-          operatorName: m.operator_name || '',
+          operatorName: opNameMap.get(m.operator_id) || '',
           createdAt: m.created_at,
         })),
         total: countRow?.total || 0,
@@ -265,12 +277,12 @@ router.get('/merchant/coupon/pending', authMiddleware, operatorOnly, async (req:
     const offset = (page - 1) * pageSize;
     const auditStatus = req.query.auditStatus as string || '1'; // 默认查待审核(1)
 
-    const conditions: string[] = ['mc.audit_status = ?', 'm.operator_id = ?', 'mc.offline_request = 0'];
+    const conditions: string[] = ['mc.audit_status = $1', 'm.operator_id = $2', 'mc.offline_request = 0'];
     const params: any[] = [parseInt(auditStatus, 10), operatorId];
 
     const merchantId = req.query.merchantId as string;
     if (merchantId) {
-      conditions.push('mc.merchant_id = ?');
+      conditions.push('mc.merchant_id = $' + (params.length + 1));
       params.push(merchantId);
     }
 
@@ -288,7 +300,7 @@ router.get('/merchant/coupon/pending', authMiddleware, operatorOnly, async (req:
        FROM merchant_coupons mc
        LEFT JOIN merchants m ON mc.merchant_id = m.id
        ${whereClause}
-       ORDER BY mc.created_at ASC LIMIT ? OFFSET ?`,
+       ORDER BY mc.created_at ASC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
       [...params, pageSize, offset]
     );
 
