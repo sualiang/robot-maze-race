@@ -589,6 +589,7 @@ router.post('/login', async (req: Request, res: Response) => {
             operator_name: member.operator_name,
             company_name: member.company_name || null,
             firstLogin,
+            passwordChangeRequired: firstLogin,
           },
         },
       });
