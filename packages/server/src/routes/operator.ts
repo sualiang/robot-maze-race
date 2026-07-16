@@ -43,8 +43,9 @@ router.post('/login', async (req: Request, res: Response) => {
       phone: string;
       email: string | null;
       status: string;
+      password_change_required: number;
     }>(
-      `SELECT id, name, phone, email, status FROM operators WHERE phone = $1`,
+      `SELECT id, name, phone, email, status, COALESCE(password_change_required, 0) as password_change_required FROM operators WHERE phone = $1`,
       [phone]
     );
 
@@ -112,6 +113,7 @@ router.post('/login', async (req: Request, res: Response) => {
           permissions,
           role_name: roleName,
           role_id: member?.role_id || '',
+          passwordChangeRequired: operator.password_change_required || 0,
         },
       },
     });
