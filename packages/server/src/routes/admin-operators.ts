@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
-import { query, queryOne, queryOp, queryOpOne, executeOp, transaction, generateSecurePassword, createOperatorDatabase } from '../config/database';
+import { query, queryOne, queryOp, queryOpOne, executeOp, execute, transaction, generateSecurePassword, createOperatorDatabase, getBaseOptions } from '../config/database';
+import mysql from 'mysql2/promise';
 import { authMiddleware } from '../middleware/auth';
 import { checkPermission } from '../middleware/rbac';
 
@@ -483,6 +484,33 @@ router.delete('/:id', authMiddleware, checkPermission('operators:delete'), async
       }
       await tx.query('DELETE FROM operators WHERE id = $1', [id]);
     });
+
+    // 4) 删除 operators_registry 记录 + DROP 运营商独立库（事务外）
+    try {
+      await execute('DELETE FROM operators_registry WHERE operator_id = $1', [id]);
+    } catch (e: any) {
+      console.error('[AdminOperators] delete registry error:', e.message);
+    }
+
+    // DROP DATABASE（raw connection，事务外，失败不影响主流程）
+    try {
+      const baseOpts = getBaseOptions();
+      const adminConn = await mysql.createConnection({
+        host: baseOpts.host,
+        port: baseOpts.port,
+        user: baseOpts.user,
+        password: baseOpts.password,
+        charset: baseOpts.charset,
+      });
+      try {
+        await adminConn.execute(`DROP DATABASE IF EXISTS \`op_${id}\``);
+        console.log(`[AdminOperators] Dropped operator DB: op_${id}`);
+      } finally {
+        await adminConn.end();
+      }
+    } catch (e: any) {
+      console.error('[AdminOperators] DROP DATABASE error (operator data already deleted):', e.message);
+    }
 
     return res.json({ code: 0, message: '删除成功', data: null });
   } catch (error: any) {

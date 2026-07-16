@@ -39,7 +39,7 @@ const COMMON_DB_NAME = process.env.COMMON_DB_NAME || 'robot_maze_race_common';
 let commonPool: mysql.Pool | null = null;
 const operatorPools: Map<string, mysql.Pool> = new Map();
 
-function getBaseOptions(): mysql.PoolOptions {
+export function getBaseOptions(): mysql.PoolOptions {
   const parsed = new URL(DATABASE_URL);
   const port = parseInt(process.env.DB_PORT || parsed.port || '3308', 10);
   return {
