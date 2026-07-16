@@ -1238,20 +1238,9 @@ let cachedVenueName = '机器狗迷宫赛场';
 let cachedVenueId = '';
 let cachedVenueStatus = 'inactive';
 
-/** 从 MySQL venues 表加载首个赛场信息 */
+/** venues 表在运营商独立库中，启动时无法解析 req context，直接使用默认值 */
 export async function initVenueCache(): Promise<void> {
-  try {
-    const row = await queryOne<{ id: string; name: string; status: string }>( 
-      'SELECT id, name, status FROM venues LIMIT 1'
-    );
-    if (row) {
-      cachedVenueName = row.name || cachedVenueName;
-      cachedVenueId = row.id || cachedVenueId;
-      cachedVenueStatus = row.status || cachedVenueStatus;
-    }
-  } catch (e) {
-    console.warn('[VenueCache] 初始化失败，使用默认值:', (e as any)?.message || e);
-  }
+  // 无操作：venues 在运营商独立库，启动时无 req 无法路由
 }
 
 export function getCurrentScreenData() {

@@ -321,22 +321,33 @@ router.post('/operator-login', async (req: Request, res: Response) => {
   }
 
   try {
-    // operator_members 已迁至公共库，用 queryOne 查询
+    // 分两步查：先查 operator_members（公共库），再补查 admin_roles 和 operators
     const member = await queryOne<any>(
-      `SELECT m.id, m.password as password, m.nickname as nickname, m.phone,
-              m.role_id, m.status, ar.label as role_name, ar.name as admin_role_name, ar.permissions,
-              m.operator_id,
-              o.name as operator_name, o.company_name,
-              m.first_login
-       FROM operator_members m
-       LEFT JOIN admin_roles ar ON ar.name = m.role_id
-       LEFT JOIN operators o ON o.id = m.operator_id
-       WHERE m.phone = ?`,
+      `SELECT id, password, nickname, phone, role_id, status, operator_id, first_login
+       FROM operator_members WHERE phone = ?`,
       [phone]
     );
 
     if (!member) {
       return res.status(401).json({ code: 401, message: '手机号或密码错误', data: null });
+    }
+
+    // 补查角色信息
+    const roleRow = member.role_id
+      ? await queryOne<any>(`SELECT label as role_name, name as admin_role_name, permissions FROM admin_roles WHERE name = ?`, [member.role_id])
+      : null;
+    if (roleRow) {
+      member.role_name = roleRow.role_name;
+      member.admin_role_name = roleRow.admin_role_name;
+      member.permissions = roleRow.permissions;
+    }
+    // 补查运营商信息
+    const opRow = member.operator_id
+      ? await queryOne<any>(`SELECT name as operator_name, company_name FROM operators WHERE id = ?`, [member.operator_id])
+      : null;
+    if (opRow) {
+      member.operator_name = opRow.operator_name;
+      member.company_name = opRow.company_name || null;
     }
 
     if (member.status === 'disabled') {
@@ -497,20 +508,31 @@ router.post('/login', async (req: Request, res: Response) => {
       }
 
       const member = await queryOne<any>(
-        `SELECT m.id, m.password as password, m.nickname as nickname, m.phone,
-                m.role_id, m.status, ar.label as role_name, ar.name as admin_role_name, ar.permissions,
-                m.operator_id,
-                o.name as operator_name, o.company_name,
-                m.first_login
-         FROM operator_members m
-         LEFT JOIN admin_roles ar ON ar.name = m.role_id
-         LEFT JOIN operators o ON o.id = m.operator_id
-         WHERE m.phone = ?`,
+        `SELECT id, password, nickname, phone, role_id, status, operator_id, first_login
+         FROM operator_members WHERE phone = ?`,
         [phone]
       );
 
       if (!member) {
         return res.status(401).json({ code: 401, message: '手机号或密码错误', data: null });
+      }
+
+      // 补查角色信息
+      const roleRow2 = member.role_id
+        ? await queryOne<any>(`SELECT label as role_name, name as admin_role_name, permissions FROM admin_roles WHERE name = ?`, [member.role_id])
+        : null;
+      if (roleRow2) {
+        member.role_name = roleRow2.role_name;
+        member.admin_role_name = roleRow2.admin_role_name;
+        member.permissions = roleRow2.permissions;
+      }
+      // 补查运营商信息
+      const opRow2 = member.operator_id
+        ? await queryOne<any>(`SELECT name as operator_name, company_name FROM operators WHERE id = ?`, [member.operator_id])
+        : null;
+      if (opRow2) {
+        member.operator_name = opRow2.operator_name;
+        member.company_name = opRow2.company_name || null;
       }
 
       if (member.status === 'disabled') {
