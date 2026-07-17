@@ -24,9 +24,9 @@ Page({
   fetchItems: function () {
     var that = this;
     request.silentGet('/points-shop/items').then(function (res) {
-      if (res && res.data) {
-        var items = res.data.items || [];
-        var userPoints = res.data.userPoints || 0;
+      if (res) {
+        var items = res.items || [];
+        var userPoints = res.userPoints || 0;
         that.setData({
           userPoints: userPoints,
           entryItems: items.filter(function (i) { return i.itemType === 'entry_deduction'; }),

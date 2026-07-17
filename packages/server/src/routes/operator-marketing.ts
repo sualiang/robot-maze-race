@@ -191,7 +191,7 @@ router.post('/batch', authMiddleware, operatorOnly, async (req: Request, res: Re
       return res.status(400).json({ code: 400, message: 'configs 不能为空', data: null });
     }
 
-    // 不传 venue_id 时，统一获取运营商ID；同时获取 operatorId 用于 venue 占位
+    // 使用 operatorId 作为 venue 标记（取前 36 字符，适配 VARCHAR(36) 限制）
     let operatorId: string;
     if (!venue_id) {
       const roleMember = await queryOne<{ operator_id: string }>(
@@ -201,19 +201,23 @@ router.post('/batch', authMiddleware, operatorOnly, async (req: Request, res: Re
       operatorId = roleMember?.operator_id || 
         ((req.user as any).operatorId) || 
         req.user!.userId;
-      venue_id = 'operator_' + operatorId;
+      venue_id = operatorId; // 直接用 operatorId，不再拼接 'operator_' 前缀
     } else {
-      // 从 venue_id 提取 operatorId（格式：operator_xxx）
+      // 如果传了 venue_id，直接采用
       operatorId = venue_id.replace(/^operator_/, '') || 
         ((req.user as any).operatorId) || 
         req.user!.userId;
     }
 
     // 确保 venue 记录存在（满足 foreign key 约束）
-    await executeOp(req, 
-      'INSERT IGNORE INTO venues (id, name, status) VALUES ($1, $2, $3, \'active\')',
-      [venue_id, venue_id, operatorId]
-    );
+    // 检查 venue_id 是否已有记录
+    const venueExists = await queryOpOne<{ id: string }>(req, 'SELECT id FROM venues WHERE id = $1', [venue_id]);
+    if (!venueExists) {
+      await executeOp(req,
+        'INSERT INTO venues (id, name, operator_id, status) VALUES ($1, $2, $3, $4)',
+        [venue_id, venue_id, operatorId, 'active']
+      );
+    }
 
     for (const { key, value } of configs) {
       const existing = await queryOpOne<{ id: string }>(req, 'SELECT id FROM marketing_config WHERE venue_id = $1 AND `key` = $2', [venue_id, key]);
