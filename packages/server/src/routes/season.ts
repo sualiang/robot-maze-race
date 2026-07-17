@@ -89,6 +89,20 @@ router.get('/user/info', authMiddleware, async (req: Request, res: Response) => 
       if (parts.length > 0) upgradeDesc = `升级${levelNames[nextLevel] || ''}立得：${parts.join(' + ')}`;
     }
 
+    // 查询剩余参赛次数（从 orders 表聚合 remaining_times）
+    let remainCount = 0;
+    try {
+      const remainRow = await queryOpOne<{ total: number }>(req,
+        `SELECT COALESCE(SUM(remaining_times), 0) as total
+         FROM orders
+         WHERE user_id = $1 AND status = 'paid' AND remaining_times > 0`,
+        [userId]
+      );
+      remainCount = remainRow?.total || 0;
+    } catch (e: any) {
+      console.error('[Season] remainCount query error:', e?.message || e);
+    }
+
     res.json({
       code: 0,
       data: {
@@ -101,6 +115,7 @@ router.get('/user/info', authMiddleware, async (req: Request, res: Response) => 
         totalPower: combat?.total_power || 0,
         points: user.points || 0,
         rank: rankRow?.user_rank || 0,
+        remainCount,
         nextLevelExp,
         currentLevelExp,
         expProgress: nextLevelExp > currentLevelExp
