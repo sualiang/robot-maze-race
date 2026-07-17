@@ -882,113 +882,19 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
     // 计算最终支付金额（最低0）
     const finalPriceCents = Math.max(0, pkg.price_cents - deductionCents);
 
-    // 创建订单（记录 remaining_times / remaining_growth 作为签到发成长值的依据）
+    // 创建订单（status='pending'，支付回调成功后改为 'paid'）
     await queryOp(req, 
       `INSERT INTO orders (id, order_no, user_id, package_id, amount_cents, discount_cents,
-               remaining_times, remaining_growth, status, paid_at, created_at, operator_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'paid', NOW(), NOW(), $9)`,
+               remaining_times, remaining_growth, status, created_at, operator_id, prepay_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', NOW(), $9, '')`,
       [orderId, orderNo, userId, packageId, pkg.price_cents, deductionCents,
        remainingTimes, remainingGrowth,
        (req.user as any)?.operatorId || '']
     );
 
-    // P0: 下单成功后自动创建结算记录
-    const operatorId = (req.user as any)?.operatorId || '';
-    try {
-      await queryOp(req,
-        `INSERT INTO settlements (id, operator_id, order_id, amount_cents, commission_cents, status, created_at)
-         VALUES ($1, $2, $3, $4, 0, 'pending', NOW())`,
-        [uuidv4(), operatorId, orderId, pkg.price_cents]
-      );
-    } catch (e: any) {
-      console.warn('[订单] settlements创建失败:', e.message?.substring(0, 100));
-    }
-
-    // 购买参赛包后，更新用户参赛次数
-    if (pkg.race_count > 0) {
-      try {
-        await execute(
-          `UPDATE users SET race_count = COALESCE(race_count, 0) + $1, updated_at = NOW() WHERE id = $2`,
-          [pkg.race_count, userId]
-        );
-        console.log('[订单] 购买参赛包增加参赛次数:', pkg.race_count, '次');
-      } catch (raceCountErr: any) {
-        console.error('[订单] 更新参赛次数失败:', raceCountErr?.message || raceCountErr);
-      }
-    }
-
-    // 购买后自动赠送抵扣金（如参赛包有 free_deduction_cents 配置）
-    const freeDeductionCents = (pkg as any).free_deduction_cents || 0;
-    if (freeDeductionCents > 0) {
-      try {
-        const deductionId = uuidv4();
-        await queryOp(req, 
-          `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
-           VALUES ($1, $2, $3, 'order_purchase', 'available', $4, $5, DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
-          [deductionId, userId, freeDeductionCents, orderId, packageId]
-        );
-        console.log(`[订单] 购买参赛包赠送抵扣金${freeDeductionCents}分`);
-      } catch (grantErr: any) {
-        console.error('[订单] 赠送抵扣金失败:', grantErr?.message || grantErr);
-      }
-    }
-
-    // 购买后自动配消费券（从券池按算法匹配，详见 coupon-service）
-    try {
-      const assignResult = await autoAssignMerchantCoupons(userId, orderId, packageId);
-      if (assignResult.grantedCount > 0) {
-        console.log(`[订单] 自动配券: ${assignResult.grantedCount}张, 总面额${assignResult.totalCents}分, 覆盖${assignResult.merchantCount}家商家`);
-      }
-    } catch (couponErr: any) {
-      console.error('[订单] 自动配券失败:', couponErr?.message || couponErr);
-    }
-
-    // 购包成功后自动发放参赛抵扣卡
-    // 专业包（tag='professional'）发3张2000分参赛抵扣卡，source='order_purchase_pro'
-    // 其他包包根据 tag 发放对应的参赛抵扣卡
-    try {
-      // 查询参赛包的 tag
-      const pkgTag = await queryOpOne<{ tag: string }>(req, 
-        `SELECT tag FROM race_packages WHERE id = $1`,
-        [packageId]
-      );
-      const tag = pkgTag?.tag || '';
-
-      if (tag === 'professional') {
-        // 专业包：发3张20元参赛抵扣卡到 entry_deductions
-        for (let i = 0; i < 3; i++) {
-          const dedId = uuidv4();
-          await executeOp(req, 
-            `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
-             VALUES ($1, $2, $3, 'order_purchase_pro', 'available', $4, $5, DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
-            [dedId, userId, 2000, orderId, packageId]
-          );
-        }
-        console.log(`[订单] 专业包购包赠参赛抵扣金：用户${userId}，参赛包${packageId}，共3张×2000分`);
-      } else if (tag === 'standard') {
-        // 标准包：发1张1500分参赛抵扣卡
-        const dedId = uuidv4();
-        await executeOp(req, 
-          `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
-           VALUES ($1, $2, $3, 'order_purchase', 'available', $4, $5, DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
-          [dedId, userId, 1500, orderId, packageId]
-        );
-        console.log(`[订单] 标准包购包赠参赛抵扣金：用户${userId}，1张×1500分`);
-      } else if (tag === 'basic') {
-        // 基础包：发1张500分参赛抵扣卡
-        const dedId = uuidv4();
-        await executeOp(req, 
-          `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
-           VALUES ($1, $2, $3, 'order_purchase', 'available', $4, $5, DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
-          [dedId, userId, 500, orderId, packageId]
-        );
-        console.log(`[订单] 基础包购包赠参赛抵扣金：用户${userId}，1张×500分`);
-      }
-    } catch (giftErr: any) {
-      console.error('[订单] 参赛包赠送抵扣金失败:', giftErr?.message || giftErr);
-    }
-
-    // 构造支付参数（优先调微信支付真实 API）
+    // 构造支付参数（调微信支付真实 API）
+    // 注意：side effects（race_count, deductions, coupons, settlements）
+    // 移至 wx-pay.ts 支付回调中执行，确保支付成功后才会发放
     let paymentParams: any;
     try {
       if (isPayConfigured() && finalPriceCents > 0) {
@@ -1042,7 +948,7 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
         finalPrice: finalPriceCents,
         raceCount: pkg.race_count,
         paymentParams,
-        status: 'paid',
+        status: 'pending',
       }
     });
   } catch (e: any) {

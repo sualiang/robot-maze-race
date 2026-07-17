@@ -447,6 +447,64 @@ router.post('/notify', async (req: Request, res: Response) => {
         console.warn('[WxPay] settlements idempotent insert warning:', e.message?.substring(0, 100));
       }
 
+      // ===== 支付成功后执行 side effects =====
+      try {
+        const [orderDetailRows] = await opPool.execute(
+          `SELECT o.user_id, o.package_id, o.operator_id, rp.race_count, rp.tag, rp.free_deduction_cents
+           FROM orders o JOIN race_packages rp ON o.package_id = rp.id
+           WHERE o.id = ?`,
+          [order.id]
+        );
+        const orderDetail = (orderDetailRows as any[])?.[0];
+        if (orderDetail) {
+          const { user_id: uid, package_id: pid, operator_id: oid, race_count: rc, tag, free_deduction_cents: fdc } = orderDetail;
+
+          // 1. 更新用户参赛次数
+          if (rc > 0) {
+            await opPool.execute(
+              `UPDATE users SET race_count = COALESCE(race_count, 0) + ?, updated_at = NOW() WHERE id = ?`,
+              [rc, uid]
+            );
+            console.log('[WxPay] 支付成功, 增加参赛次数:', rc);
+          }
+
+          // 2. 赠送抵扣金
+          if (fdc > 0) {
+            await opPool.execute(
+              `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
+               VALUES (?, ?, ?, 'order_purchase', 'available', ?, ?, DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
+              [uuidv4(), uid, fdc, order.id, pid]
+            );
+            console.log('[WxPay] 赠送抵扣金:', fdc, '分');
+          }
+
+          // 3. 购包赠送参赛抵扣卡
+          if (tag === 'professional') {
+            for (let i = 0; i < 3; i++) {
+              await opPool.execute(
+                `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
+                 VALUES (?, ?, 2000, 'order_purchase_pro', 'available', ?, ?, DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
+                [uuidv4(), uid, order.id, pid]
+              );
+            }
+          } else if (tag === 'standard') {
+            await opPool.execute(
+              `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
+               VALUES (?, ?, 1500, 'order_purchase', 'available', ?, ?, DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
+              [uuidv4(), uid, order.id, pid]
+            );
+          } else if (tag === 'basic') {
+            await opPool.execute(
+              `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
+               VALUES (?, ?, 500, 'order_purchase', 'available', ?, ?, DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
+              [uuidv4(), uid, order.id, pid]
+            );
+          }
+        }
+      } catch (sideErr: any) {
+        console.error('[WxPay] side effects error:', sideErr.message?.substring(0, 200));
+      }
+
       console.log('[WxPay] 支付成功:', outTradeNo, 'transaction_id:', transaction.transaction_id);
     } else if (['CLOSED', 'PAYERROR', 'REVOKED'].includes(tradeState)) {
       await opPool.execute(

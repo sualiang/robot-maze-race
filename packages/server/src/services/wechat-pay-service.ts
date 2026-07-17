@@ -111,7 +111,7 @@ export function generateMiniProgramPayParams(prepayId: string, appId: string): {
 }
 
 /**
- * 开发模式：生成模拟支付参数（不使用真实微信支付）
+ * 开发模式：生成模拟支付参数（使用真实 RSA 签名保证前端兼容）
  */
 export function generateMockPayParams(): {
   timeStamp: string;
@@ -120,12 +120,20 @@ export function generateMockPayParams(): {
   signType: string;
   paySign: string;
 } {
-  const prepayId = `prepay_mock_${Date.now()}`;
+  const timeStamp = Math.floor(Date.now() / 1000).toString();
+  const nonce = nonceStr();
+  const pkg = 'prepay_id=prepay_mock_' + Date.now();
+
+  const signStr = `${pkg}\n${timeStamp}\n${nonce}\n${pkg}\n`;
+  const paySign = crypto.createSign('RSA-SHA256')
+    .update(signStr)
+    .sign(fs.readFileSync(config.wechatPay.privateKeyPath, 'utf-8'), 'base64');
+
   return {
-    timeStamp: Math.floor(Date.now() / 1000).toString(),
-    nonceStr: nonceStr(),
-    package: `prepay_id=${prepayId}`,
+    timeStamp,
+    nonceStr: nonce,
+    package: pkg,
     signType: 'RSA',
-    paySign: 'MOCK_' + Math.random().toString(36).substring(2, 34),
+    paySign,
   };
 }
