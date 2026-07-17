@@ -279,7 +279,7 @@ export default function MatchPage() {
         <NoContextBanner />
         <div className="referee-card" style={{ marginBottom: 16, padding: 24, textAlign: 'center' }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>🏁</div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ref-text)', marginBottom: 8 }}>参赛功能暂未开放</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ref-text)', marginBottom: 8 }}>请联系运营商绑定赛场</div>
           <div style={{ fontSize: 14, color: 'var(--ref-text-dim)', lineHeight: 1.6 }}>
             请前往线下赛场扫描官方小程序码<br />解锁参赛、计时、排队等全部功能
           </div>
