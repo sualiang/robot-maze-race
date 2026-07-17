@@ -122,11 +122,11 @@ router.post('/register', async (req: Request, res: Response) => {
 
     // 支持 invite_id 或 token 查找邀请记录
     let invite = await queryOne<{ id: string; operator_id: string; venue_id: string; status: string; expires_at: string }>(
-      'SELECT id, venue_id, status, expires_at FROM referee_invites WHERE id = $1', [lookupId]
+      'SELECT id, operator_id, venue_id, status, expires_at FROM referee_invites WHERE id = $1', [lookupId]
     );
     if (!invite) {
       invite = await queryOne<{ id: string; operator_id: string; venue_id: string; status: string; expires_at: string }>(
-        'SELECT id, venue_id, status, expires_at FROM referee_invites WHERE token = $1', [lookupId]
+        'SELECT id, operator_id, venue_id, status, expires_at FROM referee_invites WHERE token = $1', [lookupId]
       );
     }
     if (!invite) return res.status(400).json({ code: 400, message: '邀请链接无效', data: null });
