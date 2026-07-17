@@ -5,7 +5,7 @@ import {
 } from 'antd';
 import {
   SaveOutlined, GiftOutlined, SettingOutlined, ThunderboltOutlined,
-  ShopOutlined, BellOutlined, DeleteOutlined, PlusOutlined,
+  ShopOutlined, BellOutlined, DeleteOutlined, PlusOutlined, UploadOutlined,
 } from '@ant-design/icons';
 import api from '../../../utils/api';
 
@@ -87,6 +87,7 @@ export default function MarketingConfig() {
     editForm.setFieldsValue({
       name: item.name,
       description: item.description,
+      image: item.image || '',
       needPoints: item.needPoints,
       sortWeight: item.sortWeight,
       status: item.status,
@@ -260,6 +261,10 @@ export default function MarketingConfig() {
 
   // ===== 积分商城表格列 =====
   const shopColumns = [
+    {
+      title: '图片', dataIndex: 'image', key: 'image', width: 80,
+      render: (img: string) => img ? <img src={img} alt="" style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 6 }} /> : <span style={{ color: '#ccc', fontSize: 12 }}>暂无</span>,
+    },
     { title: '商品名', dataIndex: 'name', key: 'name', width: 180 },
     {
       title: '类型',
@@ -439,6 +444,9 @@ export default function MarketingConfig() {
           </Form.Item>
           <Form.Item name="description" label="描述">
             <Input maxLength={60} />
+          </Form.Item>
+          <Form.Item name="image" label="商品图片 URL">
+            <Input placeholder="输入图片链接地址（https://...）" />
           </Form.Item>
           <Form.Item name="needPoints" label="所需积分" rules={[{ required: true, message: '请输入积分' }]}>
             <InputNumber min={1} max={999999} style={{ width: '100%' }} />

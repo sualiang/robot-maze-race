@@ -46,6 +46,7 @@ router.get('/points-shop/items', authMiddleware, async (req: Request, res: Respo
           itemId: item.item_id,
           name: item.name,
           description: item.description,
+          image: item.image || '',
           needPoints: item.need_points,
           exchangeLimit: item.exchange_limit || 0,
           sortWeight: item.sort_weight || 0,
@@ -81,6 +82,7 @@ router.get('/points-shop/items/all', authMiddleware, operatorOnly, async (req: R
         itemId: item.item_id,
         name: item.name,
         description: item.description,
+        image: item.image || '',
         needPoints: item.need_points,
         sortWeight: item.sort_weight || 0,
         status: item.status,
@@ -101,7 +103,7 @@ router.get('/points-shop/items/all', authMiddleware, operatorOnly, async (req: R
  */
 router.post('/points-shop/items', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
-    const { name, itemType, itemId, description, needPoints, sortWeight, stock } = req.body;
+    const { name, itemType, itemId, description, needPoints, sortWeight, stock, image } = req.body;
     if (!name || !itemType || !needPoints) {
       return res.status(400).json({ code: 400, message: 'name, itemType, needPoints 不能为空', data: null });
     }
@@ -111,9 +113,9 @@ router.post('/points-shop/items', authMiddleware, operatorOnly, async (req: Requ
     }
     const id = uuidv4();
     await executeOp(req, 
-      `INSERT INTO point_shop (id, item_type, item_id, name, description, need_points, sort_weight, stock)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [id, itemType, itemId || '', name, description || '', needPoints, sortWeight || 0, stock ?? 0]
+      `INSERT INTO point_shop (id, item_type, item_id, name, description, need_points, sort_weight, stock, image)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [id, itemType, itemId || '', name, description || '', needPoints, sortWeight || 0, stock ?? 0, image || '']
     );
     res.status(201).json({ code: 0, message: '商品已创建', data: { id } });
   } catch (error: any) {
@@ -129,7 +131,7 @@ router.post('/points-shop/items', authMiddleware, operatorOnly, async (req: Requ
 router.put('/points-shop/items/:id', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, itemType, itemId, description, needPoints, sortWeight, status, stock } = req.body;
+    const { name, itemType, itemId, description, needPoints, sortWeight, status, stock, image } = req.body;
 
     const updates: string[] = [];
     const params: any[] = [];
@@ -148,6 +150,7 @@ router.put('/points-shop/items/:id', authMiddleware, operatorOnly, async (req: R
     if (sortWeight !== undefined) { updates.push(`sort_weight = $${idx++}`); params.push(sortWeight); }
     if (status !== undefined) { updates.push(`status = $${idx++}`); params.push(status); }
     if (stock !== undefined) { updates.push(`stock = $${idx++}`); params.push(stock); }
+    if (image !== undefined) { updates.push(`image = $${idx++}`); params.push(image); }
 
     if (updates.length === 0) {
       return res.status(400).json({ code: 400, message: '没有要更新的字段', data: null });

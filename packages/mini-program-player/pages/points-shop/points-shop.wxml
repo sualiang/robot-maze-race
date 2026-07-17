@@ -20,6 +20,7 @@
         data-id="{{item.id}}"
         bindtap="onExchange"
       >
+        <image wx:if="{{item.image}}" class="card-image" src="{{item.image}}" mode="aspectFill" />
         <view class="card-value">{{item.name}}</view>
         <view class="card-desc" wx:if="{{item.description}}">{{item.description}}</view>
         <view class="card-footer">
@@ -49,6 +50,7 @@
         data-id="{{item.id}}"
         bindtap="onExchange"
       >
+        <image wx:if="{{item.image}}" class="card-image" src="{{item.image}}" mode="aspectFill" />
         <view class="card-value">{{item.name}}</view>
         <view class="card-desc" wx:if="{{item.description}}">{{item.description}}</view>
         <view class="card-footer">
