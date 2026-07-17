@@ -6,6 +6,68 @@ import { authMiddleware } from '../middleware/auth';
 const router = Router();
 
 /**
+ * GET /player/help/detail?helpId=xxx
+ * 助力详情页（无需登录，被分享者打开）
+ */
+router.get('/help/detail', async (req: Request, res: Response) => {
+  const helpId = (req.query.helpId || '') as string;
+  if (!helpId) {
+    res.json({ code: 400, message: '缺少 helpId 参数', data: null });
+    return;
+  }
+
+  try {
+    const help = await queryOne<any>(
+      `SELECT h.id, h.initiator_id, h.target_package_id, h.required_help_count,
+              h.current_help_count, h.status, h.expires_at, h.coupon_amount_cents, h.created_at,
+              u.nickname AS creator_nickname, u.avatar_url AS creator_avatar,
+              rp.name AS package_name
+       FROM helps h
+       JOIN users u ON h.initiator_id = u.id
+       LEFT JOIN race_packages rp ON h.target_package_id = rp.id
+       WHERE h.id = $1`,
+      [helpId]
+    );
+
+    if (!help) {
+      res.json({ code: 404, message: '助力活动不存在或已过期', data: null });
+      return;
+    }
+
+    const helpers = await query<any>(
+      `SELECT u.nickname, u.avatar_url
+       FROM help_helpers hh
+       JOIN users u ON hh.user_id = u.id
+       WHERE hh.help_id = $1
+       ORDER BY hh.helped_at ASC`,
+      [helpId]
+    );
+
+    const helperList = (helpers || []).map((h: any) => ({
+      nickname: h.nickname || '',
+      avatar: h.avatar_url || '',
+    }));
+
+    res.json({
+      code: 0,
+      data: {
+        helpId: help.id,
+        creatorNickname: help.creator_nickname || '',
+        creatorAvatar: help.creator_avatar || '',
+        status: help.status,
+        helpersCount: help.current_help_count || 0,
+        helpersTotal: help.required_help_count || 0,
+        helpers: helperList,
+        packageName: help.package_name || '',
+      },
+    });
+  } catch (e: any) {
+    console.error('[Help] detail error:', e?.message || e);
+    res.json({ code: 500, message: '查询失败', data: null });
+  }
+});
+
+/**
  * GET /player/me/help-status
  * 查询当前用户未过期的助力活动状态
  */
