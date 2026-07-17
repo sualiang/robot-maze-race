@@ -281,7 +281,25 @@ export default function MatchPage() {
           <div style={{ fontSize: 48, marginBottom: 16 }}>🏁</div>
           <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ref-text)', marginBottom: 8 }}>请联系运营商绑定赛场</div>
           <div style={{ fontSize: 14, color: 'var(--ref-text-dim)', lineHeight: 1.6 }}>
-            请前往线下赛场扫描官方小程序码<br />解锁参赛、计时、排队等全部功能
+            请前往线下赛场扫描官方小程序码<br />由运营商后台为您分配赛场后即可使用
+          </div>
+          <div style={{ marginTop: 20 }}>
+            <button
+              className="referee-btn referee-btn-outline"
+              onClick={async () => {
+                if ('caches' in window) {
+                  try {
+                    const keys = await caches.keys();
+                    await Promise.all(keys.map((k: string) => caches.delete(k)));
+                  } catch {}
+                }
+                localStorage.clear();
+                window.location.reload();
+              }}
+              style={{ fontSize: 13, padding: '8px 20px' }}
+            >
+              🔄 已经联系绑定，强制清除缓存
+            </button>
           </div>
         </div>
       </div>

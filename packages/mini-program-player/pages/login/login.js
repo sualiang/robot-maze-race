@@ -50,6 +50,7 @@ Page({
           }
 
           that._saveLogin(d.token, d.user || {});
+          console.log('[Login] token saved, operatorId=' + getApp().globalData.operatorId + ', venueId=' + getApp().globalData.venueId);
 
           // 同步运营商上下文（从编译模式/扫码获取的 operator_id/venue_id）
           getApp()._syncOperatorContext();

@@ -8,6 +8,36 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>web</title>
+    <script>
+      // 微信内置浏览器缓存破坏：每次 index.html 加载时对比版本号
+      // version.json 由构建脚本生成，包含构建时间戳
+      (function() {
+        var STORAGE_KEY = '__app_version__';
+        try {
+          var xhr = new XMLHttpRequest();
+          xhr.open('GET', '/version.json?t=' + Date.now(), false); // 同步请求，阻塞渲染
+          xhr.send();
+          if (xhr.status === 200) {
+            var data = JSON.parse(xhr.responseText);
+            var remoteVersion = data.version || '';
+            var localVersion = localStorage.getItem(STORAGE_KEY);
+            if (localVersion !== remoteVersion) {
+              // 版本不一致：清除缓存并强制刷新
+              localStorage.setItem(STORAGE_KEY, remoteVersion);
+              // 尝试清除 Service Worker 缓存
+              if ('caches' in window) {
+                caches.keys().then(function(keys) {
+                  keys.forEach(function(k) { caches.delete(k); });
+                });
+              }
+              location.reload(true);
+            }
+          }
+        } catch(e) {
+          // 静默失败，不影响页面加载
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

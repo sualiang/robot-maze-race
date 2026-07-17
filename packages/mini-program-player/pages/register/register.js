@@ -77,7 +77,7 @@ Page({
         wx.showToast({ title: '注册成功', icon: 'success', duration: 1500 });
         setTimeout(function () {
           // 同步运营商上下文
-          app._syncOperatorContext();
+          getApp()._syncOperatorContext();
           wx.switchTab({ url: '/pages/profile/profile' });
         }, 1500);
       }).catch(function (err) {

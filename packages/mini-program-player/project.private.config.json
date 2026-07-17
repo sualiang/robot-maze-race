@@ -2,7 +2,19 @@
   "description": "项目私有配置文件。此文件中的内容将覆盖 project.config.json 中的相同字段。项目的改动优先同步到此文件中。详见文档：https://developers.weixin.qq.com/miniprogram/dev/devtools/projectconfig.html",
   "projectname": "%E9%93%81%E7%94%B2%E5%BF%AB%E7%8B%97",
   "libVersion": "2.32.3",
-  "condition": {},
+  "condition": {
+    "miniprogram": {
+      "list": [
+        {
+          "name": "杭州和睦里",
+          "pathName": "pages/index/index",
+          "query": "operator_id=6146f77d-d8e8-4436-bc20-81a7b20d7c87&venue_id=16ec7012-f296-45ba-82be-0a05ca68189d",
+          "scene": null,
+          "launchMode": "default"
+        }
+      ]
+    }
+  },
   "setting": {
     "urlCheck": false,
     "coverView": true,
