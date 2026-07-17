@@ -16,7 +16,7 @@ Page({
     // 模块3: 参赛状态&福利
     couponValue: 0,
     // 模块4: 福利条
-    promoText: '🔥 今日专属：买任意参赛包，额外赠15元奶茶无门槛券',
+    promoText: '',
     // 模块5: 参赛包
     packages: [],
     packagesLoaded: false,
@@ -251,9 +251,6 @@ Page({
    */
   fetchAnnouncement: function () {
     var that = this;
-    var app = getApp();
-
-    if (!app.globalData.isLoggedIn) return;
 
     request.silentGet('/player/marketing/announcement').then(function (data) {
       var text = (data && data.text) || '';
@@ -261,7 +258,7 @@ Page({
         that.setData({ promoText: text });
       }
     }).catch(function () {
-      // 静默失败，保留默认值
+      // 静默失败，保留空值
     });
   },
 

@@ -64,8 +64,10 @@
   <!-- ============================================================ -->
   <!-- 模块4: 今日专属福利条 -->
   <!-- ============================================================ -->
-  <view class="promo-bar" bindtap="onScrollToPackages">
-    <text class="promo-text">{{promoText}}</text>
+  <view wx:if="{{promoText}}" class="promo-bar" bindtap="onScrollToPackages">
+    <view class="promo-marquee">
+      <text class="promo-text">{{promoText}}</text>
+    </view>
   </view>
 
   <!-- ============================================================ -->

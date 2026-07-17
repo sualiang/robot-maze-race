@@ -245,16 +245,35 @@
   align-items: center;
   justify-content: center;
   margin-bottom: 24rpx;
+  overflow: hidden;
 }
 
 .promo-bar:active {
   opacity: 0.9;
 }
 
+.promo-marquee {
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
 .promo-text {
   font-size: 28rpx;
   font-weight: 500;
   color: #FFFFFF;
+  display: inline-block;
+  animation: promo-scroll 12s linear infinite;
+  padding-left: 100%;
+}
+
+@keyframes promo-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-200%);
+  }
 }
 
 /* ============================================================ */
