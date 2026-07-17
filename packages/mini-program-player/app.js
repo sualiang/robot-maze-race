@@ -59,8 +59,10 @@ App({
   /**
    * 解析小程序启动/切入参数，提取 operator_id 和 venue_id
    * 支持方式：
-   *   - options.query.operator_id / venue_id（普通带参链接）
-   *   - options.scene 解析（扫码 scene 参数，格式: operator_id=XXX&venue_id=YYY）
+   *   - options.query.operator_id / venue_id（普通带参链接 / 编译模式）
+   *   - options.scene 解析（微信扫码 scene 参数）
+   *     scene 格式: o{operatorId前14位无连字符}v{venueId前14位无连字符}
+   *     scene 限制 32 字节，前缀 o/v 各 1 字符，UUID 各取前 14 字符 = 30 字符
    * 新参数会覆盖旧的 globalData，实现跨运营商扫码切换
    */
   _parseContextParams: function (options) {
@@ -69,25 +71,43 @@ App({
     var operatorId = null;
     var venueId = null;
 
-    // 方式1: query 直接传参
+    // 方式1: query 直接传参（编译模式可用）
     if (options.query) {
       operatorId = options.query.operator_id || options.query.operatorId || null;
       venueId = options.query.venue_id || options.query.venueId || null;
     }
 
-    // 方式2: scene 字符串解析（微信扫码进入时 scene 字段可见）
+    // 方式2: scene 解析（微信扫码进入）
     if (!operatorId && options.scene) {
       var scene = decodeURIComponent(options.scene);
-      // 支持 key=value 键值对格式，用 & 分隔
-      var parts = scene.split('&');
-      for (var i = 0; i < parts.length; i++) {
-        var kv = parts[i].split('=');
-        var key = kv[0];
-        var val = kv.length > 1 ? kv.slice(1).join('=') : '';
-        if (key === 'operator_id' || key === 'operatorId') {
-          operatorId = val;
-        } else if (key === 'venue_id' || key === 'venueId') {
-          venueId = val;
+
+      // 尝试 o{xx}v{yy} 格式 — 微信小程序码 scene
+      if (scene.indexOf('o') === 0) {
+        var vIdx = scene.indexOf('v');
+        if (vIdx > 1) {
+          var opPrefix = scene.substring(1, vIdx);
+          var venPrefix = scene.substring(vIdx + 1);
+          // 从 localStorage 或缓存中查找完整的 operator_id
+          // 由于 scene 只有前 14 位，需后端查询完整 UUID
+          // 先存储前缀 → 后端 bind-context 接口会处理完整匹配
+          operatorId = opPrefix;
+          venueId = venPrefix;
+          console.log('[App] scene 解析: opPrefix=' + opPrefix + ', venPrefix=' + venPrefix);
+        }
+      }
+
+      // 兼容 key=value 格式
+      if (!operatorId && scene.indexOf('=') !== -1) {
+        var parts = scene.split('&');
+        for (var i = 0; i < parts.length; i++) {
+          var kv = parts[i].split('=');
+          var key = kv[0];
+          var val = kv.length > 1 ? kv.slice(1).join('=') : '';
+          if (key === 'operator_id' || key === 'operatorId') {
+            operatorId = val;
+          } else if (key === 'venue_id' || key === 'venueId') {
+            venueId = val;
+          }
         }
       }
     }
