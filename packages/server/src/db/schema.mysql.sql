@@ -332,13 +332,9 @@ CREATE TABLE IF NOT EXISTS operators (
   city VARCHAR(64) DEFAULT '',
   district VARCHAR(64) DEFAULT '',
   company_address VARCHAR(512) DEFAULT '',
-  operator_username VARCHAR(256) DEFAULT '',
-  operator_password_hash VARCHAR(256) DEFAULT '',
   contact_phone VARCHAR(20),
   scope VARCHAR(64),
   role VARCHAR(32) DEFAULT 'admin',
-  password_change_required INT DEFAULT 1,
-  first_login INT DEFAULT 1,
   created_by VARCHAR(36),
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP

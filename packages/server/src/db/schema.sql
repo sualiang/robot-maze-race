@@ -290,13 +290,9 @@ CREATE TABLE IF NOT EXISTS operators (
   city TEXT DEFAULT '',
   district TEXT DEFAULT '',
   company_address TEXT DEFAULT '',
-  operator_username TEXT DEFAULT '',
-  operator_password_hash TEXT DEFAULT '',
   contact_phone VARCHAR(20),
   scope VARCHAR(64),
   role VARCHAR(32) DEFAULT 'admin',
-  password_change_required INTEGER DEFAULT 1,
-  first_login INTEGER DEFAULT 1,
   created_by TEXT,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))

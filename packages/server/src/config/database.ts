@@ -225,9 +225,6 @@ export async function initSchema(): Promise<void> {
   // migrations
   const dbName = COMMON_DB_NAME;
   const migs: [string, string, string][] = [
-    ['operators', 'operator_username', 'VARCHAR(256)'],
-    ['operators', 'operator_password_hash', 'VARCHAR(256)'],
-    ['operators', 'password_change_required', 'INT DEFAULT 1'],
     ['admin_users', 'operator_id', 'VARCHAR(36)'],
     ['referee_invites', 'name', 'VARCHAR(100)'], // note: referees is operator table; skip here
   ];

@@ -36,47 +36,43 @@ router.post('/login', async (req: Request, res: Response) => {
       return res.status(400).json({ code: 400, message: '手机号和密码不能为空', data: null });
     }
 
-    // 从 operators 表查询运营商
-    const operator = await queryOne<{
+    // 统一从 operator_members 表查询（唯一登录表），仅允许超管登录
+    const member = await queryOne<{
       id: string;
-      name: string;
+      operator_id: string;
       phone: string;
-      email: string | null;
+      name: string;
+      password: string;
+      role_id: string;
       status: string;
-      password_change_required: number;
+      first_login: number;
     }>(
-      `SELECT id, name, phone, email, status, COALESCE(password_change_required, 0) as password_change_required FROM operators WHERE phone = $1`,
+      `SELECT om.id, om.operator_id, om.phone, om.name, om.password, om.role_id, om.status, COALESCE(om.first_login, 0) as first_login
+       FROM operator_members om
+       WHERE om.phone = $1 AND om.role_id = 'op_super_admin'
+       LIMIT 1`,
       [phone]
     );
 
-    if (!operator) {
+    if (!member) {
       return res.status(401).json({ code: 401, message: '手机号或密码错误', data: null });
     }
 
-    if (operator.status === 'disabled') {
+    if (member.status === 'disabled') {
       return res.status(403).json({ code: 403, message: '账号已被禁用', data: null });
     }
 
     // 使用 bcrypt 验证密码
-    const operator2 = await queryOne<{ password: string }>(
-      'SELECT operator_password_hash as password FROM operators WHERE id = $1',
-      [operator.id]
-    );
-    const { compareSync } = require('../config/bcrypt');
-    if (!operator2 || !operator2.password || !compareSync(password, operator2.password)) {
+    if (!member.password || !compareSync(password, member.password)) {
       return res.status(401).json({ code: 401, message: '手机号或密码错误', data: null });
     }
 
-    // 获取角色权限 — operator_members 已迁至公共库
+    // 获取角色权限
     let permissions: string[] = ['*'];
     let roleName = '';
-    const member = await queryOne<{ role_id: string }>(
-      'SELECT role_id FROM operator_members WHERE operator_id = ? LIMIT 1',
-      [operator.id]
-    );
-    if (member && member.role_id) {
+    if (member.role_id) {
       const roleRec = await queryOne<{ permissions: string; name: string; label: string }>(
-        'SELECT permissions, name, label FROM admin_roles WHERE name = ?',
+        'SELECT permissions, name, label FROM admin_roles WHERE name = $1',
         [member.role_id]
       );
       if (roleRec) {
@@ -85,9 +81,15 @@ router.post('/login', async (req: Request, res: Response) => {
       }
     }
 
-    // 生成 JWT（使用统一的 JWT secret，fallback 到 config.default）
+    // 获取运营商名称
+    const operator = await queryOne<{ name: string; phone: string; status: string }>(
+      `SELECT id, name, phone, status FROM operators WHERE id = $1`,
+      [member.operator_id]
+    );
+
+    // 生成 JWT
     const token = jwt.sign(
-      { userId: operator.id, role: 'operator', phone: operator.phone, operatorId: operator.id, permissions },
+      { userId: member.id, role: 'operator', phone: member.phone, operatorId: member.operator_id, operator_name: operator?.name, permissions },
       config.jwt.secret,
       { expiresIn: '7d' }
     );
@@ -95,7 +97,7 @@ router.post('/login', async (req: Request, res: Response) => {
     // 获取关联的场馆
     const venue = await queryOpOne<{ id: string; name: string }>(req, 
       'SELECT id, name FROM venues WHERE operator_id = $1 LIMIT 1',
-      [operator.id]
+      [member.operator_id]
     );
 
     return res.json({
@@ -104,16 +106,17 @@ router.post('/login', async (req: Request, res: Response) => {
       data: {
         token,
         user: {
-          id: operator.id,
-          nickname: operator.name,
-          name: operator.name,
-          phone: operator.phone,
+          id: member.id,
+          operatorId: member.operator_id,
+          nickname: member.name,
+          name: operator?.name || member.name,
+          phone: member.phone,
           venueId: venue?.id || null,
           venueName: venue?.name || null,
           permissions,
           role_name: roleName,
-          role_id: member?.role_id || '',
-          passwordChangeRequired: operator.password_change_required || 0,
+          role_id: member.role_id,
+          passwordChangeRequired: member.first_login || 0,
         },
       },
     });
@@ -959,23 +962,23 @@ router.post('/profile/change-password', authMiddleware, async (req: Request, res
       return res.status(400).json({ code: 400, message: '新密码不能与旧密码相同', data: null });
     }
 
-    // 查出运营商账号
-    const operator = await queryOne<{
+    // 查出运营商成员账号（统一从 operator_members 表）
+    const member = await queryOne<{
       id: string;
-      operator_password_hash: string;
-      password_change_required: number;
+      operator_id: string;
+      password: string;
     }>(
-      'SELECT id, operator_password_hash, password_change_required FROM operators WHERE id = $1',
+      'SELECT id, operator_id, password FROM operator_members WHERE id = $1',
       [userId]
     );
 
-    if (!operator) {
+    if (!member) {
       return res.status(404).json({ code: 404, message: '运营商账号不存在', data: null });
     }
 
     // 验证旧密码
-    if (operator.operator_password_hash) {
-      if (!compareSync(oldPassword, operator.operator_password_hash)) {
+    if (member.password) {
+      if (!compareSync(oldPassword, member.password)) {
         return res.status(401).json({ code: 401, message: '旧密码错误', data: null });
       }
     }
@@ -983,17 +986,17 @@ router.post('/profile/change-password', authMiddleware, async (req: Request, res
     // 更新密码
     const newHash = hashSync(newPassword, 10);
     await query(
-      `UPDATE operators SET operator_password_hash = $1, password_change_required = 0,
+      `UPDATE operator_members SET password = $1, first_login = 0,
        updated_at = NOW() WHERE id = $2`,
       [newHash, userId]
     );
 
     // 重新签发 token（去掉 passwordChangeRequired 标记）
     const payload: AuthPayload = {
-      userId: operator.id,
+      userId: member.id,
       openid: '',
       role: 'operator',
-      operatorId: operator.id,
+      operatorId: member.operator_id,
     };
     const token = jwt.sign(payload, config.jwt.secret, { expiresIn: config.jwt.expiresIn as any });
 
@@ -1032,23 +1035,23 @@ router.post('/change-password', authMiddleware, async (req: Request, res: Respon
       return res.status(400).json({ code: 400, message: '新密码不能与旧密码相同', data: null });
     }
 
-    // 查出运营商账号
-    const operator = await queryOne<{
+    // 查出运营商成员账号（统一从 operator_members 表）
+    const member = await queryOne<{
       id: string;
-      operator_password_hash: string;
-      password_change_required: number;
+      operator_id: string;
+      password: string;
     }>(
-      'SELECT id, operator_password_hash, password_change_required FROM operators WHERE id = $1',
+      'SELECT id, operator_id, password FROM operator_members WHERE id = $1',
       [userId]
     );
 
-    if (!operator) {
+    if (!member) {
       return res.status(404).json({ code: 404, message: '运营商账号不存在', data: null });
     }
 
     // 验证旧密码
-    if (operator.operator_password_hash) {
-      if (!compareSync(oldPassword, operator.operator_password_hash)) {
+    if (member.password) {
+      if (!compareSync(oldPassword, member.password)) {
         return res.status(401).json({ code: 401, message: '旧密码错误', data: null });
       }
     }
@@ -1056,17 +1059,17 @@ router.post('/change-password', authMiddleware, async (req: Request, res: Respon
     // 更新密码
     const newHash = hashSync(newPassword, 10);
     await query(
-      `UPDATE operators SET operator_password_hash = $1, password_change_required = 0,
+      `UPDATE operator_members SET password = $1, first_login = 0,
        updated_at = NOW() WHERE id = $2`,
       [newHash, userId]
     );
 
     // 重新签发 token（去掉 passwordChangeRequired 标记）
     const payload: AuthPayload = {
-      userId: operator.id,
+      userId: member.id,
       openid: '',
       role: 'operator',
-      operatorId: operator.id,
+      operatorId: member.operator_id,
     };
     const token = jwt.sign(payload, config.jwt.secret, { expiresIn: config.jwt.expiresIn as any });
 

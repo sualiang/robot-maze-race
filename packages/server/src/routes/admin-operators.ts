@@ -168,15 +168,13 @@ router.post('/', authMiddleware, checkPermission('operators:create'), async (req
     // 生成随机密码 8位
     const plainPassword = generateSecurePassword();
     const passwordHash = bcrypt.hashSync(plainPassword, 10);
-    // 运营商用手机号作为登录账号
-    const operatorUsername = phone;
 
+    // 运营商表：仅存储业务信息（不含登录字段）
     await query(
       `INSERT INTO operators (id, name, phone, contact_phone, email, company_name,
         profit_share_rate, bank_account, bank_name, contact_person,
-        province, city, district, company_address, created_by,
-        operator_username, operator_password_hash, password_change_required)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+        province, city, district, company_address, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
       [
         id,
         name,
@@ -193,10 +191,15 @@ router.post('/', authMiddleware, checkPermission('operators:create'), async (req
         district || null,
         company_address || null,
         createdBy,
-        operatorUsername,
-        passwordHash,
-        1,
       ]
+    );
+
+    // 在 operator_members 中创建超管账号（唯一登录表）
+    const memberId = uuidv4();
+    await query(
+      `INSERT INTO operator_members (id, operator_id, phone, name, password, role_id, status, first_login, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, 'op_super_admin', 'active', 1, NOW(), NOW())`,
+      [memberId, id, phone, name, passwordHash]
     );
 
     // 运营商管理后台登录使用的是运营商端（operator login），不应该在 admin_users 中创建记录
@@ -387,8 +390,8 @@ router.post('/:id/reset-password', authMiddleware, async (req: Request, res: Res
     const { id } = req.params;
 
     // 先确认运营商存在
-    const operator = await queryOne<{ id: string; operator_username: string }>(
-      'SELECT id, operator_username FROM operators WHERE id = $1',
+    const operator = await queryOne<{ id: string; name: string; phone: string }>(
+      'SELECT id, name, phone FROM operators WHERE id = $1',
       [id]
     );
     if (!operator) {
@@ -398,28 +401,22 @@ router.post('/:id/reset-password', authMiddleware, async (req: Request, res: Res
     const plainPassword = generateSecurePassword();
     const hashedPassword = bcrypt.hashSync(plainPassword, 10);
 
-    // 尝试更新 admin_users（可能没有 operator_id 关联，改用 operator_username 匹配）
-    const adminUser = await queryOne<{ id: string }>(
-      'SELECT id FROM admin_users WHERE operator_id = $1 OR username = $2 ORDER BY created_at ASC LIMIT 1',
-      [id, operator.operator_username]
+    // 更新 operator_members 表（超管账号）的密码
+    const member = await queryOne<{ id: string }>(
+      "SELECT id FROM operator_members WHERE operator_id = $1 AND role_id = 'op_super_admin' LIMIT 1",
+      [id]
     );
-    if (adminUser) {
+    if (member) {
       await query(
-        'UPDATE admin_users SET password = $1, first_login = 1 WHERE id = $2',
-        [hashedPassword, adminUser.id]
+        'UPDATE operator_members SET password = $1, first_login = 1 WHERE id = $2',
+        [hashedPassword, member.id]
       );
     }
-
-    // 更新 operators 表的密码
-    await query(
-      'UPDATE operators SET operator_password_hash = $1, password_change_required = 1 WHERE id = $2',
-      [hashedPassword, id]
-    );
 
     return res.json({
       code: 0,
       message: '密码重置成功',
-      data: { account: operator.operator_username, password: plainPassword }
+      data: { account: operator.phone, password: plainPassword }
     });
 
   } catch (error: any) {
