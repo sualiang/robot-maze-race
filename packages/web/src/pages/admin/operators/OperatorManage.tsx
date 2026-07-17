@@ -199,6 +199,8 @@ export default function OperatorManage() {
   const handleAdd = canOperate ? () => {
     setEditingId(null);
     form.resetFields();
+    setIsOtherBank(false);
+    setOtherBankName('');
     form.setFieldsValue({
       profit_share_rate: defaultProfitRate || 80,
       status: 'active',
@@ -215,6 +217,22 @@ export default function OperatorManage() {
         ? [record.province, record.city, record.district].filter(Boolean)
         : undefined,
     });
+    // 回填 bank_name 联动状态：判断是否为常见银行列表中的值
+    if (record.bank_name) {
+      const matched = COMMON_BANKS.find(b => b.value === record.bank_name);
+      if (matched && !matched.other) {
+        // 是列表内的银行 → 直接选中
+        setIsOtherBank(false);
+        setOtherBankName('');
+      } else {
+        // 不在列表中 → 切换到"其他银行"模式并回填
+        setIsOtherBank(true);
+        setOtherBankName(record.bank_name);
+      }
+    } else {
+      setIsOtherBank(false);
+      setOtherBankName('');
+    }
     setModalOpen(true);
   } : () => {};
 
@@ -515,7 +533,6 @@ export default function OperatorManage() {
             <Descriptions.Item label="运营商名称">{drawerItem.name}</Descriptions.Item>
             <Descriptions.Item label="联系人">{drawerItem.contact_person}</Descriptions.Item>
             <Descriptions.Item label="联系电话">{drawerItem.phone}</Descriptions.Item>
-            <Descriptions.Item label="邮箱">{drawerItem.email || '-'}</Descriptions.Item>
             <Descriptions.Item label="公司名称">{drawerItem.company_name || '-'}</Descriptions.Item>
             <Descriptions.Item label="省份">{drawerItem.province || '-'}</Descriptions.Item>
             <Descriptions.Item label="城市">{drawerItem.city || '-'}</Descriptions.Item>
@@ -525,7 +542,7 @@ export default function OperatorManage() {
               <Badge status={drawerItem.status === 'active' ? 'success' : 'error'}
                 text={drawerItem.status === 'active' ? '正常' : '已禁用'} />
             </Descriptions.Item>
-            <Descriptions.Item label="赛事数">{drawerItem.venue_count}</Descriptions.Item>
+            <Descriptions.Item label="赛场数">{drawerItem.venue_count}</Descriptions.Item>
             <Descriptions.Item label="累计营收">
               ¥{(drawerItem.total_revenue / 100).toFixed(2)}
             </Descriptions.Item>
