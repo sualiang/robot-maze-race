@@ -53,6 +53,11 @@ Page({
     this.setData({ nickname: e.detail.value });
   },
 
+  // ===== 手机号输入 =====
+  onPhoneInput: function (e) {
+    this.setData({ phone: e.detail.value });
+  },
+
   // ===== 性别选择 =====
   onGenderChange: function (e) {
     var idx = parseInt(e.detail.value, 10);
@@ -66,6 +71,7 @@ Page({
     var data = {};
 
     if (this.data.nickname) data.nickname = this.data.nickname;
+    if (this.data.phone) data.phone = this.data.phone;
     data.gender = this.data.gender || '';
 
     wx.showLoading({ title: '保存中...', mask: true });

@@ -29,11 +29,11 @@
       </view>
     </picker>
 
-    <!-- 手机号 — 只读 -->
+    <!-- 手机号 — 可输入 -->
     <view class="form-cell">
       <text class="form-cell__hd">手机号</text>
       <view class="form-cell__bd form-cell__bd_right">
-        <text class="form-cell__value form-cell__value_muted">{{phone || '未获取'}}</text>
+        <input class="form-input" type="number" maxlength="11" value="{{phone}}" placeholder="请输入手机号" placeholder-style="color:#475569" bindinput="onPhoneInput" />
       </view>
     </view>
 
