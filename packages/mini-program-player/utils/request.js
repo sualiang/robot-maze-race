@@ -42,7 +42,6 @@ function request(url, options) {
           app.globalData.token = null;
           app.globalData.isLoggedIn = false;
           app.globalData.userInfo = null;
-          wx.showToast({ title: '登录已过期，请重新进入', icon: 'none', duration: 2000 });
           reject({ code: 401, message: '登录已过期' });
         } else {
           var errMsg = (body && body.message) || '请求失败(' + res.statusCode + ')';
