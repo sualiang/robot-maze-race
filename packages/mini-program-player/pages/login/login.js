@@ -1,11 +1,10 @@
-// pages/login/login.js — 微信登录（手机号 + wx.login → /auth/mp-login）
+// pages/login/login.js — 微信登录（wx.login → /auth/mp-login）
 var request = require('../../utils/request');
 var storage = require('../../utils/storage');
 
 Page({
   data: {
-    loading: false,
-    phone: ''
+    loading: false
   },
 
   onLoad: function (options) {
@@ -17,11 +16,6 @@ Page({
     }
   },
 
-  onPhoneInput: function (e) {
-    this.setData({ phone: e.detail.value });
-  },
-
-  // 保存登录态
   _saveLogin: function (token, user) {
     storage.setSync(storage.STORAGE_KEYS.TOKEN, token);
     storage.setSync(storage.STORAGE_KEYS.USER, user || {});
@@ -34,14 +28,6 @@ Page({
   // 微信登录
   onLogin: function () {
     var that = this;
-    var phone = that.data.phone;
-
-    // 校验手机号
-    if (!phone || !/^1\d{10}$/.test(phone)) {
-      wx.showToast({ title: '请填写正确的手机号', icon: 'none' });
-      return;
-    }
-
     that.setData({ loading: true });
 
     wx.login({
@@ -52,10 +38,9 @@ Page({
           return;
         }
 
-        // /auth/mp-login: code + phone
+        // /auth/mp-login: 只传 code
         request.post('/auth/mp-login', {
-          code: loginRes.code,
-          phone: phone
+          code: loginRes.code
         }).then(function (d) {
           that.setData({ loading: false });
 
@@ -66,11 +51,9 @@ Page({
 
           that._saveLogin(d.token, d.user || {});
 
-          // 新用户 → 跳转完善资料，老用户 → 进首页
-          var isNewUser = d.is_new_user;
-
-          if (isNewUser) {
-            wx.redirectTo({ url: '/pages/edit-profile/edit-profile' });
+          // 新用户（无 nickname） → 注册页，老用户 → 进首页
+          if (d.is_new_user || !d.user || !d.user.nickname) {
+            wx.redirectTo({ url: '/pages/register/register' });
           } else {
             wx.showToast({ title: '登录成功', icon: 'success', duration: 1000 });
             var dest = that._from === 'profile' ? '/pages/profile/profile' : '/pages/index/index';

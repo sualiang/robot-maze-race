@@ -5,6 +5,7 @@
     "pages/leaderboard/leaderboard",
     "pages/profile/profile",
     "pages/login/login",
+    "pages/register/register",
     "pages/packages/packages",
     "pages/checkin/checkin",
     "pages/help/help",

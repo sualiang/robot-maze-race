@@ -1,28 +1,10 @@
-<!-- pages/login/login.wxml — 微信登录 + 手机号输入 -->
+<!-- pages/login/login.wxml — 微信登录 -->
 <view class="page">
   <!-- Logo + 标题 -->
   <view class="header">
     <image class="logo" src="/assets/images/logo-avatar.png" mode="aspectFit" />
     <text class="title">迷宫竞速</text>
     <text class="subtitle">微信授权登录，开启竞速之旅</text>
-  </view>
-
-  <!-- 手机号输入 -->
-  <view class="form-area">
-    <view class="form-item">
-      <view class="form-label">手机号</view>
-      <view class="input-wrapper">
-        <input
-          class="phone-input"
-          type="number"
-          maxlength="11"
-          placeholder="请输入手机号"
-          placeholder-class="input-placeholder"
-          value="{{phone}}"
-          bindinput="onPhoneInput"
-        />
-      </view>
-    </view>
   </view>
 
   <!-- 微信登录按钮 -->
