@@ -1,10 +1,11 @@
-// pages/login/login.js — 微信登录（单按钮 wx.login → /auth/mp-login）
+// pages/login/login.js — 微信登录（手机号 + wx.login → /auth/mp-login）
 var request = require('../../utils/request');
 var storage = require('../../utils/storage');
 
 Page({
   data: {
-    loading: false
+    loading: false,
+    phone: ''
   },
 
   onLoad: function (options) {
@@ -14,6 +15,10 @@ Page({
       var dest = this._from === 'profile' ? '/pages/profile/profile' : '/pages/index/index';
       wx.switchTab({ url: dest });
     }
+  },
+
+  onPhoneInput: function (e) {
+    this.setData({ phone: e.detail.value });
   },
 
   // 保存登录态
@@ -29,6 +34,14 @@ Page({
   // 微信登录
   onLogin: function () {
     var that = this;
+    var phone = that.data.phone;
+
+    // 校验手机号
+    if (!phone || !/^1\d{10}$/.test(phone)) {
+      wx.showToast({ title: '请填写正确的手机号', icon: 'none' });
+      return;
+    }
+
     that.setData({ loading: true });
 
     wx.login({
@@ -39,9 +52,10 @@ Page({
           return;
         }
 
-        // /auth/mp-login: 用微信 code 登录（无需手机号，新用户跳转完善资料）
+        // /auth/mp-login: code + phone
         request.post('/auth/mp-login', {
-          code: loginRes.code
+          code: loginRes.code,
+          phone: phone
         }).then(function (d) {
           that.setData({ loading: false });
 
@@ -52,9 +66,8 @@ Page({
 
           that._saveLogin(d.token, d.user || {});
 
-          // 新用户（无 nickname）→ 跳转完善资料
-          var user = d.user || {};
-          var isNewUser = !user.nickname;
+          // 新用户 → 跳转完善资料，老用户 → 进首页
+          var isNewUser = d.is_new_user;
 
           if (isNewUser) {
             wx.redirectTo({ url: '/pages/edit-profile/edit-profile' });

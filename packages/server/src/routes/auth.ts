@@ -195,39 +195,36 @@ router.post('/mp-login', async (req: Request, res: Response) => {
     if (!code) {
       return res.status(400).json({ code: 400, message: '缺少登录凭证 code', data: null });
     }
-    // phone 可选；如果有必须格式正确
-    if (phone && !/^\d{11}$/.test(phone)) {
-      return res.status(400).json({ code: 400, message: '手机号格式不正确', data: null });
+    if (!phone || !/^\d{11}$/.test(phone)) {
+      return res.status(400).json({ code: 400, message: '请填写正确的手机号', data: null });
     }
 
     // 1. code → openid
     let openid: string;
     if (code === 'dev-test-code' || !config.wechat.appId) {
-      openid = `dev_openid_${phone || Date.now()}`;
+      openid = `dev_openid_${phone}`;
     } else {
       const wxResult = await wxCode2Session(code);
       openid = wxResult.openid;
     }
 
-    // 2. 查 users 表，有则 UPDATE phone（如果传了），无则 INSERT
+    // 2. 查 users 表，有则 UPDATE phone，无则 INSERT
     const existingUser = await findUserByOpenid(openid);
 
     let user: User;
     if (existingUser) {
-      if (phone) {
-        await execute(
-          'UPDATE users SET phone = $1, updated_at = NOW() WHERE id = $2',
-          [phone, existingUser.id]
-        );
-      }
-      user = phone ? await findUserByOpenid(openid) as User : existingUser;
+      await execute(
+        'UPDATE users SET phone = $1, updated_at = NOW() WHERE id = $2',
+        [phone, existingUser.id]
+      );
+      user = await findUserByOpenid(openid) as User;
     } else {
       user = await createUser({
         openid,
         unionid: undefined,
-        nickname: `玩家${(phone || '').slice(-4) || Date.now().toString(36).slice(-6)}`,
+        nickname: `玩家${phone.slice(-4)}`,
         avatar_url: '',
-        phone: phone || '',
+        phone,
         role: UserRole.PLAYER,
       });
       // 新用户赠送参赛抵扣金
