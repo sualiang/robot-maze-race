@@ -1,10 +1,9 @@
-// pages/login/login.js — 手动登录（手机号 + 微信 code → /auth/mp-login）
+// pages/login/login.js — 微信登录（单按钮 wx.login → /auth/mp-login）
 var request = require('../../utils/request');
 var storage = require('../../utils/storage');
 
 Page({
   data: {
-    phone: '',
     loading: false
   },
 
@@ -17,11 +16,6 @@ Page({
     }
   },
 
-  // 手机号输入
-  onPhoneInput: function (e) {
-    this.setData({ phone: e.detail.value });
-  },
-
   // 保存登录态
   _saveLogin: function (token, user) {
     storage.setSync(storage.STORAGE_KEYS.TOKEN, token);
@@ -32,23 +26,11 @@ Page({
     app.globalData.isLoggedIn = true;
   },
 
-  // 登录
+  // 微信登录
   onLogin: function () {
     var that = this;
-    var phone = this.data.phone.trim();
-
-    if (!phone) {
-      wx.showToast({ title: '请输入手机号', icon: 'none' });
-      return;
-    }
-    if (!/^1[3-9]\d{9}$/.test(phone)) {
-      wx.showToast({ title: '请输入正确的手机号', icon: 'none' });
-      return;
-    }
-
     that.setData({ loading: true });
 
-    // 第一步: wx.login 拿 code
     wx.login({
       success: function (loginRes) {
         if (!loginRes.code) {
@@ -57,10 +39,9 @@ Page({
           return;
         }
 
-        // 第二步: /auth/mp-login 用 code + 手机号登录
+        // /auth/mp-login: 用微信 code 登录（无需手机号，新用户跳转完善资料）
         request.post('/auth/mp-login', {
-          code: loginRes.code,
-          phone: phone
+          code: loginRes.code
         }).then(function (d) {
           that.setData({ loading: false });
 
@@ -71,9 +52,9 @@ Page({
 
           that._saveLogin(d.token, d.user || {});
 
-          // 判断是否新用户：没有昵称或没有头像 → 新用户
+          // 新用户（无 nickname）→ 跳转完善资料
           var user = d.user || {};
-          var isNewUser = !user.nickname || !user.avatar_url;
+          var isNewUser = !user.nickname;
 
           if (isNewUser) {
             wx.redirectTo({ url: '/pages/edit-profile/edit-profile' });

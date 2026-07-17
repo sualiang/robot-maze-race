@@ -1,31 +1,13 @@
-<!-- pages/login/login.wxml — 手动登录（手机号 + 微信 code） -->
+<!-- pages/login/login.wxml — 微信登录（单按钮） -->
 <view class="page">
   <!-- Logo + 标题 -->
   <view class="header">
     <image class="logo" src="/assets/images/logo-avatar.png" mode="aspectFit" />
     <text class="title">迷宫竞速</text>
-    <text class="subtitle">输入手机号，开启竞速之旅</text>
+    <text class="subtitle">微信授权登录，开启竞速之旅</text>
   </view>
 
-  <!-- 手机号输入 -->
-  <view class="form-card">
-    <view class="form-cell">
-      <text class="form-cell__hd">手机号</text>
-      <view class="form-cell__bd form-cell__bd_right">
-        <input
-          class="form-input"
-          type="number"
-          maxlength="11"
-          value="{{phone}}"
-          placeholder="请输入手机号"
-          placeholder-style="color:#475569"
-          bindinput="onPhoneInput"
-        />
-      </view>
-    </view>
-  </view>
-
-  <!-- 登录按钮 -->
+  <!-- 微信登录按钮 -->
   <view class="login-area">
     <button
       class="weui-btn weui-btn_primary"
@@ -33,7 +15,8 @@
       disabled="{{loading}}"
       bindtap="onLogin"
     >
-      <text>{{loading ? '登录中...' : '登录'}}</text>
+      <image class="weui-btn_icon" src="/assets/images/wechat-icon.svg" mode="aspectFit" />
+      <text>{{loading ? '登录中...' : '微信登录'}}</text>
     </button>
   </view>
 </view>
