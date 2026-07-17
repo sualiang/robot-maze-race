@@ -326,7 +326,7 @@ router.post('/operator-login', async (req: Request, res: Response) => {
   try {
     // 分两步查：先查 operator_members（公共库），再补查 admin_roles 和 operators
     const member = await queryOne<any>(
-      `SELECT id, password, nickname, phone, role_id, status, operator_id, first_login
+      `SELECT id, password, name, phone, role_id, status, operator_id, first_login
        FROM operator_members WHERE phone = $1`,
       [phone]
     );
@@ -397,7 +397,7 @@ router.post('/operator-login', async (req: Request, res: Response) => {
         token,
         user: {
           id: member.id,
-          nickname: member.nickname,
+          nickname: member.name,
           phone: member.phone,
           role_id: member.role_id,
           role_name: member.role_name,
@@ -511,7 +511,7 @@ router.post('/login', async (req: Request, res: Response) => {
       }
 
       const member = await queryOne<any>(
-        `SELECT id, password, nickname, phone, role_id, status, operator_id, first_login
+        `SELECT id, password, name, phone, role_id, status, operator_id, first_login
          FROM operator_members WHERE phone = $1`,
         [phone]
       );
@@ -583,7 +583,7 @@ router.post('/login', async (req: Request, res: Response) => {
           token,
           user: {
             id: member.id,
-            nickname: member.nickname,
+            nickname: member.name,
             phone: member.phone,
             role_id: member.role_id,
             role_name: member.role_name,
@@ -721,7 +721,7 @@ router.get('/me', authMiddleware, async (req: Request, res: Response<ApiResponse
     // 运营商成员：从 operator_members 表查询（已迁至公共库）
     if (userRole === 'operator') {
       const member = await queryOne<any>(
-        `SELECT om.id, om.operator_id, om.phone, om.nickname as name, om.role_id, om.status,
+        `SELECT om.id, om.operator_id, om.phone, om.name, om.role_id, om.status,
                 o.name as operator_name, o.company_name
          FROM operator_members om
          LEFT JOIN operators o ON o.id = om.operator_id
@@ -863,7 +863,7 @@ router.post('/refresh', authMiddleware, async (req: Request, res: Response<ApiRe
     // 运营商成员：从 operator_members 表查询
     if (userRole === 'operator' && (payload as any).operatorId) {
       const member = await queryOne<any>(
-        `SELECT m.id, m.phone, m.nickname, m.role_id, m.status, m.operator_id,
+        `SELECT m.id, m.phone, m.name, m.role_id, m.status, m.operator_id,
                 ar.label as role_name, ar.name as admin_role_name, ar.permissions,
                 m.first_login
          FROM operator_members m
@@ -1246,7 +1246,7 @@ router.post('/member/change-password', authMiddleware, async (req: Request, res:
       }
     } else {
       const m = await queryOne<any>(
-        `SELECT m.id, m.operator_id, m.phone, m.nickname as nickname, m.status, ar.label as role_name, ar.permissions
+        `SELECT m.id, m.operator_id, m.phone, m.name as nickname, m.status, ar.label as role_name, ar.permissions
          FROM operator_members m
          LEFT JOIN admin_roles ar ON ar.name = m.role_id
          WHERE m.id = $1`,

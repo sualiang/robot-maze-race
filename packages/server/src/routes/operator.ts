@@ -180,7 +180,7 @@ router.get('/rbac/users', authMiddleware, operatorOnly, async (req: Request, res
     const params: any[] = [operatorId];
 
     if (search) {
-      conditions.push(`(au.nickname LIKE ?)`);
+      conditions.push(`(au.name LIKE ?)`);
       params.push(`%${search}%`, `%${search}%`);
     }
 
@@ -195,7 +195,7 @@ router.get('/rbac/users', authMiddleware, operatorOnly, async (req: Request, res
 
     // 分页数据（不返回 password）
     const users = await query<any>(
-      `SELECT au.id, au.nickname, au.phone,
+      `SELECT au.id, au.name, au.phone,
               au.role_id as role_key, COALESCE(arr.label, '') as role_name, au.status, au.created_at
        FROM operator_members au
        LEFT JOIN admin_roles arr ON au.role_id = arr.name
@@ -213,7 +213,7 @@ router.get('/rbac/users', authMiddleware, operatorOnly, async (req: Request, res
 
     const list = users.map((u: any) => ({
       ...u,
-      username: u.nickname || '',
+      username: u.name || '',
       role_name: roleMap[u.role_key] || u.role_key,
     }));
 
@@ -261,7 +261,7 @@ router.post('/rbac/users', authMiddleware, operatorOnly, async (req: Request, re
     const id = uuidv4();
 
     await execute(
-      `INSERT INTO operator_members (id, nickname, password, phone, role_id, operator_id, created_at, updated_at)
+      `INSERT INTO operator_members (id, name, password, phone, role_id, operator_id, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [id, phone, hashedPassword, phone, role_key, operatorId]
     );
@@ -340,7 +340,7 @@ router.put('/rbac/users/:id', authMiddleware, operatorOnly, async (req: Request,
     );
 
     const updated = await queryOne<any>(
-      `SELECT au.id, au.nickname AS username, au.nickname AS nickname, au.phone,
+      `SELECT au.id, au.name AS username, au.name AS nickname, au.phone,
               au.role_id as role_key, COALESCE(arr.label, '') as role_name, au.status, au.created_at
        FROM operator_members au
        LEFT JOIN admin_roles arr ON au.role_id = arr.name
@@ -409,8 +409,8 @@ router.post('/rbac/users/:id/reset-password', authMiddleware, operatorOnly, asyn
     const operatorId = req.user!.operatorId;
     const { id } = req.params;
 
-    const existing = await queryOne<{ id: string; operator_id: string; phone: string; nickname: string }>(
-      'SELECT id, operator_id, phone, nickname FROM operator_members WHERE id = $1',
+    const existing = await queryOne<{ id: string; operator_id: string; phone: string; name: string }>(
+      'SELECT id, operator_id, phone, name FROM operator_members WHERE id = $1',
       [id]
     );
     if (!existing || existing.operator_id !== operatorId) {

@@ -276,7 +276,7 @@ CREATE INDEX IF NOT EXISTS idx_notification_logs_created ON notification_logs(cr
 -- 放在公共库，因为登录时需要按手机号查找成员，无法提前知道运营商 DB
 CREATE TABLE IF NOT EXISTS operator_members (
   id VARCHAR(36) PRIMARY KEY,
-  nickname VARCHAR(64),
+  name VARCHAR(64),
   phone VARCHAR(20),
   password VARCHAR(256),
   role_id VARCHAR(32),
