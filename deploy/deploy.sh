@@ -19,7 +19,7 @@ __preflight_check() {
   echo "  [服务器] 步骤 (脚本自动):"
   echo "    3. git pull（从 GitHub 拉取最新源码）"
   echo "    4. 编译后端（npx tsc）"
-  echo "    5. 拷贝 schema.sql 到 dist"
+  echo "    5. 拷贝 *.sql 文件到 dist"
   echo "    6. 拷贝 shared dist（@robot-race/shared）"
   echo "    7. 安装依赖"
   echo "    8. 部署后端 dist 到 /opt/robot-maze-race-server/"
@@ -70,8 +70,8 @@ deploy_backend() {
     echo '🔧 Step 2: 安装依赖 + 编译后端...'
     cd $REMOTE_REPO
     pnpm install 2>&1 | tail -5
-    # 拷贝 schema.sql 到 dist（tsc 不处理 .sql 文件）
-    cd $REMOTE_SERVER_DIR && cp src/db/schema.sql dist/db/schema.sql 2>/dev/null || true
+    # 拷贝 .sql 文件到 dist（tsc 不处理 .sql 文件）
+    cd $REMOTE_SERVER_DIR && mkdir -p dist/db && cp src/db/schema.mysql.sql src/db/common.sql src/db/operator.sql dist/db/ 2>/dev/null || true
     # 用本地 tsc 编译（跳过 pnpm 构建检查）
     ./node_modules/.bin/tsc 2>&1 || { echo '❌ 编译失败'; exit 1; }
     echo '  ✅ 编译成功'

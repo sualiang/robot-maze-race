@@ -57,6 +57,8 @@ COPY --from=builder /app/packages/server/src/banks.json ./dist/banks.json
 RUN if [ ! -s ./dist/banks.json ]; then printf '[]' > ./dist/banks.json; fi
 RUN mkdir -p /app/dist/db
 COPY --from=builder /app/packages/server/src/db/schema.mysql.sql ./dist/db/
+COPY --from=builder /app/packages/server/src/db/common.sql ./dist/db/
+COPY --from=builder /app/packages/server/src/db/operator.sql ./dist/db/
 COPY --from=builder /app/packages/shared/dist ./shared
 
 # pnpm deploy 将 @robot-race/shared 作为 file: 依赖打包进了 .pnpm store
