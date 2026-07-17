@@ -137,11 +137,15 @@ router.post('/register', async (req: Request, res: Response) => {
     }
     if (invite.status === 'used') return res.status(400).json({ code: 400, message: '邀请链接已被使用', data: null });
 
-    // 查 referees 表（运营商库）和 users 表（公共库）
-    let existingRef = await queryOpOne<{ id: string }>(req, 'SELECT id FROM referees WHERE phone = $1', [phone]);
-    if (!existingRef) {
-      const existingUser = await queryOne<{ id: string }>('SELECT id FROM users WHERE phone = $1 AND role = $2', [phone, 'referee']);
-      if (existingUser) existingRef = existingUser;
+    // 跨运营商允许同手机号注册裁判，只查当前邀请对应的运营商隔离库
+    const opDbName = invite.operator_id
+      ? (await queryOne<{ db_name: string }>('SELECT db_name FROM operators_registry WHERE operator_id = $1', [invite.operator_id]))?.db_name
+      : null;
+    let existingRef = null;
+    if (opDbName) {
+      const opPool = getOperatorPool(opDbName);
+      const [ref] = await opPool.execute('SELECT id FROM referees WHERE phone = ?', [phone]);
+      existingRef = ref || null;
     }
     if (existingRef) return res.status(400).json({ code: 400, message: '该手机号已被注册为裁判', data: null });
 
@@ -161,10 +165,7 @@ router.post('/register', async (req: Request, res: Response) => {
     }
 
     // 注册路由无 auth，不能用 executeOp（需要 req 里有 operator context）
-    // 手动查 DB 名 → 获取 operator pool → 直接写入
-    const opDbName = invite.operator_id
-      ? (await queryOne<{ db_name: string }>('SELECT db_name FROM operators_registry WHERE operator_id = $1', [invite.operator_id]))?.db_name
-      : null;
+    // opDbName 已在上方查过
     if (!opDbName) return res.status(500).json({ code: 500, message: '运营商信息不完整', data: null });
 
     const opPool = getOperatorPool(opDbName);
