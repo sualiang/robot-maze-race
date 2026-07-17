@@ -413,7 +413,7 @@ router.get('/:id/referees', authMiddleware, async (req: Request, res: Response) 
  * 绑定裁判员到赛场（覆盖式：传哪些裁判员就绑定哪些）
  * body: { referee_ids: string[] }
  */
-router.put('/:id/referees', async (req: Request, res: Response) => {
+router.put('/:id/referees', authMiddleware, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { referee_ids } = req.body;

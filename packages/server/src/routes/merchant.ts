@@ -131,7 +131,7 @@ router.post('/coupon/use', authMiddleware, async (req: Request, res: Response) =
  * GET /api/v1/merchant/list
  * 获取商家列表（玩家端）
  */
-router.get('/list', async (req: Request, res: Response) => {
+router.get('/list', authMiddleware, async (req: Request, res: Response) => {
   try {
     const merchants = await queryOp<any>(req, 
       `SELECT id, merchant_name, merchant_address, longitude, latitude,
@@ -166,7 +166,7 @@ router.get('/list', async (req: Request, res: Response) => {
  * GET /api/v1/merchant/detail/:id
  * 获取商家详情（玩家端）
  */
-router.get('/detail/:id', async (req: Request, res: Response) => {
+router.get('/detail/:id', authMiddleware, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const merchant = await queryOpOne<any>(req, 
