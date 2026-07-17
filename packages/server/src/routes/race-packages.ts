@@ -76,7 +76,7 @@ function toRacePackage(row: RacePackageRow): any {
  * GET /api/v1/race-packages
  * 获取参赛包列表（公开接口）
  */
-router.get('/', async (req: Request, res: Response<ApiResponse<PaginatedResult<RacePackage>>>) => {
+router.get('/', authMiddleware, async (req: Request, res: Response<ApiResponse<PaginatedResult<RacePackage>>>) => {
   try {
     const {
       status = 'active',
@@ -125,7 +125,7 @@ router.get('/', async (req: Request, res: Response<ApiResponse<PaginatedResult<R
  * GET /api/v1/race-packages/:id
  * 获取参赛包详情（含关联礼券）
  */
-router.get('/:id', async (req: Request, res: Response<ApiResponse<any>>) => {
+router.get('/:id', authMiddleware, async (req: Request, res: Response<ApiResponse<any>>) => {
   try {
     const { id } = req.params;
 
