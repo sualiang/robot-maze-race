@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
-import { query, queryOne, queryOp, queryOpOne, executeOp, execute, transaction, generateSecurePassword, createOperatorDatabase, getBaseOptions, closeOperatorPool } from '../config/database';
+import { query, queryOne, queryOp, queryOpOne, executeOp, execute, transaction, generateSecurePassword, createOperatorDatabase, getBaseOptions, closeOperatorPool, getOperatorPool } from '../config/database';
 import mysql from 'mysql2/promise';
 import { authMiddleware } from '../middleware/auth';
 import { checkPermission } from '../middleware/rbac';
@@ -72,6 +72,37 @@ router.get('/', authMiddleware, checkPermission('operators:list'), async (req: R
       params.length > 0 ? params : undefined
     );
 
+    // 实时查询每个运营商的 venue_count（批量并行，避免 N+1）
+    if (operators.length > 0) {
+      // 先从 operators_registry 查出所有 db_name
+      const operatorIds = operators.map((o: Operator) => o.id);
+      const placeholders = operatorIds.map((_: string, i: number) => `$${i + 1}`).join(', ');
+      const registryRows = await query<{ operator_id: string; db_name: string }>(
+        `SELECT operator_id, db_name FROM operators_registry WHERE operator_id IN (${placeholders})`,
+        operatorIds
+      );
+      const dbMap = new Map(registryRows.map((r: { operator_id: string; db_name: string }) => [r.operator_id, r.db_name]));
+
+      // 并行查询每个运营商的 venues 数量
+      const counts = await Promise.all(
+        operators.map(async (op: Operator) => {
+          const dbName = dbMap.get(op.id);
+          if (!dbName) return { operator_id: op.id, count: 0 };
+          try {
+            const pool = getOperatorPool(dbName);
+            const [rows] = await pool.query<any[]>('SELECT COUNT(*) AS cnt FROM venues');
+            return { operator_id: op.id, count: Number(rows?.[0]?.cnt ?? 0) };
+          } catch {
+            return { operator_id: op.id, count: 0 };
+          }
+        })
+      );
+      const countMap = new Map(counts.map(c => [c.operator_id, c.count]));
+      for (const op of operators) {
+        (op as any).venue_count = countMap.get(op.id) ?? 0;
+      }
+    }
+
     return res.json({ code: 0, message: 'ok', data: operators });
   } catch (error: any) {
     console.error('[AdminOperators] list error:', error.message);
@@ -101,6 +132,23 @@ router.get('/:id', authMiddleware, checkPermission('operators:read'), async (req
 
     if (!operator) {
       return res.status(404).json({ code: 404, message: '运营商不存在', data: null });
+    }
+
+    // 实时查询 venue_count
+    try {
+      const regRow = await queryOne<{ db_name: string }>(
+        'SELECT db_name FROM operators_registry WHERE operator_id = $1',
+        [id]
+      );
+      if (regRow?.db_name) {
+        const pool = getOperatorPool(regRow.db_name);
+        const [rows] = await pool.query<any[]>('SELECT COUNT(*) AS cnt FROM venues');
+        (operator as any).venue_count = Number(rows?.[0]?.cnt ?? 0);
+      } else {
+        (operator as any).venue_count = 0;
+      }
+    } catch {
+      (operator as any).venue_count = 0;
     }
 
     return res.json({ code: 0, message: 'ok', data: operator });
