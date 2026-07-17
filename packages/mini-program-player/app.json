@@ -63,10 +63,7 @@
     }
   },
   "requiredPrivateInfos": [
-    "chooseAvatar",
-    "chooseNickname",
-    "getLocation",
-    "chooseAddress"
+    "getLocation"
   ],
   "style": "v2",
   "sitemapLocation": "sitemap.json",

@@ -1,10 +1,10 @@
-// pages/login/login.js — 微信登录（三步流程，WeUI 白底风格）
-// 步骤: getPhoneNumber → wx.login → /auth/wx-login → /auth/decrypt-phone → /auth/me
+// pages/login/login.js — 手动登录（手机号 + 微信 code → /auth/mp-login）
 var request = require('../../utils/request');
 var storage = require('../../utils/storage');
 
 Page({
   data: {
+    phone: '',
     loading: false
   },
 
@@ -17,7 +17,12 @@ Page({
     }
   },
 
-  // ===== 保存登录态 =====
+  // 手机号输入
+  onPhoneInput: function (e) {
+    this.setData({ phone: e.detail.value });
+  },
+
+  // 保存登录态
   _saveLogin: function (token, user) {
     storage.setSync(storage.STORAGE_KEYS.TOKEN, token);
     storage.setSync(storage.STORAGE_KEYS.USER, user || {});
@@ -27,24 +32,21 @@ Page({
     app.globalData.isLoggedIn = true;
   },
 
-  // ===== 微信登录按钮（open-type="getPhoneNumber" 回调） =====
-  onGetPhoneNumber: function (e) {
+  // 登录
+  onLogin: function () {
     var that = this;
-    var detail = e.detail;
+    var phone = this.data.phone.trim();
 
-    // 用户拒绝授权
-    if (detail.errMsg && detail.errMsg.indexOf(':ok') === -1) {
+    if (!phone) {
+      wx.showToast({ title: '请输入手机号', icon: 'none' });
       return;
     }
-
-    if (!detail.code) {
-      wx.showToast({ title: '获取手机号失败', icon: 'none' });
+    if (!/^1[3-9]\d{9}$/.test(phone)) {
+      wx.showToast({ title: '请输入正确的手机号', icon: 'none' });
       return;
     }
 
     that.setData({ loading: true });
-
-    var phoneCode = detail.code;
 
     // 第一步: wx.login 拿 code
     wx.login({
@@ -55,58 +57,33 @@ Page({
           return;
         }
 
-        // 第二步: /auth/wx-login 用微信 code 换 token
-        request.post('/auth/wx-login', {
-          code: loginRes.code
+        // 第二步: /auth/mp-login 用 code + 手机号登录
+        request.post('/auth/mp-login', {
+          code: loginRes.code,
+          phone: phone
         }).then(function (d) {
+          that.setData({ loading: false });
+
           if (!d || !d.token) {
-            that.setData({ loading: false });
-            wx.showToast({ title: '登录失败', icon: 'none' });
+            wx.showToast({ title: (d && d.message) || '登录失败', icon: 'none' });
             return;
           }
 
-          // 保存 token
           that._saveLogin(d.token, d.user || {});
 
-          // 第三步: /auth/decrypt-phone 解密手机号
-          request.post('/auth/decrypt-phone', {
-            code: phoneCode
-          }).then(function (phoneRes) {
-            var phone = (phoneRes && phoneRes.phone) || '';
+          // 判断是否新用户：没有昵称或没有头像 → 新用户
+          var user = d.user || {};
+          var isNewUser = !user.nickname || !user.avatar_url;
 
-            // 第四步: /auth/me 查用户完整信息
-            request.silentGet('/auth/me').then(function (me) {
-              that.setData({ loading: false });
-              var user = me || {};
-
-              // 判断新老用户：有昵称 且 有头像 → 老用户
-              var isNewUser = !user.nickname || !user.avatar_url;
-
-              if (phone) {
-                user.phone = phone;
-                storage.setSync(storage.STORAGE_KEYS.USER, user);
-                getApp().globalData.userInfo = user;
-              }
-
-              if (isNewUser) {
-                wx.redirectTo({ url: '/pages/edit-profile/edit-profile' });
-              } else {
-                wx.showToast({ title: '登录成功', icon: 'success', duration: 1000 });
-                var dest = that._from === 'profile' ? '/pages/profile/profile' : '/pages/index/index';
-                setTimeout(function () {
-                  wx.switchTab({ url: dest });
-                }, 1000);
-              }
-            }).catch(function () {
-              that.setData({ loading: false });
-              // /auth/me 失败，按新用户处理
-              wx.redirectTo({ url: '/pages/edit-profile/edit-profile' });
-            });
-          }).catch(function (err) {
-            that.setData({ loading: false });
-            var msg = (err && err.message) || '获取手机号失败';
-            wx.showToast({ title: msg, icon: 'none' });
-          });
+          if (isNewUser) {
+            wx.redirectTo({ url: '/pages/edit-profile/edit-profile' });
+          } else {
+            wx.showToast({ title: '登录成功', icon: 'success', duration: 1000 });
+            var dest = that._from === 'profile' ? '/pages/profile/profile' : '/pages/index/index';
+            setTimeout(function () {
+              wx.switchTab({ url: dest });
+            }, 1000);
+          }
         }).catch(function (err) {
           that.setData({ loading: false });
           var msg = (err && err.message) || '登录失败';
