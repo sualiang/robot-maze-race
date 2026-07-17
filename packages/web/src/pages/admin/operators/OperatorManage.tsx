@@ -189,7 +189,8 @@ export default function OperatorManage() {
     setLoading(true);
     try {
       const res: any = await api.get('/admin/operators');
-      setList(res?.list ?? res ?? []);
+      // 兼容两种响应格式：直接的数组 或 { list: [...] }
+      setList(Array.isArray(res) ? res : (res?.list ?? []));
     } catch { setList([]); } finally { setLoading(false); }
   }, [checkLogin]);
 
