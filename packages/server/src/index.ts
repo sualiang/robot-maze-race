@@ -47,6 +47,7 @@ import adminSeasonRoutes from './routes/admin-season';
 import adminMerchantRoutes from './routes/admin-merchant';
 import adminTaskRoutes from './routes/admin-task';
 import uploadRoutes from './routes/upload';
+import helpRoutes from './routes/help';
 
 const app = express();
 const PORT = config.port || 3000;
@@ -99,6 +100,7 @@ app.use('/api/v1/venues', venueRoutes);
 app.use('/api/v1/referees', refereeRoutes);
 app.use('/api/v1/race-packages', racePackageRoutes);
 app.use('/api/v1/packages', racePackageRoutes); // alias for frontend compatibility
+app.use('/api/v1/player', helpRoutes);
 app.use('/api/v1/player', playerRoutes);
 app.use('/api/v1/admin/operators', adminOperatorRoutes);
 app.use('/api/v1/admin/finance', adminFinanceRoutes);
