@@ -1027,6 +1027,27 @@ async function getUserRemainingRaces(userId: string, req: Request): Promise<numb
 }
 
 /**
+ * POST /player/order/:id/confirm-payment
+ * 前端支付成功后手动确认订单（wx.requestPayment success 回调触发）
+ * 仅更新 status='paid'，不去重 — 微信回调 side effects 由 /pay/notify 统一处理
+ */
+router.post('/order/:id/confirm-payment', authMiddleware, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const userId = req.user!.userId;
+
+  try {
+    const result = await executeOp(req,
+      `UPDATE orders SET status = 'paid', paid_at = NOW() WHERE id = $1 AND user_id = $2 AND status = 'pending'`,
+      [id, userId]
+    );
+    res.json({ code: 0, data: { status: 'paid', updated: (result as any)?.rowCount > 0 } });
+  } catch (e: any) {
+    console.error('[Player] confirm-payment error:', e?.message || e);
+    res.json({ code: 500, message: '确认失败', data: null });
+  }
+});
+
+/**
  * GET /player/marketing/announcement
  * 查询首页公告（从运营商隔离库 marketing_config 表）
  */

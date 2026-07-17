@@ -389,6 +389,7 @@ Page({
 
       // 支付参数从后端 data.paymentParams 获取
       var orderBody = orderData && orderData.code === 0 ? orderData.data : orderData;
+      var orderId = orderBody && orderBody.orderId;
       var pp = orderBody && orderBody.paymentParams;
       if (pp) {
         wx.requestPayment({
@@ -398,6 +399,10 @@ Page({
           signType: pp.signType || 'MD5',
           paySign: String(pp.paySign || ''),
           success: function () {
+            // 支付成功后手动确认订单状态
+            if (orderId) {
+              request.silentPost('/player/order/' + orderId + '/confirm-payment');
+            }
             wx.showToast({ title: '购买成功', icon: 'success' });
             that.loadAllData();
           },
