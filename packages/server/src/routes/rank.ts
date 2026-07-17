@@ -1,8 +1,84 @@
 import { Router, Request, Response } from 'express';
-import { query, queryOne } from '../config/database';
+import { query, queryOne, getOperatorPool } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 
 const router = Router();
+
+/**
+ * 获取用户的区域和俱乐部名称
+ * 区域：从用户最近签到的赛场所在城市/区域获取
+ * 俱乐部：从该赛场所属运营商名称获取
+ */
+async function getUserRegionAndClub(userId: string): Promise<{ region: string; clubName: string }> {
+  try {
+    // 从 common DB 查找: 用户最近签到的 checkins → venue_id → operator_id
+    // 然后从 operators_registry + operators 获取信息
+    const latestCheckin = await queryOne<{ venue_id: string; operator_id: string }>(
+      `SELECT c.venue_id, c.operator_id
+       FROM checkins c
+       WHERE c.user_id = $1
+       ORDER BY c.created_at DESC
+       LIMIT 1`,
+      [userId]
+    );
+
+    if (!latestCheckin) {
+      // 尝试从 race_results 获取 operator_id
+      const lastRace = await queryOne<{ operator_id: string }>(
+        `SELECT operator_id FROM race_results WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`,
+        [userId]
+      );
+      if (!lastRace?.operator_id) {
+        return { region: '', clubName: '' };
+      }
+      // 通过 operator_id 获取运营商名称
+      const op = await queryOne<{ name: string }>(
+        `SELECT name FROM operators WHERE id = $1`,
+        [lastRace.operator_id]
+      );
+      return { region: '', clubName: op?.name || '' };
+    }
+
+    // 获取运营商名称
+    const op = latestCheckin.operator_id
+      ? await queryOne<{ name: string }>(
+          `SELECT name FROM operators WHERE id = $1`,
+          [latestCheckin.operator_id]
+        )
+      : null;
+
+    // 从运营商独立数据库获取赛场区域
+    let region = '';
+    if (latestCheckin.operator_id && latestCheckin.venue_id) {
+      try {
+        const registry = await queryOne<{ db_name: string }>(
+          `SELECT db_name FROM operators_registry WHERE operator_id = $1`,
+          [latestCheckin.operator_id]
+        );
+        if (registry?.db_name) {
+          const pool = getOperatorPool(registry.db_name);
+          if (pool) {
+            const [venueRows] = await pool.query(
+              `SELECT city, district FROM venues WHERE id = $1`,
+              [latestCheckin.venue_id]
+            ) as any;
+            const rows = venueRows as any[];
+            if (rows.length > 0) {
+              const v = rows[0];
+              region = [v.city, v.district].filter(Boolean).join(' · ') || v.city || v.district || '';
+            }
+          }
+        }
+      } catch {
+        // operator DB 不可用时忽略区域
+      }
+    }
+
+    return { region: region || '', clubName: op?.name || '' };
+  } catch {
+    return { region: '', clubName: '' };
+  }
+}
 
 /**
  * 获取当前赛季信息（没有 seasons 表时自动从 system_config 获取）
@@ -152,6 +228,9 @@ router.get('/my', authMiddleware, async (req: Request, res: Response) => {
       ? Math.round(((totalPlayers - rank) / totalPlayers) * 100)
       : 0;
 
+    // 获取用户的区域和俱乐部名称
+    const { region, clubName } = await getUserRegionAndClub(userId);
+
     res.json({
       code: 0,
       data: {
@@ -162,6 +241,8 @@ router.get('/my', authMiddleware, async (req: Request, res: Response) => {
         totalPlayers,
         seasonName: season.name,
         hasData: true,
+        region: region || '',
+        clubName: clubName || '',
       },
     });
   } catch (e: any) {
@@ -323,11 +404,10 @@ router.get('/:type', authMiddleware, async (req: Request, res: Response) => {
       ? Math.round(((totalPlayers - myRank) / totalPlayers) * 100)
       : 0;
 
-    // 前三名特殊标记
-    const top3 = entries.slice(0, 3).map((e, i) => ({
-      ...e,
-      medal: i === 0 ? 'gold' : i === 1 ? 'silver' : 'bronze',
-    }));
+    // 获取用户的区域和俱乐部名称
+    const { region, clubName } = myRank > 0
+      ? await getUserRegionAndClub(userId)
+      : { region: '', clubName: '' };
 
     res.json({
       code: 0,
@@ -347,6 +427,8 @@ router.get('/:type', authMiddleware, async (req: Request, res: Response) => {
           bestScore: myBestScore,
           totalRaces: myTotalRaces,
           beatPercent,
+          region: region || '',
+          clubName: clubName || '',
         },
         totalPlayers,
       },
