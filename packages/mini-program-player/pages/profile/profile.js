@@ -66,33 +66,30 @@ Page({
     var user = storage.getSync(storage.STORAGE_KEYS.USER, {});
     that.setData({ userInfo: user });
 
-    request.silentGet('/player/me/profile').then(function (res) {
+    request.silentGet('/player/me/profile-check').then(function (res) {
       if (res) {
-        var profileData = res.code === 0 && res.data ? res.data : res;
-        if (profileData.avatarUrl && !profileData.avatar_url) {
-          profileData.avatar_url = profileData.avatarUrl;
+        var d = res.code === 0 && res.data ? res.data : res;
+        if (d.avatarUrl && !d.avatar_url) {
+          d.avatar_url = d.avatarUrl;
         }
-        if (profileData.raceCount && !profileData.race_count) {
-          profileData.race_count = profileData.raceCount;
+        if (d.raceCount && !d.race_count) {
+          d.race_count = d.raceCount;
         }
-        var merged = Object.assign({}, that.data.userInfo, profileData);
+        var merged = Object.assign({}, that.data.userInfo, d);
         that.setData({ userInfo: merged });
         storage.setSync(storage.STORAGE_KEYS.USER, merged);
-      }
-    }).catch(function () {});
 
-    request.silentGet('/player/me/profile-check').then(function (res) {
-      var d = res.data || res;
-      var balance = d.pointsBalance || 0;
-      that.setData({
-        assets: {
-          deductible: (d.availableDeductionCents || 0) / 100,
-          couponCount: 0,
-          couponTotal: d.couponTotalYuan || 0
-        },
-        'menuList[2].rightText': '当前' + balance + '积分',
-        'userInfo.points': balance
-      });
+        var balance = d.pointsBalance || 0;
+        that.setData({
+          assets: {
+            deductible: (d.availableDeductionCents || 0) / 100,
+            couponCount: 0,
+            couponTotal: d.couponTotalYuan || 0
+          },
+          'menuList[2].rightText': '当前' + balance + '积分',
+          'userInfo.points': balance
+        });
+      }
     }).catch(function () {});
 
     request.silentGet('/season/user/info').then(function (res) {
