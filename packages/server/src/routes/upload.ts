@@ -16,6 +16,45 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 }
 
 /**
+ * POST /api/v1/upload/image
+ * 通用图片上传（base64 或 dataURL）— 用于积分商城商品图、公告图等
+ * Body: { image: "data:image/png;base64,..." }
+ * Returns: { code: 0, data: { url: "/uploads/xxx.jpg" } }
+ */
+router.post('/image', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { image } = req.body;
+    if (!image) {
+      res.json({ code: 400, message: '缺少图片数据', data: null });
+      return;
+    }
+
+    const matches = image.match(/^data:image\/(png|jpeg|jpg|gif|webp);base64,(.+)$/);
+    if (!matches) {
+      res.json({ code: 400, message: '图片格式不合法，仅支持 PNG/JPEG/GIF/WebP', data: null });
+      return;
+    }
+
+    const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1];
+    const buffer = Buffer.from(matches[2], 'base64');
+
+    if (buffer.length > 2 * 1024 * 1024) {
+      res.json({ code: 400, message: '图片大小不能超过 2MB', data: null });
+      return;
+    }
+
+    const filename = `img_${uuidv4().slice(0, 8)}_${Date.now()}.${ext}`;
+    fs.writeFileSync(path.join(UPLOADS_DIR, filename), buffer);
+
+    const url = `/uploads/${filename}`;
+    res.json({ code: 0, data: { url } });
+  } catch (e: any) {
+    console.error('[Upload] image error:', e?.message || e);
+    res.json({ code: 500, message: '上传失败', data: null });
+  }
+});
+
+/**
  * POST /api/v1/upload/merchant-logo
  * 商家 Logo 上传（base64 或 dataURL）
  * Body: { image: "data:image/png;base64,..." }

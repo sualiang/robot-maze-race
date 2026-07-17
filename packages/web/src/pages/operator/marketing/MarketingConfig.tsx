@@ -153,6 +153,31 @@ export default function MarketingConfig() {
     } catch {}
   };
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      message.error('图片大小不能超过 2MB');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const data: any = await api.post('/upload/image', { image: reader.result });
+        const url = data?.url || '';
+        if (url) {
+          editForm.setFieldsValue({ image: url });
+          message.success('上传成功');
+        }
+      } catch {
+        message.error('上传失败');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   // ===== 原配置 =====
   const checkHasData = useCallback(async () => {
     try {
@@ -445,8 +470,19 @@ export default function MarketingConfig() {
           <Form.Item name="description" label="描述">
             <Input maxLength={60} />
           </Form.Item>
-          <Form.Item name="image" label="商品图片 URL">
-            <Input placeholder="输入图片链接地址（https://...）" />
+          <Form.Item name="image" label="商品图片">
+            <Space.Compact style={{ width: '100%' }}>
+              <Input placeholder="图片URL（也可点右侧上传按钮）" style={{ flex: 1 }} />
+              <label style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                width: 40, height: 32, background: '#1677ff', borderRadius: '0 6px 6px 0',
+                cursor: 'pointer',
+              }}>
+                <UploadOutlined style={{ color: '#fff', fontSize: 16 }} />
+                <input type="file" accept="image/*" onChange={handleImageUpload}
+                  style={{ display: 'none' }} />
+              </label>
+            </Space.Compact>
           </Form.Item>
           <Form.Item name="needPoints" label="所需积分" rules={[{ required: true, message: '请输入积分' }]}>
             <InputNumber min={1} max={999999} style={{ width: '100%' }} />
