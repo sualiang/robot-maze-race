@@ -51,6 +51,9 @@ Page({
 
           that._saveLogin(d.token, d.user || {});
 
+          // 同步运营商上下文（从编译模式/扫码获取的 operator_id/venue_id）
+          app._syncOperatorContext();
+
           // 新用户（无 nickname） → 注册页，老用户 → 进首页
           if (d.is_new_user || !d.user || !d.user.nickname) {
             wx.redirectTo({ url: '/pages/register/register' });
