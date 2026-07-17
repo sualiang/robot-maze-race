@@ -6,6 +6,8 @@ import { authMiddleware } from '../middleware/auth';
 
 import { autoAssignMerchantCoupons } from '../services/coupon-service';
 import { rateLimiter } from '../middleware/rateLimiter';
+import { wechatPayRequest, isPayConfigured, generateMiniProgramPayParams, generateMockPayParams } from '../services/wechat-pay-service';
+import { config } from '../config';
 
 const router = Router();
 
@@ -986,14 +988,47 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
       console.error('[订单] 参赛包赠送抵扣金失败:', giftErr?.message || giftErr);
     }
 
-    // 构造支付参数（开发环境直接返回模拟参数）
-    const paymentParams = {
-      timeStamp: String(Math.floor(Date.now() / 1000)),
-      nonceStr: Math.random().toString(36).substring(2, 18),
-      package: 'prepay_id=' + Math.random().toString(36).substring(2, 20),
-      signType: 'MD5',
-      paySign: 'MOCK_' + Math.random().toString(36).substring(2, 34),
-    };
+    // 构造支付参数（优先调微信支付真实 API）
+    let paymentParams: any;
+    try {
+      if (isPayConfigured() && finalPriceCents > 0) {
+        // 调微信支付 V3 JSAPI 统一下单
+        const appId = config.wechat.appId;
+        const userOpenid = (req.user as any)?.openid || '';
+
+        if (!userOpenid) {
+          console.warn('[订单] 用户缺少 openid，降级为模拟支付');
+          paymentParams = generateMockPayParams();
+        } else {
+          const wxOrder = await wechatPayRequest<any>('POST', '/v3/pay/transactions/jsapi', {
+            appid: appId,
+            mchid: config.wechatPay.mchId,
+            description: `参赛包-${pkg.name}`.slice(0, 127),
+            out_trade_no: orderNo,
+            notify_url: config.wechatPay.notifyUrl,
+            amount: { total: finalPriceCents, currency: 'CNY' },
+            payer: { openid: userOpenid },
+          });
+
+          // 保存 prepay_id 到订单
+          await queryOp(req,
+            `UPDATE orders SET payment_method = 'wechat_pay', prepay_id = $1 WHERE id = $2`,
+            [wxOrder.prepay_id, orderId]
+          );
+
+          // 生成小程序调起支付参数
+          paymentParams = generateMiniProgramPayParams(wxOrder.prepay_id, appId);
+          console.log('[订单] 微信支付下单成功, prepay_id:', wxOrder.prepay_id);
+        }
+      } else {
+        // 开发模式 / 零元订单：降级为模拟参数
+        paymentParams = generateMockPayParams();
+      }
+    } catch (payErr: any) {
+      console.error('[订单] 微信支付下单失败:', payErr?.message || payErr);
+      // 降级：返回模拟参数，避免阻塞下单流程
+      paymentParams = generateMockPayParams();
+    }
 
     res.json({
       code: 0,
