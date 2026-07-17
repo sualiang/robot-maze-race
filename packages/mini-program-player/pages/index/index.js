@@ -55,6 +55,7 @@ Page({
     that.fetchPackages();
     that.fetchSeasonUserInfo();
     that.fetchSeasonConfig();
+    that.fetchAnnouncement();
 
     return Promise.resolve();
   },
@@ -242,6 +243,25 @@ Page({
       });
     }).catch(function () {
       // 静默失败
+    });
+  },
+
+  /**
+   * 获取首页公告 /api/v1/player/marketing/announcement
+   */
+  fetchAnnouncement: function () {
+    var that = this;
+    var app = getApp();
+
+    if (!app.globalData.isLoggedIn) return;
+
+    request.silentGet('/player/marketing/announcement').then(function (data) {
+      var text = (data && data.text) || '';
+      if (text) {
+        that.setData({ promoText: text });
+      }
+    }).catch(function () {
+      // 静默失败，保留默认值
     });
   },
 

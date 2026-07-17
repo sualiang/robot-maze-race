@@ -1085,4 +1085,20 @@ async function getUserRemainingRaces(userId: string, req: Request): Promise<numb
   }
 }
 
+/**
+ * GET /player/marketing/announcement
+ * 查询首页公告（从运营商隔离库 marketing_config 表）
+ */
+router.get('/marketing/announcement', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const row = await queryOpOne<{ value: string }>(req,
+      `SELECT value FROM marketing_config WHERE \`key\` = 'home_announcement' ORDER BY updated_at DESC LIMIT 1`
+    );
+    res.json({ code: 0, data: { text: row?.value || '' } });
+  } catch (e: any) {
+    console.error('[Player] marketing/announcement error:', e?.message || e);
+    res.json({ code: 0, data: { text: '' } });
+  }
+});
+
 export default router;
