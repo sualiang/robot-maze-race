@@ -182,6 +182,72 @@ router.post('/wx-login', async (req: Request, res: Response<ApiResponse<WxLoginR
 });
 
 /**
+ * POST /api/v1/auth/mp-login
+ * 小程序手机号登录
+ * @param body.code - 微信 wx.login() 返回的 code
+ * @param body.phone - 用户手机号（必填）
+ * @returns { token, user }
+ */
+router.post('/mp-login', async (req: Request, res: Response) => {
+  try {
+    const { code, phone } = req.body;
+
+    if (!code) {
+      return res.status(400).json({ code: 400, message: '缺少登录凭证 code', data: null });
+    }
+    if (!phone || !/^\d{11}$/.test(phone)) {
+      return res.status(400).json({ code: 400, message: '请填写正确的手机号', data: null });
+    }
+
+    // 1. code → openid
+    let openid: string;
+    if (code === 'dev-test-code' || !config.wechat.appId) {
+      openid = `dev_openid_${phone}`;
+    } else {
+      const wxResult = await wxCode2Session(code);
+      openid = wxResult.openid;
+    }
+
+    // 2. 查 users 表，有则 UPDATE phone，无则 INSERT
+    const existing = await queryOne<{ id: string }>(
+      'SELECT id FROM users WHERE openid = $1', [openid]
+    );
+
+    let user: User;
+    if (existing) {
+      await execute(
+        'UPDATE users SET phone = $1, updated_at = NOW() WHERE id = $2',
+        [phone, existing.id]
+      );
+      user = await findUserByOpenid(openid) as User;
+    } else {
+      user = await createUser({
+        openid,
+        unionid: undefined,
+        nickname: `玩家${phone.slice(-4)}`,
+        avatar_url: '',
+        phone,
+        role: UserRole.PLAYER,
+      });
+      // 新用户赠送参赛抵扣金
+      await grantFreeEntryDeduction(req, user.id);
+    }
+
+    // 3. 签发 JWT
+    const token = generateToken(user);
+
+    return res.json({
+      code: 0,
+      message: '登录成功',
+      data: { token, user, is_new_user: !existing },
+    });
+  } catch (error: any) {
+    console.error('[Auth] mp-login error:', error.message);
+    return res.status(500).json({ code: 500, message: error.message || '登录失败', data: null });
+  }
+});
+
+/**
  * POST /api/v1/auth/admin-login
  * 管理员密码登录（RBAC 版）
  * @param body.username - 管理员用户名

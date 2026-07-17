@@ -45,6 +45,15 @@ router.get('/player/context/current', authMiddleware, async (req: Request, res: 
     const jwtOperatorId = (req.user as any)?.operatorId;
     if (jwtOperatorId) {
       operatorId = jwtOperatorId;
+    } else if ((req.user as any)?.role === 'referee') {
+      // 裁判：从 referees 表查 operator_id（裁判没有 Redis 上下文，也不在 JWT 里）
+      const ref = await queryOne<{ operator_id: string }>(
+        `SELECT r.operator_id FROM referees r WHERE r.user_id = $1 LIMIT 1`,
+        [userId]
+      );
+      if (ref?.operator_id) {
+        operatorId = ref.operator_id;
+      }
     } else {
       // 从 Redis 获取
       const ctx = await getOperatorContext(userId);
