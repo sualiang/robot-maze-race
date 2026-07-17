@@ -185,7 +185,7 @@ router.post('/wx-login', async (req: Request, res: Response<ApiResponse<WxLoginR
  * POST /api/v1/auth/mp-login
  * 小程序手机号登录
  * @param body.code - 微信 wx.login() 返回的 code
- * @param body.phone - 用户手机号（必填）
+ * @param body.phone - 用户手机号（可选，有则 UPDATE）
  * @returns { token, user }
  */
 router.post('/mp-login', async (req: Request, res: Response) => {
@@ -195,38 +195,39 @@ router.post('/mp-login', async (req: Request, res: Response) => {
     if (!code) {
       return res.status(400).json({ code: 400, message: '缺少登录凭证 code', data: null });
     }
-    if (!phone || !/^\d{11}$/.test(phone)) {
-      return res.status(400).json({ code: 400, message: '请填写正确的手机号', data: null });
+    // phone 可选；如果有必须格式正确
+    if (phone && !/^\d{11}$/.test(phone)) {
+      return res.status(400).json({ code: 400, message: '手机号格式不正确', data: null });
     }
 
     // 1. code → openid
     let openid: string;
     if (code === 'dev-test-code' || !config.wechat.appId) {
-      openid = `dev_openid_${phone}`;
+      openid = `dev_openid_${phone || Date.now()}`;
     } else {
       const wxResult = await wxCode2Session(code);
       openid = wxResult.openid;
     }
 
-    // 2. 查 users 表，有则 UPDATE phone，无则 INSERT
-    const existing = await queryOne<{ id: string }>(
-      'SELECT id FROM users WHERE openid = $1', [openid]
-    );
+    // 2. 查 users 表，有则 UPDATE phone（如果传了），无则 INSERT
+    const existingUser = await findUserByOpenid(openid);
 
     let user: User;
-    if (existing) {
-      await execute(
-        'UPDATE users SET phone = $1, updated_at = NOW() WHERE id = $2',
-        [phone, existing.id]
-      );
-      user = await findUserByOpenid(openid) as User;
+    if (existingUser) {
+      if (phone) {
+        await execute(
+          'UPDATE users SET phone = $1, updated_at = NOW() WHERE id = $2',
+          [phone, existingUser.id]
+        );
+      }
+      user = phone ? await findUserByOpenid(openid) as User : existingUser;
     } else {
       user = await createUser({
         openid,
         unionid: undefined,
-        nickname: `玩家${phone.slice(-4)}`,
+        nickname: `玩家${(phone || '').slice(-4) || Date.now().toString(36).slice(-6)}`,
         avatar_url: '',
-        phone,
+        phone: phone || '',
         role: UserRole.PLAYER,
       });
       // 新用户赠送参赛抵扣金
@@ -239,7 +240,7 @@ router.post('/mp-login', async (req: Request, res: Response) => {
     return res.json({
       code: 0,
       message: '登录成功',
-      data: { token, user, is_new_user: !existing },
+      data: { token, user, is_new_user: !existingUser },
     });
   } catch (error: any) {
     console.error('[Auth] mp-login error:', error.message);
