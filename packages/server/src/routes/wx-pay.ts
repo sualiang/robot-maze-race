@@ -375,7 +375,7 @@ router.post('/notify', async (req: Request, res: Response) => {
     let opPool: any = null;
     if (attachOperatorId) {
       const opDbName = (await queryOne<{ db_name: string }>(
-        'SELECT db_name FROM operators_registry WHERE operator_id = $1', [attachOperatorId]
+        'SELECT db_name FROM operators_registry WHERE operator_id = ?', [attachOperatorId]
       ))?.db_name;
       if (opDbName) opPool = getOperatorPool(opDbName);
     }
