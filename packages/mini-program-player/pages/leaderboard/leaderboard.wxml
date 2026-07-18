@@ -12,7 +12,7 @@
 
     <!-- 顶部标题 -->
     <view class="lb-header">
-      <text class="lb-header-title">排行榜</text>
+      <text class="lb-header-title">我的榜单</text>
     </view>
 
     <!-- 我的排名卡片：近期最佳成绩 + 今日全区排名 -->
