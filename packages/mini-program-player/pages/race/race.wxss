@@ -364,15 +364,22 @@
 
 /* ===== 历史记录查看全部 ===== */
 .history-view-all {
-  text-align: center;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   padding: 24rpx 0;
   font-size: 26rpx;
-  color: #60A5FA;
+  color: #aaa;
   border-top: 1rpx solid rgba(255,255,255,0.06);
   margin-top: 8rpx;
 }
 
-/* ===== 历史记录弹窗 ===== */
+.history-view-all-arrow {
+  color: #60A5FA;
+  font-size: 24rpx;
+}
+
+/* ===== 历史记录弹窗（已废弃，保留样式以防残留引用） ===== */
 .history-modal-mask {
   position: fixed;
   top: 0;

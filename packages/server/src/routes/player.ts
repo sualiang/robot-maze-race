@@ -702,23 +702,31 @@ router.get('/me/stats', authMiddleware, async (req: Request, res: Response) => {
 /**
  * GET /player/me/race-records
  * 返回历史参赛记录列表
+ * 支持 ?month=YYYY-MM 按月筛选
  * 从 race_results 表查询
  */
 router.get('/me/race-records', authMiddleware, async (req: Request, res: Response) => {
   const userId = req.user!.userId;
+  const month = (req.query.month || '') as string;
 
   try {
     const opId = (req.user as any)?.operatorId || '';
-    const records = await queryOp<any>(req, 
-      `SELECT rr.id, rr.score_ms, rr.rank, rr.status, rr.finished_at, rr.created_at,
+
+    let sql = `SELECT rr.id, rr.score_ms, rr.rank, rr.status, rr.finished_at, rr.created_at,
               v.name as venue_name
        FROM race_results rr
        LEFT JOIN venues v ON rr.venue_id = v.id
-       WHERE rr.user_id = $1 AND rr.operator_id = $2
-       ORDER BY rr.created_at DESC
-       LIMIT 50`,
-      [userId, opId]
-    );
+       WHERE rr.user_id = $1 AND rr.operator_id = $2`;
+    const params: any[] = [userId, opId];
+
+    if (month) {
+      sql += ` AND DATE_FORMAT(rr.created_at, '%Y-%m') = $3`;
+      params.push(month);
+    }
+
+    sql += ` ORDER BY rr.created_at DESC LIMIT 100`;
+
+    const records = await queryOp<any>(req, sql, params);
 
     const result = (records || []).map((r: any) => ({
       id: r.id,

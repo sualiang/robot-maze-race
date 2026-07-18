@@ -292,26 +292,11 @@ Page({
     });
   },
 
-  // ===== 历史记录弹窗 =====
+  // ===== 查看全部历史记录 =====
   onViewAllHistory: function () {
-    this.setData({ showHistoryModal: true, historyMonthFilter: '' });
-    this.filterHistoryByMonth('');
-  },
-
-  onCloseHistoryModal: function () {
-    this.setData({ showHistoryModal: false });
-  },
-
-  onFilterHistoryMonth: function (e) {
-    var month = e.currentTarget.dataset.month || '';
-    this.setData({ historyMonthFilter: month });
-    this.filterHistoryByMonth(month);
-  },
-
-  filterHistoryByMonth: function (month) {
-    var all = this.data.fullHistoryRecords;
-    var filtered = month ? all.filter(function (r) { return r.monthKey === month; }) : all;
-    this.setData({ truncatedHistory: filtered });
+    wx.navigateTo({
+      url: '/pages/race-history/race-history'
+    });
   },
 
   // ===== 事件处理 =====

@@ -1,0 +1,43 @@
+<!-- pages/race-history/race-history.wxml -->
+<view class="rh-container">
+  <!-- 月份筛选 -->
+  <view class="rh-filter-bar">
+    <view class="rh-filter-btn" bindtap="onSelectMonth">
+      <text class="{{selectedMonth ? 'active' : ''}}">{{selectedMonth || '全部月份'}}</text>
+      <text class="rh-filter-arrow">▼</text>
+    </view>
+  </view>
+
+  <!-- 加载骨架 -->
+  <view wx:if="{{loading}}" class="rh-loading">
+    <view class="rh-skeleton-item"></view>
+    <view class="rh-skeleton-item"></view>
+    <view class="rh-skeleton-item"></view>
+  </view>
+
+  <!-- 列表 -->
+  <view wx:else class="rh-list">
+    <view
+      wx:for="{{records}}"
+      wx:key="id"
+      class="rh-item"
+      data-item="{{item}}"
+      bindtap="onTapRecord"
+    >
+      <view class="rh-left">
+        <text class="rh-score">{{item.scoreText}}</text>
+        <text class="rh-date">{{item.dateText}}</text>
+      </view>
+      <view class="rh-middle">
+        <text wx:if="{{item.medal}}" class="rh-medal">{{item.medal}}</text>
+        <text class="rh-rank">{{item.rankText || '-'}}</text>
+      </view>
+    </view>
+
+    <!-- 空状态 -->
+    <view wx:if="{{isEmpty}}" class="rh-empty">
+      <text class="rh-empty-icon">🏁</text>
+      <text class="rh-empty-text">暂无参赛记录</text>
+    </view>
+  </view>
+</view>

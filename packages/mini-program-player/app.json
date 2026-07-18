@@ -15,7 +15,8 @@
     "pages/task/task",
     "pages/evaluation/evaluation",
     "pages/orders/orders",
-    "pages/points-shop/points-shop"
+    "pages/points-shop/points-shop",
+    "pages/race-history/race-history"
   ],
   "window": {
     "backgroundTextStyle": "dark",
