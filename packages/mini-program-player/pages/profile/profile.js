@@ -32,7 +32,6 @@ Page({
 
     menuList: [
       { key: 'order', icon: '📋', label: '我的订单', url: '/pages/orders/orders', rightText: '' },
-      { key: 'coupon', icon: '🎫', label: '我的卡券', url: '/pages/coupon/coupon', rightText: '' },
     ]
   },
 
