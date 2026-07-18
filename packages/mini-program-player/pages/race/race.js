@@ -16,6 +16,7 @@ Page({
     // 三状态核心
     hasContext: false,
     venueName: '',
+    venueId: '',
     remainCount: 0,
 
     // 赛季最佳成绩
@@ -117,13 +118,15 @@ Page({
       if (d && d.hasContext) {
         that.setData({
           hasContext: true,
-          venueName: d.venueName || ''
+          venueName: d.venueName || '',
+          venueId: d.venueId || ''
         });
         that.startQueuePolling();
       } else {
         that.setData({
           hasContext: false,
-          venueName: ''
+          venueName: '',
+          venueId: ''
         });
         that.stopQueuePolling();
       }
@@ -333,7 +336,7 @@ Page({
   },
 
   /**
-   * 状态2: 立即参赛 → POST /checkin
+   * 状态2: 立即参赛 → 弹确认窗 → POST /checkin
    */
   onRaceNow: function () {
     var that = this;
@@ -355,21 +358,44 @@ Page({
       return;
     }
 
+    var venueId = that.data.venueId;
+    var venueName = that.data.venueName;
+
+    // 有赛场上下文：弹确认窗后直接签到
+    if (venueId && venueName) {
+      wx.showModal({
+        title: '确认参赛',
+        content: '即将进入 ' + venueName + ' 的比赛队列，是否确认？',
+        success: function (modalRes) {
+          if (modalRes.confirm) {
+            that.doCheckin(venueId);
+          }
+        }
+      });
+      return;
+    }
+
+    // 无赛场上下文：扫码获取 venue
     wx.scanCode({
       onlyFromCamera: false,
       success: function (res) {
-        wx.showLoading({ title: '处理中...' });
-        request.post('/checkin', { code: res.result }).then(function () {
-          wx.hideLoading();
-          that.fetchAll();
-        }).catch(function (err) {
-          wx.hideLoading();
-          wx.showToast({ title: (err && err.message) || '参赛失败', icon: 'none' });
-        });
+        that.doCheckin(res.result);
       },
       fail: function () {
         // 用户取消
       }
+    });
+  },
+
+  doCheckin: function (code) {
+    var that = this;
+    wx.showLoading({ title: '处理中...' });
+    request.post('/checkin', { code: code }).then(function () {
+      wx.hideLoading();
+      that.fetchAll();
+    }).catch(function (err) {
+      wx.hideLoading();
+      wx.showToast({ title: (err && err.message) || '参赛失败', icon: 'none' });
     });
   },
 
