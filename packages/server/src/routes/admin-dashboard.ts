@@ -232,7 +232,7 @@ router.get('/revenue-by-province/:province', authMiddleware, checkPermission('da
 
     // Step 1: common 库查该省下所有 operator_id
     const ops = await query<any>(
-      `SELECT id, COALESCE(city, '未知') as city FROM operators WHERE province = $1`,
+      `SELECT id, COALESCE(city, '未知') as city FROM operators WHERE province = ?`,
       [province]
     );
     if (ops.length === 0) {
@@ -288,7 +288,7 @@ router.get('/revenue-by-city/:city', authMiddleware, checkPermission('dashboard:
 
     // Step 1: common 库查该市下所有 operator_id
     const ops = await query<any>(
-      `SELECT id, COALESCE(district, '未知') as district FROM operators WHERE city = $1`,
+      `SELECT id, COALESCE(district, '未知') as district FROM operators WHERE city = ?`,
       [city]
     );
     if (ops.length === 0) {
@@ -348,7 +348,7 @@ router.get('/operator-detail/:operatorId', authMiddleware, checkPermission('dash
               bank_account, bank_name, contact_person,
               province, city, district, company_address,
               created_at, updated_at
-       FROM operators WHERE id = $1`,
+       FROM operators WHERE id = ?`,
       [operatorId]
     );
 
@@ -569,7 +569,7 @@ router.get('/operator-orders/:operatorId', authMiddleware, checkPermission('dash
 
     // 查运营商名称
     const op = await queryOne<{ name: string; company_name: string | null }>(
-      `SELECT name, company_name FROM operators WHERE id = $1`,
+      `SELECT name, company_name FROM operators WHERE id = ?`,
       [operatorId]
     );
 
@@ -610,22 +610,21 @@ router.get('/region-revenue', authMiddleware, checkPermission('dashboard:read'),
     const { level, province, city, district } = req.query as any;
 
     if (level === 'province') {
-      // common 库查 operators 统计（不跨库）
+      // Step 1: common 库查 operators 按 province 汇总（province 为空归入「未设置」）
       const rows = await query(
         `SELECT
-           o.province as name,
+           COALESCE(NULLIF(o.province, ''), '未设置') as name,
            COUNT(*) as operator_count,
            COALESCE(SUM(o.total_revenue), 0) as total_revenue_cents
          FROM operators o
-         WHERE o.province IS NOT NULL AND o.province != ''
-         GROUP BY o.province
+         GROUP BY COALESCE(NULLIF(o.province, ''), '未设置')
          ORDER BY operator_count DESC`
       );
 
-      // operator 库补查 today/month/prev_month 营收
+      // 补查 today/month/prev_month 营收（超管遍历所有运营商库）
       if (rows.length > 0) {
         const provinces = rows.map((r: any) => r.name);
-        const ph = provinces.map((_: any, i: number) => '$' + (i + 1)).join(',');
+        const ph = provinces.map(() => '?').join(',');
         // 取该省运营商的 operator_ids
         const opsInProv = await query<any>(
           `SELECT id, province FROM operators WHERE province IN (${ph})`,
@@ -697,15 +696,15 @@ router.get('/region-revenue', authMiddleware, checkPermission('dashboard:read'),
       if (!province) {
         return res.status(400).json({ code: 400, message: '缺少 province 参数', data: null });
       }
-      // common 库查 operators
+      // city level — common 库查 operators 按城市汇总（city 为空归入「未设置」）
       const rows = await query(
         `SELECT
-           o.city as name,
+           COALESCE(NULLIF(o.city, ''), '未设置') as name,
            COUNT(*) as operator_count,
            COALESCE(SUM(o.total_revenue), 0) as total_revenue_cents
          FROM operators o
-         WHERE o.province = $1 AND o.city IS NOT NULL AND o.city != ''
-         GROUP BY o.city
+         WHERE o.province = ?
+         GROUP BY COALESCE(NULLIF(o.city, ''), '未设置')
          ORDER BY operator_count DESC`,
         [province]
       );
@@ -716,14 +715,15 @@ router.get('/region-revenue', authMiddleware, checkPermission('dashboard:read'),
       if (!city) {
         return res.status(400).json({ code: 400, message: '缺少 city 参数', data: null });
       }
+      // district level — common 库查 operators 按区县汇总（district 为空归入「未设置」）
       const rows = await query(
         `SELECT
-           o.district as name,
+           COALESCE(NULLIF(o.district, ''), '未设置') as name,
            COUNT(*) as operator_count,
            COALESCE(SUM(o.total_revenue), 0) as total_revenue_cents
          FROM operators o
-         WHERE o.city = $1 AND o.district IS NOT NULL AND o.district != ''
-         GROUP BY o.district
+         WHERE o.city = ?
+         GROUP BY COALESCE(NULLIF(o.district, ''), '未设置')
          ORDER BY operator_count DESC`,
         [city]
       );
@@ -734,10 +734,11 @@ router.get('/region-revenue', authMiddleware, checkPermission('dashboard:read'),
       if (!district) {
         return res.status(400).json({ code: 400, message: '缺少 district 参数', data: null });
       }
+      // operator level — common 库查 operators
       const rows = await query(
         `SELECT o.id, o.name, o.province, o.city, o.district
          FROM operators o
-         WHERE o.district = $1
+         WHERE o.district = ?
          ORDER BY o.name`,
         [district]
       );
