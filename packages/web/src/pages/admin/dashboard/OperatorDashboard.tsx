@@ -24,6 +24,7 @@ interface PlatformStats {
 }
 
 interface TopOperator {
+  id: string;
   rank: number;
   name: string;
   province: string;
@@ -32,6 +33,16 @@ interface TopOperator {
   total_revenue: number;
   total_platform_profit: number;
   order_count: number;
+}
+
+interface OperatorOrder {
+  id: string;
+  orderNo: string;
+  packageName: string;
+  amountCents: number;
+  pointsDeductionCents: number;
+  paidAt: string;
+  status: string;
 }
 
 
@@ -69,6 +80,15 @@ export default function OperatorDashboard() {
   const [topOpsDateRange, setTopOpsDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
   const [topOpsPage, setTopOpsPage] = useState(1);
   const [topOpsPageSize] = useState(10);
+
+  /* ── State: Operator orders detail modal ── */
+  const [orderModalOpen, setOrderModalOpen] = useState(false);
+  const [orderModalTitle, setOrderModalTitle] = useState('');
+  const [operatorOrders, setOperatorOrders] = useState<OperatorOrder[]>([]);
+  const [orderLoading, setOrderLoading] = useState(false);
+  const [orderPage, setOrderPage] = useState(1);
+  const [orderTotal, setOrderTotal] = useState(0);
+  const [currentOperatorId, setCurrentOperatorId] = useState('');
 
 
 
@@ -118,7 +138,26 @@ export default function OperatorDashboard() {
     fetchTopOperators(1);
   }, [fetchStats, fetchTopOperators]);
 
-
+  /* ── Open operator orders modal ── */
+  const openOperatorOrders = async (op: TopOperator, page: number = 1) => {
+    setCurrentOperatorId(op.id);
+    setOrderModalTitle(`${op.name} 订单明细`);
+    setOrderPage(page);
+    setOrderLoading(true);
+    setOrderModalOpen(true);
+    try {
+      const res: any = await api.get(`/admin/dashboard/operator-orders/${op.id}`, {
+        params: { page, pageSize: 10 },
+      });
+      setOperatorOrders(res?.data?.list ?? []);
+      setOrderTotal(res?.data?.total ?? 0);
+    } catch {
+      setOperatorOrders([]);
+      setOrderTotal(0);
+    } finally {
+      setOrderLoading(false);
+    }
+  };
 
   const handleExport = async () => {
     try {
@@ -140,7 +179,11 @@ export default function OperatorDashboard() {
   /* ── Columns: Top Operators ── */
   const topOpColumns: ColumnsType<TopOperator> = [
     { title: '排名', dataIndex: 'rank', key: 'rank', width: 60, align: 'center' },
-    { title: '运营商名称', dataIndex: 'name', key: 'name', width: 180 },
+    { title: '运营商名称', dataIndex: 'name', key: 'name', width: 180,
+      render: (name: string, record: TopOperator) => (
+        <a onClick={() => openOperatorOrders(record)}>{name}</a>
+      ),
+    },
     { title: '省', dataIndex: 'province', key: 'province', width: 80 },
     { title: '市', dataIndex: 'city', key: 'city', width: 80 },
     { title: '区', dataIndex: 'district', key: 'district', width: 80 },
@@ -266,6 +309,62 @@ export default function OperatorDashboard() {
       <Card>
         <Tabs items={tabItems} activeKey={activeTab} onChange={handleTabChange} />
       </Card>
+
+      {/* 运营商订单明细弹窗 */}
+      <Modal
+        title={orderModalTitle}
+        open={orderModalOpen}
+        onCancel={() => setOrderModalOpen(false)}
+        footer={null}
+        width={800}
+      >
+        <Table
+          columns={[
+            { title: '订单号', dataIndex: 'orderNo', key: 'orderNo', width: 200, ellipsis: true },
+            { title: '参赛包', dataIndex: 'packageName', key: 'packageName', width: 120 },
+            {
+              title: '金额', dataIndex: 'amountCents', key: 'amountCents', width: 100,
+              render: (v: number) => `¥${(v / 100).toFixed(2)}`,
+            },
+            {
+              title: '积分抵扣', dataIndex: 'pointsDeductionCents', key: 'pointsDeductionCents', width: 100,
+              render: (v: number) => v > 0 ? <Tag color="gold">-¥{(v / 100).toFixed(2)}</Tag> : <span style={{ color: '#999' }}>未使用</span>,
+            },
+            {
+              title: '支付时间', dataIndex: 'paidAt', key: 'paidAt', width: 160,
+              render: (v: string) => v ? new Date(v).toLocaleString('zh-CN') : '-',
+            },
+          ]}
+          dataSource={operatorOrders}
+          rowKey="id"
+          loading={orderLoading}
+          pagination={{
+            current: orderPage,
+            pageSize: 10,
+            total: orderTotal,
+            onChange: (p) => {
+              if (currentOperatorId) {
+                openOperatorOrders({ id: currentOperatorId, rank: 0, name: '', province: '', city: '', district: '', total_revenue: 0, total_platform_profit: 0, order_count: 0 }, p);
+              }
+            },
+            showTotal: (t: number) => `共 ${t} 笔订单`,
+          }}
+          size="small"
+          summary={() => {
+            const totalAmount = operatorOrders.reduce((s, o) => s + o.amountCents, 0);
+            const totalPtsDeduction = operatorOrders.reduce((s, o) => s + o.pointsDeductionCents, 0);
+            return (
+              <Table.Summary.Row>
+                <Table.Summary.Cell index={0}><strong>合计</strong></Table.Summary.Cell>
+                <Table.Summary.Cell index={1}></Table.Summary.Cell>
+                <Table.Summary.Cell index={2}><strong>¥{(totalAmount / 100).toFixed(2)}</strong></Table.Summary.Cell>
+                <Table.Summary.Cell index={3}><strong>-¥{(totalPtsDeduction / 100).toFixed(2)}</strong></Table.Summary.Cell>
+                <Table.Summary.Cell index={4}></Table.Summary.Cell>
+              </Table.Summary.Row>
+            );
+          }}
+        />
+      </Modal>
     </div>
   );
 }

@@ -472,6 +472,95 @@ router.get('/top-operators', authMiddleware, checkPermission('dashboard:list'), 
 });
 
 // ============================================================
+// GET /api/v1/admin/dashboard/operator-orders/:operatorId
+// 总部看板 - 查看某运营商订单明细（含积分抵扣），dashboard:read
+// ============================================================
+router.get('/operator-orders/:operatorId', authMiddleware, checkPermission('dashboard:read'), async (req: Request, res: Response) => {
+  try {
+    const { operatorId } = req.params;
+    const {
+      page: pageStr = '1',
+      pageSize: pageSizeStr = '20',
+      start_date,
+      end_date,
+    } = req.query;
+
+    const page = Math.max(1, parseInt(pageStr as string, 10) || 1);
+    const pageSize = Math.min(100, Math.max(1, parseInt(pageSizeStr as string, 10) || 20));
+    const offset = (page - 1) * pageSize;
+
+    // 默认本月
+    const now = new Date();
+    let dateStart: string;
+    let dateEnd: string;
+    if (start_date && end_date) {
+      dateStart = start_date as string;
+      dateEnd = end_date as string;
+    } else {
+      const year = now.getFullYear();
+      const monthNum = now.getMonth() + 1;
+      const monthStr = String(monthNum).padStart(2, '0');
+      dateStart = `${year}-${monthStr}-01`;
+      const lastDay = new Date(year, monthNum, 0).getDate();
+      dateEnd = `${year}-${monthStr}-${lastDay}`;
+    }
+
+    // 查询订单
+    const countRow = await queryOpOne<{ count: string }>(req,
+      `SELECT COUNT(*) as count FROM orders
+       WHERE operator_id = $1 AND status = 'paid'
+         AND DATE(paid_at) >= $2 AND DATE(paid_at) <= $3`,
+      [operatorId, dateStart, dateEnd]
+    );
+    const total = parseInt(countRow?.count || '0', 10);
+
+    const rows = await queryOp<any>(req,
+      `SELECT o.id, o.order_no, o.amount_cents, o.points_deduction_cents,
+              o.paid_at, o.status,
+              rp.name as package_name
+       FROM orders o
+       LEFT JOIN race_packages rp ON o.package_id = rp.id
+       WHERE o.operator_id = $1 AND o.status = 'paid'
+         AND DATE(o.paid_at) >= $2 AND DATE(o.paid_at) <= $3
+       ORDER BY o.paid_at DESC
+       LIMIT ${pageSize} OFFSET ${offset}`,
+      [operatorId, dateStart, dateEnd]
+    );
+
+    // 查运营商名称
+    const op = await queryOne<{ name: string; company_name: string | null }>(
+      `SELECT name, company_name FROM operators WHERE id = $1`,
+      [operatorId]
+    );
+
+    const list = (rows || []).map((r: any) => ({
+      id: r.id,
+      orderNo: r.order_no,
+      packageName: r.package_name || '参赛包',
+      amountCents: r.amount_cents || 0,
+      pointsDeductionCents: r.points_deduction_cents || 0,
+      paidAt: r.paid_at,
+      status: r.status,
+    }));
+
+    return res.json({
+      code: 0,
+      data: {
+        list,
+        total,
+        page,
+        pageSize,
+        operatorName: op?.name || '',
+        operatorCompany: op?.company_name || '',
+      },
+    });
+  } catch (error: any) {
+    console.error('[AdminDashboard] operator-orders error:', error.message);
+    return res.status(500).json({ code: 500, message: '获取运营商订单失败', data: null });
+  }
+});
+
+// ============================================================
 // GET /api/v1/admin/dashboard/region-revenue
 // 区域营收钻取 — 按运营商省市区三级汇总
 // 修复: operators 在 common 库，region-revenue 的 operators 字段直接查 common

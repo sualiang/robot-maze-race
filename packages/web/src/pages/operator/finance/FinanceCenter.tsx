@@ -60,11 +60,12 @@ export default function FinanceCenter() {
   const [detailDate, setDetailDate] = useState('');
   const [detailOrders, setDetailOrders] = useState<OrderDetail[]>([]);
 
-  // 统计数据 — 只保留4个
+  // 统计数据 — 5个：今日营收、本月营收、今日订单、本月订单、本月积分抵扣
   const [todayRevenue, setTodayRevenue] = useState(0);
   const [monthRevenue, setMonthRevenue] = useState(0);
   const [todayOrders, setTodayOrders] = useState(0);
   const [monthOrders, setMonthOrders] = useState(0);
+  const [monthPointsDeducted, setMonthPointsDeducted] = useState(0);
 
   const fetchRevenue = useCallback(async () => {
     setLoadingRevenue(true);
@@ -75,6 +76,7 @@ export default function FinanceCenter() {
       setTodayOrders(s.settled_count ?? 0);
       setMonthRevenue(Math.round(((s.settled_amount_cents ?? 0) + (s.pending_amount_cents ?? 0)) / 100));
       setMonthOrders((s.settled_count ?? 0) + (s.pending_count ?? 0));
+      setMonthPointsDeducted(Math.round((s.total_points_deduction_cents ?? 0) / 100));
     } catch { }
     finally { setLoadingRevenue(false); }
   }, []);
@@ -218,7 +220,7 @@ export default function FinanceCenter() {
     {
       title: '积分抵扣', dataIndex: 'pointsDeducted', key: 'pointsDeducted', width: 100,
       render: (v: number) => v > 0
-        ? <Tag color="gold">{v} 积分（抵 ¥{(v / 100).toFixed(2)}）</Tag>
+        ? <Tag color="gold">-¥{(v / 100).toFixed(2)}</Tag>
         : <span style={{ color: '#999' }}>未使用</span>,
     },
     {
@@ -229,7 +231,7 @@ export default function FinanceCenter() {
 
   return (
     <div>
-      {/* 统计卡片 — 只保留4个：今日营收、本月营收、今日订单、本月订单 */}
+      {/* 统计卡片 — 5个 */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={24} sm={12} lg={6}>
           <Card>
@@ -275,6 +277,18 @@ export default function FinanceCenter() {
             />
           </Card>
         </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic
+              title="本月积分抵扣"
+              value={monthPointsDeducted / 100}
+              precision={2}
+              prefix={<DollarOutlined />}
+              suffix="元"
+              valueStyle={{ color: '#52c41a' }}
+            />
+          </Card>
+        </Col>
       </Row>
 
       {/* 明细 */}
@@ -315,7 +329,7 @@ export default function FinanceCenter() {
               <Table.Summary.Row>
                 <Table.Summary.Cell index={0}><strong>合计</strong></Table.Summary.Cell>
                 <Table.Summary.Cell index={1}><strong>¥{(totalAmount / 100).toFixed(2)}</strong></Table.Summary.Cell>
-                <Table.Summary.Cell index={2}><strong>{totalPts} 积分</strong></Table.Summary.Cell>
+                <Table.Summary.Cell index={2}><strong>-¥{(totalPts / 100).toFixed(2)}</strong></Table.Summary.Cell>
                 <Table.Summary.Cell index={3}></Table.Summary.Cell>
               </Table.Summary.Row>
             );
