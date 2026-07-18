@@ -396,7 +396,7 @@ router.post('/notify', async (req: Request, res: Response) => {
 
     // 3. 查询订单（手动 pool，无 auth）
     const [orderRow] = await opPool.execute(
-      `SELECT id, status, amount_cents as amount, discount_cents, points_deduction_cents FROM orders WHERE order_no = ?`,
+      `SELECT id, status, amount_cents as amount, discount_cents, points_deduction_cents, user_id, operator_id FROM orders WHERE order_no = ?`,
       [outTradeNo]
     );
     const order = orderRow as any;
@@ -429,6 +429,13 @@ router.post('/notify', async (req: Request, res: Response) => {
       await opPool.execute(
         `UPDATE orders SET status = 'paid', transaction_id = ?, paid_at = NOW(), updated_at = NOW() WHERE id = ? AND status = 'pending'`,
         [transaction.transaction_id, order.id]
+      );
+
+      // 写入 payments 表
+      await opPool.execute(
+        `INSERT INTO payments (id, order_id, operator_id, user_id, transaction_id, amount_cents, status, pay_time, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'paid', NOW(), NOW())`,
+        [uuidv4(), order.id, order.operator_id, order.user_id, transaction.transaction_id, order.amount]
       );
 
       // 记录支付流水
