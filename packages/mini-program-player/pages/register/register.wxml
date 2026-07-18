@@ -3,7 +3,7 @@
 
   <!-- 头像 — 顶部居中圆形 -->
   <button class="avatar-area" bindtap="onChooseAvatar">
-    <image class="avatar-circle" src="{{avatar || '/assets/images/default-avatar.png'}}" mode="aspectFill" />
+    <image class="avatar-circle" src="{{avatar || '/assets/images/logo-avatar.png'}}" mode="aspectFill" />
     <text class="avatar-hint">点击设置头像</text>
   </button>
 

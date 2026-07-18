@@ -3,7 +3,7 @@
 
   <!-- 模块1: 用户信息栏 -->
   <view class="user-card" bindtap="onEditProfile">
-    <image class="user-avatar" src="{{userInfo.avatar_url || userInfo.avatarUrl || '/assets/images/default-avatar.png'}}" mode="aspectFill" />
+    <image class="user-avatar" src="{{userInfo.avatar_url || userInfo.avatarUrl || '/assets/images/logo-avatar.png'}}" mode="aspectFill" />
     <view class="user-info">
       <text class="user-nickname">{{userInfo.nickname || '未设置昵称'}}</text>
       <text class="user-phone">{{userInfo.phone || ''}}</text>

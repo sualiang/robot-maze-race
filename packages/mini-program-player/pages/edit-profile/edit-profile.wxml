@@ -3,7 +3,7 @@
 
   <!-- 头像 — 顶部居中大圆（chooseMedia 兼容新版隐私协议） -->
   <view class="avatar-area" bindtap="onChooseAvatar">
-    <image class="avatar-circle" src="{{avatar || '/assets/images/default-avatar.png'}}" mode="aspectFill" />
+    <image class="avatar-circle" src="{{avatar || '/assets/images/logo-avatar.png'}}" mode="aspectFill" />
     <text class="avatar-hint">点击更换头像</text>
   </view>
 
