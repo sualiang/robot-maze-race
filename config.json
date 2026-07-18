@@ -1,0 +1,12 @@
+{
+  "project_path": "/Users/longshe/.openclaw/workspace/robot-maze-race/packages/mini-program-player",
+  "dev_tool_path": "/Applications/wechatwebdevtools.app/Contents/MacOS/cli",
+  "debug_mode": "debug",
+  "request_timeout": 30,
+  "enable_app_log": true,
+  "auto_relaunch": true,
+  "device_desire": {
+    "close_webview": true,
+    "auto_authorize": true
+  }
+}

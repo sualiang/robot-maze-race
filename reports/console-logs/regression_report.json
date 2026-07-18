@@ -1,0 +1,86 @@
+{
+  "time": "2026-07-16T06:20:53.659Z",
+  "bugs": [
+    {
+      "module": "登录",
+      "test": "admin/admin123",
+      "result": "✅"
+    },
+    {
+      "module": "运营商创建",
+      "test": "分润比例非disabled",
+      "result": "✅"
+    },
+    {
+      "module": "运营商创建",
+      "test": "POST /admin/operators",
+      "result": "✅ 200"
+    },
+    {
+      "module": "玩家管理",
+      "test": "GET /admin/players",
+      "result": "✅"
+    },
+    {
+      "module": "运营商登录",
+      "test": "POST operator/login",
+      "result": "⚠️ 凭据无效(需确认)"
+    },
+    {
+      "module": "Dashboard",
+      "test": "页面",
+      "result": "✅"
+    },
+    {
+      "module": "营销管理",
+      "test": "页面",
+      "result": "✅"
+    },
+    {
+      "module": "财务管理",
+      "test": "页面",
+      "result": "✅"
+    },
+    {
+      "module": "系统设置",
+      "test": "页面",
+      "result": "✅"
+    },
+    {
+      "module": "角色管理",
+      "test": "页面",
+      "result": "✅"
+    },
+    {
+      "module": "运营商编辑",
+      "test": "弹窗",
+      "result": "✅"
+    }
+  ],
+  "apiErrs": [
+    {
+      "method": "POST",
+      "url": "/api/v1/auth/login",
+      "status": 401,
+      "body": "{\"code\":401,\"message\":\"用户名或密码错误\",\"data\":null}"
+    },
+    {
+      "method": "POST",
+      "url": "/api/v1/auth/login",
+      "status": 401,
+      "body": "{\"code\":401,\"message\":\"手机号或密码错误\",\"data\":null}"
+    }
+  ],
+  "consoleErrs": [
+    {
+      "text": "Failed to load resource: the server responded with a status of 401 ()"
+    },
+    {
+      "text": "Failed to load resource: the server responded with a status of 401 ()"
+    }
+  ],
+  "summary": {
+    "errors": 0,
+    "warnings": 1
+  }
+}

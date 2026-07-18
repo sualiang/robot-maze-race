@@ -1,0 +1,135 @@
+{
+  "time": "2026-07-16T05:26:34.921Z",
+  "bugs": [
+    {
+      "module": "登录",
+      "test": "admin登录",
+      "result": "✅"
+    },
+    {
+      "module": "Dashboard",
+      "test": "页面加载",
+      "result": "✅"
+    },
+    {
+      "module": "运营商管理",
+      "test": "列表加载",
+      "result": "✅"
+    },
+    {
+      "module": "运营商管理",
+      "test": "新建(13891385954)",
+      "result": "⚠️ 未检测到POST"
+    },
+    {
+      "module": "运营商管理",
+      "test": "编辑",
+      "result": "✅"
+    },
+    {
+      "module": "玩家管理",
+      "test": "列表加载",
+      "result": "✅"
+    },
+    {
+      "module": "营销管理",
+      "test": "页面加载",
+      "result": "✅"
+    },
+    {
+      "module": "财务管理",
+      "test": "页面加载",
+      "result": "✅"
+    },
+    {
+      "module": "系统设置",
+      "test": "页面加载",
+      "result": "✅"
+    },
+    {
+      "module": "角色管理",
+      "test": "页面加载",
+      "result": "✅"
+    }
+  ],
+  "api": [
+    {
+      "method": "POST",
+      "url": "/api/v1/auth/admin-login",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "/api/v1/client-log",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "/api/v1/client-log",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "/api/v1/client-log",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "/api/v1/client-log",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "/api/v1/client-log",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "/api/v1/client-log",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "/api/v1/client-log",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "/api/v1/client-log",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "/api/v1/client-log",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "/api/v1/client-log",
+      "status": 200
+    }
+  ],
+  "console": [
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 500 ()"
+    },
+    {
+      "type": "requestfailed",
+      "text": "https://dog.amberrobot.com.cn/api/v1/client-log: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "https://dog.amberrobot.com.cn/api/v1/client-log: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "https://dog.amberrobot.com.cn/api/v1/client-log: net::ERR_ABORTED"
+    }
+  ],
+  "summary": {
+    "errors": 0,
+    "warnings": 1,
+    "total": 10
+  }
+}

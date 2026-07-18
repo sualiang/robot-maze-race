@@ -185,6 +185,46 @@ export async function executeOp(req: Request, text: string, params?: any[]): Pro
   return doExecute(getOperatorPool(dbName), text, params);
 }
 
+/**
+ * 通过订单 ID 直接查找对应的运营商数据库
+ * 用于 player 端无 operator context 的场景（如 confirm-payment）
+ * 遍历所有运营商库查找订单，找到后返回对应 pool
+ */
+export async function resolveOperatorDbForOrder(orderId: string): Promise<mysql.Pool | null> {
+  const common = getCommonPool();
+  const [allOps] = await common.query<any[]>(
+    `SELECT db_name FROM operators_registry WHERE db_name IS NOT NULL`
+  );
+  if (!allOps || allOps.length === 0) return null;
+
+  for (const opReg of allOps) {
+    if (!opReg.db_name) continue;
+    try {
+      const pool = getOperatorPool(opReg.db_name);
+      const [rows] = await pool.execute(
+        `SELECT id FROM orders WHERE id = ? LIMIT 1`,
+        [orderId]
+      );
+      if (rows && (Array.isArray(rows) ? rows.length > 0 : true)) {
+        return pool;
+      }
+    } catch {
+      // 跳过连接失败的库
+    }
+  }
+  return null;
+}
+
+/**
+ * 通过订单 ID 直接对运营商库执行写操作
+ * 用于 player 端无 operator context 的确认支付场景
+ */
+export async function executeOpByOrder(orderId: string, text: string, params?: any[]): Promise<{ changes: number; lastInsertRowid: number | bigint }> {
+  const pool = await resolveOperatorDbForOrder(orderId);
+  if (!pool) return { changes: 0, lastInsertRowid: 0 };
+  return doExecute(pool, text, params);
+}
+
 // ==================== 事务（仅公共库） ====================
 
 export async function transaction<T>(fn: (executor: any) => T): Promise<T> {
@@ -402,4 +442,4 @@ export function generateSecurePassword(length = 12): string {
   return pw.split('').sort(() => Math.random() - 0.5).join('');
 }
 
-export default { query, queryOne, execute, transaction, queryOp, queryOpOne, executeOp, initSchema, createOperatorDatabase, generateSecurePassword, resolveOperatorDb };
+export default { query, queryOne, execute, transaction, queryOp, queryOpOne, executeOp, executeOpByOrder, initSchema, createOperatorDatabase, generateSecurePassword, resolveOperatorDb, resolveOperatorDbForOrder };

@@ -37,8 +37,8 @@ Page({
           amount_text: ((o.amount_cents || 0) / 100).toFixed(2),
           discount_cents: o.discount_cents || 0,
           status: o.status || 'pending',
-          paid_at: o.paid_at || '',
-          created_at: (o.created_at || '').substring(0, 19)
+          paid_at: (o.paid_at || '').replace('T', ' ').substring(0, 19),
+          created_at: (o.created_at || '').replace('T', ' ').substring(0, 19)
         };
       });
 

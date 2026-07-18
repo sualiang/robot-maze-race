@@ -25,6 +25,10 @@
           <text class="order-label">购买时间</text>
           <text class="order-value">{{item.created_at}}</text>
         </view>
+        <view wx:if="{{item.paid_at}}" class="order-info">
+          <text class="order-label">支付时间</text>
+          <text class="order-value">{{item.paid_at}}</text>
+        </view>
       </view>
     </block>
   </view>

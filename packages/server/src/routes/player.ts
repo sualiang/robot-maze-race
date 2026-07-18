@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../config/database';
+import { query, queryOne, execute, queryOp, queryOpOne, executeOp, executeOpByOrder } from '../config/database';
 import { getConfigInt } from '../config/utils';
 import { authMiddleware } from '../middleware/auth';
 
@@ -1036,11 +1036,14 @@ router.post('/order/:id/confirm-payment', authMiddleware, async (req: Request, r
   const userId = req.user!.userId;
 
   try {
-    const result = await executeOp(req,
-      `UPDATE orders SET status = 'paid', paid_at = NOW() WHERE id = $1 AND user_id = $2 AND status = 'pending'`,
+    // 使用 executeOpByOrder 直接通过订单 ID 定位运营商数据库
+    // 避免依赖 resolveOperatorDb 的 Redis operator context（player 端可能未设置）
+    const result = await executeOpByOrder(id,
+      `UPDATE orders SET status = 'paid', paid_at = NOW() WHERE id = ? AND user_id = ? AND status = 'pending'`,
       [id, userId]
     );
-    res.json({ code: 0, data: { status: 'paid', updated: (result as any)?.rowCount > 0 } });
+    console.log(`[Player] confirm-payment order=${id} user=${userId} changes=${result.changes}`);
+    res.json({ code: 0, data: { status: 'paid', updated: result.changes > 0 } });
   } catch (e: any) {
     console.error('[Player] confirm-payment error:', e?.message || e);
     res.json({ code: 500, message: '确认失败', data: null });

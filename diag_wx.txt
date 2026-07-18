@@ -1,0 +1,91 @@
+=== project.config.json ===
+{
+  "description": "机器狗迷宫竞速赛事 - 玩家端小程序",
+  "packOptions": {
+    "ignore": [],
+    "include": []
+  },
+  "setting": {
+    "bundle": false,
+    "userConfirmedBundleSwitch": false,
+    "urlCheck": false,
+    "scopeDataCheck": false,
+    "coverView": true,
+    "es6": false,
+    "postcss": true,
+    "compileHotReLoad": false,
+    "lazyloadPlaceholderEnable": false,
+    "preloadBackgroundData": false,
+    "minified": true,
+    "autoAudits": false,
+    "newFeature": false,
+    "uglifyFileName": false,
+    "uploadWithSourceMap": true,
+    "useIsolateContext": true,
+    "nodeModules": false,
+    "enhance": false,
+    "useMultiFrameRuntime": true,
+    "useApiHook": true,
+    "useApiHostProcess": true,
+    "showShadowRootInWxmlPanel": true,
+    "packNpmManually": false,
+    "enableEngineNative": false,
+    "packNpmRelationList": [],
+    "minifyWXSS": true,
+    "showES6CompileOption": false,
+    "minifyWXML": true,
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    },
+    "compileWorklet": false,
+    "localPlugins": false,
+    "disableUseStrict": false,
+    "useCompilerPlugins": false,
+    "condition": false,
+    "swc": false,
+    "disableSWC": true
+  },
+  "compileType": "miniprogram",
+  "libVersion": "2.32.3",
+  "appid": "wx619c9f373868ab63",
+  "projectname": "robot-maze-race-player",
+  "condition": {},
+  "editorSetting": {
+    "tabIndent": "insertSpaces",
+    "tabSize": 2
+  },
+  "simulatorPluginLibVersion": {}
+}
+=== miniprogram_npm ===
+@robot-race
+
+/Users/longshe/.openclaw/workspace/robot-maze-race/packages/mini-program-player/miniprogram_npm//@robot-race:
+shared
+
+/Users/longshe/.openclaw/workspace/robot-maze-race/packages/mini-program-player/miniprogram_npm//@robot-race/shared:
+index.js
+index.js.map
+
+=== node_modules @robot-race/shared ===
+dist
+node_modules
+package.json
+src
+tsconfig.json
+
+=== app.wxss exists? ===
+    5902 /Users/longshe/.openclaw/workspace/robot-maze-race/packages/mini-program-player/app.wxss
+
+=== index wxml first 3 lines ===
+<!-- pages/index/index.wxml - 首页 V2重构版 -->
+<!-- 模块1: 顶部导航栏 | 模块2: 主视觉Banner | 模块3: 参赛状态&福利总览卡 -->
+<!-- 模块4: 今日专属福利条 | 模块5: 参赛包推荐区 | 模块6: 赛季竞技入口卡片 -->
+
+=== index js first imports ===
+// pages/index/index.js - 首页（V2重构版）
+// 模块1: 顶部导航栏 | 模块2: 主视觉Banner | 模块3: 参赛状态&福利总览卡
+// 模块4: 今日专属福利条 | 模块5: 参赛包推荐区 | 模块6: 赛季竞技入口卡片
+var request = require('../../utils/request');
+

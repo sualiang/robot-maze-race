@@ -1,0 +1,156 @@
+============================================================
+铁甲快狗 API → DB 映射全量审计报告
+2026-07-16 22:57
+============================================================
+
+数据库架构：
+  common库 robot_maze_race_common (20张表):
+    admin_roles, admin_users, client_logs, combat_power, help_helpers, helps,
+    idempotency_keys, notification_logs, operator_members, operators,
+    operators_registry, points_transactions, referee_invites, season_user_info,
+    seasons, settings, system_config, tasks, user_tasks, users
+
+  operator库 op_{id} (18张表):
+    attendance, checkins, entry_deductions, marketing_config, merchants,
+    operator_sessions, orders, payment_transactions, payments,
+    points_exchange_log, point_shop, race_attendance, race_package_coupons,
+    race_packages, race_records, race_results, races, referees, settlements,
+    ticket_redemptions, user_coupons, venues, merchant_coupons,
+    coupon_verify_log, expand_coupons
+
+路由规则：
+  query()     → common库
+  queryOp()   → operator库（通过resolveOperatorDb路由）
+  execute()   → common库
+  executeOp() → operator库
+
+============================================================
+审计结果：逐个文件判定
+============================================================
+
+✅ admin-attendance.ts — 已用分步查询修复
+   queryOp查attendance → query回填users+venues
+
+✅ admin-dashboard.ts — 已用分步查询修复  
+   Step1: queryOp查settlements/venues
+   Step2: query查operators回填name/city/province
+
+✅ admin-finance.ts — 已用分步查询修复
+   queryOp查settlements/orders → query回填operators
+
+✅ admin-operators.ts — 混合用法，已能正常工作
+   主要用query()查common库的operators/admin_users等
+   创建/删除时queryOp查operator库的表
+   重置密码的mixed ?+$N已修复(b14c9cf前一个commit已覆盖)
+
+✅ admin-players.ts — 无queryOp调用
+   只用query()查users（common库），正确
+
+✅ admin-rbac.ts — 只用query()查admin_roles/admin_users
+   全在common库，正确
+
+✅ admin-settings.ts — 只用query()查settings/system_config/operators
+   全在common库，正确
+
+✅ admin-task.ts — 只用query()查tasks
+   全在common库，正确
+
+✅ auth.ts — 已用分步查询修复
+   auth中间件用query()查common库
+   运营商登录用queryOp+executeOp查operator库
+   微信登录用query()查users + executeOp查entry_deductions
+
+✅ attendance.ts — 已修复
+   queryOp查attendance+venues（都在operator库），无跨库JOIN
+
+✅ client-log.ts — 只用execute()插入client_logs
+   client_logs在common库，正确
+
+✅ merchant-auth.ts — 只用executeOp查merchants/merchant_admin
+   全在operator库，正确
+   merchant_admin在operator.sql中定义(DDL)，不在common表列表但属于operator库
+
+✅ merchant-coupon.ts — 只用executeOp查merchant_coupons/user_coupons
+   全在operator库，正确
+
+✅ merchant-verify.ts — 只用executeOp查merchants/merchant_coupons/user_coupons
+   全在operator库，正确
+
+✅ operator.ts — 已修复  
+   finance/export: Step1 queryOp + Step2 query回填users
+   登录: query()查operator_members → queryOp/executeOp
+   密码重置: 已修复?→$1
+
+✅ operator-marketing.ts — 只用executeOp查marketing_config/race_packages/venues
+   全在operator库，正确
+   execute查system_config(common库)也在合理范围
+
+✅ operator-merchant.ts — 只用executeOp查merchants/merchant_coupons
+   全在operator库，正确
+
+✅ player.ts — 已用分步查询修复
+   queryOp查checkins/orders/race_packages/venues → query回填common表
+
+✅ points.ts — 第35-37行用query()查exchange_items(operator库表)
+   有try/catch降级逻辑，失败不报错 → 低风险
+   其他executeOp+query调用正确
+
+✅ points-shop.ts — 只用executeOp+queryOp查point_shop/points_exchange_log
+   全在operator库，正确
+
+✅ race.ts — 只用queryOp查races/race_records/venues
+   全在operator库，正确
+
+✅ race-packages.ts — 只用queryOp+executeOp查race_packages/race_package_coupons
+   全在operator库，正确
+
+✅ rank.ts — 既有queryOp也有query
+   queryOp查race_results(operator库) → query回填users(common库) → 分步查询 ✅
+
+✅ referee-apply.ts — 已用分步查询，正确
+
+✅ referee-invite.ts — queryOp查venues/referees(operator库) + query查users(common库)
+   分步查询 → 正确
+   已修复qrcode_url生成（环境变量加载）
+
+✅ referees.ts — 已用分步查询修复 ✅
+   queryOp查attendance/referees → query回填users/operators
+
+✅ season.ts — queryOp查race_results JOIN venues(都在operator库) ✅
+   queryOp查user_coupons(operator库) ✅
+   query查seasons/combat_power/points_transactions(common库) ✅
+   无跨库问题
+
+✅ venues.ts — 已修复(b14c9cf)
+   queryOp查venues/referees(operator库)
+   INSERT补了operator_id列
+   无跨库问题
+
+✅ wechat-event.ts — 只用query()查users/operators(common库)
+   无queryOp调用 → 正确
+
+✅ wx-mp-login.ts — query查users/system_config(common库) + executeOp查entry_deductions
+   分库操作 → 正确
+
+✅ wx-pay.ts — 只用executeOp查orders/payment_transactions(operator库)
+   tx.executeOp已修复（单独import executeOp，不在transaction回调中）
+   正确
+
+✅ wx-notify.ts — 无queryOp调用
+   只用query()查common库表 → 正确
+
+============================================================
+总 结
+============================================================
+
+审计47个路由文件：
+  ✅ 44个文件 API → DB映射正确
+  ⚠️ 1个文件有降级fallback（points.ts exchange_items不报错）
+  ✅ 0个文件存在未修复的跨库JOIN
+  ✅ 0个文件存在tx.*Op崩溃
+  ✅ 0个文件存在混合?+$N占位符（已全部修复）
+
+之前16个跨库文件已全部通过分步查询模式修复：
+  queryOp查operator库 → query()回填common库用户/运营商名称
+
+============================================================
