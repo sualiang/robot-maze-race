@@ -1142,9 +1142,9 @@ router.post('/order/:id/confirm-payment', authMiddleware, async (req: Request, r
       return;
     }
 
-    // 1. 防重复：查询订单当前状态
+    // 1. 防重复 + 查订单完整信息
     const [orderRows] = await pool.execute(
-      `SELECT id, status, user_id, package_id, operator_id FROM orders WHERE id = ? AND user_id = ?`,
+      `SELECT id, order_no, status, user_id, package_id, operator_id, amount_cents, discount_cents FROM orders WHERE id = ? AND user_id = ?`,
       [id, userId]
     );
     const order = (orderRows as any[])?.[0];
@@ -1168,8 +1168,51 @@ router.post('/order/:id/confirm-payment', authMiddleware, async (req: Request, r
     );
     const changes = (updateResult as any)?.affectedRows || 0;
 
-    // 3. 执行 side effects（与 /pay/notify 微信回调逻辑一致）
     if (changes > 0) {
+      // 3a. 🔴 财务：写入运营商库 payment_transactions
+      try {
+        await pool.execute(
+          `INSERT INTO payment_transactions (id, order_id, user_id, amount, transaction_id, payment_method, status, created_at)
+           VALUES (?, ?, ?, ?, '', 'wechat_pay', 'success', NOW())`,
+          [uuidv4(), id, order.user_id, order.amount_cents || 0]
+        );
+      } catch (ptErr: any) {
+        console.warn('[Player] confirm-payment payment_transactions:', ptErr.message?.substring(0, 100));
+      }
+
+      // 3b. 🔴 财务：幂等写入运营商库 settlements
+      try {
+        const [stlRows] = await pool.execute(
+          `SELECT id FROM settlements WHERE order_id = ? LIMIT 1`, [id]
+        );
+        if (!stlRows || (Array.isArray(stlRows) && stlRows.length === 0)) {
+          await pool.execute(
+            `INSERT INTO settlements (id, order_id, amount_cents, commission_cents, operator_id, status, created_at)
+             VALUES (?, ?, ?, 0, ?, 'pending', NOW())`,
+            [uuidv4(), id, order.amount_cents || 0, order.operator_id]
+          );
+        }
+      } catch (stlErr: any) {
+        console.warn('[Player] confirm-payment settlements:', stlErr.message?.substring(0, 100));
+      }
+
+      // 3c. 🔴 财务：写入总部 common 库 settlements（跨运营商分账）
+      try {
+        const [commonStl] = await query<any[]>(
+          `SELECT id FROM settlements WHERE order_id = ? LIMIT 1`, [id]
+        );
+        if (!commonStl || commonStl.length === 0) {
+          await execute(
+            `INSERT INTO settlements (id, order_id, operator_id, amount_cents, commission_cents, status, created_at)
+             VALUES (?, ?, ?, ?, 0, 'pending', NOW())`,
+            [uuidv4(), id, order.operator_id, order.amount_cents || 0]
+          );
+        }
+      } catch (cStlErr: any) {
+        console.warn('[Player] confirm-payment common settlements:', cStlErr.message?.substring(0, 100));
+      }
+
+      // 3d. 执行 side effects（参赛次数、抵扣金等）
       try {
         const [orderDetailRows] = await pool.execute(
           `SELECT o.user_id, o.package_id, rp.race_count, rp.tag, rp.free_deduction_cents
@@ -1182,7 +1225,6 @@ router.post('/order/:id/confirm-payment', authMiddleware, async (req: Request, r
           const { user_id: uid, race_count: rc, tag, free_deduction_cents: fdc } = d;
           const NEW = () => uuidv4();
 
-          // a) 更新参赛次数
           if (rc > 0) {
             await pool.execute(
               `UPDATE users SET race_count = COALESCE(race_count, 0) + ?, updated_at = NOW() WHERE id = ?`,
@@ -1191,7 +1233,6 @@ router.post('/order/:id/confirm-payment', authMiddleware, async (req: Request, r
             console.log(`[Player] confirm-payment side: +${rc} races for user ${uid}`);
           }
 
-          // b) 赠送抵扣金
           if (fdc > 0) {
             await pool.execute(
               `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
@@ -1200,7 +1241,6 @@ router.post('/order/:id/confirm-payment', authMiddleware, async (req: Request, r
             );
           }
 
-          // c) 购包赠送参赛抵扣卡
           if (tag === 'professional') {
             for (let i = 0; i < 3; i++) {
               await pool.execute(
@@ -1225,8 +1265,8 @@ router.post('/order/:id/confirm-payment', authMiddleware, async (req: Request, r
         }
       } catch (sideErr: any) {
         console.error('[Player] confirm-payment side-effects error:', sideErr.message?.substring(0, 200));
-        // side effects 失败不影响返回（微信回调会补上）
       }
+    }
     }
 
     console.log(`[Player] confirm-payment order=${id} user=${userId} changes=${changes}`);

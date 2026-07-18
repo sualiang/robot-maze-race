@@ -430,7 +430,7 @@ router.post('/notify', async (req: Request, res: Response) => {
         [uuidv4(), order.id, order.id, order.amount, transaction.transaction_id]
       );
 
-      // P0-14: 幂等创建结算记录
+      // P0-14: 幂等创建结算记录（运营商库）
       try {
         const [stlRows] = await opPool.execute(
           `SELECT id FROM settlements WHERE order_id = ? LIMIT 1`,
@@ -445,6 +445,22 @@ router.post('/notify', async (req: Request, res: Response) => {
         }
       } catch (e: any) {
         console.warn('[WxPay] settlements idempotent insert warning:', e.message?.substring(0, 100));
+      }
+
+      // P0-14: 写入总部 common 库 settlements（跨运营商分账报表）
+      try {
+        const [commonStl] = await query<any[]>(
+          `SELECT id FROM settlements WHERE order_id = ? LIMIT 1`, [order.id]
+        );
+        if (!commonStl || commonStl.length === 0) {
+          await execute(
+            `INSERT INTO settlements (id, order_id, operator_id, amount_cents, commission_cents, status, created_at)
+             VALUES (?, ?, ?, ?, 0, 'pending', NOW())`,
+            [uuidv4(), order.id, attachOperatorId, order.amount]
+          );
+        }
+      } catch (e: any) {
+        console.warn('[WxPay] common settlements insert warning:', e.message?.substring(0, 100));
       }
 
       // ===== 支付成功后执行 side effects =====
