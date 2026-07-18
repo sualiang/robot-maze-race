@@ -2,13 +2,27 @@
 console.log('==== ORDERS PAGE LOADED ====');
 var request = require('../../utils/request');
 
+/**
+ * 日期格式化: ISO 8601 → yyyy-MM-dd HH:mm:ss
+ * 兜底处理: MySQL DATETIME / ISO 8601 两种格式
+ */
+function fmtDateTime(val) {
+  if (!val) return '';
+  var s = String(val);
+  // 统一替换 T → 空格，取前19位 "yyyy-MM-dd HH:mm:ss"
+  s = s.replace('T', ' ');
+  if (s.length >= 19) s = s.substring(0, 19);
+  return s;
+}
+
 Page({
   data: {
     orders: [],
     loaded: false,
     selectedMonth: '',
-    monthLabel: '筛选月份',
-    monthOptions: []
+    monthLabel: '全部月份',
+    monthOptions: [],
+    pickerValue: ''
   },
 
   onLoad: function () {
@@ -44,6 +58,17 @@ Page({
       var list = (data && data.list) ? data.list : [];
 
       var mapped = list.map(function (o) {
+        var status = o.status || 'pending';
+        var statusMap = {
+          'paid':      { text: '已支付', cls: 'status-paid' },
+          'pending':   { text: '待支付', cls: 'status-pending' },
+          'cancelled': { text: '已取消', cls: 'status-cancel' },
+          'refunding': { text: '退款中', cls: 'status-pending' },
+          'refunded':  { text: '已退款', cls: 'status-cancel' },
+          'abnormal':  { text: '异常',   cls: 'status-pending' }
+        };
+        var sm = statusMap[status] || { text: '待支付', cls: 'status-pending' };
+
         return {
           id: o.id,
           order_no: o.order_no,
@@ -54,9 +79,11 @@ Page({
           points_deduction_cents: o.points_deduction_cents || 0,
           points_deduction_text: ((o.points_deduction_cents || 0) / 100).toFixed(2),
           has_points_deduction: (o.points_deduction_cents || 0) > 0,
-          status: o.status || 'pending',
-          paid_at: (o.paid_at || '').replace('T', ' ').substring(0, 19),
-          created_at: (o.created_at || '').replace('T', ' ').substring(0, 19)
+          status: status,
+          statusText: sm.text,
+          statusClass: sm.cls,
+          paid_at: fmtDateTime(o.paid_at),
+          created_at: fmtDateTime(o.created_at)
         };
       });
 
@@ -69,24 +96,23 @@ Page({
     });
   },
 
-  onSelectMonth: function () {
-    var that = this;
-    var options = this.data.monthOptions;
-    var labels = options.map(function (o) { return o.label; });
-
-    wx.showActionSheet({
-      itemList: labels,
-      success: function (res) {
-        var idx = res.tapIndex;
-        var opt = options[idx];
-        if (opt) {
-          that.setData({
-            selectedMonth: opt.value,
-            monthLabel: opt.value || '筛选月份'
-          });
-          that.fetchOrders();
-        }
-      }
-    });
+  onMonthChange: function (e) {
+    var val = e.detail.value; // "YYYY-MM"
+    if (!val) {
+      this.setData({
+        selectedMonth: '',
+        monthLabel: '全部月份',
+        pickerValue: ''
+      });
+    } else {
+      var parts = val.split('-');
+      var monthLabel = parts[0] + '年' + parseInt(parts[1], 10) + '月';
+      this.setData({
+        selectedMonth: val,
+        monthLabel: monthLabel,
+        pickerValue: val
+      });
+    }
+    this.fetchOrders();
   }
 });
