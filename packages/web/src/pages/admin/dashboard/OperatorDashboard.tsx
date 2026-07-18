@@ -192,7 +192,7 @@ export default function OperatorDashboard() {
       render: (v: number) => `¥${(v / 100).toFixed(2)}`,
     },
     {
-      title: '平台利润', dataIndex: 'total_platform_profit', key: 'total_platform_profit', width: 130,
+      title: '预估平台收入', dataIndex: 'total_platform_profit', key: 'total_platform_profit', width: 130,
       render: (v: number) => `¥${(v / 100).toFixed(2)}`,
     },
     {
