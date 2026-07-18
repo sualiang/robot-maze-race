@@ -468,27 +468,46 @@ router.get('/queue/current', authMiddleware, rateLimiter(10, 60), async (req: Re
 
     const venueId = venueRow.id;
 
-    // 队列: waiting/called/skipped
+    // 队列: waiting/called/skipped（运营商库查 race_queues，不 JOIN users）
     const queueRows = await queryOp<any>(req,
-      `SELECT rq.id, rq.queue_number, rq.status, rq.remaining_races, rq.race_type,
-              u.nickname, u.avatar_url
+      `SELECT rq.id, rq.user_id, rq.queue_number, rq.status, rq.remaining_races, rq.race_type
        FROM race_queues rq
-       LEFT JOIN users u ON rq.user_id = u.id
        WHERE rq.venue_id = $1 AND rq.status IN ('waiting','called','skipped')
        ORDER BY rq.queue_number ASC`,
       [venueId]
     );
 
-    // 当前选手: racing/paused
+    // 当前选手: racing/paused（运营商库查 race_queues，不 JOIN users）
     const currentRow = await queryOpOne<any>(req,
-      `SELECT rq.id, rq.queue_number, rq.status, rq.remaining_races, rq.race_type,
-              u.nickname, u.avatar_url, rq.start_time_ms, rq.paused_elapsed_ms
+      `SELECT rq.id, rq.user_id, rq.queue_number, rq.status, rq.remaining_races, rq.race_type,
+              rq.start_time_ms, rq.paused_elapsed_ms
        FROM race_queues rq
-       LEFT JOIN users u ON rq.user_id = u.id
        WHERE rq.venue_id = $1 AND rq.status IN ('racing','paused')
        ORDER BY rq.created_at DESC LIMIT 1`,
       [venueId]
     );
+
+    // 收集所有需要查询的用户 ID（队列 + 当前选手）
+    const allUserIds: string[] = [];
+    for (const r of queueRows) {
+      if (r.user_id) allUserIds.push(r.user_id);
+    }
+    if (currentRow?.user_id) allUserIds.push(currentRow.user_id);
+
+    // 从 common 库批量查用户信息
+    const userMap: Record<string, { nickname: string; avatar_url: string }> = {};
+    if (allUserIds.length > 0) {
+      const placeholders = allUserIds.map((_, i) => `$${i + 1}`).join(',');
+      const userRows = await query<any>(
+        `SELECT id, nickname, avatar_url FROM users WHERE id IN (${placeholders})`,
+        allUserIds
+      );
+      for (const u of userRows) {
+        userMap[u.id] = { nickname: u.nickname || '', avatar_url: u.avatar_url || '' };
+      }
+    }
+
+    const userFor = (uid: string) => userMap[uid] || { nickname: '', avatar_url: '' };
 
     const elapsed = currentRow ? (
       currentRow.status === 'racing' && currentRow.start_time_ms ? Date.now() - currentRow.start_time_ms : (currentRow.paused_elapsed_ms || 0)
@@ -502,8 +521,8 @@ router.get('/queue/current', authMiddleware, rateLimiter(10, 60), async (req: Re
         queue: queueRows.map((r: any) => ({
           id: r.id,
           queueNumber: r.queue_number,
-          nickname: r.nickname || '选手',
-          avatarUrl: r.avatar_url || undefined,
+          nickname: userFor(r.user_id).nickname || '选手',
+          avatarUrl: userFor(r.user_id).avatar_url || undefined,
           remainingRaces: r.remaining_races,
           raceType: r.race_type || undefined,
           status: r.status,
@@ -511,8 +530,8 @@ router.get('/queue/current', authMiddleware, rateLimiter(10, 60), async (req: Re
         currentRacer: currentRow ? {
           id: currentRow.id,
           queueNumber: currentRow.queue_number,
-          nickname: currentRow.nickname || '选手',
-          avatarUrl: currentRow.avatar_url || undefined,
+          nickname: userFor(currentRow.user_id).nickname || '选手',
+          avatarUrl: userFor(currentRow.user_id).avatar_url || undefined,
           remainingRaces: currentRow.remaining_races,
           status: currentRow.status,
           elapsed,

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { query, queryOne, execute } from '../config/database';
+import { query, queryOne, execute, resolveOperatorDbForUserId } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 
 const router = Router();
@@ -8,6 +8,9 @@ const router = Router();
 /**
  * GET /player/help/detail?helpId=xxx
  * 助力详情页（无需登录，被分享者打开）
+ *
+ * helps/help_helpers/users 在 common 库
+ * race_packages 在运营商库 → 用 resolveOperatorDbForUserId 跨库查
  */
 router.get('/help/detail', async (req: Request, res: Response) => {
   const helpId = (req.query.helpId || '') as string;
@@ -17,14 +20,13 @@ router.get('/help/detail', async (req: Request, res: Response) => {
   }
 
   try {
+    // 1. 查 helps + users（都在 common 库）
     const help = await queryOne<any>(
       `SELECT h.id, h.initiator_id, h.target_package_id, h.required_help_count,
               h.current_help_count, h.status, h.expires_at, h.coupon_amount_cents, h.created_at,
-              u.nickname AS creator_nickname, u.avatar_url AS creator_avatar,
-              rp.name AS package_name
+              u.nickname AS creator_nickname, u.avatar_url AS creator_avatar
        FROM helps h
        JOIN users u ON h.initiator_id = u.id
-       LEFT JOIN race_packages rp ON h.target_package_id = rp.id
        WHERE h.id = $1`,
       [helpId]
     );
@@ -34,6 +36,28 @@ router.get('/help/detail', async (req: Request, res: Response) => {
       return;
     }
 
+    // 2. 跨库查 race_packages（运营商库）
+    let packageName = '';
+    if (help.target_package_id && help.initiator_id) {
+      try {
+        const opDb = await resolveOperatorDbForUserId(help.initiator_id);
+        if (opDb) {
+          const { getOperatorPool } = require('../config/database');
+          const opPool = getOperatorPool(opDb);
+          const [pkgs] = await opPool.query<any[]>(
+            `SELECT name FROM race_packages WHERE id = ? LIMIT 1`,
+            [help.target_package_id]
+          );
+          if (pkgs && pkgs.length > 0) {
+            packageName = pkgs[0].name || '';
+          }
+        }
+      } catch {
+        // 跨库查询失败不影响主流程
+      }
+    }
+
+    // 3. 查 helpers（common 库 JOIN users）
     const helpers = await query<any>(
       `SELECT u.nickname, u.avatar_url
        FROM help_helpers hh
@@ -74,7 +98,7 @@ router.get('/help/detail', async (req: Request, res: Response) => {
           currentHelpCount: help.current_help_count || 0,
           requiredHelpCount: help.required_help_count || 0,
           helpers: helperList,
-          packageName: help.package_name || '',
+          packageName,
         },
         canHelp,
         needLogin,
