@@ -1253,7 +1253,7 @@ router.post('/attendance/check-out', authMiddleware, async (req: Request, res: R
         `UPDATE race_queues SET status = 'waiting', start_time_ms = NULL, paused_elapsed_ms = 0,
          finish_time_ms = NULL, finish_status = NULL, fault_reason = NULL
          WHERE venue_id = $1 AND status NOT IN ('finished','forfeit','invalid')`,
-        [cachedVenueId || venue.id]
+        [cachedVenueId]
       );
     } catch (_) {}
 
