@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Card, Table, Statistic, Row, Col, Button, Space, Tag, Select,
-  DatePicker, message, Modal,
+  DatePicker, message,
   Tabs, Result,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
@@ -11,7 +11,6 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import api from '../../../utils/api';
-import RegionRevenueDrilldown from './RegionRevenueMap';
 
 const { RangePicker } = DatePicker;
 
@@ -202,15 +201,11 @@ export default function OperatorDashboard() {
 
 
 
-  /* ── 默认 Tab 为营收排行，区域钻取延迟加载避免 GeoJSON 大文件卡死 ── */
+  /* ── 默认 Tab 为营收排行 ── */
   const [activeTab, setActiveTab] = useState('topops');
-  const [regionLoaded, setRegionLoaded] = useState(false);
 
   const handleTabChange = (key: string) => {
     setActiveTab(key);
-    if (key === 'region' && !regionLoaded) {
-      setRegionLoaded(true);
-    }
   };
 
   /* ── Tab items ── */
@@ -268,11 +263,6 @@ export default function OperatorDashboard() {
           />
         </Card>
       ),
-    },
-    {
-      key: 'region',
-      label: '区域营收钻取',
-      children: regionLoaded ? <RegionRevenueDrilldown /> : <div style={{ textAlign: 'center', padding: 48, color: '#999' }}>点击此标签页加载数据</div>,
     },
   ];
 
