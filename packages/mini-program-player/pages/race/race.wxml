@@ -11,7 +11,7 @@
 
     <!-- 顶部标题 -->
     <view class="race-header">
-      <text class="race-header-title">比赛记录</text>
+      <text class="race-header-title" style="text-align:center;">我的比赛</text>
     </view>
 
     <!-- ============================================================ -->
