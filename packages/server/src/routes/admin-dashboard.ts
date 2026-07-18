@@ -473,7 +473,7 @@ router.get('/top-operators', authMiddleware, checkPermission('dashboard:list'), 
         const profitShareRate = parseFloat(op.profit_share_rate) || 0;
         const platformProfit = commissionFromDB > 0
           ? commissionFromDB
-          : Math.round(revenue * (1 - profitShareRate));
+          : Math.round(revenue * (1 - profitShareRate / 100));
         return {
           id: op.id,
           name: op.name,
