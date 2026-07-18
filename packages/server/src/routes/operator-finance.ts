@@ -208,7 +208,7 @@ router.get('/revenue-details', authMiddleware, operatorOnly, async (req: Request
     // 按日期汇总:日期, 订单数, 总营收, 总积分抵扣
     const dailyRows = await queryOp<any>(req,
       `SELECT
-         DATE(o.paid_at) as date,
+         DATE_FORMAT(o.paid_at, '%Y-%m-%d') as date,
          COUNT(*) as order_count,
          COALESCE(SUM(o.amount_cents), 0) as total_revenue,
          COALESCE(SUM(o.points_deduction_cents), 0) as total_points_deducted
@@ -216,8 +216,8 @@ router.get('/revenue-details', authMiddleware, operatorOnly, async (req: Request
        WHERE o.operator_id = ?
          AND o.status = 'paid'
          ${dateFilter}
-       GROUP BY DATE(o.paid_at)
-       ORDER BY DATE(o.paid_at) ${sortOrder}`,
+       GROUP BY DATE_FORMAT(o.paid_at, '%Y-%m-%d')
+       ORDER BY DATE_FORMAT(o.paid_at, '%Y-%m-%d') ${sortOrder}`,
       params
     );
 
@@ -225,10 +225,10 @@ router.get('/revenue-details', authMiddleware, operatorOnly, async (req: Request
     const result = await Promise.all((dailyRows || []).map(async (day: any) => {
       const orderRows = await queryOp<any>(req,
         `SELECT o.id, o.order_no, o.amount_cents, o.discount_cents,
-                o.points_deduction_cents, o.paid_at, o.package_id
+                o.points_deduction_cents, DATE_FORMAT(o.paid_at, '%Y-%m-%d') as paid_at, o.package_id
          FROM orders o
          WHERE o.operator_id = ?
-           AND DATE(o.paid_at) = ?
+           AND DATE_FORMAT(o.paid_at, '%Y-%m-%d') = ?
            AND o.status = 'paid'
          ORDER BY o.paid_at DESC`,
         [operatorId, day.date]
@@ -240,7 +240,7 @@ router.get('/revenue-details', authMiddleware, operatorOnly, async (req: Request
         amountCents: o.amount_cents || 0,
         discountCents: o.discount_cents || 0,
         pointsDeducted: o.points_deduction_cents || 0, // 金额分
-        paidAt: typeof o.paid_at === 'string' ? o.paid_at.split('T')[0] : o.paid_at,
+        paidAt: o.paid_at,
         packageId: o.package_id,
       }));
 
@@ -269,8 +269,8 @@ router.get('/export', authMiddleware, operatorOnly, async (req: Request, res: Re
   try {
     const operatorId = req.user!.operatorId;
     const rows = await queryOp<any>(req,
-      `SELECT o.created_at, o.order_no, o.amount_cents, o.discount_cents,
-              o.points_deduction_cents, o.status, o.paid_at
+      `SELECT DATE_FORMAT(o.created_at, '%Y-%m-%d') as created_at, o.order_no, o.amount_cents, o.discount_cents,
+              o.points_deduction_cents, o.status, DATE_FORMAT(o.paid_at, '%Y-%m-%d') as paid_at
        FROM orders o
        WHERE o.operator_id = ?
        ORDER BY o.created_at DESC`,
