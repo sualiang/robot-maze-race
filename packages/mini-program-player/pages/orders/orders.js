@@ -1,4 +1,5 @@
 // pages/orders/orders.js - 我的订单
+console.log('==== ORDERS PAGE LOADED ====');
 var request = require('../../utils/request');
 
 Page({
@@ -40,7 +41,7 @@ Page({
     }
 
     request.silentGet(url).then(function (data) {
-      var list = (data && data.data && data.data.list) ? data.data.list : [];
+      var list = (data && data.list) ? data.list : [];
 
       var mapped = list.map(function (o) {
         return {
