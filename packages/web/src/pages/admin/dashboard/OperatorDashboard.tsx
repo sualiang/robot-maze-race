@@ -11,6 +11,7 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import api from '../../../utils/api';
+import PaymentRecords from './PaymentRecords';
 
 const { RangePicker } = DatePicker;
 
@@ -263,6 +264,11 @@ export default function OperatorDashboard() {
           />
         </Card>
       ),
+    },
+    {
+      key: 'payments',
+      label: '支付凭证',
+      children: <PaymentRecords />,
     },
   ];
 

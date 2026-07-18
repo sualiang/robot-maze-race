@@ -522,4 +522,114 @@ router.get('/pending', authMiddleware, checkPermission('finance:withdraw'), asyn
   }
 });
 
+/**
+ * GET /api/v1/admin/finance/payment-records
+ * 支付原始凭证列表 — 跨库聚合所有运营商 payments 表
+ * 支持分页和筛选
+ */
+router.get('/payment-records', authMiddleware, checkPermission('admin:finance'), async (req: Request, res: Response) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string) || 20));
+    const offset = (page - 1) * pageSize;
+    const filterOpId = (req.query.operator_id as string) || '';
+    const filterStatus = (req.query.status as string) || '';
+    const dateStart = (req.query.date_start as string) || '';
+    const dateEnd = (req.query.date_end as string) || '';
+    const opId = (req.user as any)?.operatorId || null;
+
+    // 动态 WHERE
+    const wheres: string[] = [];
+    const params: any[] = [];
+    if (filterOpId && !opId) { wheres.push('o.operator_id = ?'); params.push(filterOpId); }
+    if (filterStatus) { wheres.push('p.status = ?'); params.push(filterStatus); }
+    if (dateStart) { wheres.push('p.pay_time >= ?'); params.push(dateStart); }
+    if (dateEnd) { wheres.push('p.pay_time < ?'); params.push(dateEnd + ' 23:59:59'); }
+    const whereClause = wheres.length > 0 ? 'AND ' + wheres.join(' AND ') : '';
+
+    // 运营商库内部 JOIN orders 获取 operator_id 和 user_id
+    const baseSql = `
+      SELECT p.id, p.order_id, o.operator_id, o.user_id, p.transaction_id,
+             p.amount_cents, p.status, p.pay_time, p.created_at
+      FROM payments p
+      JOIN orders o ON p.order_id = o.id
+      WHERE 1=1 ${whereClause}
+    `;
+
+    let allRows: any[];
+    let total: number;
+
+    if (opId) {
+      // 普通运营商：单库
+      const countSql = baseSql.replace('1=1', 'o.operator_id = ?');
+      const countParams = [opId, ...params];
+      const countRow = await queryOpOne<{ count: string }>(req,
+        `SELECT COUNT(*) as count FROM (${countSql}) t`,
+        countParams
+      );
+      total = parseInt(countRow?.count || '0', 10);
+      const pageSql = `
+        SELECT p.id, p.order_id, o.operator_id, o.user_id, p.transaction_id,
+               p.amount_cents, p.status, p.pay_time, p.created_at
+        FROM payments p
+        JOIN orders o ON p.order_id = o.id
+        WHERE o.operator_id = ? ${whereClause}
+        ORDER BY p.pay_time DESC LIMIT ? OFFSET ?
+      `;
+      allRows = await queryOp<any>(req, pageSql, [opId, ...params, pageSize, offset]);
+    } else {
+      // 超管：跨库聚合
+      const opRegs = await query<any>('SELECT db_name, operator_id, name FROM operators_registry WHERE db_name IS NOT NULL', []);
+      const opNameMap = new Map<string, string>();
+      for (const reg of opRegs) opNameMap.set(reg.operator_id, reg.name);
+
+      let allDbRows: any[] = [];
+      for (const reg of opRegs) {
+        try {
+          const pool = getOperatorPool(reg.db_name);
+          const dbParams = filterOpId ? [filterOpId, ...params] : [reg.operator_id, ...params];
+          const dbSql = baseSql.replace('1=1', 'o.operator_id = ?');
+          const [dbRows] = await pool.execute(dbSql + ' ORDER BY p.pay_time DESC', dbParams);
+          for (const r of (dbRows as any[])) {
+            r.operator_name = opNameMap.get(r.operator_id) || '未知运营商';
+          }
+          allDbRows.push(...(dbRows as any[]));
+        } catch { /* skip */ }
+      }
+      allDbRows.sort((a, b) => (b.pay_time || '').localeCompare(a.pay_time || ''));
+      total = allDbRows.length;
+      allRows = allDbRows.slice(offset, offset + pageSize);
+      // 补充 operator_name
+      for (const r of allRows) {
+        if (!r.operator_name) r.operator_name = opNameMap.get(r.operator_id) || '未知运营商';
+      }
+    }
+
+    // 运营商名（普通管理员只有自己，但格式一致）
+    if (opId) {
+      const myOp = await queryOne<{ name: string }>('SELECT name FROM operators WHERE id = ?', [opId]);
+      const myName = myOp?.name || '未知运营商';
+      for (const r of allRows) r.operator_name = myName;
+    }
+
+    const list = allRows.map((r: any) => ({
+      id: r.id,
+      order_id: r.order_id,
+      operator_id: r.operator_id,
+      operator_name: r.operator_name || '未知运营商',
+      user_id: r.user_id,
+      transaction_id: r.transaction_id,
+      amount_cents: r.amount_cents,
+      status: r.status,
+      pay_time: r.pay_time,
+      created_at: r.created_at,
+    }));
+
+    return res.json({ code: 0, message: 'ok', data: { list, total, page, pageSize } });
+  } catch (error: any) {
+    console.error('[AdminFinance] payment-records error:', error.message);
+    return res.status(500).json({ code: 500, message: '获取支付凭证失败', data: null });
+  }
+});
+
 export default router;
