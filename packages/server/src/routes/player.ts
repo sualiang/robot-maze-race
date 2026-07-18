@@ -733,13 +733,21 @@ router.get('/me/race-records', authMiddleware, async (req: Request, res: Respons
       score: r.score_ms || 0,
       rank: r.rank || 0,
       date: r.finished_at || r.created_at,
-      growValue: 0,   // 成长值在 V2 暂从 race_results 不直接关联，后续可扩展
-      points: 0,       // 积分奖励在完成比赛时已写入 users.points，此处展示历史固定值
+      growValue: 0,
+      points: 0,
       venueName: r.venue_name || '',
       status: r.status || '',
     }));
 
-    res.json({ code: 0, data: result });
+    // 获取用户有记录的月份列表
+    const monthsResult = await queryOp<any>(req,
+      `SELECT DISTINCT DATE_FORMAT(created_at, '%Y-%m') AS month
+       FROM race_results WHERE user_id = $1 AND operator_id = $2 ORDER BY month DESC`,
+      [userId, opId]
+    );
+    const availableMonths = (monthsResult || []).map((r: any) => r.month);
+
+    res.json({ code: 0, data: { records: result, availableMonths } });
   } catch (e: any) {
     console.error('[Player] race-records error:', e?.message || e);
     res.json({ code: 500, message: '查询参赛记录失败', data: null });

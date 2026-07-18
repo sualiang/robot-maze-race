@@ -634,36 +634,29 @@ router.get('/region-revenue', authMiddleware, checkPermission('dashboard:read'),
         if (opIds.length > 0) {
           const oph = opIds.map(() => '?').join(',');
           const todayData = await queryAllOpDash<any>(req,
-            `SELECT vv.operator_id,
+            `SELECT ord.operator_id,
                     SUM(ord.amount_cents) as today_rev
              FROM orders ord
-             JOIN race_packages rp ON rp.id = ord.package_id
-             JOIN races r ON r.id = rp.race_id
-             JOIN venues vv ON vv.id = r.venue_id
-             WHERE DATE(ord.paid_at) = CURDATE() AND ord.status = 'paid'
-             GROUP BY vv.operator_id`,
+             WHERE ord.status = 'paid' AND DATE(ord.paid_at) = CURDATE()
+             GROUP BY ord.operator_id`,
             []
           );
           const monthData = await queryAllOpDash<any>(req,
-            `SELECT vv.operator_id,
+            `SELECT ord.operator_id,
                     SUM(ord.amount_cents) as month_rev
              FROM orders ord
-             JOIN race_packages rp ON rp.id = ord.package_id
-             JOIN races r ON r.id = rp.race_id
-             JOIN venues vv ON vv.id = r.venue_id
-             WHERE DATE_FORMAT(ord.paid_at, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m') AND ord.status = 'paid'
-             GROUP BY vv.operator_id`,
+             WHERE ord.status = 'paid'
+               AND DATE_FORMAT(ord.paid_at, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')
+             GROUP BY ord.operator_id`,
             []
           );
           const prevMonthData = await queryAllOpDash<any>(req,
-            `SELECT vv.operator_id,
+            `SELECT ord.operator_id,
                     SUM(ord.amount_cents) as prev_month_rev
              FROM orders ord
-             JOIN race_packages rp ON rp.id = ord.package_id
-             JOIN races r ON r.id = rp.race_id
-             JOIN venues vv ON vv.id = r.venue_id
-             WHERE DATE_FORMAT(ord.paid_at, '%Y-%m') = DATE_FORMAT(DATE_SUB(NOW(), INTERVAL 1 MONTH), '%Y-%m') AND ord.status = 'paid'
-             GROUP BY vv.operator_id`,
+             WHERE ord.status = 'paid'
+               AND DATE_FORMAT(ord.paid_at, '%Y-%m') = DATE_FORMAT(DATE_SUB(NOW(), INTERVAL 1 MONTH), '%Y-%m')
+             GROUP BY ord.operator_id`,
             []
           );
 
@@ -756,15 +749,11 @@ router.get('/region-revenue', authMiddleware, checkPermission('dashboard:read'),
       if (!operator_id) {
         return res.status(400).json({ code: 400, message: '缺少 operator_id 参数', data: null });
       }
-      // orders.venue_id 不存在，正确链路：orders → race_packages → races → venues
       const rows = await queryAllOpDash(req, 
         `SELECT DATE(o.paid_at) as date, COUNT(*) as order_count,
                 COALESCE(SUM(o.amount_cents), 0) as revenue_cents
          FROM orders o
-         JOIN race_packages rp ON rp.id = o.package_id
-         JOIN races r ON r.id = rp.race_id
-         JOIN venues v ON v.id = r.venue_id
-         WHERE v.operator_id = ?
+         WHERE o.operator_id = ?
            AND o.paid_at >= ? AND o.paid_at <= ? AND o.status = 'paid'
          GROUP BY DATE(o.paid_at)
          ORDER BY date DESC

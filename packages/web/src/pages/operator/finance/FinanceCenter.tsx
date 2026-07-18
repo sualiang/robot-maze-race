@@ -71,12 +71,13 @@ export default function FinanceCenter() {
     setLoadingRevenue(true);
     try {
       const res: any = await api.get('/operator/finance/summary');
-      const s = res?.settlements ?? {};
-      setTodayRevenue(Math.round((s.settled_amount_cents ?? 0) / 100));
-      setTodayOrders(s.settled_count ?? 0);
-      setMonthRevenue(Math.round(((s.settled_amount_cents ?? 0) + (s.pending_amount_cents ?? 0)) / 100));
-      setMonthOrders((s.settled_count ?? 0) + (s.pending_count ?? 0));
-      setMonthPointsDeducted(Math.round((s.total_points_deduction_cents ?? 0) / 100));
+      // 从 orders 字段取实时营收统计（settlements 表可能为空）
+      const o = res?.orders ?? {};
+      setTodayRevenue(o.today_revenue_cents ?? 0);
+      setMonthRevenue(o.month_revenue_cents ?? 0);
+      setTodayOrders(o.today_orders ?? 0);
+      setMonthOrders(o.month_orders ?? 0);
+      setMonthPointsDeducted(o.month_points_deduction_cents ?? 0);
     } catch { }
     finally { setLoadingRevenue(false); }
   }, []);

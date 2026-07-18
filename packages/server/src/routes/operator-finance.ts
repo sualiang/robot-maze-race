@@ -28,11 +28,11 @@ router.get('/', authMiddleware, operatorOnly, async (req: Request, res: Response
       profit_share_rate: number; total_revenue: number;
     }>(
       `SELECT id, name, company_name, profit_share_rate, total_revenue
-       FROM operators WHERE id = $1`,
+       FROM operators WHERE id = ?`,
       [operatorId]
     );
     const venueCount = await queryOpOne<{ count: string }>(req,
-      'SELECT COUNT(*) as count FROM venues WHERE operator_id = $1',
+      'SELECT COUNT(*) as count FROM venues WHERE operator_id = ?',
       [operatorId]
     );
     const settlementStats = await queryOpOne<{
@@ -49,9 +49,25 @@ router.get('/', authMiddleware, operatorOnly, async (req: Request, res: Response
          COALESCE(SUM(CASE WHEN status = 'pending' THEN amount_cents ELSE 0 END), 0) as total_pending_cents,
          COALESCE(SUM(CASE WHEN status = 'settled' THEN 1 ELSE 0 END), 0) as settled_count,
          COALESCE(SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END), 0) as pending_count
-       FROM settlements WHERE operator_id = $1`,
+       FROM settlements WHERE operator_id = ?`,
       [operatorId]
     );
+
+    // 从 orders 表取实时统计（今日/本月营收+订单数）—— settlements 表可能为空
+    const orderStats = await queryOpOne<{
+      today_revenue: string; month_revenue: string;
+      today_orders: string; month_orders: string; month_points: string;
+    }>(req,
+      `SELECT
+         COALESCE(SUM(CASE WHEN DATE(paid_at) = CURDATE() THEN amount_cents ELSE 0 END), 0) as today_revenue,
+         COALESCE(SUM(CASE WHEN DATE_FORMAT(paid_at, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m') THEN amount_cents ELSE 0 END), 0) as month_revenue,
+         COALESCE(SUM(CASE WHEN DATE(paid_at) = CURDATE() THEN 1 ELSE 0 END), 0) as today_orders,
+         COALESCE(SUM(CASE WHEN DATE_FORMAT(paid_at, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m') THEN 1 ELSE 0 END), 0) as month_orders,
+         COALESCE(SUM(CASE WHEN DATE_FORMAT(paid_at, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m') THEN points_deduction_cents ELSE 0 END), 0) as month_points
+       FROM orders WHERE operator_id = ? AND status = 'paid'`,
+      [operatorId]
+    );
+
     const netIncome = (settlementStats?.total_amount_cents || 0) - (settlementStats?.total_commission_cents || 0);
 
     return res.json({
@@ -59,6 +75,13 @@ router.get('/', authMiddleware, operatorOnly, async (req: Request, res: Response
       data: {
         operator: operator || null,
         venue_count: parseInt(venueCount?.count || '0', 10),
+        orders: {
+          today_revenue_cents: parseInt(orderStats?.today_revenue || '0', 10),
+          month_revenue_cents: parseInt(orderStats?.month_revenue || '0', 10),
+          today_orders: parseInt(orderStats?.today_orders || '0', 10),
+          month_orders: parseInt(orderStats?.month_orders || '0', 10),
+          month_points_deduction_cents: parseInt(orderStats?.month_points || '0', 10),
+        },
         settlements: {
           total_amount_cents: settlementStats?.total_amount_cents || 0,
           total_commission_cents: settlementStats?.total_commission_cents || 0,
@@ -90,12 +113,12 @@ router.get('/summary', authMiddleware, operatorOnly, async (req: Request, res: R
       profit_share_rate: number; total_revenue: number;
     }>(
       `SELECT id, name, company_name, profit_share_rate, total_revenue
-       FROM operators WHERE id = $1`,
+       FROM operators WHERE id = ?`,
       [operatorId]
     );
 
     const venueCount = await queryOpOne<{ count: string }>(req,
-      'SELECT COUNT(*) as count FROM venues WHERE operator_id = $1',
+      'SELECT COUNT(*) as count FROM venues WHERE operator_id = ?',
       [operatorId]
     );
 
@@ -113,7 +136,22 @@ router.get('/summary', authMiddleware, operatorOnly, async (req: Request, res: R
          COALESCE(SUM(CASE WHEN status = 'pending' THEN amount_cents ELSE 0 END), 0) as total_pending_cents,
          COALESCE(SUM(CASE WHEN status = 'settled' THEN 1 ELSE 0 END), 0) as settled_count,
          COALESCE(SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END), 0) as pending_count
-       FROM settlements WHERE operator_id = $1`,
+       FROM settlements WHERE operator_id = ?`,
+      [operatorId]
+    );
+
+    // 从 orders 表取实时统计（今日/本月营收+订单数）—— settlements 表可能为空
+    const orderStats = await queryOpOne<{
+      today_revenue: string; month_revenue: string;
+      today_orders: string; month_orders: string; month_points: string;
+    }>(req,
+      `SELECT
+         COALESCE(SUM(CASE WHEN DATE(paid_at) = CURDATE() THEN amount_cents ELSE 0 END), 0) as today_revenue,
+         COALESCE(SUM(CASE WHEN DATE_FORMAT(paid_at, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m') THEN amount_cents ELSE 0 END), 0) as month_revenue,
+         COALESCE(SUM(CASE WHEN DATE(paid_at) = CURDATE() THEN 1 ELSE 0 END), 0) as today_orders,
+         COALESCE(SUM(CASE WHEN DATE_FORMAT(paid_at, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m') THEN 1 ELSE 0 END), 0) as month_orders,
+         COALESCE(SUM(CASE WHEN DATE_FORMAT(paid_at, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m') THEN points_deduction_cents ELSE 0 END), 0) as month_points
+       FROM orders WHERE operator_id = ? AND status = 'paid'`,
       [operatorId]
     );
 
@@ -124,6 +162,13 @@ router.get('/summary', authMiddleware, operatorOnly, async (req: Request, res: R
       data: {
         operator: operator || null,
         venue_count: parseInt(venueCount?.count || '0', 10),
+        orders: {
+          today_revenue_cents: parseInt(orderStats?.today_revenue || '0', 10),
+          month_revenue_cents: parseInt(orderStats?.month_revenue || '0', 10),
+          today_orders: parseInt(orderStats?.today_orders || '0', 10),
+          month_orders: parseInt(orderStats?.month_orders || '0', 10),
+          month_points_deduction_cents: parseInt(orderStats?.month_points || '0', 10),
+        },
         settlements: {
           total_amount_cents: settlementStats?.total_amount_cents || 0,
           total_commission_cents: settlementStats?.total_commission_cents || 0,
@@ -156,7 +201,7 @@ router.get('/revenue-details', authMiddleware, operatorOnly, async (req: Request
     let dateFilter = '';
     const params: any[] = [operatorId];
     if (startDate && endDate) {
-      dateFilter = `AND o.paid_at >= $2 AND o.paid_at < $3`;
+      dateFilter = `AND o.paid_at >= ? AND o.paid_at < ?`;
       params.push(startDate, endDate + ' 23:59:59');
     }
 
@@ -168,7 +213,7 @@ router.get('/revenue-details', authMiddleware, operatorOnly, async (req: Request
          COALESCE(SUM(o.amount_cents), 0) as total_revenue,
          COALESCE(SUM(o.points_deduction_cents), 0) as total_points_deducted
        FROM orders o
-       WHERE o.operator_id = $1
+       WHERE o.operator_id = ?
          AND o.status = 'paid'
          ${dateFilter}
        GROUP BY DATE(o.paid_at)
@@ -182,8 +227,8 @@ router.get('/revenue-details', authMiddleware, operatorOnly, async (req: Request
         `SELECT o.id, o.order_no, o.amount_cents, o.discount_cents,
                 o.points_deduction_cents, o.paid_at, o.package_id
          FROM orders o
-         WHERE o.operator_id = $1
-           AND DATE(o.paid_at) = $2
+         WHERE o.operator_id = ?
+           AND DATE(o.paid_at) = ?
            AND o.status = 'paid'
          ORDER BY o.paid_at DESC`,
         [operatorId, day.date]
@@ -227,7 +272,7 @@ router.get('/export', authMiddleware, operatorOnly, async (req: Request, res: Re
       `SELECT o.created_at, o.order_no, o.amount_cents, o.discount_cents,
               o.points_deduction_cents, o.status, o.paid_at
        FROM orders o
-       WHERE o.operator_id = $1
+       WHERE o.operator_id = ?
        ORDER BY o.created_at DESC`,
       [operatorId]
     );

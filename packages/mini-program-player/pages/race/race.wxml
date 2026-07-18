@@ -11,7 +11,7 @@
 
     <!-- 顶部标题 -->
     <view class="race-header">
-      <text class="race-header-title" style="text-align:center;">我的比赛</text>
+      <text class="race-header-title">我的比赛</text>
     </view>
 
     <!-- ============================================================ -->
@@ -72,7 +72,7 @@
       <!-- 无记录时的副标题 -->
       <view wx:if="{{!hasSeasonBest}}" class="action-empty" style="padding-top: 40rpx;">
         <text class="action-empty-title" style="font-size: 32rpx;">准备好上场了吗？</text>
-        <text class="action-empty-desc">扫码出发，创造你的最佳记录</text>
+        <text class="action-empty-desc">创造你的最佳记录</text>
       </view>
 
       <!-- ============================================================ -->
@@ -82,7 +82,6 @@
         <view class="race-cta-btn" bindtap="onRaceNow">
           <text class="race-cta-text">立即参赛（剩余 {{remainCount}} 次）</text>
         </view>
-        <text class="race-cta-hint">扫描赛场二维码即可出发</text>
       </view>
 
       <!-- ============================================================ -->
@@ -98,10 +97,24 @@
     </block>
 
     <!-- ============================================================ -->
+    <!-- ============================================================ -->
     <!-- 历史参赛记录 -->
     <!-- ============================================================ -->
     <view class="history-section">
       <text class="history-title">历史参赛记录</text>
+
+      <!-- 月份滑动标签栏 -->
+      <scroll-view wx:if="{{historyMonths.length > 1}}" class="month-tabs" scroll-x="true" enhanced show-scrollbar="{{false}}">
+        <view class="month-tabs-inner">
+          <view
+            wx:for="{{historyMonths}}"
+            wx:key="value"
+            class="month-tab {{selectedMonth === item.value ? 'month-tab-active' : ''}}"
+            data-month="{{item.value}}"
+            bindtap="onSelectHistoryMonth"
+          >{{item.label}}</view>
+        </view>
+      </scroll-view>
 
       <view wx:if="{{historyLoading && historyRecords.length === 0}}" class="history-loading">
         <view class="history-skeleton-item"></view>

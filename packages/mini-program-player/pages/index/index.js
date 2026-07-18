@@ -107,8 +107,9 @@ Page({
     request.silentGet('/player/me/profile-check').then(function (data) {
       var d = data.data || data;
       var points = d.pointsBalance || 0;
+      var remain = (typeof d.remainCount !== 'undefined') ? d.remainCount : (d.raceCount || 0);
       that.setData({
-        remainCount: d.raceCount || 0,
+        remainCount: remain,
         couponValue: d.couponTotalYuan || 0,
         pointsBalance: points
       });
@@ -133,7 +134,8 @@ Page({
     }
 
     request.silentGet('/player/me/profile').then(function (data) {
-      var remain = (typeof data.race_count !== 'undefined') ? data.race_count :
+      var remain = (typeof data.remainCount !== 'undefined') ? data.remainCount :
+                   (typeof data.race_count !== 'undefined') ? data.race_count :
                    (data.raceCount || data.remainCount || 0);
       that.setData({ remainCount: remain });
     }).catch(function () {

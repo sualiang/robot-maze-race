@@ -122,17 +122,4 @@
     </view>
   </view>
 
-  <!-- ============================================================ -->
-  <!-- 模块6: 赛季竞技入口卡片 -->
-  <!-- ============================================================ -->
-  <view class="season-card" bindtap="onGoLeaderboard">
-    <view class="season-card-left">
-      <text class="season-card-title">立即参赛 参与排名</text>
-    </view>
-    <view class="season-card-right">
-      <text class="season-card-rank">我在当前赛场排名 第{{userRank || 0}}名</text>
-      <text class="season-card-arrow">›</text>
-    </view>
-  </view>
-
 </view>

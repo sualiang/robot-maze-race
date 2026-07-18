@@ -23,13 +23,13 @@ Page({
     seasonBest: null,
     hasSeasonBest: false,
 
+    // 月份筛选
+    selectedMonth: '',
+    historyMonths: [],
+
     // 历史参赛列表
     historyRecords: [],
     truncatedHistory: [],
-    fullHistoryRecords: [],
-    showHistoryModal: false,
-    historyMonthFilter: '',
-    historyMonths: [],
     historyLoading: false,
 
     // 实时排队
@@ -227,7 +227,14 @@ Page({
     var that = this;
     that.setData({ historyLoading: true });
 
-    return request.get('/player/me/race-records').then(function (records) {
+    var url = '/player/me/race-records';
+    var month = that.data.selectedMonth;
+    if (month) {
+      url += '?month=' + encodeURIComponent(month);
+    }
+
+    return request.get(url).then(function (data) {
+      var records = (data && data.records) ? data.records : (Array.isArray(data) ? data : []);
       var list = records || [];
       var mapped = list.map(function (item) {
         var score = item.bestTime || item.score || item.time || 0;
@@ -235,8 +242,9 @@ Page({
         var rank = item.rank || 0;
 
         var dateText = '';
+        var d = null;
         if (item.createdAt || item.date) {
-          var d = new Date(item.createdAt || item.date);
+          d = new Date(item.createdAt || item.date);
           dateText = (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
         }
 
@@ -270,29 +278,36 @@ Page({
         };
       });
 
-      // 收集月份列表
-      var monthSet = {};
-      for (var j = 0; j < mapped.length; j++) {
-        if (mapped[j].monthKey) monthSet[mapped[j].monthKey] = mapped[j].monthLabel;
-      }
-      var months = Object.keys(monthSet).sort().reverse().map(function (k) {
-        return { key: k, label: monthSet[k] };
-      });
-
       // 截断：默认显示最近 6 条
       var truncated = mapped.length > 6 ? mapped.slice(0, 6) : mapped;
 
-      that.setData({
+      var result = {
         historyRecords: mapped,
-        fullHistoryRecords: mapped,
         truncatedHistory: truncated,
-        historyMonths: months,
         historyLoading: false
-      });
+      };
+
+      // 构建月份选项
+      if (data && data.availableMonths && that.data.historyMonths.length === 0) {
+        var options = [{ label: '全部', value: '' }];
+        (data.availableMonths || []).forEach(function (m) {
+          options.push({ label: m, value: m });
+        });
+        result.historyMonths = options;
+      }
+
+      that.setData(result);
     }).catch(function (err) {
       console.error('获取历史记录失败', err);
       that.setData({ historyRecords: [], truncatedHistory: [], historyLoading: false });
     });
+  },
+
+  // 月份切换
+  onSelectHistoryMonth: function (e) {
+    var month = e.currentTarget.dataset.month;
+    this.setData({ selectedMonth: month });
+    this.fetchHistoryRecords();
   },
 
   // ===== 查看全部历史记录 =====
