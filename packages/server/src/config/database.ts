@@ -75,6 +75,53 @@ export function getOperatorPool(dbName: string): mysql.Pool {
   return pool;
 }
 
+// 缓存：userId → db_name，避免每次请求都遍历所有运营商库
+const userIdDbCache = new Map<string, { dbName: string; ts: number }>();
+const USERID_CACHE_TTL_MS = 5 * 60 * 1000; // 5 分钟
+
+/**
+ * 通过 userId 遍历所有运营商库查找用户所在的数据库
+ * 用于 player 端无 Redis operator context 时的 fallback
+ */
+export async function resolveOperatorDbForUserId(userId: string): Promise<string | null> {
+  if (!userId) return null;
+
+  // 先查缓存
+  const cached = userIdDbCache.get(userId);
+  if (cached && Date.now() - cached.ts < USERID_CACHE_TTL_MS) {
+    return cached.dbName;
+  }
+
+  const common = getCommonPool();
+  let allOps: any[];
+  try {
+    const [rows] = await common.query<any[]>(
+      `SELECT db_name FROM operators_registry WHERE db_name IS NOT NULL`
+    );
+    allOps = rows || [];
+  } catch {
+    return null;
+  }
+
+  for (const opReg of allOps) {
+    if (!opReg.db_name) continue;
+    try {
+      const pool = getOperatorPool(opReg.db_name);
+      const [rows] = await pool.execute(
+        `SELECT id FROM users WHERE id = ? LIMIT 1`,
+        [userId]
+      );
+      if (rows && (Array.isArray(rows) ? rows.length > 0 : true)) {
+        userIdDbCache.set(userId, { dbName: opReg.db_name, ts: Date.now() });
+        return opReg.db_name;
+      }
+    } catch {
+      // 跳过连接失败的库
+    }
+  }
+  return null;
+}
+
 export async function resolveOperatorDb(req: Request): Promise<string | null> {
   // 优先从 JWT 获取 operatorId
   const jwtOperatorId = (req.user as any)?.operatorId
@@ -92,13 +139,19 @@ export async function resolveOperatorDb(req: Request): Promise<string | null> {
   try {
     const ctx = await getOperatorContext(userId);
     const operatorId = ctx?.operator_id;
-    if (!operatorId) return null;
-    const pool = getCommonPool();
-    const [rows] = await pool.query<any[]>(
-      `SELECT db_name FROM operators_registry WHERE operator_id = ?`, [operatorId]
-    );
-    return (rows && rows.length > 0 && rows[0].db_name) ? rows[0].db_name : null;
-  } catch { return null; }
+    if (operatorId) {
+      const pool = getCommonPool();
+      const [rows] = await pool.query<any[]>(
+        `SELECT db_name FROM operators_registry WHERE operator_id = ?`, [operatorId]
+      );
+      if (rows && rows.length > 0 && rows[0].db_name) {
+        return rows[0].db_name;
+      }
+    }
+  } catch { /* ignore Redis failure */ }
+
+  // 最终 fallback：遍历所有运营商库查找该用户所在的库
+  return resolveOperatorDbForUserId(userId);
 }
 
 // ==================== SQL 工具 ====================
@@ -442,4 +495,4 @@ export function generateSecurePassword(length = 12): string {
   return pw.split('').sort(() => Math.random() - 0.5).join('');
 }
 
-export default { query, queryOne, execute, transaction, queryOp, queryOpOne, executeOp, executeOpByOrder, initSchema, createOperatorDatabase, generateSecurePassword, resolveOperatorDb, resolveOperatorDbForOrder };
+export default { query, queryOne, execute, transaction, queryOp, queryOpOne, executeOp, executeOpByOrder, initSchema, createOperatorDatabase, generateSecurePassword, resolveOperatorDb, resolveOperatorDbForOrder, resolveOperatorDbForUserId };

@@ -1129,21 +1129,108 @@ async function getUserRemainingRaces(userId: string, req: Request): Promise<numb
 /**
  * POST /player/order/:id/confirm-payment
  * 前端支付成功后手动确认订单（wx.requestPayment success 回调触发）
- * 仅更新 status='paid'，不去重 — 微信回调 side effects 由 /pay/notify 统一处理
+ * 写入 status='paid' 并执行 side effects（参赛次数、抵扣金等），幂等防重复
  */
 router.post('/order/:id/confirm-payment', authMiddleware, async (req: Request, res: Response) => {
   const { id } = req.params;
   const userId = req.user!.userId;
 
   try {
-    // 使用 executeOpByOrder 直接通过订单 ID 定位运营商数据库
-    // 避免依赖 resolveOperatorDb 的 Redis operator context（player 端可能未设置）
-    const result = await executeOpByOrder(id,
-      `UPDATE orders SET status = 'paid', paid_at = NOW() WHERE id = ? AND user_id = ? AND status = 'pending'`,
+    const pool = await resolveOperatorDbForOrder(id);
+    if (!pool) {
+      res.json({ code: 404, message: '订单不存在', data: null });
+      return;
+    }
+
+    // 1. 防重复：查询订单当前状态
+    const [orderRows] = await pool.execute(
+      `SELECT id, status, user_id, package_id, operator_id FROM orders WHERE id = ? AND user_id = ?`,
       [id, userId]
     );
-    console.log(`[Player] confirm-payment order=${id} user=${userId} changes=${result.changes}`);
-    res.json({ code: 0, data: { status: 'paid', updated: result.changes > 0 } });
+    const order = (orderRows as any[])?.[0];
+    if (!order) {
+      res.json({ code: 404, message: '订单不存在', data: null });
+      return;
+    }
+    if (order.status === 'paid') {
+      res.json({ code: 0, data: { status: 'paid', updated: false, message: 'already paid' } });
+      return;
+    }
+    if (order.status !== 'pending') {
+      res.json({ code: 0, data: { status: order.status, updated: false } });
+      return;
+    }
+
+    // 2. 更新订单状态
+    const [updateResult] = await pool.execute(
+      `UPDATE orders SET status = 'paid', paid_at = NOW() WHERE id = ? AND status = 'pending'`,
+      [id]
+    );
+    const changes = (updateResult as any)?.affectedRows || 0;
+
+    // 3. 执行 side effects（与 /pay/notify 微信回调逻辑一致）
+    if (changes > 0) {
+      try {
+        const [orderDetailRows] = await pool.execute(
+          `SELECT o.user_id, o.package_id, rp.race_count, rp.tag, rp.free_deduction_cents
+           FROM orders o JOIN race_packages rp ON o.package_id = rp.id
+           WHERE o.id = ?`,
+          [id]
+        );
+        const d = (orderDetailRows as any[])?.[0];
+        if (d) {
+          const { user_id: uid, race_count: rc, tag, free_deduction_cents: fdc } = d;
+          const NEW = () => uuidv4();
+
+          // a) 更新参赛次数
+          if (rc > 0) {
+            await pool.execute(
+              `UPDATE users SET race_count = COALESCE(race_count, 0) + ?, updated_at = NOW() WHERE id = ?`,
+              [rc, uid]
+            );
+            console.log(`[Player] confirm-payment side: +${rc} races for user ${uid}`);
+          }
+
+          // b) 赠送抵扣金
+          if (fdc > 0) {
+            await pool.execute(
+              `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
+               VALUES (?, ?, ?, 'order_purchase', 'available', ?, ?, DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
+              [NEW(), uid, fdc, id, d.package_id]
+            );
+          }
+
+          // c) 购包赠送参赛抵扣卡
+          if (tag === 'professional') {
+            for (let i = 0; i < 3; i++) {
+              await pool.execute(
+                `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
+                 VALUES (?, ?, 2000, 'order_purchase_pro', 'available', ?, ?, DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
+                [NEW(), uid, id, d.package_id]
+              );
+            }
+          } else if (tag === 'standard') {
+            await pool.execute(
+              `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
+               VALUES (?, ?, 1500, 'order_purchase', 'available', ?, ?, DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
+              [NEW(), uid, id, d.package_id]
+            );
+          } else if (tag === 'basic') {
+            await pool.execute(
+              `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
+               VALUES (?, ?, 500, 'order_purchase', 'available', ?, ?, DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
+              [NEW(), uid, id, d.package_id]
+            );
+          }
+        }
+      } catch (sideErr: any) {
+        console.error('[Player] confirm-payment side-effects error:', sideErr.message?.substring(0, 200));
+        // side effects 失败不影响返回（微信回调会补上）
+      }
+    }
+
+    console.log(`[Player] confirm-payment order=${id} user=${userId} changes=${changes}`);
+    res.json({ code: 0, data: { status: 'paid', updated: changes > 0 } });
   } catch (e: any) {
     console.error('[Player] confirm-payment error:', e?.message || e);
     res.json({ code: 500, message: '确认失败', data: null });
