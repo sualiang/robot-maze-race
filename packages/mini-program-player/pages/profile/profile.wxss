@@ -115,6 +115,10 @@
   line-height: 1.4;
 }
 
+.medal-card-simple {
+  padding: 40rpx 32rpx;
+}
+
 .medal-upgrade-btn {
   width: 140rpx;
   height: 56rpx;

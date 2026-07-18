@@ -10,28 +10,15 @@
     </view>
   </view>
 
-  <!-- 模块2: 赛季段位卡片 -->
-  <view wx:if="{{!seasonClosed}}" class="medal-card">
+  <!-- 模块2: 赛季段位卡片（仅展示等级图标+等级名称） -->
+  <view wx:if="{{!seasonClosed}}" class="medal-card medal-card-simple">
     <view class="medal-card-hd">
       <view class="medal-icon-area">
         <image class="medal-icon-badge trophy-icon" src="/assets/images/trophy-{{medalInfo.level}}.svg" mode="aspectFit" />
       </view>
       <view class="medal-title-area">
         <text class="medal-level-name">{{medalInfo.levelName}}</text>
-        <text class="medal-rank-text">商圈排名 第{{medalInfo.rank}}名</text>
       </view>
-      <view class="medal-upgrade-area">
-        <view class="medal-upgrade-btn" bindtap="onUpgrade">去升级</view>
-      </view>
-    </view>
-    <view class="medal-progress-wrap">
-      <view class="medal-progress-bg">
-        <view class="medal-progress-fill" style="width: {{medalInfo.expPercent}}%"></view>
-      </view>
-    </view>
-    <view class="medal-info-row">
-      <text class="medal-exp-text">{{medalInfo.currentExp}} / {{medalInfo.nextLevelExp}} 成长值</text>
-      <text class="medal-upgrade-desc">{{medalInfo.upgradeDesc}}</text>
     </view>
   </view>
 
@@ -43,15 +30,15 @@
 
   <!-- 模块3: 福利资产卡片 -->
   <view class="assets-card">
-    <view class="assets-col" bindtap="onDeductTap">
-      <text class="assets-number assets-number-red">¥{{assets.deductible}}</text>
-      <text class="assets-label">参赛抵扣卡</text>
-      <text class="assets-subtext">买参赛包直接抵扣</text>
+    <view class="assets-col" bindtap="onGoPointsShop">
+      <text class="assets-number assets-number-red">{{userInfo.points || 0}}</text>
+      <text class="assets-label">积分兑换</text>
+      <text class="assets-subtext">礼品多多 快来兑换</text>
     </view>
     <view class="assets-divider"></view>
     <view class="assets-col" bindtap="onCouponTap">
       <text class="assets-number assets-number-gold">¥{{assets.couponTotal}}</text>
-      <text class="assets-label">消费券</text>
+      <text class="assets-label">商圈消费券</text>
       <text class="assets-subtext">满减/兑换通用</text>
     </view>
   </view>

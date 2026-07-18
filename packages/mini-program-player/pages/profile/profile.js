@@ -34,7 +34,6 @@ Page({
     menuList: [
       { key: 'order', icon: '📋', label: '我的订单', url: '/pages/orders/orders', rightText: '' },
       { key: 'coupon', icon: '🎫', label: '我的卡券', url: '/pages/coupon/coupon', rightText: '' },
-      { key: 'exchange', icon: '🎁', label: '积分兑换', url: '/pages/points-shop/points-shop', rightText: '' },
     ]
   },
 
@@ -86,7 +85,6 @@ Page({
             couponCount: 0,
             couponTotal: d.couponTotalYuan || 0
           },
-          'menuList[2].rightText': '当前' + balance + '积分',
           'userInfo.points': balance
         });
       }
@@ -126,8 +124,8 @@ Page({
     wx.switchTab({ url: '/pages/index/index' });
   },
 
-  onDeductTap: function () {
-    wx.navigateTo({ url: '/pages/coupon/coupon?tab=0' });
+  onGoPointsShop: function () {
+    wx.navigateTo({ url: '/pages/points-shop/points-shop' });
   },
 
   onCouponTap: function () {

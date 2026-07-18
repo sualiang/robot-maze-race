@@ -9,7 +9,10 @@ Page({
     showConfirm: false,
     targetItem: null,
     exchanging: false,
-    toastMsg: ''
+    toastMsg: '',
+    showRecords: false,
+    records: [],
+    recordMonthFilter: ''
   },
 
   onLoad: function () {
@@ -78,6 +81,35 @@ Page({
 
   onCloseConfirm: function () {
     this.setData({ showConfirm: false, targetItem: null });
+  },
+
+  onShowRecords: function () {
+    this.setData({ showRecords: true });
+    this.fetchRecords();
+  },
+
+  onCloseRecords: function () {
+    this.setData({ showRecords: false });
+  },
+
+  onFilterMonth: function (e) {
+    this.setData({ recordMonthFilter: e.detail.value });
+    this.fetchRecords();
+  },
+
+  fetchRecords: function () {
+    var that = this;
+    var params = {};
+    if (that.data.recordMonthFilter) {
+      params.month = that.data.recordMonthFilter;
+    }
+    request.silentGet('/points-shop/records', params).then(function (res) {
+      if (res) {
+        that.setData({ records: res.records || res.data || [] });
+      }
+    }).catch(function () {
+      that.setData({ records: [] });
+    });
   },
 
   showToast: function (msg) {

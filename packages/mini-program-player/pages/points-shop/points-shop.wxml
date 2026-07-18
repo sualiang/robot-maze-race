@@ -1,9 +1,14 @@
 <view class="page">
-  <!-- 顶部用户积分 -->
+  <!-- 顶部用户积分 + 兑换记录入口 -->
   <view class="user-points-bar">
-    <text class="points-label">我的积分</text>
-    <text class="points-value">{{userPoints}}</text>
-    <text class="points-unit">分</text>
+    <view class="points-left">
+      <text class="points-label">我的积分</text>
+      <text class="points-value">{{userPoints}}</text>
+      <text class="points-unit">分</text>
+    </view>
+    <view class="points-right" bindtap="onShowRecords">
+      <text class="records-btn-text">兑换记录 ›</text>
+    </view>
   </view>
 
   <!-- 参赛抵扣卡分区 -->
@@ -86,6 +91,31 @@
       <button class="modal-btn modal-btn-cancel" bindtap="onCloseConfirm">取消</button>
       <button class="modal-btn modal-btn-confirm" bindtap="onConfirmExchange" loading="{{exchanging}}" disabled="{{exchanging}}">确认兑换</button>
     </view>
+  </view>
+
+  <!-- 兑换记录弹窗 -->
+  <view class="modal-mask {{showRecords ? 'modal-show' : ''}}" bindtap="onCloseRecords"></view>
+  <view class="records-modal {{showRecords ? 'modal-show' : ''}}">
+    <view class="records-modal-hd">
+      <text class="records-modal-title">兑换记录</text>
+      <picker mode="date" fields="month" value="{{recordMonthFilter}}" bindchange="onFilterMonth">
+        <view class="records-filter-btn">{{recordMonthFilter || '按月份筛选'}} ▼</view>
+      </picker>
+    </view>
+    <scroll-view scroll-y class="records-list" wx:if="{{records.length > 0}}">
+      <view wx:for="{{records}}" wx:key="id" class="records-item">
+        <image wx:if="{{item.image}}" class="records-item-img" src="{{item.image}}" mode="aspectFill" />
+        <view class="records-item-info">
+          <text class="records-item-name">{{item.name}}</text>
+          <text class="records-item-time">{{item.createdAt}}</text>
+        </view>
+        <text class="records-item-points">-{{item.points}}分</text>
+      </view>
+    </scroll-view>
+    <view wx:else class="records-empty">
+      <text>暂无兑换记录</text>
+    </view>
+    <view class="records-close-btn" bindtap="onCloseRecords">关闭</view>
   </view>
 
   <!-- toast -->

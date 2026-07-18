@@ -1,8 +1,8 @@
 <!-- pages/edit-profile/edit-profile.wxml — 完善个人信息（深色主题） -->
 <view class="page">
 
-  <!-- 头像 — 顶部居中大圆 -->
-  <button class="avatar-area" bindtap="onChooseAvatarTap">
+  <!-- 头像 — 顶部居中大圆（使用原生 chooseAvatar 获取临时路径后上传） -->
+  <button class="avatar-area" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
     <image class="avatar-circle" src="{{avatar || '/assets/images/default-avatar.png'}}" mode="aspectFill" />
     <text class="avatar-hint">点击更换头像</text>
   </button>
@@ -29,11 +29,11 @@
       </view>
     </picker>
 
-    <!-- 手机号 — 可输入 -->
-    <view class="form-cell">
+    <!-- 手机号 — 不可修改（注册时锁定） -->
+    <view class="form-cell form-cell_disabled">
       <text class="form-cell__hd">手机号</text>
       <view class="form-cell__bd form-cell__bd_right">
-        <input class="form-input" type="number" maxlength="11" value="{{phone}}" placeholder="请输入手机号" placeholder-style="color:#475569" bindinput="onPhoneInput" />
+        <text class="form-cell__value form-cell__value--dim">{{phone || '未填写'}}</text>
       </view>
     </view>
 

@@ -5,7 +5,6 @@ var storage = require('../../utils/storage');
 Page({
   data: {
     avatar: '',
-    avatarBase64: '',
     nickname: '',
     gender: '',
     genderOptions: ['男', '女', '不显示'],
@@ -27,23 +26,30 @@ Page({
     });
   },
 
-  // ===== 选择头像（wx.chooseImage） =====
-  onChooseAvatarTap: function () {
+  // ===== 选择头像（button open-type=chooseAvatar + uploadFile） =====
+  onChooseAvatar: function (e) {
     var that = this;
-    wx.chooseImage({
-      count: 1,
-      sizeType: ['compressed'],
-      sourceType: ['album', 'camera'],
+    var tempPath = e.detail.avatarUrl;
+    that.setData({ avatar: tempPath });
+    
+    // 上传头像到服务器
+    var token = wx.getStorageSync('player_token');
+    wx.uploadFile({
+      url: (request.getBaseUrl ? request.getBaseUrl() : 'https://dog.amberrobot.com.cn/api/v1') + '/auth/upload-avatar',
+      filePath: tempPath,
+      name: 'file',
+      header: { 'Authorization': 'Bearer ' + token },
       success: function (res) {
-        var tempPath = res.tempFilePaths[0];
-        that.setData({ avatar: tempPath });
-        wx.getFileSystemManager().readFile({
-          filePath: tempPath,
-          encoding: 'base64',
-          success: function (fsRes) {
-            that.setData({ avatarBase64: 'data:image/jpeg;base64,' + fsRes.data });
-          }
-        });
+        var data = JSON.parse(res.data);
+        if (data.code === 0 && data.url) {
+          var fullUrl = 'https://dog.amberrobot.com.cn' + data.url;
+          that.setData({ avatar: fullUrl });
+          // 更新全局状态
+          var app = getApp();
+          var user = app.globalData.userInfo || {};
+          user.avatar_url = fullUrl;
+          app.globalData.userInfo = user;
+        }
       }
     });
   },
@@ -51,11 +57,6 @@ Page({
   // ===== 昵称输入 =====
   onNicknameInput: function (e) {
     this.setData({ nickname: e.detail.value });
-  },
-
-  // ===== 手机号输入 =====
-  onPhoneInput: function (e) {
-    this.setData({ phone: e.detail.value });
   },
 
   // ===== 性别选择 =====
@@ -71,7 +72,6 @@ Page({
     var data = {};
 
     if (this.data.nickname) data.nickname = this.data.nickname;
-    if (this.data.phone) data.phone = this.data.phone;
     data.gender = this.data.gender || '';
 
     wx.showLoading({ title: '保存中...', mask: true });
@@ -97,18 +97,10 @@ Page({
       });
     }
 
-    // 有新头像 base64 → 先上传
-    if (this.data.avatarBase64) {
-      request.post('/auth/upload-avatar', { image: this.data.avatarBase64 }).then(function (res) {
-        if (res && res.url) {
-          data.avatarUrl = 'https://dog.amberrobot.com.cn' + res.url;
-        }
-        doSave();
-      }).catch(function () {
-        doSave();
-      });
-    } else {
-      doSave();
+    // 头像已在 chooseAvatar 时即时上传，这里只需写入 avatarUrl
+    if (that.data.avatar && that.data.avatar.indexOf('http') === 0) {
+      data.avatar_url = that.data.avatar;
     }
+    doSave();
   }
 });

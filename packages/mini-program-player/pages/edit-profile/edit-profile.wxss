@@ -104,6 +104,14 @@ button.avatar-area::after {
   color: #64748b;
 }
 
+.form-cell_disabled {
+  opacity: 0.55;
+}
+
+.form-cell__value--dim {
+  color: #64748b;
+}
+
 .form-cell__arrow {
   flex-shrink: 0;
   color: #475569;
