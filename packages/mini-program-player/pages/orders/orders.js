@@ -7,8 +7,6 @@ Page({
     loaded: false,
     selectedMonth: '',
     monthLabel: '筛选月份',
-    showPicker: false,
-    pickerValue: [0],
     monthOptions: []
   },
 
@@ -23,12 +21,12 @@ Page({
 
   buildMonthOptions: function () {
     var now = new Date();
-    var options = [{ label: '全部', value: '' }];
+    var options = [{ label: '显示全部', value: '' }];
     for (var i = 11; i >= 0; i--) {
       var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       var y = d.getFullYear();
       var m = ('0' + (d.getMonth() + 1)).slice(-2);
-      options.push({ label: y + '-' + m, value: y + '-' + m });
+      options.push({ label: y + '年' + (d.getMonth() + 1) + '月', value: y + '-' + m });
     }
     this.setData({ monthOptions: options });
   },
@@ -42,14 +40,7 @@ Page({
     }
 
     request.silentGet(url).then(function (data) {
-      var list = [];
-      if (Array.isArray(data)) {
-        list = data;
-      } else if (data && data.list) {
-        list = data;
-      } else if (data && data.data && data.data.list) {
-        list = data.data.list;
-      }
+      var list = (data && data.data && data.data.list) ? data.data.list : [];
 
       var mapped = list.map(function (o) {
         return {
@@ -74,46 +65,24 @@ Page({
     });
   },
 
-  onTogglePicker: function () {
-    var show = !this.data.showPicker;
-    if (show) {
-      var idx = 0;
-      var sel = this.data.selectedMonth;
-      if (sel) {
-        for (var i = 0; i < this.data.monthOptions.length; i++) {
-          if (this.data.monthOptions[i].value === sel) {
-            idx = i;
-            break;
-          }
+  onSelectMonth: function () {
+    var that = this;
+    var options = this.data.monthOptions;
+    var labels = options.map(function (o) { return o.label; });
+
+    wx.showActionSheet({
+      itemList: labels,
+      success: function (res) {
+        var idx = res.tapIndex;
+        var opt = options[idx];
+        if (opt) {
+          that.setData({
+            selectedMonth: opt.value,
+            monthLabel: opt.value || '筛选月份'
+          });
+          that.fetchOrders();
         }
       }
-      this.setData({ showPicker: true, pickerValue: [idx] });
-    } else {
-      this.setData({ showPicker: false });
-    }
-  },
-
-  onPickerChange: function (e) {
-    this.setData({ pickerValue: e.detail.value });
-  },
-
-  onConfirmMonth: function () {
-    var idx = this.data.pickerValue[0];
-    var option = this.data.monthOptions[idx];
-    this.setData({
-      selectedMonth: option.value,
-      monthLabel: option.value || '筛选月份',
-      showPicker: false
     });
-    this.fetchOrders();
-  },
-
-  onClearFilter: function () {
-    this.setData({
-      selectedMonth: '',
-      monthLabel: '筛选月份',
-      showPicker: false
-    });
-    this.fetchOrders();
   }
 });

@@ -2,23 +2,9 @@
 <view class="page">
   <view class="header">
     <text class="header-title">我的订单</text>
-    <view class="header-filter" bindtap="onTogglePicker">
+    <view class="header-filter" bindtap="onSelectMonth">
       <text class="filter-label">{{monthLabel}}</text>
       <text class="filter-arrow">▼</text>
-    </view>
-  </view>
-
-  <view wx:if="{{showPicker}}" class="picker-mask" bindtap="onTogglePicker">
-    <view class="picker-panel" catchtap="">
-      <picker-view class="month-picker" value="{{pickerValue}}" bindchange="onPickerChange" indicator-style="height: 44px;">
-        <picker-view-column>
-          <view wx:for="{{monthOptions}}" wx:key="*this" class="picker-item">{{item.label}}</view>
-        </picker-view-column>
-      </picker-view>
-      <view class="picker-actions">
-        <button class="picker-btn picker-btn-clear" bindtap="onClearFilter">显示全部</button>
-        <button class="picker-btn picker-btn-confirm" bindtap="onConfirmMonth">确定</button>
-      </view>
     </view>
   </view>
 
