@@ -82,52 +82,62 @@ router.get('/', authMiddleware, checkPermission('dashboard:read'), async (req: R
 // GET /api/v1/admin/dashboard/stats
 // 全平台统计总览 — dashboard:read
 // ============================================================
+// GET /api/v1/admin/dashboard/stats
+// 全平台 GMV — dashboard:read
+// payments 表聚合，跨库但快
+// ============================================================
 router.get('/stats', authMiddleware, checkPermission('dashboard:read'), async (req: Request, res: Response) => {
   try {
-    // 全平台营收
     const revenueResult = await queryAllOpDashOne<{ total: string }>(req, 
       `SELECT COALESCE(SUM(amount_cents), 0) as total FROM payments WHERE status = 'paid'`
     );
     const totalRevenue = parseInt(revenueResult?.total || '0', 10);
 
-    // 全平台订单数
+    return res.json({
+      code: 0,
+      message: 'ok',
+      data: { total_revenue: totalRevenue },
+    });
+  } catch (error: any) {
+    console.error('[AdminDashboard] stats error:', error.message);
+    return res.status(500).json({ code: 500, message: '获取统计总览失败', data: null });
+  }
+});
+
+// ============================================================
+// GET /api/v1/admin/dashboard/stats-cross
+// 跨库聚合指标（慢查询，按需加载）
+// 返回: total_orders, platform_profit, pending_withdraw
+// ============================================================
+router.get('/stats-cross', authMiddleware, checkPermission('dashboard:read'), async (req: Request, res: Response) => {
+  try {
     const orderResult = await queryAllOpDashOne<{ total: string }>(req, 
       `SELECT COUNT(*) as total FROM orders`
     );
     const totalOrders = parseInt(orderResult?.total || '0', 10);
 
-    // 平台利润（所有结算的 commission 之和）
     const profitResult = await queryAllOpDashOne<{ total: string }>(req, 
       `SELECT COALESCE(SUM(commission_cents), 0) as total FROM settlements WHERE status = 'settled'`
     );
     const platformProfit = parseInt(profitResult?.total || '0', 10);
 
-    // 待审核提现总额
     const pendingResult = await queryAllOpDashOne<{ total: string }>(req, 
       `SELECT COALESCE(SUM(amount_cents), 0) as total FROM settlements WHERE status = 'pending'`
     );
     const pendingWithdraw = parseInt(pendingResult?.total || '0', 10);
 
-    // 已提现总额
-    const withdrawnResult = await queryAllOpDashOne<{ total: string }>(req, 
-      `SELECT COALESCE(SUM(amount_cents), 0) as total FROM settlements WHERE status = 'settled'`
-    );
-    const totalWithdrawn = parseInt(withdrawnResult?.total || '0', 10);
-
     return res.json({
       code: 0,
       message: 'ok',
       data: {
-        total_revenue: totalRevenue,
         total_orders: totalOrders,
         platform_profit: platformProfit,
         pending_withdraw: pendingWithdraw,
-        total_withdrawn: totalWithdrawn,
       },
     });
   } catch (error: any) {
-    console.error('[AdminDashboard] stats error:', error.message);
-    return res.status(500).json({ code: 500, message: '获取统计总览失败', data: null });
+    console.error('[AdminDashboard] stats-cross error:', error.message);
+    return res.status(500).json({ code: 500, message: '获取跨库统计失败', data: null });
   }
 });
 
