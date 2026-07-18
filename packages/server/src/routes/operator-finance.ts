@@ -22,7 +22,7 @@ function operatorOnly(req: Request, res: Response, next: Function): void {
  */
 router.get('/', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
-    const operatorId = req.user!.userId;
+    const operatorId = req.user!.operatorId;
     const operator = await queryOne<{
       id: string; name: string; company_name: string | null;
       profit_share_rate: number; total_revenue: number;
@@ -83,7 +83,7 @@ router.get('/', authMiddleware, operatorOnly, async (req: Request, res: Response
  */
 router.get('/summary', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
-    const operatorId = req.user!.userId;
+    const operatorId = req.user!.operatorId;
 
     const operator = await queryOne<{
       id: string; name: string; company_name: string | null;
@@ -148,7 +148,7 @@ router.get('/summary', authMiddleware, operatorOnly, async (req: Request, res: R
  */
 router.get('/revenue-details', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
-    const operatorId = req.user!.userId;
+    const operatorId = req.user!.operatorId;
     const startDate = (req.query.startDate as string) || '';
     const endDate = (req.query.endDate as string) || '';
     const sortOrder = (req.query.sortOrder as string) === 'asc' ? 'ASC' : 'DESC';
@@ -222,7 +222,7 @@ router.get('/revenue-details', authMiddleware, operatorOnly, async (req: Request
  */
 router.get('/export', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
-    const operatorId = req.user!.userId;
+    const operatorId = req.user!.operatorId;
     const rows = await queryOp<any>(req,
       `SELECT o.created_at, o.order_no, o.amount_cents, o.discount_cents,
               o.points_deduction_cents, o.status, o.paid_at
