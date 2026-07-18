@@ -734,11 +734,13 @@ router.get('/points-deduction-info', authMiddleware, async (req: Request, res: R
     const pointsBalance = parseInt(pointsRow?.balance || '0', 10);
 
     // 积分抵扣配置
-    const rateRow = await queryOpOne<any>(req,
+    const configRows = await queryOp<any>(req,
       `SELECT \`key\`, \`value\` FROM marketing_config WHERE \`key\` IN ('points_deduction_rate', 'points_max_deduction_cents')`
     );
     const configMap: Record<string, string> = {};
-    if (rateRow) configMap[rateRow.key] = rateRow.value;
+    if (Array.isArray(configRows)) {
+      for (const row of configRows) configMap[row.key] = row.value;
+    }
     // Fallback defaults
     const deductionRate = parseInt(configMap['points_deduction_rate'] || '100', 10); // 100 points = 1 yuan
     const maxDeductionCents = parseInt(configMap['points_max_deduction_cents'] || '2000', 10); // max 20 yuan
