@@ -128,7 +128,6 @@
   <view class="season-card" bindtap="onGoLeaderboard">
     <view class="season-card-left">
       <text class="season-card-title">立即参赛 参与排名</text>
-      <text class="season-card-subtitle">距决赛还有{{seasonEndDays || 0}}天 · 前20名赢机器狗大奖</text>
     </view>
     <view class="season-card-right">
       <text class="season-card-rank">我在当前赛场排名 第{{userRank || 0}}名</text>
