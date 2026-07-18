@@ -265,9 +265,11 @@ router.get('/history-withdraws', authMiddleware, checkPermission('finance:histor
 router.post('/withdraws/:id/approve', authMiddleware, checkPermission('finance:withdraw'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const opId = (req.user as any)?.operatorId || null;
 
-    const existing = await queryAllOperatorsOne<{ id: string; status: string }>(req,
-      'SELECT id, status FROM settlements WHERE id = ?',
+    // 查找 settlement 记录（同时拿到 amount_cents 和 operator_id）
+    const existing = await queryAllOperatorsOne<{ id: string; status: string; amount_cents: number; operator_id: string }>(req,
+      'SELECT id, status, amount_cents, operator_id FROM settlements WHERE id = ?',
       [id]
     );
 
@@ -278,12 +280,35 @@ router.post('/withdraws/:id/approve', authMiddleware, checkPermission('finance:w
       return res.status(400).json({ code: 400, message: '只能审核待处理状态的提现', data: null });
     }
 
-    await executeAllOperators(req,
-      'UPDATE settlements SET status = ?, settled_at = NOW() WHERE id = ?',
-      ['approved', id]
-    );
+    // 计算平台佣金: profit_share_rate 是运营商占比(如80=80%), 平台拿 (100-rate)%
+    let commissionCents = 0;
+    try {
+      const op = await queryOne<{ profit_share_rate: number }>(
+        'SELECT profit_share_rate FROM operators WHERE id = ?', [existing.operator_id]
+      );
+      if (op?.profit_share_rate) {
+        const rate = Number(op.profit_share_rate);
+        commissionCents = Math.round(existing.amount_cents * (100 - rate) / 100);
+      }
+    } catch (e: any) {
+      console.warn('[AdminFinance] profit_share_rate lookup failed:', e.message);
+    }
 
-    return res.json({ code: 0, message: '提现已批准', data: null });
+    // 更新 settlement（跨库/单库）
+    if (opId) {
+      await executeOp(req,
+        'UPDATE settlements SET status = ?, commission_cents = ?, settled_at = NOW() WHERE id = ?',
+        ['approved', commissionCents, id]
+      );
+    } else {
+      // 超管：遍历所有库找到并更新
+      await executeAllOperators(req,
+        'UPDATE settlements SET status = ?, commission_cents = ?, settled_at = NOW() WHERE id = ?',
+        ['approved', commissionCents, id]
+      );
+    }
+
+    return res.json({ code: 0, message: '提现已批准', data: { commission_cents: commissionCents } });
   } catch (error: any) {
     console.error('[AdminFinance] approve error:', error.message);
     return res.status(500).json({ code: 500, message: '批准提现失败', data: null });
