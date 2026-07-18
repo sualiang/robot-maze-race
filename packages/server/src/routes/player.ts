@@ -966,9 +966,6 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
     }
 
     // 成长值发放机制重构：购包不直接发经验/积分，签到才发
-    const growthValue = (pkg as any).growth_value || 0;
-    const pointValue = (pkg as any).point_value || 0;
-    const remainingTimes = pkg.race_count || 0;
     // remaining_times = race_count（包的参赛次数）, remaining_growth = growth_value
     // 每签到一次发放成长值：growth_value / race_count
     const growthValue = (pkg as any).growth_value || 0;
