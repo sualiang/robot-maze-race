@@ -544,51 +544,71 @@ router.get('/match/queue', authMiddleware, async (req: Request, res: Response) =
     }
     const vid = (req as any).venueId || venueId;
 
-    // queue: status in (waiting, called, skipped)
+    // 分两段查询：race_queues 在运营商库，users 在 common 库，不能直接 JOIN
     const queueRows = await queryOp<RacerRow>(req,
-      `SELECT rq.*, u.nickname, u.avatar_url
-       FROM race_queues rq
-       LEFT JOIN users u ON rq.user_id = u.id
+      `SELECT rq.* FROM race_queues rq
        WHERE rq.venue_id = $1 AND rq.status IN ('waiting','called','skipped')
        ORDER BY rq.queue_number ASC`,
       [vid]
     );
 
-    // currentRacer: status in (racing, paused, malfunction)
     const currentRow = await queryOpOne<RacerRow>(req,
-      `SELECT rq.*, u.nickname, u.avatar_url
-       FROM race_queues rq
-       LEFT JOIN users u ON rq.user_id = u.id
+      `SELECT rq.* FROM race_queues rq
        WHERE rq.venue_id = $1 AND rq.status IN ('racing','paused','malfunction')
        ORDER BY rq.created_at DESC LIMIT 1`,
       [vid]
     );
 
-    const queue = queueRows.map(r => ({
-      id: r.id,
-      nickname: r.nickname || '选手',
-      name: r.nickname || '选手',
-      robotName: '',
-      attempt: 1,
-      remainingRaces: r.remaining_races,
-      avatarUrl: r.avatar_url || undefined,
-      queueNumber: r.queue_number,
-      race_type: r.race_type || undefined,
-    }));
+    // 收集所有 user_id 去 common 库查 users 信息
+    const allUserIds = [
+      ...queueRows.map(r => r.user_id),
+      ...(currentRow ? [currentRow.user_id] : []),
+    ].filter(Boolean);
+    const userMap = new Map<string, { nickname: string; avatar_url: string }>();
+    if (allUserIds.length > 0) {
+      try {
+        const placeholders = allUserIds.map(() => '?').join(',');
+        const userRows = await query<any[]>(
+          `SELECT id, nickname, avatar_url FROM users WHERE id IN (${placeholders})`,
+          allUserIds
+        );
+        for (const u of (userRows || [])) {
+          userMap.set(u.id, { nickname: u.nickname, avatar_url: u.avatar_url });
+        }
+      } catch (e: any) {
+        console.warn('[Match] query users from common DB failed:', e.message);
+      }
+    }
+
+    const queue = queueRows.map(r => {
+      const u = userMap.get(r.user_id);
+      return {
+        id: r.id,
+        nickname: u?.nickname || '选手',
+        name: u?.nickname || '选手',
+        robotName: '',
+        attempt: 1,
+        remainingRaces: r.remaining_races,
+        avatarUrl: u?.avatar_url || undefined,
+        queueNumber: r.queue_number,
+        race_type: r.race_type || undefined,
+      };
+    });
 
     let currentRacer = null;
     if (currentRow) {
+      const cu = userMap.get(currentRow.user_id);
       const elapsed = currentRow.start_time_ms
         ? (currentRow.paused_elapsed_ms || 0) + (currentRow.status === 'racing' ? Date.now() - currentRow.start_time_ms : 0)
         : (currentRow.finish_time_ms || 0);
       currentRacer = {
         id: currentRow.id,
-        nickname: currentRow.nickname || '选手',
-        name: currentRow.nickname || '选手',
+        nickname: cu?.nickname || '选手',
+        name: cu?.nickname || '选手',
         robotName: '',
         attempt: 1,
         remainingRaces: currentRow.remaining_races,
-        avatarUrl: currentRow.avatar_url || undefined,
+        avatarUrl: cu?.avatar_url || undefined,
         queueNumber: currentRow.queue_number,
         isCurrent: true,
         race_type: currentRow.race_type || undefined,
@@ -756,15 +776,22 @@ router.post('/match/end', authMiddleware, async (req: Request, res: Response) =>
       return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
     }
 
-    const row = await queryOpOne<RacerRow>(req,
-      `SELECT id, user_id, venue_id, remaining_races, nickname, avatar_url FROM race_queues
-       LEFT JOIN users u ON race_queues.user_id = u.id
-       WHERE race_queues.id = $1`,
+    let row = await queryOpOne<RacerRow>(req,
+      `SELECT id, user_id, venue_id, remaining_races FROM race_queues
+       WHERE id = $1`,
       [racerId]
     );
     if (!row) {
       return res.status(404).json({ code: 404, message: '选手未在队列中', data: null });
     }
+
+    // 从 common 库查 user 信息（users 表不在运营商隔离库）
+    let userInfo: any = {};
+    try {
+      userInfo = await queryOne<any>('SELECT nickname, avatar_url FROM users WHERE id = $1', [row.user_id]) || {};
+    } catch { /* ignore */ }
+    row.nickname = userInfo.nickname || '';
+    row.avatar_url = userInfo.avatar_url || '';
 
     const elapsed = finishTimeMs || 0;
     const finishStatus = raceStatus === 'timeout' ? 'timeout' : 'finished';
@@ -885,11 +912,18 @@ router.post('/match/malfunction', authMiddleware, async (req: Request, res: Resp
     }
 
     const row = await queryOpOne<RacerRow>(req,
-      `SELECT id, nickname, avatar_url FROM race_queues
-       LEFT JOIN users u ON race_queues.user_id = u.id
-       WHERE race_queues.id = $1`,
+      `SELECT id, user_id FROM race_queues
+       WHERE id = $1`,
       [racerId]
     );
+    // 从 common 库查 user 信息
+    let malfunctionUserInfo: any = {};
+    if (row) {
+      try {
+        malfunctionUserInfo = await queryOne<any>('SELECT nickname, avatar_url FROM users WHERE id = $1', [row.user_id]) || {};
+      } catch { /* ignore */ }
+    }
+    if (row) { row.nickname = malfunctionUserInfo.nickname || ''; row.avatar_url = malfunctionUserInfo.avatar_url || ''; }
 
     await executeOp(req,
       `UPDATE race_queues SET status = 'malfunction', start_time_ms = NULL,
@@ -926,15 +960,20 @@ router.post('/match/forfeit', authMiddleware, async (req: Request, res: Response
       return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
     }
 
-    const row = await queryOpOne<RacerRow>(req,
-      `SELECT id, venue_id, remaining_races, nickname, avatar_url FROM race_queues
-       LEFT JOIN users u ON race_queues.user_id = u.id
-       WHERE race_queues.id = $1`,
+    let row = await queryOpOne<RacerRow>(req,
+      `SELECT id, user_id, venue_id, remaining_races FROM race_queues
+       WHERE id = $1`,
       [racerId]
     );
     if (!row) {
       return res.status(404).json({ code: 404, message: '选手未在队列中', data: null });
     }
+    // 从 common 库查 user 信息
+    try {
+      const ui = await queryOne<any>('SELECT nickname, avatar_url FROM users WHERE id = $1', [row.user_id]) || {};
+      row.nickname = ui.nickname || '';
+      row.avatar_url = ui.avatar_url || '';
+    } catch { /* ignore */ }
 
     const newRemaining = Math.max(0, row.remaining_races - 1);
 
@@ -987,15 +1026,19 @@ router.post('/match/invalidate', authMiddleware, async (req: Request, res: Respo
       return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
     }
 
-    const row = await queryOpOne<RacerRow>(req,
-      `SELECT id, finish_time_ms, finish_status, nickname FROM race_queues
-       LEFT JOIN users u ON race_queues.user_id = u.id
-       WHERE race_queues.id = $1`,
+    let row = await queryOpOne<RacerRow>(req,
+      `SELECT id, user_id, finish_time_ms, finish_status FROM race_queues
+       WHERE id = $1`,
       [racerId]
     );
     if (!row) {
       return res.status(404).json({ code: 404, message: '选手未在队列中', data: null });
     }
+    // 从 common 库查 user info
+    try {
+      const ui = await queryOne<any>('SELECT nickname FROM users WHERE id = $1', [row.user_id]) || {};
+      row.nickname = ui.nickname || '';
+    } catch { /* ignore */ }
 
     await executeOp(req,
       `UPDATE race_queues SET finish_status = 'invalid', fault_reason = '成绩无效'
@@ -1470,41 +1513,62 @@ async function broadcastAfterUpdate(req: Request) {
   try {
     const venueId = cachedVenueId;
 
-    // query queue
+    // 分两段查询：race_queues 在运营商库，users 在 common 库
     const queueRows = await queryOp<RacerRow>(req,
-      `SELECT rq.*, u.nickname, u.avatar_url FROM race_queues rq
-       LEFT JOIN users u ON rq.user_id = u.id
+      `SELECT rq.* FROM race_queues rq
        WHERE rq.venue_id = $1 AND rq.status IN ('waiting','called','skipped')
        ORDER BY rq.queue_number ASC`,
       [venueId]
     );
 
-    // current racer
     const currentRow = await queryOpOne<RacerRow>(req,
-      `SELECT rq.*, u.nickname, u.avatar_url FROM race_queues rq
-       LEFT JOIN users u ON rq.user_id = u.id
+      `SELECT rq.* FROM race_queues rq
        WHERE rq.venue_id = $1 AND rq.status IN ('racing','paused')
        ORDER BY rq.created_at DESC LIMIT 1`,
       [venueId]
     );
 
-    // last finished result
     const lastFinished = await queryOpOne<RacerRow>(req,
-      `SELECT rq.*, u.nickname, u.avatar_url FROM race_queues rq
-       LEFT JOIN users u ON rq.user_id = u.id
+      `SELECT rq.* FROM race_queues rq
        WHERE rq.venue_id = $1 AND rq.status = 'finished' AND rq.finish_status != 'invalid'
        ORDER BY rq.updated_at DESC LIMIT 1`,
       [venueId]
     );
 
-    // leaderboard: 所有 finished 选手按成绩排序
     const leaderboardRows = await queryOp<RacerRow>(req,
-      `SELECT rq.*, u.nickname, u.avatar_url FROM race_queues rq
-       LEFT JOIN users u ON rq.user_id = u.id
+      `SELECT rq.* FROM race_queues rq
        WHERE rq.venue_id = $1 AND rq.status = 'finished' AND rq.finish_status != 'invalid'
        ORDER BY rq.finish_time_ms ASC LIMIT 10`,
       [venueId]
     );
+
+    // 收集所有 user_id，批量从 common 库查 users
+    const allUserIds = [
+      ...queueRows.map(r => r.user_id),
+      ...(currentRow ? [currentRow.user_id] : []),
+      ...(lastFinished ? [lastFinished.user_id] : []),
+      ...leaderboardRows.map(r => r.user_id),
+    ].filter(Boolean);
+    const broadcastUserMap = new Map<string, { nickname: string; avatar_url: string }>();
+    if (allUserIds.length > 0) {
+      try {
+        const placeholders = allUserIds.map(() => '?').join(',');
+        const userRows = await query<any[]>(
+          `SELECT id, nickname, avatar_url FROM users WHERE id IN (${placeholders})`,
+          allUserIds
+        );
+        for (const u of (userRows || [])) {
+          broadcastUserMap.set(u.id, { nickname: u.nickname, avatar_url: u.avatar_url });
+        }
+      } catch (e: any) {
+        console.warn('[Broadcast] query users from common DB failed:', e.message);
+      }
+    }
+    // 将 user info 合并回 rows
+    for (const r of queueRows) { const u = broadcastUserMap.get(r.user_id); if (u) { r.nickname = u.nickname; r.avatar_url = u.avatar_url; } }
+    if (currentRow) { const u = broadcastUserMap.get(currentRow.user_id); if (u) { currentRow.nickname = u.nickname; currentRow.avatar_url = u.avatar_url; } }
+    if (lastFinished) { const u = broadcastUserMap.get(lastFinished.user_id); if (u) { lastFinished.nickname = u.nickname; lastFinished.avatar_url = u.avatar_url; } }
+    for (const r of leaderboardRows) { const u = broadcastUserMap.get(r.user_id); if (u) { r.nickname = u.nickname; r.avatar_url = u.avatar_url; } }
 
     const currentRacer = currentRow ? {
       nickname: currentRow.nickname || '选手',

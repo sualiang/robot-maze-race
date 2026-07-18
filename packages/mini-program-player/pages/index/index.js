@@ -404,12 +404,16 @@ Page({
           signType: pp.signType || 'MD5',
           paySign: String(pp.paySign || ''),
           success: function () {
-            // 支付成功后手动确认订单状态
+            // 支付成功后手动确认订单状态（await DB 写入完成再刷新数据）
+            var onConfirmDone = function () {
+              wx.showToast({ title: '购买成功', icon: 'success' });
+              setTimeout(function () { that.loadAllData(); }, 500);
+            };
             if (orderId) {
-              request.silentPost('/player/order/' + orderId + '/confirm-payment');
+              request.silentPost('/player/order/' + orderId + '/confirm-payment').then(onConfirmDone).catch(onConfirmDone);
+            } else {
+              onConfirmDone();
             }
-            wx.showToast({ title: '购买成功', icon: 'success' });
-            that.loadAllData();
           },
           fail: function (err) {
             if (err.errMsg && err.errMsg.indexOf('cancel') >= 0) {
