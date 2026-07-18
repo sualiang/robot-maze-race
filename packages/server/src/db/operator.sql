@@ -128,12 +128,15 @@ CREATE INDEX idx_orders_status ON orders(status);
 CREATE TABLE IF NOT EXISTS payments (
   id VARCHAR(36) PRIMARY KEY,
   order_id VARCHAR(36) NOT NULL,
+  operator_id VARCHAR(36),
+  user_id VARCHAR(36),
   transaction_id VARCHAR(128),
   amount_cents INT NOT NULL,
   channel VARCHAR(20) NOT NULL,
   status VARCHAR(20) NOT NULL DEFAULT 'pending',
   raw_data TEXT,
   paid_at DATETIME,
+  pay_time DATETIME,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
