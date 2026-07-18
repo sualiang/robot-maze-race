@@ -589,7 +589,7 @@ router.get('/operator-orders/:operatorId', authMiddleware, checkPermission('dash
       packageName: r.package_name || '参赛包',
       amountCents: r.amount_cents || 0,
       pointsDeductionCents: r.points_deduction_cents || 0,
-      paidAt: r.paid_at,
+      paidAt: typeof r.paid_at === 'string' ? r.paid_at.split('T')[0] : r.paid_at,
       status: r.status,
     }));
 
