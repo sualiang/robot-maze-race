@@ -467,6 +467,13 @@ router.get('/top-operators', authMiddleware, checkPermission('dashboard:list'), 
     const merged = allOps
       .map((op: any) => {
         const rev = revMap.get(op.id) || { total_revenue: 0, total_platform_profit: 0, order_count: 0 };
+        const revenue = parseInt(rev.total_revenue, 10);
+        // 平台利润: 优先取 settlements.commission_cents, 为0时用 profit_share_rate 计算
+        const commissionFromDB = parseInt(rev.total_platform_profit, 10);
+        const profitShareRate = parseFloat(op.profit_share_rate) || 0;
+        const platformProfit = commissionFromDB > 0
+          ? commissionFromDB
+          : Math.round(revenue * (1 - profitShareRate));
         return {
           id: op.id,
           name: op.name,
@@ -474,13 +481,13 @@ router.get('/top-operators', authMiddleware, checkPermission('dashboard:list'), 
           email: op.email,
           company_name: op.company_name,
           status: op.status,
-          profit_share_rate: op.profit_share_rate,
+          profit_share_rate: profitShareRate,
           venue_count: op.venue_count,
           province: op.province,
           city: op.city,
           district: op.district,
-          total_revenue: parseInt(rev.total_revenue, 10),
-          total_platform_profit: parseInt(rev.total_platform_profit, 10),
+          total_revenue: revenue,
+          total_platform_profit: platformProfit,
           order_count: parseInt(rev.order_count, 10),
         };
       })
