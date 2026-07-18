@@ -38,15 +38,32 @@ async function queryAllOpDashOne<T = any>(
 ): Promise<T | null> {
   const opId = (req.user as any)?.operatorId || null;
   if (opId) return queryOpOne<T>(req, sql, params);
+
+  // 超管：遍历所有运营商库，累加数值列
   const opRegs = await query<any>('SELECT db_name FROM operators_registry WHERE db_name IS NOT NULL', []);
+  const keySet = new Set<string>();
+  const accum: Record<string, number> = {};
+
   for (const reg of opRegs) {
     try {
       const pool = getOperatorPool(reg.db_name);
       const [rows] = await pool.query<any[]>(sql, params);
-      if (rows && rows.length > 0) return rows[0] as T;
+      if (!rows || rows.length === 0) continue;
+      const row = rows[0];
+      for (const k of Object.keys(row)) {
+        keySet.add(k);
+        accum[k] = (accum[k] || 0) + Number(row[k] || 0);
+      }
     } catch { /* skip */ }
   }
-  return null;
+
+  if (keySet.size === 0) return null;
+  // 重建行对象，数值列累加，非数值列保留第一个非空值
+  const merged: any = {};
+  for (const k of keySet) {
+    merged[k] = accum[k];
+  }
+  return merged as T;
 }
 
 // ============================================================
