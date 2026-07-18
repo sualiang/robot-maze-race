@@ -19,50 +19,10 @@
   <!-- ============================================================ -->
   <view class="hero-banner-image">
     <image class="hero-banner-img" src="/assets/images/home-banner.png" mode="widthFix" />
-    <view class="hero-btn-wrap">
-      <view class="hero-btn {{remainCount <= 0 ? 'hero-btn-disabled' : ''}}" bindtap="onScan" style="background-color: #FF3B5C; opacity: 1;">
-        <text class="hero-btn-text">扫码参赛</text>
-      </view>
-    </view>
-
   </view>
 
   <!-- ============================================================ -->
-  <!-- 模块3: 参赛状态&福利总览卡 -->
-  <!-- ============================================================ -->
-  <view class="status-card">
-    <view class="status-card-body">
-      <!-- 左侧: 剩余参赛次数 -->
-      <view class="status-left">
-        <text class="status-label">剩余参赛次数</text>
-        <view class="status-number-wrap">
-          <text class="status-number-red">{{remainCount}}</text>
-          <text class="status-unit">次</text>
-        </view>
-      </view>
-
-      <!-- 分割线 -->
-      <view class="status-divider"></view>
-
-      <!-- 右侧: 我的福利 -->
-      <view class="status-right" bindtap="onGoCouponFromBenefits">
-        <text class="status-label">我的福利</text>
-        <view class="status-number-wrap">
-          <text class="status-number-gold">¥{{couponValue}}</text>
-          <text class="status-arrow">›</text>
-        </view>
-        <text class="status-subtext">含餐饮/游乐/兑换券</text>
-      </view>
-    </view>
-
-    <!-- 底部提示条 -->
-    <view class="status-tip">
-      <text class="status-tip-text">购买参赛包，立得等额商场券+参赛资格</text>
-    </view>
-  </view>
-
-  <!-- ============================================================ -->
-  <!-- 模块4: 今日专属福利条 - 跑马灯滚动 -->
+  <!-- 模块3: 今日专属福利条 - 跑马灯滚动 -->
   <!-- ============================================================ -->
   <view wx:if="{{promoText}}" class="promo-bar" bindtap="onScrollToPackages">
     <view class="promo-marquee">
@@ -127,9 +87,9 @@
       </view>
     </scroll-view>
 
-    <!-- 无参赛包时的占位 -->
+    <!-- 未登录或无参赛包时的占位 -->
     <view wx:if="{{packagesLoaded && packages.length === 0}}" class="packages-empty">
-      <text class="packages-empty-text">暂无参赛包，敬请期待</text>
+      <text class="packages-empty-text">{{isLoggedIn ? '暂无参赛包，敬请期待' : '参赛包仅在登录后可见'}}</text>
     </view>
   </view>
 
@@ -138,11 +98,11 @@
   <!-- ============================================================ -->
   <view class="season-card" bindtap="onGoLeaderboard">
     <view class="season-card-left">
-      <text class="season-card-title">本赛季商圈挑战赛</text>
+      <text class="season-card-title">立即参赛 参与排名</text>
       <text class="season-card-subtitle">距决赛还有{{seasonEndDays || 0}}天 · 前20名赢机器狗大奖</text>
     </view>
     <view class="season-card-right">
-      <text class="season-card-rank">我的排名 第{{userRank || 0}}名</text>
+      <text class="season-card-rank">我在当前赛场排名 第{{userRank || 0}}名</text>
       <text class="season-card-arrow">›</text>
     </view>
   </view>

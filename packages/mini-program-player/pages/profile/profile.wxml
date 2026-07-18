@@ -56,19 +56,7 @@
     </view>
   </view>
 
-  <!-- 模块4: 赛季数据轻览 -->
-  <view class="stats-bar">
-    <view class="stats-item">
-      <text class="stats-value">{{seasonStats.totalRaces}}场</text>
-      <text class="stats-label">完赛场次</text>
-    </view>
-    <view class="stats-item">
-      <text class="stats-value">{{seasonStats.bestTime}}</text>
-      <text class="stats-label">最佳成绩</text>
-    </view>
-  </view>
-
-  <!-- 模块5: 功能入口列表 -->
+  <!-- 模块4: 功能入口列表 -->
   <view class="menu-section">
     <view
       wx:for="{{menuList}}"

@@ -93,7 +93,7 @@
       <!-- ============================================================ -->
       <view wx:if="{{remainCount <= 0}}" class="race-cta-wrap">
         <view class="race-cta-btn race-cta-buy" bindtap="onBuyPackage">
-          <text class="race-cta-text">购买参赛包</text>
+          <text class="race-cta-text">参赛次数不足，请购买参赛包</text>
         </view>
         <text class="race-cta-hint race-cta-hint-empty">当前无可用参赛次数</text>
       </view>
@@ -142,11 +142,5 @@
 
   </block>
 
-  <!-- 底部固定条 -->
-  <view class="race-footer-bar" bindtap="onBuyPackage">
-    <text class="footer-bar-text">
-      积分不足？<text class="footer-bar-highlight">购买参赛包</text> 提升段位
-    </text>
-  </view>
 
 </view>

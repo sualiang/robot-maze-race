@@ -15,14 +15,16 @@
       <text class="lb-header-title">排行榜</text>
     </view>
 
-    <!-- 我的排名卡片 -->
+    <!-- 我的排名卡片：近期最佳成绩 + 今日全区排名 -->
     <view class="my-rank-card">
       <view class="my-rank-top">
-        <text class="my-rank-badge">第 {{myRanking.rank}} 名</text>
-        <text class="my-rank-region">{{myRanking.region}}</text>
+        <text class="my-rank-badge">近期最佳成绩</text>
+        <text class="my-rank-region">{{myRanking.bestScore}}</text>
       </view>
-      <text class="my-rank-score">{{myRanking.bestScore}}</text>
-      <text class="my-rank-score-label">最佳成绩</text>
+      <view class="my-rank-top" style="margin-top: 12rpx;">
+        <text class="my-rank-badge">今日全区排名</text>
+        <text class="my-rank-region">第 {{myRanking.rank}} 名</text>
+      </view>
 
       <view class="my-rank-info-row">
         <view class="my-rank-info-item">
@@ -86,7 +88,7 @@
           <view class="path-steps">
             <view class="path-step">
               <view class="path-step-num">1</view>
-              <text class="path-step-text">达到入围门槛分数线</text>
+              <text class="path-step-text">达到门槛分数线</text>
             </view>
             <view class="path-arrow">→</view>
             <view class="path-step">

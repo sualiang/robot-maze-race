@@ -7,6 +7,7 @@ Page({
   data: {
     // 通用状态
     loaded: false,
+    isLoggedIn: false,
     // 模块1: 导航栏
     venueName: '',  // 上次扫码赛场名, 从微信缓存取
     couponCount: 0,
@@ -32,6 +33,8 @@ Page({
   },
 
   onShow: function () {
+    var app = getApp();
+    this.setData({ isLoggedIn: !!app.globalData.isLoggedIn });
     this.loadAllData();
   },
 
@@ -44,6 +47,8 @@ Page({
   /* ======== 数据加载 ======== */
   loadAllData: function () {
     var that = this;
+    var app = getApp();
+    that.setData({ isLoggedIn: !!app.globalData.isLoggedIn });
 
     // 获取赛场上下文（顶部场地名）
     that.fetchVenueContext();
