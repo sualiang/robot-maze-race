@@ -62,11 +62,12 @@
   </view>
 
   <!-- ============================================================ -->
-  <!-- 模块4: 今日专属福利条 -->
+  <!-- 模块4: 今日专属福利条 - 跑马灯滚动 -->
   <!-- ============================================================ -->
   <view wx:if="{{promoText}}" class="promo-bar" bindtap="onScrollToPackages">
     <view class="promo-marquee">
-      <text class="promo-text">{{promoText}}</text>
+      <text class="promo-text">{{promoText}}　　{{promoText}}</text>
+      <text class="promo-text promo-text-copy">{{promoText}}　　{{promoText}}</text>
     </view>
   </view>
 

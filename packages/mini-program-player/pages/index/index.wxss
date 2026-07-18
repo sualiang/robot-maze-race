@@ -234,7 +234,7 @@
 }
 
 /* ============================================================ */
-/* 模块4: 今日专属福利条 */
+/* 模块4: 今日专属福利条 - 跑马灯滚动 */
 /* ============================================================ */
 .promo-bar {
   width: 686rpx;
@@ -243,7 +243,6 @@
   border-radius: 12rpx;
   display: flex;
   align-items: center;
-  justify-content: center;
   margin-bottom: 24rpx;
   overflow: hidden;
 }
@@ -253,18 +252,21 @@
 }
 
 .promo-marquee {
-  width: 100%;
-  overflow: hidden;
-  white-space: nowrap;
+  display: flex;
+  flex-shrink: 0;
+  animation: promo-scroll 12s linear infinite;
 }
 
 .promo-text {
   font-size: 28rpx;
   font-weight: 500;
   color: #FFFFFF;
-  display: inline-block;
-  animation: promo-scroll 12s linear infinite;
-  padding-left: 100%;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.promo-text-copy {
+  /* 第二份用于无缝衔接 */
 }
 
 @keyframes promo-scroll {
@@ -272,7 +274,7 @@
     transform: translateX(0);
   }
   100% {
-    transform: translateX(-200%);
+    transform: translateX(-50%);
   }
 }
 
