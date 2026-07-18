@@ -965,8 +965,8 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
 
   try {
     // 查询参赛包（含新字段）
-    const pkg = await queryOpOne<{ id: string; name: string; price_cents: number; race_count: number; growth_value: number; point_value: number; free_deduction_cents: number }>(req, 
-      `SELECT id, name, price_cents, race_count, growth_value, point_value, free_deduction_cents FROM race_packages WHERE id = $1 AND status = 'active'`,
+    const pkg = await queryOpOne<{ id: string; name: string; price_cents: number; race_count: number; growth_value: number; point_value: number; free_deduction_cents: number; operator_id: string }>(req, 
+      `SELECT id, name, price_cents, race_count, growth_value, point_value, free_deduction_cents, operator_id FROM race_packages WHERE id = $1 AND status = 'active'`,
       [packageId]
     );
 
@@ -1033,7 +1033,7 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', NOW(), $10, '')`,
       [orderId, orderNo, userId, packageId, pkg.price_cents, 0,
        deductionCents, remainingTimes, remainingGrowth,
-       (req.user as any)?.operatorId || '']
+       (pkg as any).operator_id || '']
     );
 
     // 构造支付参数（调微信支付真实 API）
