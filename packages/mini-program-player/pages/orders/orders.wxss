@@ -6,8 +6,9 @@
   box-sizing: border-box;
 }
 
+/* 标题 */
 .header {
-  padding: 20rpx 0;
+  padding: 20rpx 0 16rpx;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -18,23 +19,36 @@
   color: #fff;
 }
 
-.header-filter {
-  display: flex;
+/* 月份滑动标签栏 */
+.month-tabs {
+  width: 100%;
+  white-space: nowrap;
+  margin-bottom: 24rpx;
+}
+.month-tabs-inner {
+  display: inline-flex;
+  gap: 14rpx;
+  padding: 4rpx 0 8rpx;
+}
+.month-tab {
+  display: inline-flex;
   align-items: center;
-  gap: 6rpx;
-  padding: 8rpx 20rpx;
-  background: rgba(255,255,255,0.08);
-  border-radius: 32rpx;
-}
-.filter-label {
-  font-size: 24rpx;
-  color: #aaa;
-}
-.filter-arrow {
-  font-size: 18rpx;
+  justify-content: center;
+  padding: 12rpx 28rpx;
+  font-size: 26rpx;
   color: #888;
+  background: rgba(255,255,255,0.06);
+  border-radius: 32rpx;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+.month-tab-active {
+  color: #fff;
+  background: #e94560;
+  font-weight: 600;
 }
 
+/* 订单列表 */
 .order-list {
   display: flex;
   flex-direction: column;
@@ -105,6 +119,7 @@
   font-weight: 600;
 }
 
+/* 空态 */
 .empty {
   display: flex;
   flex-direction: column;
@@ -122,6 +137,7 @@
   color: #555;
 }
 
+/* 加载中 */
 .loading {
   display: flex;
   justify-content: center;

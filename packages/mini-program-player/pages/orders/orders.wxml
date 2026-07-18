@@ -2,22 +2,26 @@
 <view class="page">
   <view class="header">
     <text class="header-title">我的订单</text>
-    <picker mode="date" fields="month" value="{{pickerValue}}" bindchange="onMonthChange">
-      <view class="header-filter">
-        <text class="filter-label">{{monthLabel}}</text>
-        <text class="filter-arrow">▼</text>
-      </view>
-    </picker>
   </view>
+
+  <scroll-view class="month-tabs" scroll-x="true" enhanced show-scrollbar="{{false}}">
+    <view class="month-tabs-inner">
+      <view
+        wx:for="{{monthOptions}}"
+        wx:key="value"
+        class="month-tab {{selectedMonth === item.value ? 'month-tab-active' : ''}}"
+        data-month="{{item.value}}"
+        bindtap="onSelectMonth"
+      >{{item.label}}</view>
+    </view>
+  </scroll-view>
 
   <view class="order-list">
     <block wx:for="{{orders}}" wx:key="id">
       <view class="order-card">
         <view class="order-top">
           <text class="order-package">{{item.package_name}}</text>
-          <text class="order-status {{item.statusClass}}">
-            {{item.statusText}}
-          </text>
+          <text class="order-status {{item.statusClass}}">{{item.statusText}}</text>
         </view>
         <view class="order-info">
           <text class="order-label">订单号</text>

@@ -1,15 +1,12 @@
 // pages/orders/orders.js - 我的订单
-console.log('==== ORDERS PAGE LOADED ====');
 var request = require('../../utils/request');
 
 /**
  * 日期格式化: ISO 8601 → yyyy-MM-dd HH:mm:ss
- * 兜底处理: MySQL DATETIME / ISO 8601 两种格式
  */
 function fmtDateTime(val) {
   if (!val) return '';
   var s = String(val);
-  // 统一替换 T → 空格，取前19位 "yyyy-MM-dd HH:mm:ss"
   s = s.replace('T', ' ');
   if (s.length >= 19) s = s.substring(0, 19);
   return s;
@@ -20,13 +17,10 @@ Page({
     orders: [],
     loaded: false,
     selectedMonth: '',
-    monthLabel: '全部月份',
-    monthOptions: [],
-    pickerValue: ''
+    monthOptions: []
   },
 
   onLoad: function () {
-    this.buildMonthOptions();
     this.fetchOrders();
   },
 
@@ -34,16 +28,18 @@ Page({
     this.fetchOrders();
   },
 
-  buildMonthOptions: function () {
-    var now = new Date();
-    var options = [{ label: '显示全部', value: '' }];
-    for (var i = 11; i >= 0; i--) {
-      var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      var y = d.getFullYear();
-      var m = ('0' + (d.getMonth() + 1)).slice(-2);
-      options.push({ label: y + '年' + (d.getMonth() + 1) + '月', value: y + '-' + m });
-    }
+  buildMonthOptions: function (availableMonths) {
+    var options = [{ label: '全部', value: '' }];
+    (availableMonths || []).forEach(function (m) {
+      options.push({ label: m, value: m });
+    });
     this.setData({ monthOptions: options });
+  },
+
+  onSelectMonth: function (e) {
+    var month = e.currentTarget.dataset.month;
+    this.setData({ selectedMonth: month });
+    this.fetchOrders();
   },
 
   fetchOrders: function () {
@@ -55,7 +51,14 @@ Page({
     }
 
     request.silentGet(url).then(function (data) {
-      var list = (data && data.list) ? data.list : [];
+      var list = [];
+      if (Array.isArray(data)) {
+        list = data;
+      } else if (data && data.list) {
+        list = data.list;
+      } else if (data && data.data && data.data.list) {
+        list = data.data.list;
+      }
 
       var mapped = list.map(function (o) {
         var status = o.status || 'pending';
@@ -91,28 +94,13 @@ Page({
         orders: mapped,
         loaded: true
       });
+
+      // 根据 availableMonths 构建月份选项
+      if (data && data.availableMonths && that.data.monthOptions.length === 0) {
+        that.buildMonthOptions(data.availableMonths);
+      }
     }).catch(function () {
       that.setData({ loaded: true });
     });
-  },
-
-  onMonthChange: function (e) {
-    var val = e.detail.value; // "YYYY-MM"
-    if (!val) {
-      this.setData({
-        selectedMonth: '',
-        monthLabel: '全部月份',
-        pickerValue: ''
-      });
-    } else {
-      var parts = val.split('-');
-      var monthLabel = parts[0] + '年' + parseInt(parts[1], 10) + '月';
-      this.setData({
-        selectedMonth: val,
-        monthLabel: monthLabel,
-        pickerValue: val
-      });
-    }
-    this.fetchOrders();
   }
 });
