@@ -1,43 +1,38 @@
-<!-- pages/race-history/race-history.wxml -->
-<view class="rh-container">
-  <!-- 月份筛选 -->
-  <view class="rh-filter-bar">
-    <view class="rh-filter-btn" bindtap="onSelectMonth">
-      <text class="{{selectedMonth ? 'active' : ''}}">{{selectedMonth || '全部月份'}}</text>
-      <text class="rh-filter-arrow">▼</text>
+<!-- pages/race-history/race-history.wxml - 历史参赛记录（全部） -->
+<view class="page">
+  <view class="header">
+    <view class="header-back" bindtap="onBack">
+      <text class="back-icon">‹</text>
     </view>
+    <text class="header-title">我的比赛记录</text>
+    <picker mode="date" fields="month" value="{{pickerValue}}" bindchange="onMonthChange">
+      <view class="header-filter">
+        <text class="filter-label">{{monthLabel}}</text>
+        <text class="filter-arrow">▼</text>
+      </view>
+    </picker>
   </view>
 
-  <!-- 加载骨架 -->
-  <view wx:if="{{loading}}" class="rh-loading">
-    <view class="rh-skeleton-item"></view>
-    <view class="rh-skeleton-item"></view>
-    <view class="rh-skeleton-item"></view>
+  <view wx:if="{{records.length === 0 && !loading}}" class="empty">
+    <text class="empty-text">暂无参赛记录</text>
   </view>
 
-  <!-- 列表 -->
-  <view wx:else class="rh-list">
-    <view
-      wx:for="{{records}}"
-      wx:key="id"
-      class="rh-item"
-      data-item="{{item}}"
-      bindtap="onTapRecord"
-    >
-      <view class="rh-left">
-        <text class="rh-score">{{item.scoreText}}</text>
-        <text class="rh-date">{{item.dateText}}</text>
+  <view class="record-list">
+    <block wx:for="{{records}}" wx:key="id">
+      <view class="record-card">
+        <view class="record-top">
+          <text class="record-score {{item.medal || ''}}">{{item.scoreText}}</text>
+          <text wx:if="{{item.rank > 0}}" class="record-rank">第{{item.rank}}名</text>
+        </view>
+        <view class="record-meta">
+          <text class="record-date">{{item.dateText}}</text>
+          <text wx:if="{{item.bonusText}}" class="record-bonus">{{item.bonusText}}</text>
+        </view>
       </view>
-      <view class="rh-middle">
-        <text wx:if="{{item.medal}}" class="rh-medal">{{item.medal}}</text>
-        <text class="rh-rank">{{item.rankText || '-'}}</text>
-      </view>
-    </view>
+    </block>
+  </view>
 
-    <!-- 空状态 -->
-    <view wx:if="{{isEmpty}}" class="rh-empty">
-      <text class="rh-empty-icon">🏁</text>
-      <text class="rh-empty-text">暂无参赛记录</text>
-    </view>
+  <view wx:if="{{loading}}" class="loading">
+    <text>加载中...</text>
   </view>
 </view>

@@ -1,7 +1,4 @@
 {
-  "navigationBarTitleText": "我的比赛",
-  "navigationBarBackgroundColor": "#0f0f23",
-  "navigationBarTextStyle": "white",
-  "backgroundColor": "#0f0f23",
-  "enablePullDownRefresh": true
+  "usingComponents": {},
+  "navigationStyle": "custom"
 }

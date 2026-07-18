@@ -1,45 +1,19 @@
-// pages/race-history/race-history.js
-var app = getApp();
+// pages/race-history/race-history.js - 我的比赛记录（全部）
 var request = require('../../utils/request');
+
+function pad(n) { return n < 10 ? '0' + n : '' + n; }
 
 Page({
   data: {
     records: [],
-    monthOptions: [],
-    selectedMonth: '',
     loading: true,
-    isEmpty: false
+    selectedMonth: '',
+    monthLabel: '全部月份',
+    pickerValue: ''
   },
 
   onLoad: function () {
-    this.buildMonthOptions();
     this.fetchRecords();
-  },
-
-  onShow: function () {
-    this.setData({ isLoggedIn: !!app.globalData.isLoggedIn });
-    if (app.globalData.isLoggedIn) {
-      this.fetchRecords();
-    }
-  },
-
-  onPullDownRefresh: function () {
-    var that = this;
-    this.fetchRecords().then(function () {
-      wx.stopPullDownRefresh();
-    });
-  },
-
-  buildMonthOptions: function () {
-    var now = new Date();
-    var options = [{ label: '全部', value: '' }];
-    for (var i = 11; i >= 0; i--) {
-      var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      var y = d.getFullYear();
-      var m = ('0' + (d.getMonth() + 1)).slice(-2);
-      options.push({ label: y + '-' + m, value: y + '-' + m });
-    }
-    this.setData({ monthOptions: options });
   },
 
   fetchRecords: function () {
@@ -52,98 +26,77 @@ Page({
       url += '?month=' + encodeURIComponent(month);
     }
 
-    return request.get(url).then(function (data) {
-      var list = (data && data.data) ? data.data : (Array.isArray(data) ? data : []);
+    request.get(url).then(function (list) {
+      var records = (list || []).map(function (item) {
+        var score = item.bestTime || item.score || item.time || 0;
+        var scoreNum = typeof score === 'number' ? score : parseFloat(score) || 0;
 
-      var mapped = list.map(function (item) {
-        var score = item.score || 0;
-        var scoreText = that.formatScore(score);
-        var rank = item.rank || 0;
-
-        var dateText = '';
-        if (item.date) {
-          var d = new Date(item.date);
-          dateText = (d.getMonth() + 1) + '月' + d.getDate() + '日 ' +
-            that.pad(d.getHours()) + ':' + that.pad(d.getMinutes());
+        var scoreText = '--';
+        if (scoreNum > 0) {
+          if (scoreNum < 60) {
+            scoreText = scoreNum.toFixed(1) + 's';
+          } else {
+            var m = Math.floor(scoreNum / 60);
+            var s = (scoreNum % 60).toFixed(1);
+            scoreText = m + 'm' + s + 's';
+          }
         }
 
+        var rank = item.rank || 0;
         var medal = '';
         if (rank === 1) medal = '🥇';
         else if (rank === 2) medal = '🥈';
         else if (rank === 3) medal = '🥉';
 
+        var dateText = '';
+        if (item.createdAt || item.date) {
+          var d = new Date(item.createdAt || item.date);
+          dateText = (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+        }
+
+        var growth = item.growth || 0;
+        var points = item.points || 0;
+        var bonusText = '';
+        if (growth > 0) bonusText += '成长+' + growth;
+        if (points > 0) {
+          if (bonusText) bonusText += ' ';
+          bonusText += '积分+' + points;
+        }
+
         return {
           id: item.id || '',
-          score: score,
+          score: scoreNum,
           scoreText: scoreText,
           rank: rank,
-          rankText: rank > 0 ? '第' + rank + '名' : '',
           medal: medal,
           dateText: dateText,
-          venueName: item.venueName || '',
-          status: item.status || ''
+          bonusText: bonusText
         };
       });
 
-      that.setData({
-        records: mapped,
-        isEmpty: mapped.length === 0,
-        loading: false
+      that.setData({ records: records, loading: false });
+    }).catch(function (err) {
+      console.error('获取历史记录失败', err);
+      that.setData({ records: [], loading: false });
+    });
+  },
+
+  onMonthChange: function (e) {
+    var val = e.detail.value; // "YYYY-MM"
+    if (!val) {
+      this.setData({ selectedMonth: '', monthLabel: '全部月份', pickerValue: '' });
+    } else {
+      var parts = val.split('-');
+      this.setData({
+        selectedMonth: val,
+        monthLabel: parts[0] + '年' + parseInt(parts[1], 10) + '月',
+        pickerValue: val
       });
-    }).catch(function () {
-      that.setData({ records: [], isEmpty: true, loading: false });
-    });
+    }
+    this.fetchRecords();
   },
 
-  onSelectMonth: function () {
-    var that = this;
-    var range = this.data.monthOptions.map(function (o) { return o.label; });
-    var selectedMonth = this.data.selectedMonth;
-    var currentIdx = 0;
-    for (var i = 0; i < this.data.monthOptions.length; i++) {
-      if (this.data.monthOptions[i].value === selectedMonth) {
-        currentIdx = i;
-        break;
-      }
-    }
-
-    wx.showActionSheet({
-      itemList: range,
-      success: function (res) {
-        var idx = res.tapIndex;
-        var opt = that.data.monthOptions[idx];
-        if (opt) {
-          that.setData({ selectedMonth: opt.value });
-          that.fetchRecords();
-        }
-      }
-    });
-  },
-
-  formatScore: function (ms) {
-    if (!ms || ms <= 0) return '0.0s';
-    if (ms >= 1000000) {
-      var m = Math.floor(ms / 60000);
-      var s = ((ms % 60000) / 1000).toFixed(1);
-      return m + '分' + s + '秒';
-    }
-    if (ms >= 60000) {
-      var min = Math.floor(ms / 60000);
-      var sec = ((ms % 60000) / 1000).toFixed(1);
-      return min + ':' + (sec < 10 ? '0' : '') + sec;
-    }
-    return (ms / 1000).toFixed(1) + 's';
-  },
-
-  pad: function (n) {
-    return n < 10 ? '0' + n : '' + n;
-  },
-
-  onTapRecord: function (e) {
-    // 可扩展: 点击记录详情
-    var item = e.currentTarget.dataset.item;
-    if (item && item.scoreText) {
-      wx.showToast({ title: item.scoreText, icon: 'none' });
-    }
+  onBack: function () {
+    wx.navigateBack();
   }
 });
