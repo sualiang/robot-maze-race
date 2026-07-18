@@ -24,6 +24,11 @@ Page({
 
     // 历史参赛列表
     historyRecords: [],
+    truncatedHistory: [],
+    fullHistoryRecords: [],
+    showHistoryModal: false,
+    historyMonthFilter: '',
+    historyMonths: [],
     historyLoading: false,
 
     // 实时排队
@@ -256,18 +261,57 @@ Page({
           rankText: rank > 0 ? '第' + rank + '名' : '',
           medal: medal,
           dateText: dateText,
-          bonusText: bonusText
+          bonusText: bonusText,
+          monthKey: (d ? d.getFullYear() + '-' + ((d.getMonth() + 1 < 10 ? '0' : '') + (d.getMonth() + 1)) : ''),
+          monthLabel: (d ? d.getFullYear() + '年' + (d.getMonth() + 1) + '月' : '')
         };
       });
 
+      // 收集月份列表
+      var monthSet = {};
+      for (var j = 0; j < mapped.length; j++) {
+        if (mapped[j].monthKey) monthSet[mapped[j].monthKey] = mapped[j].monthLabel;
+      }
+      var months = Object.keys(monthSet).sort().reverse().map(function (k) {
+        return { key: k, label: monthSet[k] };
+      });
+
+      // 截断：默认显示最近 6 条
+      var truncated = mapped.length > 6 ? mapped.slice(0, 6) : mapped;
+
       that.setData({
         historyRecords: mapped,
+        fullHistoryRecords: mapped,
+        truncatedHistory: truncated,
+        historyMonths: months,
         historyLoading: false
       });
     }).catch(function (err) {
       console.error('获取历史记录失败', err);
-      that.setData({ historyRecords: [], historyLoading: false });
+      that.setData({ historyRecords: [], truncatedHistory: [], historyLoading: false });
     });
+  },
+
+  // ===== 历史记录弹窗 =====
+  onViewAllHistory: function () {
+    this.setData({ showHistoryModal: true, historyMonthFilter: '' });
+    this.filterHistoryByMonth('');
+  },
+
+  onCloseHistoryModal: function () {
+    this.setData({ showHistoryModal: false });
+  },
+
+  onFilterHistoryMonth: function (e) {
+    var month = e.currentTarget.dataset.month || '';
+    this.setData({ historyMonthFilter: month });
+    this.filterHistoryByMonth(month);
+  },
+
+  filterHistoryByMonth: function (month) {
+    var all = this.data.fullHistoryRecords;
+    var filtered = month ? all.filter(function (r) { return r.monthKey === month; }) : all;
+    this.setData({ truncatedHistory: filtered });
   },
 
   // ===== 事件处理 =====
@@ -398,7 +442,9 @@ Page({
         }
       }
     });
-  }
+  },
+
+  noop: function () {}
 });
 
 function formatScore(score) {
@@ -412,3 +458,5 @@ function formatScore(score) {
 function pad(n) {
   return n < 10 ? '0' + n : '' + n;
 }
+
+module.exports = null;

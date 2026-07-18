@@ -269,3 +269,37 @@
   background: linear-gradient(135deg, #52c41a, #73d13d);
   color: #fff;
 }
+
+/* ===== 积分抵扣开关 ===== */
+.points-deduction-bar {
+  margin: 16rpx 24rpx;
+  padding: 24rpx;
+  background: #1E293B;
+  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.deduction-info {
+  flex: 1;
+  margin-right: 16rpx;
+}
+
+.deduction-label {
+  display: block;
+  font-size: 28rpx;
+  color: #E2E8F0;
+  font-weight: 600;
+  margin-bottom: 4rpx;
+}
+
+.deduction-detail {
+  font-size: 22rpx;
+  color: #94A3B8;
+}
+
+.deduction-hl {
+  color: #F59E0B;
+  font-weight: 600;
+}

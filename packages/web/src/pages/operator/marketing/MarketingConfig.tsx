@@ -134,7 +134,7 @@ export default function MarketingConfig() {
     setEditingItem(null);
     editForm.resetFields();
     editForm.setFieldsValue({
-      itemType: 'entry_deduction',
+      itemType: 'physical_gift',
       needPoints: 100,
       sortWeight: 0,
       status: 1,
@@ -298,7 +298,6 @@ export default function MarketingConfig() {
       width: 140,
       render: (t: string) => {
         const map: Record<string, string> = {
-          entry_deduction: '参赛抵扣卡',
           physical_gift: '实物礼品',
         };
         return <Tag>{map[t] || t}</Tag>;
@@ -412,7 +411,7 @@ export default function MarketingConfig() {
       children: (
         <>
           <Alert
-            message="管理积分商城可兑换的商品。目前支持：参赛抵扣卡、实物礼品。实物礼品的兑换需玩家到赛场现场领取。"
+            message="管理积分商城可兑换的商品。目前支持：实物礼品。实物礼品的兑换需玩家到赛场现场领取。"
             type="info" showIcon style={{ marginBottom: 16 }}
           />
           <div style={{ marginBottom: 16 }}>
@@ -460,12 +459,11 @@ export default function MarketingConfig() {
           </Form.Item>
           <Form.Item name="itemType" label="商品类型" rules={[{ required: true, message: '请选择类型' }]}>
             <select style={{ width: '100%', height: 32, borderRadius: 6, border: '1px solid #d9d9d9', padding: '0 11px' }}>
-              <option value="entry_deduction">参赛抵扣卡</option>
               <option value="physical_gift">实物礼品</option>
             </select>
           </Form.Item>
-          <Form.Item name="itemId" label="面额（分）/ 备注">
-            <Input placeholder="参赛抵扣卡填写金额分（500=5元），实物礼品可为空" />
+          <Form.Item name="itemId" label="备注">
+            <Input placeholder="实物礼品描述信息" />
           </Form.Item>
           <Form.Item name="description" label="描述">
             <Input maxLength={60} />

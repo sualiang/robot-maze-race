@@ -1,5 +1,4 @@
-// 我的卡券 V3.5 - 4Tab 统一页面
-// Tab 0: 参赛抵扣卡（独立接口 /player/deductions）
+// 我的卡券 V3.6 - 3Tab 统一页面（参赛抵扣卡已废弃）
 // Tab 1: 立减券（coupon_type=1）
 // Tab 2: 满减券（coupon_type=3）
 // Tab 3: 兑换券（coupon_type=4）
@@ -8,14 +7,13 @@ var request = require('../../utils/request');
 
 Page({
   data: {
-    // 4个Tab
+    // 3个Tab
     tabs: [
-      { key: 0, label: '🏆 参赛抵扣卡' },
       { key: 1, label: '🏪 立减券' },
       { key: 3, label: '🏪 满减券' },
       { key: 4, label: '🏪 兑换券' }
     ],
-    currentTab: 0,
+    currentTab: 1,
     cardList: [],
     isEmpty: false,
     loading: false,
@@ -26,8 +24,8 @@ Page({
   },
 
   onLoad: function (options) {
-    // 支持从外部传 tab 参数：0=参赛抵扣卡 1=立减券 3=满减券 4=兑换券
-    var defaultTab = 0;
+    // 支持从外部传 tab 参数：1=立减券 3=满减券 4=兑换券
+    var defaultTab = 1;
     if (options && options.tab !== undefined) {
       var parsed = parseInt(options.tab, 10);
       if (!isNaN(parsed) && [0, 1, 3, 4].indexOf(parsed) !== -1) {
@@ -56,48 +54,7 @@ Page({
 
     var type = that.data.currentTab;
 
-    // === Tab 0: 参赛抵扣卡（独立接口 /player/deductions） ===
-    if (type === 0) {
-      request.get('/player/deductions', {}).then(function (res) {
-        var list = [];
-        if (Array.isArray(res)) {
-          list = res;
-        } else if (res && Array.isArray(res.list)) {
-          list = res.list;
-        } else if (res && res.data && Array.isArray(res.data.list)) {
-          list = res.data.list;
-        }
-
-        var mapped = list.map(function (d) {
-          var status = d.status === 'available' ? 1 : 0;
-          return {
-            id: d.id,
-            isDeduction: true,
-            source: d.racePackageId ? '参赛包赠送' : '新用户专享',
-            amountYuan: (d.amountCents || 0) / 100,
-            amountText: ((d.amountCents || 0) / 100).toFixed(2) + '元',
-            status: status,
-            statusText: status === 1 ? '可用' : (d.status === 'used' ? '已使用' : '已过期'),
-            createdAt: (d.createdAt || '').substring(0, 10),
-            expiresAt: (d.expiresAt || '').substring(0, 10),
-            _sortWeight: status === 1 ? 0 : 1
-          };
-        });
-
-        mapped.sort(function (a, b) { return a._sortWeight - b._sortWeight; });
-
-        that.setData({
-          cardList: mapped,
-          isEmpty: mapped.length === 0,
-          loading: false
-        });
-      }).catch(function () {
-        that.setData({ cardList: [], isEmpty: true, loading: false });
-      });
-      return;
-    }
-
-    // === Tab 1/2/3: 商家消费券（/player/coupons?type=X） ===
+    // 商家消费券（/player/coupons?type=X）
     request.get('/player/coupons', { type: type }).then(function (res) {
       var list = [];
       if (Array.isArray(res)) {
@@ -165,17 +122,6 @@ Page({
         loading: false
       });
     });
-  },
-
-  // ========== 参赛抵扣卡（Tab 0）点击 ==========
-  onCardTap: function (e) {
-    var item = e.currentTarget.dataset.item;
-    if (!item || !item.isDeduction) return;
-    wx.navigateTo({ url: "/pages/packages/packages" });
-  },
-
-  onUseDeduct: function () {
-    wx.navigateTo({ url: "/pages/packages/packages" });
   },
 
   // ========== 消费券「立即使用」按钮 ==========

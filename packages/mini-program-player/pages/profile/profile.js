@@ -20,7 +20,6 @@ Page({
     },
 
     assets: {
-      deductible: 0,
       couponCount: 0,
       couponTotal: 0
     },
@@ -81,7 +80,6 @@ Page({
         var balance = d.pointsBalance || 0;
         that.setData({
           assets: {
-            deductible: (d.availableDeductionCents || 0) / 100,
             couponCount: 0,
             couponTotal: d.couponTotalYuan || 0
           },

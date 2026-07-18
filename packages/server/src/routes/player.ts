@@ -547,18 +547,6 @@ router.get('/me/profile-check', authMiddleware, async (req: Request, res: Respon
       [userId]
     );
 
-    // 查询可用抵扣金余额（通过物理隔离自动按运营商过滤）
-    let availableDeductionCents = 0;
-    try {
-      const deductionRow = await queryOpOne<{ total: number }>(req, 
-        `SELECT COALESCE(SUM(amount_cents), 0) as total FROM entry_deductions WHERE user_id = $1 AND status = 'available'`,
-        [userId]
-      );
-      availableDeductionCents = deductionRow?.total || 0;
-    } catch (deductionErr) {
-      console.error('[profile-check] 查询参赛抵扣卡失败:', (deductionErr as Error)?.message);
-    }
-
     // 查询消费券总额（按 operator_id 过滤）
     let couponTotalCents = 0;
     try {
@@ -595,8 +583,6 @@ router.get('/me/profile-check', authMiddleware, async (req: Request, res: Respon
         gender: user?.gender || '',
         raceCount: user?.race_count || 0,
         remainCount,
-        availableDeductionCents,
-        availableDeductionYuan: availableDeductionCents / 100,
         couponTotalCents,
         couponTotalYuan: couponTotalCents / 100,
         pointsBalance,
@@ -604,7 +590,7 @@ router.get('/me/profile-check', authMiddleware, async (req: Request, res: Respon
     });
   } catch (e: any) {
     console.error('[profile-check] error:', e?.message || e);
-    res.json({ code: 0, data: { needPhone: true, nickname: '', phone: '', gender: '', raceCount: 0, remainCount: 0, availableDeductionCents: 0, availableDeductionYuan: 0, couponTotalCents: 0, couponTotalYuan: 0, pointsBalance: 0 } });
+    res.json({ code: 0, data: { needPhone: true, nickname: '', phone: '', gender: '', raceCount: 0, remainCount: 0, couponTotalCents: 0, couponTotalYuan: 0, pointsBalance: 0 } });
   }
 });
 
@@ -734,36 +720,45 @@ router.get('/me/race-records', authMiddleware, async (req: Request, res: Respons
 });
 
 /**
- * GET /player/deductions
- * 获取用户的参赛抵扣金列表
+ * GET /player/points-deduction-info
+ * 获取用户积分余额及抵扣配置（替代原参赛抵扣卡机制）
  */
-router.get('/deductions', authMiddleware, async (req: Request, res: Response) => {
+router.get('/points-deduction-info', authMiddleware, async (req: Request, res: Response) => {
   const userId = req.user!.userId;
-
   try {
-    const deductions = await queryOp<any>(req, 
-      `SELECT id, amount_cents, amount_cents as used_cents, source, status, order_id,
-              race_package_id, expires_at, created_at
-       FROM entry_deductions
-       WHERE user_id = $1
-       ORDER BY created_at DESC`,
+    // 用户积分余额
+    const pointsRow = await queryOpOne<{ balance: string }>(req,
+      `SELECT COALESCE(SUM(points), 0) as balance FROM points_transactions WHERE user_id = $1`,
       [userId]
     );
-    const list = (deductions || []).map((d: any) => ({
-      id: d.id,
-      amountCents: d.amount_cents || 0,
-      amountYuan: (d.amount_cents || 0) / 100,
-      usedCents: d.used_cents || 0,
-      source: d.source,
-      status: d.status,
-      orderId: d.order_id,
-      racePackageId: d.race_package_id,
-      expiresAt: d.expires_at,
-      createdAt: d.created_at,
-    }));
-    res.json({ code: 0, data: { list } });
+    const pointsBalance = parseInt(pointsRow?.balance || '0', 10);
+
+    // 积分抵扣配置
+    const rateRow = await queryOpOne<any>(req,
+      `SELECT \`key\`, \`value\` FROM marketing_config WHERE \`key\` IN ('points_deduction_rate', 'points_max_deduction_cents')`
+    );
+    const configMap: Record<string, string> = {};
+    if (rateRow) configMap[rateRow.key] = rateRow.value;
+    // Fallback defaults
+    const deductionRate = parseInt(configMap['points_deduction_rate'] || '100', 10); // 100 points = 1 yuan
+    const maxDeductionCents = parseInt(configMap['points_max_deduction_cents'] || '2000', 10); // max 20 yuan
+
+    // 计算最多可抵扣积分
+    const maxDeductiblePoints = Math.floor(maxDeductionCents * deductionRate / 100);
+    const maxDeductionYuan = maxDeductionCents / 100;
+
+    res.json({
+      code: 0,
+      data: {
+        pointsBalance,
+        deductionRate,
+        maxDeductionCents,
+        maxDeductiblePoints,
+        maxDeductionYuan,
+      }
+    });
   } catch (e: any) {
-    console.error('[Player] deductions error:', e?.message || e);
+    console.error('[Player] points-deduction-info error:', e?.message || e);
     res.json({ code: 500, message: '查询失败', data: null });
   }
 });
@@ -933,45 +928,47 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
     const orderId = uuidv4();
     const orderNo = 'ORD_' + Date.now() + '_' + userId.substring(0, 8);
     
-    // 自动使用可用参赛抵扣金
+    // 积分抵扣新机制（替代参赛抵扣卡）
     let deductionCents = 0;
-    let deductionRecordIds: string[] = [];
-    try {
-      // 查询用户所有可用抵扣金（按创建时间升序）
-      const deductions = await queryOp<{ id: any; amount_cents: number }>(req, 
-        `SELECT id, amount_cents FROM entry_deductions
-         WHERE user_id = $1 AND status = 'available'
-         ORDER BY created_at ASC`,
-        [userId]
-      );
+    const { usePointsDeduction } = req.body;
+    if (usePointsDeduction) {
+      try {
+        const rateRow = await queryOpOne<any>(req,
+          `SELECT \`key\`, \`value\` FROM marketing_config WHERE \`key\` = 'points_deduction_rate'`
+        );
+        const capRow = await queryOpOne<any>(req,
+          `SELECT \`key\`, \`value\` FROM marketing_config WHERE \`key\` = 'points_max_deduction_cents'`
+        );
+        const rate = parseInt(rateRow?.value || '100', 10);
+        const maxCents = parseInt(capRow?.value || '2000', 10);
 
-      if (deductions && deductions.length > 0) {
-        let remainingPrice = pkg.price_cents;
+        const balRow = await queryOpOne<{ balance: string }>(req,
+          `SELECT COALESCE(SUM(points), 0) as balance FROM points_transactions WHERE user_id = $1`,
+          [userId]
+        );
+        const points = parseInt(balRow?.balance || '0', 10);
+        const maxFromPoints = Math.min(Math.floor(points * 100 / rate), maxCents);
+        deductionCents = Math.min(maxFromPoints, pkg.price_cents);
 
-        for (const d of deductions) {
-          if (remainingPrice <= 0) break;
-          const useAmount = Math.min(d.amount_cents, remainingPrice);
-          deductionCents += useAmount;
-          remainingPrice -= useAmount;
-
-          // 标记已使用的抵扣金
-          await executeOp(req, 
-            `UPDATE entry_deductions
-             SET status = 'used', order_id = $1, used_at = NOW()
-             WHERE id = $2`,
-            [orderId, d.id]
+        if (deductionCents > 0) {
+          const usedPoints = Math.ceil(deductionCents * rate / 100);
+          await executeOp(req,
+            `INSERT INTO points_transactions (id, user_id, points, reason, operator_id, created_at)
+             VALUES ($1, $2, $3, 'order_deduction', $4, NOW())`,
+            ['PT_' + uuidv4().slice(0, 8), userId, -usedPoints, (req.user as any)?.operatorId || '']
           );
-          deductionRecordIds.push(String(d.id));
+          console.log(`[订单] 用户${userId}使用${usedPoints}积分抵扣${deductionCents}分`);
         }
-
-        console.log(`[订单] 用户${userId}使用抵扣金${deductionCents}分（${deductionRecordIds.length}张）`);
+      } catch (deductionErr: any) {
+        console.error('[订单] 积分抵扣失败（不阻止下单）:', deductionErr?.message || deductionErr);
+        deductionCents = 0;
       }
-    } catch (deductionErr: any) {
-      console.error('[订单] 扣减抵扣金失败（不阻止下单）:', deductionErr?.message || deductionErr);
-      // 抵扣金扣减失败不应阻止下单
     }
 
     // 成长值发放机制重构：购包不直接发经验/积分，签到才发
+    const growthValue = (pkg as any).growth_value || 0;
+    const pointValue = (pkg as any).point_value || 0;
+    const remainingTimes = pkg.race_count || 0;
     // remaining_times = race_count（包的参赛次数）, remaining_growth = growth_value
     // 每签到一次发放成长值：growth_value / race_count
     const growthValue = (pkg as any).growth_value || 0;
@@ -1212,18 +1209,17 @@ router.post('/order/:id/confirm-payment', authMiddleware, async (req: Request, r
         console.warn('[Player] confirm-payment common settlements:', cStlErr.message?.substring(0, 100));
       }
 
-      // 3d. 执行 side effects（参赛次数、抵扣金等）
+      // 3d. 执行 side effects（仅参赛次数，抵扣卡已废弃）
       try {
         const [orderDetailRows] = await pool.execute(
-          `SELECT o.user_id, o.package_id, rp.race_count, rp.tag, rp.free_deduction_cents
+          `SELECT o.user_id, o.package_id, rp.race_count
            FROM orders o JOIN race_packages rp ON o.package_id = rp.id
            WHERE o.id = ?`,
           [id]
         );
         const d = (orderDetailRows as any[])?.[0];
         if (d) {
-          const { user_id: uid, race_count: rc, tag, free_deduction_cents: fdc } = d;
-          const NEW = () => uuidv4();
+          const { user_id: uid, race_count: rc } = d;
 
           if (rc > 0) {
             await pool.execute(
@@ -1231,36 +1227,6 @@ router.post('/order/:id/confirm-payment', authMiddleware, async (req: Request, r
               [rc, uid]
             );
             console.log(`[Player] confirm-payment side: +${rc} races for user ${uid}`);
-          }
-
-          if (fdc > 0) {
-            await pool.execute(
-              `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
-               VALUES (?, ?, ?, 'order_purchase', 'available', ?, ?, DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
-              [NEW(), uid, fdc, id, d.package_id]
-            );
-          }
-
-          if (tag === 'professional') {
-            for (let i = 0; i < 3; i++) {
-              await pool.execute(
-                `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
-                 VALUES (?, ?, 2000, 'order_purchase_pro', 'available', ?, ?, DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
-                [NEW(), uid, id, d.package_id]
-              );
-            }
-          } else if (tag === 'standard') {
-            await pool.execute(
-              `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
-               VALUES (?, ?, 1500, 'order_purchase', 'available', ?, ?, DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
-              [NEW(), uid, id, d.package_id]
-            );
-          } else if (tag === 'basic') {
-            await pool.execute(
-              `INSERT INTO entry_deductions (id, user_id, amount_cents, source, status, order_id, race_package_id, expires_at, created_at)
-               VALUES (?, ?, 500, 'order_purchase', 'available', ?, ?, DATE_ADD(NOW(), INTERVAL 365 DAY), NOW())`,
-              [NEW(), uid, id, d.package_id]
-            );
           }
         }
       } catch (sideErr: any) {

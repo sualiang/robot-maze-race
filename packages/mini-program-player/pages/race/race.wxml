@@ -113,7 +113,7 @@
       </view>
 
       <view
-        wx:for="{{historyRecords}}"
+        wx:for="{{truncatedHistory}}"
         wx:key="id"
         class="history-item"
         data-scoretext="{{item.scoreText}}"
@@ -135,8 +135,58 @@
         </view>
       </view>
 
+      <!-- 查看全部按钮 -->
+      <view wx:if="{{historyRecords.length > 6}}" class="history-view-all" bindtap="onViewAllHistory">
+        <text>查看全部（{{historyRecords.length}} 条）</text>
+      </view>
+
       <view wx:if="{{historyRecords.length === 0 && !historyLoading}}" class="history-empty">
         <text class="history-empty-text">暂无参赛记录</text>
+      </view>
+    </view>
+
+    <!-- ============================================================ -->
+    <!-- 历史记录全屏弹窗 -->
+    <!-- ============================================================ -->
+    <view wx:if="{{showHistoryModal}}" class="history-modal-mask" catchtap="onCloseHistoryModal">
+      <view class="history-modal-panel" catchtap="noop">
+        <view class="history-modal-header">
+          <text class="history-modal-title">全部参赛记录</text>
+          <text class="history-modal-close" bindtap="onCloseHistoryModal">✕</text>
+        </view>
+
+        <!-- 月份筛选 -->
+        <scroll-view wx:if="{{historyMonths.length > 0}}" class="history-month-bar" scroll-x>
+          <text
+            class="history-month-tag {{historyMonthFilter === '' ? 'history-month-active' : ''}}"
+            bindtap="onFilterHistoryMonth"
+            data-month="">全部</text>
+          <text
+            wx:for="{{historyMonths}}"
+            wx:key="key"
+            class="history-month-tag {{historyMonthFilter === item.key ? 'history-month-active' : ''}}"
+            bindtap="onFilterHistoryMonth"
+            data-month="{{item.key}}">{{item.label}}</text>
+        </scroll-view>
+
+        <scroll-view class="history-modal-body" scroll-y>
+          <view wx:for="{{truncatedHistory}}" wx:key="id" class="history-item">
+            <view class="history-left">
+              <text class="history-score">{{item.scoreText}}</text>
+              <text class="history-date">{{item.dateText}}</text>
+            </view>
+            <view class="history-middle">
+              <text wx:if="{{item.medal}}" class="history-medal">{{item.medal}}</text>
+              <text class="history-rank">{{item.rankText || '-'}}</text>
+            </view>
+            <view wx:if="{{item.bonusText}}" class="history-right">
+              <text class="history-bonus">{{item.bonusText}}</text>
+            </view>
+          </view>
+          <view wx:if="{{truncatedHistory.length === 0}}" class="history-empty" style="padding:60rpx 0;">
+            <text class="history-empty-text">该月份暂无参赛记录</text>
+          </view>
+        </scroll-view>
       </view>
     </view>
 
