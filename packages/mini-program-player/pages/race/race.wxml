@@ -20,10 +20,7 @@
     <view wx:if="{{!hasContext}}" class="action-empty">
       <view class="action-empty-illustration">🤖🏁</view>
       <text class="action-empty-title">开启你的第一场竞技挑战</text>
-      <text class="action-empty-desc">扫描赛场专属小程序码入场，记录成绩冲击排名</text>
-      <view class="btn-scan" bindtap="onScanGuide">
-        <text>去扫码参赛</text>
-      </view>
+      <text class="action-empty-desc">前往附近赛场，扫描入口处小程序码即可参赛</text>
     </view>
 
     <!-- ============================================================ -->
