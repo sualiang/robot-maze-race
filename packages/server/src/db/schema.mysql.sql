@@ -455,6 +455,31 @@ CREATE TABLE IF NOT EXISTS race_attendance (
   status VARCHAR(20)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ==================== 排队队列表 ====================
+CREATE TABLE IF NOT EXISTS race_queues (
+  id VARCHAR(36) PRIMARY KEY,
+  venue_id VARCHAR(36) NOT NULL,
+  user_id VARCHAR(36) NOT NULL,
+  queue_number INT NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'waiting' COMMENT 'waiting | called | racing | paused | finished | timeout | skipped | forfeit | malfunction | invalid',
+  remaining_races INT NOT NULL DEFAULT 1,
+  avatar_url VARCHAR(512),
+  race_type VARCHAR(64) DEFAULT 'normal' COMMENT 'normal | final',
+  checkin_id VARCHAR(36),
+  referee_id VARCHAR(36),
+  start_time_ms BIGINT,
+  paused_elapsed_ms BIGINT DEFAULT 0,
+  finish_time_ms BIGINT,
+  finish_status VARCHAR(20) COMMENT 'finished | timeout | forfeit | invalid',
+  fault_reason TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX IF NOT EXISTS idx_race_queues_venue ON race_queues(venue_id);
+CREATE INDEX IF NOT EXISTS idx_race_queues_user ON race_queues(user_id);
+CREATE INDEX IF NOT EXISTS idx_race_queues_status ON race_queues(status);
+CREATE INDEX IF NOT EXISTS idx_race_queues_venue_queue ON race_queues(venue_id, queue_number);
+
 -- ==================== 票券兑换表 ====================
 CREATE TABLE IF NOT EXISTS ticket_redemptions (
   id VARCHAR(36) PRIMARY KEY,

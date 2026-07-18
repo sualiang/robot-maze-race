@@ -503,404 +503,567 @@ router.patch('/:id/status', authMiddleware, async (req: Request, res: Response<A
 // ============================================================
 
 // ============================================================
-// Match 子路由 — 裁判比赛管理（Mock 数据）
+// Match 子路由 — 裁判比赛管理（DB 持久化）
 // ============================================================
 
-interface Racer {
-  id: number;
-  name: string;
-  team: string;
-  queueNumber: number;
-  remainingRaces: number;
-  avatarUrl?: string;
+interface RacerRow {
+  id: string;
+  venue_id: string;
+  user_id: string;
+  queue_number: number;
+  status: string;
+  remaining_races: number;
+  avatar_url: string | null;
+  race_type: string | null;
+  checkin_id: string | null;
+  referee_id: string | null;
+  start_time_ms: number | null;
+  paused_elapsed_ms: number;
+  finish_time_ms: number | null;
+  finish_status: string | null;
+  fault_reason: string | null;
+  nickname?: string;
 }
-
-interface CurrentRacer extends Racer {
-  status: 'waiting' | 'racing' | 'paused' | 'malfunction' | 'finished';
-  startTime: number | null;
-  elapsed: number;
-  pausedElapsed: number;
-}
-
-let mockQueue: Racer[] = [];
-let mockCurrentRacer: CurrentRacer | null = null;
-const mockResults: { id: number; racerId: number; elapsed: number; status: string }[] = [];
-let mockRacerSeq = 1;
 
 /**
  * GET /api/v1/referees/match/queue
- * 获取排队队列 + 当前选手
+ * 获取排队队列 + 当前选手（DB 查询）
  */
-router.get('/match/queue', authMiddleware, async (_req: Request, res: Response) => {
-  return res.json({
-    code: 0,
-    message: 'ok',
-    data: {
-      queue: mockQueue,
-      currentRacer: mockCurrentRacer,
-    },
-  });
+router.get('/match/queue', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const venueId = (req as any).venueId || (req.query as any).venueId;
+    if (!venueId) {
+      const ref = await queryOpOne<{ venue_id: string }>(req,
+        'SELECT venue_id FROM referees WHERE user_id = $1 LIMIT 1',
+        [req.user!.userId]
+      );
+      if (!ref?.venue_id) {
+        return res.json({ code: 0, message: 'ok', data: { queue: [], currentRacer: null } });
+      }
+      (req as any).venueId = ref.venue_id;
+    }
+    const vid = (req as any).venueId || venueId;
+
+    // queue: status in (waiting, called, skipped)
+    const queueRows = await queryOp<RacerRow>(req,
+      `SELECT rq.*, u.nickname, u.avatar_url
+       FROM race_queues rq
+       LEFT JOIN users u ON rq.user_id = u.id
+       WHERE rq.venue_id = $1 AND rq.status IN ('waiting','called','skipped')
+       ORDER BY rq.queue_number ASC`,
+      [vid]
+    );
+
+    // currentRacer: status in (racing, paused, malfunction)
+    const currentRow = await queryOpOne<RacerRow>(req,
+      `SELECT rq.*, u.nickname, u.avatar_url
+       FROM race_queues rq
+       LEFT JOIN users u ON rq.user_id = u.id
+       WHERE rq.venue_id = $1 AND rq.status IN ('racing','paused','malfunction')
+       ORDER BY rq.created_at DESC LIMIT 1`,
+      [vid]
+    );
+
+    const queue = queueRows.map(r => ({
+      id: r.id,
+      nickname: r.nickname || '选手',
+      name: r.nickname || '选手',
+      robotName: '',
+      attempt: 1,
+      remainingRaces: r.remaining_races,
+      avatarUrl: r.avatar_url || undefined,
+      queueNumber: r.queue_number,
+      race_type: r.race_type || undefined,
+    }));
+
+    let currentRacer = null;
+    if (currentRow) {
+      const elapsed = currentRow.start_time_ms
+        ? (currentRow.paused_elapsed_ms || 0) + (currentRow.status === 'racing' ? Date.now() - currentRow.start_time_ms : 0)
+        : (currentRow.finish_time_ms || 0);
+      currentRacer = {
+        id: currentRow.id,
+        nickname: currentRow.nickname || '选手',
+        name: currentRow.nickname || '选手',
+        robotName: '',
+        attempt: 1,
+        remainingRaces: currentRow.remaining_races,
+        avatarUrl: currentRow.avatar_url || undefined,
+        queueNumber: currentRow.queue_number,
+        isCurrent: true,
+        race_type: currentRow.race_type || undefined,
+        status: currentRow.status,
+        elapsed,
+        pausedElapsed: currentRow.paused_elapsed_ms || 0,
+        startTime: currentRow.start_time_ms,
+      };
+    }
+
+    return res.json({ code: 0, message: 'ok', data: { queue, currentRacer } });
+  } catch (e: any) {
+    console.error('[Match] queue error:', e.message);
+    return res.status(500).json({ code: 500, message: '获取队列失败', data: null });
+  }
 });
 
 /**
  * POST /api/v1/referees/match/select-racer
- * 选号（从队列选下一个选手）
+ * 选号（从排队队列选下一个选手，状态 waiting→called）
  */
 router.post('/match/select-racer', authMiddleware, async (req: Request, res: Response) => {
-  const { racerId } = req.body;
-
-  let selected: Racer | undefined;
-
-  if (racerId) {
-    selected = mockQueue.find((r) => r.id === racerId);
-    if (!selected) {
-      return res.status(404).json({ code: 404, message: '选手不存在', data: null });
-    }
-  } else {
-    // 自动选第一个
-    selected = mockQueue[0];
-    if (!selected) {
-      return res.status(400).json({ code: 400, message: '队列为空', data: null });
-    }
-  }
-
-  // 从队列中移除
-  const idx = mockQueue.findIndex((r) => r.id === selected!.id);
-  mockQueue.splice(idx, 1);
-
-  mockCurrentRacer = {
-    ...selected!,
-    status: 'waiting',
-    startTime: null,
-    elapsed: 0,
-    pausedElapsed: 0,
-  };
-
   try {
-    broadcastToScreen({
-      race_status: 'waiting',
-      current_racer: { nickname: mockCurrentRacer.name, queue_number: mockCurrentRacer.queueNumber, avatar_url: mockCurrentRacer.avatarUrl },
-      elapsed_ms: 0,
-      next_racer: mockQueue.length > 0 ? { nickname: mockQueue[0].name, queue_number: mockQueue[0].queueNumber } : null,
-      queue: mockQueue.map(q => ({ queue_number: q.queueNumber, nickname: q.name, status: 'waiting' })),
-      venue_name: cachedVenueName,
-      venue_id: cachedVenueId,
-      leaderboard: getLeaderboard(),
-      timestamp: new Date().toLocaleString('zh-CN'),
-    });
-  } catch (e: any) {
-    console.error('[广播] select-racer 广播失败:', e.message);
-  }
+    const { racerId } = req.body;
 
-  return res.json({
-    code: 0,
-    message: 'ok',
-    data: {
-      currentRacer: mockCurrentRacer,
-      queue: mockQueue,
-    },
-  });
+    if (!racerId) {
+      // 自动选第一个 waiting 的选手
+      const first = await queryOpOne<RacerRow>(req,
+        `SELECT id FROM race_queues WHERE status = 'waiting' ORDER BY queue_number ASC LIMIT 1`, []
+      );
+      if (!first) {
+        return res.status(400).json({ code: 400, message: '队列为空', data: null });
+      }
+      (req.body as any).racerId = first.id;
+    }
+
+    const rid = racerId || (req.body as any).racerId;
+
+    // 如果已有当前选手在比赛，先放回队列
+    await executeOp(req,
+      `UPDATE race_queues SET status = 'waiting', start_time_ms = NULL, paused_elapsed_ms = 0
+       WHERE status IN ('called','malfunction') AND id != $1`,
+      [rid]
+    );
+
+    // 更新该选手状态为 called
+    await executeOp(req,
+      `UPDATE race_queues SET status = 'called', start_time_ms = NULL, paused_elapsed_ms = 0, finish_time_ms = NULL, referee_id = $2
+       WHERE id = $1`,
+      [rid, req.user!.userId]
+    );
+
+    await broadcastAfterUpdate(req);
+
+    return res.json({ code: 0, message: '已叫号', data: null });
+  } catch (e: any) {
+    console.error('[Match] select-racer error:', e.message);
+    return res.status(500).json({ code: 500, message: '叫号失败', data: null });
+  }
 });
 
 /**
  * POST /api/v1/referees/match/start
- * 开始比赛（计时开始）
+ * 开始比赛（called/暂停→racing，记录 start_time_ms）
  */
-router.post('/match/start', authMiddleware, async (_req: Request, res: Response) => {
-  if (!mockCurrentRacer) {
-    return res.status(400).json({ code: 400, message: '没有当前选手', data: null });
-  }
-
-  const now = Date.now();
-  mockCurrentRacer.status = 'racing';
-  mockCurrentRacer.startTime = now;
-  mockCurrentRacer.elapsed = 0;
-  mockCurrentRacer.pausedElapsed = 0;
-
+router.post('/match/start', authMiddleware, async (req: Request, res: Response) => {
   try {
-    broadcastToScreen({
-      race_status: 'racing',
-      current_racer: { nickname: mockCurrentRacer.name, queue_number: mockCurrentRacer.queueNumber, avatar_url: mockCurrentRacer.avatarUrl },
-      elapsed_ms: 0,
-      start_time: now,
-      next_racer: mockQueue.length > 0 ? { nickname: mockQueue[0].name, queue_number: mockQueue[0].queueNumber } : null,
-      queue: mockQueue.map(q => ({ queue_number: q.queueNumber, nickname: q.name, status: 'waiting' })),
-      venue_name: cachedVenueName,
-      venue_id: cachedVenueId,
-      leaderboard: getLeaderboard(),
-      timestamp: new Date().toLocaleString('zh-CN'),
-    });
-  } catch (e: any) {
-    console.error('[广播] start 广播失败:', e.message);
-  }
+    const now = Date.now();
+    const { racerId } = req.body;
 
-  return res.json({
-    code: 0,
-    message: 'ok',
-    data: {
-      currentRacer: mockCurrentRacer,
-      startTime: now,
-    },
-  });
+    if (!racerId) {
+      return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
+    }
+
+    const row = await queryOpOne<RacerRow>(req,
+      `SELECT id, status, paused_elapsed_ms FROM race_queues WHERE id = $1`,
+      [racerId]
+    );
+    if (!row) {
+      return res.status(404).json({ code: 404, message: '选手未在队列中', data: null });
+    }
+
+    // 从 paused_elapsed_ms 继续计时
+    const adjustStart = now - (row.paused_elapsed_ms || 0);
+    await executeOp(req,
+      `UPDATE race_queues SET status = 'racing', start_time_ms = $2, paused_elapsed_ms = 0 WHERE id = $1`,
+      [racerId, adjustStart]
+    );
+
+    await broadcastAfterUpdate(req);
+
+    return res.json({ code: 0, message: '比赛开始', data: { startTime: now } });
+  } catch (e: any) {
+    console.error('[Match] start error:', e.message);
+    return res.status(500).json({ code: 500, message: '开始比赛失败', data: null });
+  }
 });
 
 /**
  * POST /api/v1/referees/match/pause
- * 暂停
+ * 暂停（记录 paused_elapsed_ms）
  */
-router.post('/match/pause', authMiddleware, async (_req: Request, res: Response) => {
-  if (!mockCurrentRacer) {
-    return res.status(400).json({ code: 400, message: '没有当前选手', data: null });
-  }
+router.post('/match/pause', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { racerId, elapsed } = req.body;
+    if (!racerId) {
+      return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
+    }
 
-  if (mockCurrentRacer.status === 'racing' && mockCurrentRacer.startTime) {
-    mockCurrentRacer.pausedElapsed = Date.now() - mockCurrentRacer.startTime;
-  }
-  mockCurrentRacer.status = 'paused';
+    const pausedMs = elapsed != null ? elapsed : 0;
+    await executeOp(req,
+      `UPDATE race_queues SET status = 'paused', paused_elapsed_ms = $2 WHERE id = $1 AND status = 'racing'`,
+      [racerId, pausedMs]
+    );
 
-  return res.json({
-    code: 0,
-    message: 'ok',
-    data: {
-      currentRacer: mockCurrentRacer,
-      pausedElapsed: mockCurrentRacer.pausedElapsed,
-    },
-  });
+    return res.json({ code: 0, message: '已暂停', data: null });
+  } catch (e: any) {
+    console.error('[Match] pause error:', e.message);
+    return res.status(500).json({ code: 500, message: '暂停失败', data: null });
+  }
 });
 
 /**
  * POST /api/v1/referees/match/resume
- * 恢复
+ * 恢复（从 paused_elapsed_ms 继续）
  */
-router.post('/match/resume', authMiddleware, async (_req: Request, res: Response) => {
-  if (!mockCurrentRacer) {
-    return res.status(400).json({ code: 400, message: '没有当前选手', data: null });
+router.post('/match/resume', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { racerId } = req.body;
+    if (!racerId) {
+      return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
+    }
+
+    const row = await queryOpOne<RacerRow>(req,
+      `SELECT paused_elapsed_ms FROM race_queues WHERE id = $1 AND status = 'paused'`,
+      [racerId]
+    );
+    if (!row) {
+      return res.status(400).json({ code: 400, message: '当前不处于暂停状态', data: null });
+    }
+
+    const adjustStart = Date.now() - (row.paused_elapsed_ms || 0);
+    await executeOp(req,
+      `UPDATE race_queues SET status = 'racing', start_time_ms = $2, paused_elapsed_ms = 0 WHERE id = $1`,
+      [racerId, adjustStart]
+    );
+
+    await broadcastAfterUpdate(req);
+
+    return res.json({ code: 0, message: '比赛恢复', data: null });
+  } catch (e: any) {
+    console.error('[Match] resume error:', e.message);
+    return res.status(500).json({ code: 500, message: '恢复失败', data: null });
   }
-
-  const now = Date.now();
-  mockCurrentRacer.status = 'racing';
-  // 调整 startTime，使得 elapsed 从 pausedElapsed 继续
-  mockCurrentRacer.startTime = now - mockCurrentRacer.pausedElapsed;
-
-  return res.json({
-    code: 0,
-    message: 'ok',
-    data: {
-      currentRacer: mockCurrentRacer,
-      startTime: now,
-    },
-  });
 });
 
 /**
  * POST /api/v1/referees/match/end
- * 结束比赛（记录成绩）
+ * 结束比赛（记录成绩到 race_queues.finish_time_ms，扣减次数）
  */
 router.post('/match/end', authMiddleware, async (req: Request, res: Response) => {
-  if (!mockCurrentRacer) {
-    return res.status(400).json({ code: 400, message: '没有当前选手', data: null });
-  }
-
-  const { elapsed, finishTimeMs } = req.body;
-  console.log('[endRace] req.body:', JSON.stringify(req.body), 'pausedElapsed:', mockCurrentRacer.pausedElapsed);
-  const finalElapsed = elapsed || finishTimeMs || mockCurrentRacer.pausedElapsed || 0;
-  console.log('[endRace] finalElapsed:', finalElapsed);
-
-  const result = {
-    id: mockResults.length + 1,
-    racerId: mockCurrentRacer.id,
-    elapsed: finalElapsed,
-    status: 'finished',
-    racerName: mockCurrentRacer.name,
-    racerAvatar: mockCurrentRacer.avatarUrl || '🤖',
-  };
-
-  mockResults.push(result);
-  mockCurrentRacer.status = 'finished';
-  mockCurrentRacer.elapsed = finalElapsed;
-  if (mockCurrentRacer.remainingRaces > 0) mockCurrentRacer.remainingRaces--;
-
   try {
-    broadcastToScreen({
-      race_status: 'finished',
-      current_racer: null,
-      last_result: result,
-      elapsed_ms: finalElapsed,
-      next_racer: mockQueue.length > 0 ? { nickname: mockQueue[0].name, queue_number: mockQueue[0].queueNumber } : null,
-      queue: mockQueue.map(q => ({ queue_number: q.queueNumber, nickname: q.name, status: 'waiting' })),
-      venue_name: cachedVenueName,
-      venue_id: cachedVenueId,
-      leaderboard: getLeaderboard(),
-      timestamp: new Date().toLocaleString('zh-CN'),
+    const { racerId, finishTimeMs, status: raceStatus } = req.body;
+    if (!racerId) {
+      return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
+    }
+
+    const row = await queryOpOne<RacerRow>(req,
+      `SELECT id, user_id, venue_id, remaining_races, nickname, avatar_url FROM race_queues
+       LEFT JOIN users u ON race_queues.user_id = u.id
+       WHERE race_queues.id = $1`,
+      [racerId]
+    );
+    if (!row) {
+      return res.status(404).json({ code: 404, message: '选手未在队列中', data: null });
+    }
+
+    const elapsed = finishTimeMs || 0;
+    const finishStatus = raceStatus === 'timeout' ? 'timeout' : 'finished';
+    const newRemaining = Math.max(0, row.remaining_races - 1);
+
+    await executeOp(req,
+      `UPDATE race_queues SET status = 'finished', finish_time_ms = $2, finish_status = $3,
+       remaining_races = $4, start_time_ms = NULL, paused_elapsed_ms = 0
+       WHERE id = $1`,
+      [racerId, elapsed, finishStatus, newRemaining]
+    );
+
+    // 同步写入 race_records（成绩记录）
+    if (row.user_id && row.venue_id) {
+      await executeOp(req,
+        `INSERT INTO race_records (id, race_id, player_id, score, duration_seconds, status, started_at, finished_at, operator_id)
+         VALUES ($1, NULL, $2, $3, $4, $5, NOW() - INTERVAL $6/1000 SECOND, NOW(), $7)`,
+        [uuidv4(), row.user_id, elapsed, Math.round(elapsed / 1000), finishStatus, elapsed, row.nickname]
+      );
+    }
+
+    // 同步写入 race_results
+    await writeRaceResult(req, row.user_id, row.venue_id, row.nickname, elapsed, finishStatus);
+
+    await broadcastAfterUpdate(req);
+
+    return res.json({
+      code: 0,
+      message: '比赛结束',
+      data: { racerId, elapsed, status: finishStatus },
     });
   } catch (e: any) {
-    console.error('[广播] end 广播失败:', e.message);
+    console.error('[Match] end error:', e.message);
+    return res.status(500).json({ code: 500, message: '结束比赛失败', data: null });
   }
-
-  return res.json({
-    code: 0,
-    message: 'ok',
-    data: { result },
-  });
 });
 
 /**
  * POST /api/v1/referees/match/re-enter
- * 当前选手再玩一次（重新进入 waiting 状态）
+ * 当前选手再玩一次（重置为 waiting 状态，不清除成绩）
  */
-router.post('/match/re-enter', authMiddleware, async (_req: Request, res: Response) => {
-  if (!mockCurrentRacer) {
-    return res.status(400).json({ code: 400, message: '没有当前选手', data: null });
+router.post('/match/re-enter', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { racerId } = req.body;
+    if (!racerId) {
+      return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
+    }
+
+    await executeOp(req,
+      `UPDATE race_queues SET status = 'waiting', start_time_ms = NULL, paused_elapsed_ms = 0,
+       finish_time_ms = NULL, finish_status = NULL
+       WHERE id = $1`,
+      [racerId]
+    );
+
+    await broadcastAfterUpdate(req);
+
+    return res.json({ code: 0, message: '已重新叫号', data: null });
+  } catch (e: any) {
+    console.error('[Match] re-enter error:', e.message);
+    return res.status(500).json({ code: 500, message: '重新叫号失败', data: null });
   }
-
-  mockCurrentRacer.status = 'waiting';
-  mockCurrentRacer.startTime = null;
-  mockCurrentRacer.elapsed = 0;
-  mockCurrentRacer.pausedElapsed = 0;
-
-  broadcastToScreen({
-    race_status: 'waiting',
-    current_racer: { nickname: mockCurrentRacer.name, queue_number: mockCurrentRacer.queueNumber, avatar_url: mockCurrentRacer.avatarUrl },
-    elapsed_ms: 0,
-    next_racer: mockQueue.length > 0 ? { nickname: mockQueue[0].name, queue_number: mockQueue[0].queueNumber } : null,
-    queue: mockQueue.map(q => ({ queue_number: q.queueNumber, nickname: q.name, status: 'waiting' })),
-    venue_name: cachedVenueName,
-    venue_id: cachedVenueId,
-    leaderboard: getLeaderboard(),
-    timestamp: new Date().toLocaleString('zh-CN'),
-  });
-
-  return res.json({
-    code: 0,
-    message: 'ok',
-    data: {
-      currentRacer: mockCurrentRacer,
-      queue: mockQueue,
-    },
-  });
 });
 
 /**
  * POST /api/v1/referees/match/call-next
- * 完成当前选手，放回队列末尾
+ * 完成当前选手，放回队列末尾（仅当 remaining_races > 0 时放回）
  */
-router.post('/match/call-next', authMiddleware, async (_req: Request, res: Response) => {
-  if (!mockCurrentRacer) {
-    return res.status(400).json({ code: 400, message: '没有当前选手', data: null });
+router.post('/match/call-next', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { racerId } = req.body;
+    if (!racerId) {
+      return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
+    }
+
+    const row = await queryOpOne<RacerRow>(req,
+      `SELECT id, venue_id, remaining_races FROM race_queues WHERE id = $1`,
+      [racerId]
+    );
+    if (!row) {
+      return res.status(404).json({ code: 404, message: '选手未在队列中', data: null });
+    }
+
+    if (row.remaining_races > 0) {
+      // 获取当前最大排队号 + 1
+      const maxQ = await queryOpOne<{ max_q: number }>(req,
+        `SELECT COALESCE(MAX(queue_number), 0) as max_q FROM race_queues WHERE venue_id = $1`,
+        [row.venue_id]
+      );
+      const nextQ = (maxQ?.max_q ?? 0) + 1;
+      await executeOp(req,
+        `UPDATE race_queues SET status = 'waiting', queue_number = $2, start_time_ms = NULL,
+         paused_elapsed_ms = 0, finish_time_ms = NULL, finish_status = NULL
+         WHERE id = $1`,
+        [racerId, nextQ]
+      );
+    }
+    // remaining_races == 0 时，清除该记录（所有次数用尽）
+
+    await broadcastAfterUpdate(req);
+
+    return res.json({ code: 0, message: '已呼叫下一位', data: null });
+  } catch (e: any) {
+    console.error('[Match] call-next error:', e.message);
+    return res.status(500).json({ code: 500, message: '呼叫下一位失败', data: null });
   }
-
-  // 当前选手放回队列末尾
-  const reQueue: Racer = {
-    id: mockCurrentRacer.id,
-    name: mockCurrentRacer.name,
-    team: mockCurrentRacer.name,
-    queueNumber: mockCurrentRacer.queueNumber,
-    remainingRaces: mockCurrentRacer.remainingRaces,
-    avatarUrl: mockCurrentRacer.avatarUrl,
-  };
-  mockQueue.push(reQueue);
-  mockCurrentRacer = null;
-
-  broadcastToScreen({
-    event: 'call_next',
-    data: {
-      queue: mockQueue.map(q => ({ queue_number: q.queueNumber, nickname: q.name, status: 'waiting' })),
-      currentRacer: null,
-    },
-  });
-
-  return res.json({
-    code: 0,
-    message: 'ok',
-    data: {
-      queue: mockQueue,
-    },
-  });
 });
 
 /**
  * POST /api/v1/referees/match/malfunction
- * 故障处理
+ * 故障处理（保留次数，计时归零，重置为 waiting）
  */
-router.post('/match/malfunction', authMiddleware, async (_req: Request, res: Response) => {
-  if (!mockCurrentRacer) {
-    return res.status(400).json({ code: 400, message: '没有当前选手', data: null });
+router.post('/match/malfunction', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { racerId } = req.body;
+    if (!racerId) {
+      return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
+    }
+
+    const row = await queryOpOne<RacerRow>(req,
+      `SELECT id, nickname, avatar_url FROM race_queues
+       LEFT JOIN users u ON race_queues.user_id = u.id
+       WHERE race_queues.id = $1`,
+      [racerId]
+    );
+
+    await executeOp(req,
+      `UPDATE race_queues SET status = 'malfunction', start_time_ms = NULL,
+       paused_elapsed_ms = 0, fault_reason = '机器狗故障'
+       WHERE id = $1`,
+      [racerId]
+    );
+
+    // 广播故障事件到大屏
+    broadcastToScreen({
+      event: 'racer_malfunction',
+      data: {
+        racerName: row?.nickname || '选手',
+        race_status: 'malfunction',
+        currentRacer: null,
+      },
+    });
+
+    return res.json({ code: 0, message: '故障已登记', data: null });
+  } catch (e: any) {
+    console.error('[Match] malfunction error:', e.message);
+    return res.status(500).json({ code: 500, message: '故障处理失败', data: null });
   }
-
-  mockCurrentRacer.status = 'malfunction';
-
-  // 广播故障事件到大屏
-  broadcastToScreen({
-    event: 'racer_malfunction',
-    data: {
-      racerName: mockCurrentRacer.name,
-      race_status: 'malfunction',
-      currentRacer: null,
-      queue: mockQueue,
-    },
-  });
-
-  return res.json({
-    code: 0,
-    message: 'ok',
-    data: {
-      currentRacer: mockCurrentRacer,
-      status: 'malfunction',
-    },
-  });
 });
 
 /**
  * POST /api/v1/referees/match/forfeit
- * 弃赛
+ * 弃赛（扣减次数，放回队首）
  */
-router.post('/match/forfeit', authMiddleware, async (_req: Request, res: Response) => {
-  if (!mockCurrentRacer) {
-    return res.status(400).json({ code: 400, message: '没有当前选手', data: null });
+router.post('/match/forfeit', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { racerId } = req.body;
+    if (!racerId) {
+      return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
+    }
+
+    const row = await queryOpOne<RacerRow>(req,
+      `SELECT id, venue_id, remaining_races, nickname, avatar_url FROM race_queues
+       LEFT JOIN users u ON race_queues.user_id = u.id
+       WHERE race_queues.id = $1`,
+      [racerId]
+    );
+    if (!row) {
+      return res.status(404).json({ code: 404, message: '选手未在队列中', data: null });
+    }
+
+    const newRemaining = Math.max(0, row.remaining_races - 1);
+
+    if (newRemaining > 0) {
+      // 放回队首
+      // 先把当前所有 waiting 选手的 queue_number + 1 腾出位置
+      await executeOp(req,
+        `UPDATE race_queues SET queue_number = queue_number + 1
+         WHERE venue_id = $1 AND status = 'waiting' AND id != $2`,
+        [row.venue_id, racerId]
+      );
+      await executeOp(req,
+        `UPDATE race_queues SET status = 'waiting', queue_number = 1, remaining_races = $2,
+         start_time_ms = NULL, paused_elapsed_ms = 0, finish_time_ms = NULL, finish_status = 'forfeit'
+         WHERE id = $1`,
+        [racerId, newRemaining]
+      );
+    } else {
+      // 次数用尽，标记为 forfeit
+      await executeOp(req,
+        `UPDATE race_queues SET status = 'forfeit', remaining_races = 0, finish_status = 'forfeit'
+         WHERE id = $1`,
+        [racerId]
+      );
+    }
+
+    broadcastToScreen({
+      event: 'racer_forfeit',
+      data: {
+        racerName: row.nickname || '选手',
+        currentRacer: null,
+      },
+    });
+
+    return res.json({ code: 0, message: '弃赛已记录', data: null });
+  } catch (e: any) {
+    console.error('[Match] forfeit error:', e.message);
+    return res.status(500).json({ code: 500, message: '弃赛处理失败', data: null });
   }
+});
 
-  const forfeitedRacer = { ...mockCurrentRacer };
+/**
+ * POST /api/v1/referees/match/invalidate
+ * 标记成绩无效（裁判专用操作）
+ */
+router.post('/match/invalidate', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { racerId } = req.body;
+    if (!racerId) {
+      return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
+    }
 
-  // 弃赛扣减一次参赛次数
-  if (mockCurrentRacer.remainingRaces !== undefined) {
-    mockCurrentRacer.remainingRaces--;
+    const row = await queryOpOne<RacerRow>(req,
+      `SELECT id, finish_time_ms, finish_status, nickname FROM race_queues
+       LEFT JOIN users u ON race_queues.user_id = u.id
+       WHERE race_queues.id = $1`,
+      [racerId]
+    );
+    if (!row) {
+      return res.status(404).json({ code: 404, message: '选手未在队列中', data: null });
+    }
+
+    await executeOp(req,
+      `UPDATE race_queues SET finish_status = 'invalid', fault_reason = '成绩无效'
+       WHERE id = $1`,
+      [racerId]
+    );
+
+    // 同步标记 race_records 为 invalid
+    await executeOp(req,
+      `UPDATE race_records SET status = 'invalid' WHERE player_id = $1 AND status = 'finished' ORDER BY created_at DESC LIMIT 1`,
+      [row.nickname]
+    );
+
+    broadcastToScreen({
+      event: 'racer_invalid',
+      data: {
+        racerName: row.nickname || '选手',
+        racerId,
+      },
+    });
+
+    return res.json({ code: 0, message: '成绩已标记为无效', data: null });
+  } catch (e: any) {
+    console.error('[Match] invalidate error:', e.message);
+    return res.status(500).json({ code: 500, message: '标记无效失败', data: null });
   }
+});
 
-  // 弃赛后选手回到队列第一位（仅当还有剩余次数）
-  const remaining = mockCurrentRacer.remainingRaces ?? 0;
-  if (remaining > 0) {
-    const reQueue: Racer = {
-      id: forfeitedRacer.id,
-      name: forfeitedRacer.name,
-      team: forfeitedRacer.name,
-      queueNumber: forfeitedRacer.queueNumber,
-      remainingRaces: remaining,
-      avatarUrl: forfeitedRacer.avatarUrl,
-    };
-    mockQueue.unshift(reQueue);
+/**
+ * POST /api/v1/referees/match/skip
+ * 跳过当前排队的选手（放到下一位后面）
+ */
+router.post('/match/skip', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { racerId } = req.body;
+    if (!racerId) {
+      return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
+    }
+
+    const row = await queryOpOne<RacerRow>(req,
+      `SELECT id, venue_id FROM race_queues WHERE id = $1`,
+      [racerId]
+    );
+    if (!row) {
+      return res.status(404).json({ code: 404, message: '选手未在队列中', data: null });
+    }
+
+    // 获取当前最大排队号
+    const maxQ = await queryOpOne<{ max_q: number }>(req,
+      `SELECT COALESCE(MAX(queue_number), 0) as max_q FROM race_queues WHERE venue_id = $1`,
+      [row.venue_id]
+    );
+    const nextQ = (maxQ?.max_q ?? 0) + 1;
+
+    // 将选手排到下一位（最后）
+    await executeOp(req,
+      `UPDATE race_queues SET queue_number = $2, status = 'skipped'
+       WHERE id = $1`,
+      [racerId, nextQ]
+    );
+
+    await broadcastAfterUpdate(req);
+
+    return res.json({ code: 0, message: '已跳过', data: null });
+  } catch (e: any) {
+    console.error('[Match] skip error:', e.message);
+    return res.status(500).json({ code: 500, message: '跳过失败', data: null });
   }
-
-  mockCurrentRacer = null;
-
-  // 广播弃赛事件到大屏
-  broadcastToScreen({
-    event: 'racer_forfeit',
-    data: {
-      racerName: forfeitedRacer.name,
-      currentRacer: null,
-      queue: mockQueue,
-      leaderboard: getLeaderboard(),
-    },
-  });
-
-  return res.json({
-    code: 0,
-    message: 'ok',
-    data: {
-      currentRacer: null,
-      queue: mockQueue,
-    },
-  });
 });
 
 // ============================================================
@@ -1085,9 +1248,14 @@ router.post('/attendance/check-out', authMiddleware, async (req: Request, res: R
     try { await executeOp(req, 'UPDATE venues SET status = \'closed\' LIMIT 1'); } catch (_) {}
 
     // 清空排队队列和当前选手，重置所有比赛状态（新玩家需重新扫码排队）
-    mockQueue.length = 0;
-    mockCurrentRacer = null;
-    mockResults.length = 0;
+    try {
+      await executeOp(req,
+        `UPDATE race_queues SET status = 'waiting', start_time_ms = NULL, paused_elapsed_ms = 0,
+         finish_time_ms = NULL, finish_status = NULL, fault_reason = NULL
+         WHERE venue_id = $1 AND status NOT IN ('finished','forfeit','invalid')`,
+        [cachedVenueId || venue.id]
+      );
+    } catch (_) {}
 
     // 广播赛场关闭通知到大屏（含清空后的队列和选手信息）
     broadcastToScreen({
@@ -1261,53 +1429,146 @@ router.get('/attendance/records', authMiddleware, async (req: Request, res: Resp
   }
 });
 
-/** 获取排行榜数据（从数据库读取） */
-function getLeaderboard() {
-  return [];
-}
-
-/** 获取当前赛场数据（供大屏 WebSocket 使用） */
-// ====== 当前赛场的激活状态（由签到/签退控制） ======
-let venueActive = false;
-
-export function setVenueActive(active: boolean) {
-  venueActive = active;
-}
+// ============================================================
+// 内部辅助函数（DB 查询版）
+// ============================================================
 
 let cachedVenueName = '机器狗迷宫赛场';
 let cachedVenueId = '';
 let cachedVenueStatus = 'inactive';
 
-/** venues 表在运营商独立库中，启动时无法解析 req context，直接使用默认值 */
+export function setVenueActive(active: boolean) {
+  // venActive 由签到/签退控制
+}
+
 export async function initVenueCache(): Promise<void> { return; }
 
+/** 获取当前大屏数据（从 DB 异步查询） */
 export function getCurrentScreenData() {
-  const leaderboard = getLeaderboard();
-
-  const isActive = venueActive;
-
+  // 由 WebSocket handler 调用，返回基础结构；具体值由 broadcastAfterUpdate 推送
+  console.log('[WS] getCurrentScreenData: venueStatus=' + cachedVenueStatus + ' venueId=' + cachedVenueId);
   return {
-    race_status: isActive ? (mockCurrentRacer?.status === 'racing' ? 'racing' : mockCurrentRacer?.status || 'waiting') : 'inactive',
+    race_status: 'inactive',
     venue_status: cachedVenueStatus,
-    current_racer: isActive && mockCurrentRacer ? { nickname: mockCurrentRacer.name, queue_number: mockCurrentRacer.queueNumber, avatar_url: mockCurrentRacer.avatarUrl } : null,
-    elapsed_ms: !isActive ? 0
-      : mockCurrentRacer?.status === 'finished'
-      ? (mockCurrentRacer.elapsed || 0)
-      : mockCurrentRacer?.startTime ? Date.now() - mockCurrentRacer.startTime : 0,
-    start_time: isActive ? (mockCurrentRacer?.startTime || null) : null,
-    next_racer: isActive && mockQueue.length > 0 ? { nickname: mockQueue[0].name, queue_number: mockQueue[0].queueNumber } : null,
-    queue: isActive ? mockQueue.map(q => ({ queue_number: q.queueNumber, nickname: q.name, status: 'waiting' })) : [],
+    current_racer: null,
+    elapsed_ms: 0,
+    start_time: null,
+    next_racer: null,
+    queue: [],
     venue_name: cachedVenueName,
     venue_id: cachedVenueId,
-    leaderboard: isActive ? leaderboard : [],
-    last_result: mockCurrentRacer?.status === 'finished' && mockCurrentRacer?.elapsed != null ? {
-      racerName: mockCurrentRacer.name,
-      racerAvatar: mockCurrentRacer.avatarUrl,
-      finishTimeMs: mockCurrentRacer.elapsed,
-      isTimeout: false,
-    } : undefined,
+    leaderboard: [],
+    last_result: undefined,
     timestamp: new Date().toLocaleString('zh-CN'),
   };
+}
+
+/** 从 DB 查询当前状态并广播 screen_data 到大屏 */
+async function broadcastAfterUpdate(req: Request) {
+  if (!cachedVenueId) return;
+
+  try {
+    const venueId = cachedVenueId;
+
+    // query queue
+    const queueRows = await queryOp<RacerRow>(req,
+      `SELECT rq.*, u.nickname, u.avatar_url FROM race_queues rq
+       LEFT JOIN users u ON rq.user_id = u.id
+       WHERE rq.venue_id = $1 AND rq.status IN ('waiting','called','skipped')
+       ORDER BY rq.queue_number ASC`,
+      [venueId]
+    );
+
+    // current racer
+    const currentRow = await queryOpOne<RacerRow>(req,
+      `SELECT rq.*, u.nickname, u.avatar_url FROM race_queues rq
+       LEFT JOIN users u ON rq.user_id = u.id
+       WHERE rq.venue_id = $1 AND rq.status IN ('racing','paused')
+       ORDER BY rq.created_at DESC LIMIT 1`,
+      [venueId]
+    );
+
+    // last finished result
+    const lastFinished = await queryOpOne<RacerRow>(req,
+      `SELECT rq.*, u.nickname, u.avatar_url FROM race_queues rq
+       LEFT JOIN users u ON rq.user_id = u.id
+       WHERE rq.venue_id = $1 AND rq.status = 'finished' AND rq.finish_status != 'invalid'
+       ORDER BY rq.updated_at DESC LIMIT 1`,
+      [venueId]
+    );
+
+    // leaderboard: 所有 finished 选手按成绩排序
+    const leaderboardRows = await queryOp<RacerRow>(req,
+      `SELECT rq.*, u.nickname, u.avatar_url FROM race_queues rq
+       LEFT JOIN users u ON rq.user_id = u.id
+       WHERE rq.venue_id = $1 AND rq.status = 'finished' AND rq.finish_status != 'invalid'
+       ORDER BY rq.finish_time_ms ASC LIMIT 10`,
+      [venueId]
+    );
+
+    const currentRacer = currentRow ? {
+      nickname: currentRow.nickname || '选手',
+      queue_number: currentRow.queue_number,
+      avatar_url: currentRow.avatar_url || undefined,
+    } : null;
+
+    const elapsed_ms = !currentRow ? 0
+      : currentRow.status === 'racing' && currentRow.start_time_ms
+        ? Date.now() - (currentRow.start_time_ms || 0)
+        : (currentRow.paused_elapsed_ms || 0);
+
+    const raceStatus = currentRow?.status === 'racing' ? 'racing'
+      : currentRow?.status === 'paused' ? 'paused'
+      : queueRows.length > 0 ? 'waiting' : 'idle';
+
+    const lastResult = lastFinished?.finish_time_ms != null ? {
+      racerName: lastFinished.nickname || '选手',
+      racerAvatar: lastFinished.avatar_url || undefined,
+      elapsed: lastFinished.finish_time_ms,
+    } : undefined;
+
+    broadcastToScreen({
+      race_status: raceStatus,
+      current_racer: currentRacer,
+      elapsed_ms,
+      start_time: currentRow?.start_time_ms || null,
+      next_racer: queueRows.length > 0 ? { nickname: queueRows[0].nickname || '选手', queue_number: queueRows[0].queue_number } : null,
+      queue: queueRows.map(q => ({ queue_number: q.queue_number, nickname: q.nickname || '选手', status: q.status, avatar_url: q.avatar_url || undefined })),
+      venue_name: cachedVenueName,
+      venue_id: cachedVenueId,
+      leaderboard: leaderboardRows.map((r, i) => ({
+        rank: i + 1,
+        name: r.nickname || '选手',
+        avatar: r.avatar_url || undefined,
+        elapsed: r.finish_time_ms || 0,
+        status: r.finish_status || 'finished',
+      })),
+      last_result: lastResult,
+      timestamp: new Date().toLocaleString('zh-CN'),
+    });
+  } catch (e: any) {
+    console.error('[Match] broadcastAfterUpdate error:', e.message);
+  }
+}
+
+/** 写入比赛成绩 */
+async function writeRaceResult(req: Request, userId: string, venueId: string, nickname: string | undefined, elapsed: number, status: string) {
+  try {
+    const existing = await queryOpOne<{ id: string }>(req,
+      `SELECT id FROM race_results WHERE user_id = $1 AND created_at > NOW() - INTERVAL 10 SECOND`,
+      [userId]
+    );
+    if (!existing) {
+      await executeOp(req,
+        `INSERT INTO race_results (id, checkin_id, user_id, venue_id, referee_id, score_ms, status, race_type, finished_at)
+         VALUES ($1, NULL, $2, $3, $4, $5, $6, 1, NOW())`,
+        [uuidv4(), userId, venueId, req.user!.userId, elapsed, status]
+      );
+    }
+  } catch (e: any) {
+    console.error('[Match] writeRaceResult error:', e.message);
+    // 不阻塞主流程
+  }
 }
 
 /**

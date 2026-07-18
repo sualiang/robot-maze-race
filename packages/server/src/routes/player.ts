@@ -1,8 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { query, queryOne, execute, queryOp, queryOpOne, executeOp, executeOpByOrder } from '../config/database';
+import { query, queryOne, execute, queryOp, queryOpOne, executeOp, executeOpByOrder, resolveOperatorDb } from '../config/database';
 import { getConfigInt } from '../config/utils';
 import { authMiddleware } from '../middleware/auth';
+import { getOperatorContext } from '../middleware/operator-context';
 
 import { autoAssignMerchantCoupons } from '../services/coupon-service';
 import { rateLimiter } from '../middleware/rateLimiter';
@@ -434,6 +435,105 @@ router.get('/checkin/queue', authMiddleware, async (req: Request, res: Response)
     res.json({ code: 0, data: { hasQueue: false } });
   }
 });
+
+/**
+ * GET /player/queue/current
+ * 获取当前赛场实时排队列表（供小程序比赛Tab展示）
+ * 通过 resolveOperatorDb 获取玩家所在赛场的 venue_id
+ */
+router.get('/queue/current', authMiddleware, rateLimiter(10, 60), async (req: Request, res: Response) => {
+  try {
+    // 获取该玩家的 operator context，查找所在 venue
+    const dbName = await resolveOperatorDb(req);
+    if (!dbName) {
+      // 玩家未扫场馆码，无操作上下文
+      return res.json({ code: 0, message: 'ok', data: { queue: [], currentRacer: null } });
+    }
+
+    // 通过 operator_context 里的 operator_id 找对应 venue
+    const ctx = await getOperatorContext(req.user!.userId);
+    const operatorId = ctx?.operator_id;
+    if (!operatorId) {
+      return res.json({ code: 0, message: 'ok', data: { queue: [], currentRacer: null } });
+    }
+
+    // 查 venues 表找到该运营商的 open 赛场
+    const venueRow = await queryOpOne<{ id: string; name: string }>(req,
+      `SELECT id, name FROM venues WHERE operator_id = $1 AND status = 'open' LIMIT 1`,
+      [operatorId]
+    );
+    if (!venueRow?.id) {
+      return res.json({ code: 0, message: 'ok', data: { queue: [], currentRacer: null } });
+    }
+
+    const venueId = venueRow.id;
+
+    // 队列: waiting/called/skipped
+    const queueRows = await queryOp<any>(req,
+      `SELECT rq.id, rq.queue_number, rq.status, rq.remaining_races, rq.race_type,
+              u.nickname, u.avatar_url
+       FROM race_queues rq
+       LEFT JOIN users u ON rq.user_id = u.id
+       WHERE rq.venue_id = $1 AND rq.status IN ('waiting','called','skipped')
+       ORDER BY rq.queue_number ASC`,
+      [venueId]
+    );
+
+    // 当前选手: racing/paused
+    const currentRow = await queryOpOne<any>(req,
+      `SELECT rq.id, rq.queue_number, rq.status, rq.remaining_races, rq.race_type,
+              u.nickname, u.avatar_url, rq.start_time_ms, rq.paused_elapsed_ms
+       FROM race_queues rq
+       LEFT JOIN users u ON rq.user_id = u.id
+       WHERE rq.venue_id = $1 AND rq.status IN ('racing','paused')
+       ORDER BY rq.created_at DESC LIMIT 1`,
+      [venueId]
+    );
+
+    const elapsed = currentRow ? (
+      currentRow.status === 'racing' && currentRow.start_time_ms ? Date.now() - currentRow.start_time_ms : (currentRow.paused_elapsed_ms || 0)
+    ) : 0;
+
+    res.json({
+      code: 0,
+      message: 'ok',
+      data: {
+        venueId,
+        queue: queueRows.map((r: any) => ({
+          id: r.id,
+          queueNumber: r.queue_number,
+          nickname: r.nickname || '选手',
+          avatarUrl: r.avatar_url || undefined,
+          remainingRaces: r.remaining_races,
+          raceType: r.race_type || undefined,
+          status: r.status,
+        })),
+        currentRacer: currentRow ? {
+          id: currentRow.id,
+          queueNumber: currentRow.queue_number,
+          nickname: currentRow.nickname || '选手',
+          avatarUrl: currentRow.avatar_url || undefined,
+          remainingRaces: currentRow.remaining_races,
+          status: currentRow.status,
+          elapsed,
+          elapsedText: formatElapsed(elapsed),
+        } : null,
+      },
+    });
+  } catch (e: any) {
+    console.error('[Player] queue/current error:', e.message);
+    return res.json({ code: 0, message: 'ok', data: { queue: [], currentRacer: null } });
+  }
+});
+
+function formatElapsed(ms: number): string {
+  if (ms <= 0) return '0s';
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  if (m > 0) return m + 'm ' + sec + 's';
+  return sec + 's';
+}
 
 /**
  * GET /player/me/profile-check

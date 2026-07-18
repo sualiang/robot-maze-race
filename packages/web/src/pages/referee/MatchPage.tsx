@@ -70,7 +70,7 @@ export default function MatchPage() {
   const [pageLoading, setPageLoading] = useState(true);
   const [wsConnected, setWsConnected] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  const [maxTimeout] = useState(180);
+  const [maxTimeout] = useState(60);
   const [checkedIn, setCheckedIn] = useState<boolean | null>(null);
   const [checkingStatus, setCheckingStatus] = useState(true);
   const { hasContext, loading: contextLoading } = useOperatorContext();
@@ -207,7 +207,7 @@ export default function MatchPage() {
       if (destroyedRef.current) { clearTimer(); return; }
       const e = baseElapsed + (Date.now() - startTimestamp);
       elapsedRef.current = e;
-      if (maxTimeout > 0 && e >= maxTimeout * 1000) { setElapsed(e); clearTimer(); endRace(); return; }
+      if (maxTimeout > 0 && e >= maxTimeout * 1000) { setElapsed(e); clearTimer(); handleTimeout(); return; }
       setElapsed(e);
     }, 10);
   };
@@ -242,6 +242,20 @@ export default function MatchPage() {
     finally { setActionLoading(false); }
   };
 
+  const handleTimeout = async () => {
+    const ri = currentRacer?.id; if (!ri) return;
+    const racerName = currentRacer?.nickname || currentRacer?.name || '选手';
+    // 超时 → 跳过此选手（排到下一位后面）
+    try {
+      await api.post('/referees/match/end', { racerId: ri, finishTimeMs: maxTimeout * 1000, status: 'timeout' });
+      await api.post('/referees/match/skip', { racerId: ri });
+    } catch {}
+    setErrorMsg('⏰ ' + racerName + ' 超时，已自动跳过');
+    setTimeout(() => setErrorMsg(''), 2500);
+    setStatus('finished');
+    loadQueue();
+  };
+
   const handleMalfunction = () => {
     if (!currentRacer) return; clearTimer();
     const racerName = currentRacer.nickname || currentRacer.name; const ce = elapsed; const ri = currentRacer.id;
@@ -261,6 +275,22 @@ export default function MatchPage() {
     if (!window.confirm('确认 ' + racerName + ' 弃赛？\n\n将消耗一次参赛次数。')) { if (status === 'running' && !destroyedRef.current) startTimerInternal(elapsed, Date.now()); return; }
     setActionLoading(true);
     api.post('/referees/match/forfeit', { racerId: ri }).then(() => { setErrorMsg(racerName + ' 弃赛'); resetMatch(); loadQueue(); }).catch(() => { setErrorMsg('网络异常，操作已缓存'); resetMatch(); }).finally(() => setActionLoading(false));
+  };
+
+  const handleInvalidate = () => {
+    if (!currentRacer) return;
+    const racerName = currentRacer.nickname || currentRacer.name; const ri = currentRacer.id;
+    if (!window.confirm('确认将 ' + racerName + ' 本次成绩标记为无效？\n\n该操作不可撤销。')) return;
+    setActionLoading(true);
+    api.post('/referees/match/invalidate', { racerId: ri }).then(() => { setErrorMsg('❌ ' + racerName + ' 成绩已标记无效'); loadQueue(); }).catch(() => { setErrorMsg('网络异常，操作失败'); }).finally(() => setActionLoading(false));
+  };
+
+  const handleSkip = () => {
+    if (!currentRacer) return;
+    const racerName = currentRacer.nickname || currentRacer.name; const ri = currentRacer.id;
+    if (!window.confirm('确认跳过 ' + racerName + '？\n\n该选手将排到下一位后面。')) return;
+    setActionLoading(true);
+    api.post('/referees/match/skip', { racerId: ri }).then(() => { setErrorMsg('⏭ ' + racerName + ' 已跳过'); resetMatch(); loadQueue(); }).catch(() => { setErrorMsg('网络异常，操作失败'); }).finally(() => setActionLoading(false));
   };
 
   const resetMatch = () => { clearTimer(); setStatus('idle'); setElapsed(0); setPausedElapsed(0); setCurrentRacer(null); setActionLoading(false); };
@@ -366,6 +396,8 @@ export default function MatchPage() {
       </div>
       {errorMsg && <div className="referee-error-msg" dangerouslySetInnerHTML={{ __html: errorMsg.replace(/\*\*(.+?)\*\*/g, '<strong style="color:#27ae60">$1</strong>') }} />}
       {checkedIn === true && currentRacer && (status === 'running' || status === 'paused') && <div className="referee-card referee-card-compact" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16, padding: 16 }}><button className="referee-btn referee-btn-outline" onClick={handleMalfunction} disabled={actionLoading}>🤖 机器狗故障 · 保留次数重新排队</button><button className="referee-btn referee-btn-ghost referee-btn-sm" onClick={handleForfeit} disabled={actionLoading}>🚫 选手弃赛</button></div>}
+      {checkedIn === true && currentRacer && status === 'finished' && <div className="referee-card referee-card-compact" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16, padding: 16 }}><button className="referee-btn referee-btn-outline" style={{ borderColor: '#e74c3c', color: '#e74c3c' }} onClick={handleInvalidate} disabled={actionLoading}>❌ 标记成绩无效</button></div>}
+      {checkedIn === true && currentRacer && (status === 'called' || status === 'waiting') && <div className="referee-card referee-card-compact" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16, padding: 16 }}><button className="referee-btn referee-btn-ghost referee-btn-sm" onClick={handleSkip} disabled={actionLoading}>⏭ 跳过此选手</button></div>}
       {checkedIn === true && <><div className="referee-section">
         <div className="referee-section-header"><span>📋 排队列表</span><span className="referee-section-count">{queue.length} 人</span></div>
         {queue.length === 0 && <div className="referee-empty"><span className="referee-empty-icon">📭</span><span className="referee-empty-text">暂无排队选手</span></div>}

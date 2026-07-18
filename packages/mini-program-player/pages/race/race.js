@@ -24,7 +24,13 @@ Page({
 
     // 历史参赛列表
     historyRecords: [],
-    historyLoading: false
+    historyLoading: false,
+
+    // 实时排队
+    queueList: [],
+    currentRacer: null,
+    queueVisible: false,
+    queueTimer: null
   },
 
   onLoad: function () {
@@ -34,9 +40,18 @@ Page({
   onShow: function () {
     if (getApp().globalData.isLoggedIn) {
       this.fetchAll();
+      this.startQueuePolling();
     } else {
       this.checkLogin();
     }
+  },
+
+  onHide: function () {
+    this.stopQueuePolling();
+  },
+
+  onUnload: function () {
+    this.stopQueuePolling();
   },
 
   onPullDownRefresh: function () {
@@ -99,17 +114,61 @@ Page({
           hasContext: true,
           venueName: d.venueName || ''
         });
+        that.startQueuePolling();
       } else {
         that.setData({
           hasContext: false,
           venueName: ''
         });
+        that.stopQueuePolling();
       }
     }).catch(function () {
       that.setData({
         hasContext: false,
         venueName: ''
       });
+    });
+  },
+
+  /**
+   * 开始排队轮询（每 3 秒查询一次）
+   */
+  startQueuePolling: function () {
+    var that = this;
+    that.stopQueuePolling();
+    // 立即拉一次
+    that.fetchQueueData();
+    that.data.queueTimer = setInterval(function () {
+      that.fetchQueueData();
+    }, 3000);
+  },
+
+  stopQueuePolling: function () {
+    if (this.data.queueTimer) {
+      clearInterval(this.data.queueTimer);
+      this.data.queueTimer = null;
+    }
+  },
+
+  /**
+   * 获取排队数据
+   */
+  fetchQueueData: function () {
+    var that = this;
+    request.silentGet('/player/queue/current').then(function (data) {
+      if (!data) {
+        that.setData({ queueList: [], currentRacer: null });
+        return;
+      }
+      var list = data.queue || [];
+      var current = data.currentRacer || null;
+      that.setData({
+        queueList: list,
+        currentRacer: current,
+        queueVisible: list.length > 0 || current != null
+      });
+    }).catch(function () {
+      // 静默失败
     });
   },
 

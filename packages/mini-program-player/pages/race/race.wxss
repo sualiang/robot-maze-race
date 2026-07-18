@@ -286,3 +286,78 @@
   color: #FF3B5C;
   font-weight: 600;
 }
+
+/* 排队列表样式 */
+.queue-section {
+  margin: 0 32rpx 32rpx;
+  padding: 24rpx;
+  background: #1E293B;
+  border: 1rpx solid #334155;
+  border-radius: 20rpx;
+}
+
+.queue-current-card {
+  display: flex;
+  align-items: center;
+  padding: 20rpx 16rpx;
+  background: rgba(255, 59, 92, 0.1);
+  border: 1rpx solid rgba(255, 59, 92, 0.25);
+  border-radius: 14rpx;
+  margin-bottom: 16rpx;
+}
+
+.queue-current-icon {
+  font-size: 40rpx;
+  margin-right: 16rpx;
+}
+
+.queue-current-info {
+  flex: 1;
+}
+
+.queue-current-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #FF3B5C;
+  display: block;
+}
+
+.queue-current-elapsed {
+  font-size: 24rpx;
+  color: #CBD5E1;
+  margin-top: 4rpx;
+  display: block;
+}
+
+.queue-item {
+  display: flex;
+  align-items: center;
+  padding: 16rpx 12rpx;
+  border-bottom: 1rpx solid #334155;
+}
+
+.queue-item:last-child {
+  border-bottom: none;
+}
+
+.queue-item-num {
+  font-size: 24rpx;
+  color: #64748B;
+  width: 64rpx;
+  flex-shrink: 0;
+}
+
+.queue-item-name {
+  font-size: 26rpx;
+  color: #E2E8F0;
+  flex: 1;
+}
+
+.queue-item-tag {
+  font-size: 20rpx;
+  color: #F59E0B;
+  background: rgba(245, 158, 11, 0.15);
+  padding: 2rpx 12rpx;
+  border-radius: 8rpx;
+  flex-shrink: 0;
+}
