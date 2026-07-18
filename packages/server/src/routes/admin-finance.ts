@@ -87,8 +87,8 @@ async function executeAllOperators(
   for (const reg of opRegs) {
     try {
       const pool = getOperatorPool(reg.db_name);
-      const [r] = await pool.execute(sql, params);
-      total += (r as any).affectedRows || 0;
+      const [result] = await pool.execute(sql, params);
+      total += (result as any).affectedRows || 0;
     } catch { /* skip */ }
   }
   return { changes: total };

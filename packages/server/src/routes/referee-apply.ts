@@ -37,10 +37,11 @@ router.post('/apply', async (req: Request, res: Response) => {
     if (!opDbName) return res.status(500).json({ code: 500, message: '运营商信息不完整', data: null });
 
     const opPool = getOperatorPool(opDbName);
-    const [existing] = await opPool.execute(
+    const [rows] = await opPool.execute(
       'SELECT id, status FROM referees WHERE phone = ?',
       [phone]
     );
+    const existing = (rows as any[])?.[0];
     if (existing) {
       const label = (existing as any).status === 'approved' ? '已注册' :
         (existing as any).status === 'pending' ? '正在审核中' : '已被驳回';

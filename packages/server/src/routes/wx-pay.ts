@@ -723,8 +723,8 @@ router.post('/notify-refund', async (req: Request, res: Response) => {
       for (const opReg of allOps) {
         if (!opReg.db_name) continue;
         const p = getOperatorPool(opReg.db_name);
-        const [chk] = await p.execute('SELECT id FROM orders WHERE order_no = ? LIMIT 1', [refundResult.out_trade_no]);
-        if (chk) { refOpPool = p; break; }
+        const [chkRows] = await p.execute('SELECT id FROM orders WHERE order_no = ? LIMIT 1', [refundResult.out_trade_no]);
+        if ((chkRows as any[])?.[0]) { refOpPool = p; break; }
       }
       if (refOpPool) {
         await refOpPool.execute(

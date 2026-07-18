@@ -144,8 +144,8 @@ router.post('/register', async (req: Request, res: Response) => {
     let existingRef = null;
     if (opDbName) {
       const opPool = getOperatorPool(opDbName);
-      const [ref] = await opPool.execute('SELECT id FROM referees WHERE phone = ?', [phone]);
-      existingRef = ref || null;
+      const [rows] = await opPool.execute('SELECT id FROM referees WHERE phone = ?', [phone]);
+      existingRef = (rows as any[])?.[0] || null;
     }
     if (existingRef) return res.status(400).json({ code: 400, message: '该手机号已被注册为裁判', data: null });
 

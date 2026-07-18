@@ -132,21 +132,22 @@ router.post('/register', async (req: Request, res: Response) => {
     const pool = getOperatorPool(opDbName);
 
     // 校验邀请码
-    const [invite] = await pool.execute(
+    const [inviteRows] = await pool.execute(
       `SELECT * FROM merchant_invite_codes WHERE code = ? AND used = 0`,
       [inviteCode]
     );
+    const invite = (inviteRows as any[])?.[0];
     if (!invite) {
       res.json({ code: 400, message: '邀请码无效或已使用', data: null });
       return;
     }
 
     // 检查用户名是否已存在
-    const [existing] = await pool.execute(
+    const [adminRows] = await pool.execute(
       `SELECT id FROM merchant_admin WHERE username = ?`,
       [username]
     );
-    if (existing) {
+    if ((adminRows as any[])?.[0]) {
       res.json({ code: 400, message: '用户名已存在', data: null });
       return;
     }
@@ -204,14 +205,14 @@ router.post('/login', async (req: Request, res: Response) => {
     }
     const pool = getOperatorPool(opDbName);
 
-    const [admin] = await pool.execute(
+    const [adminRows] = await pool.execute(
       `SELECT ma.*, m.merchant_name
        FROM merchant_admin ma
        LEFT JOIN merchants m ON ma.merchant_id = m.id
        WHERE ma.username = ?`,
       [username]
     );
-    const adminRow = admin as any;
+    const adminRow = (adminRows as any[])?.[0];
 
     if (!adminRow) {
       res.json({ code: 401, message: '用户名或密码错误', data: null });
@@ -290,11 +291,11 @@ router.post('/change-password', merchantAuthMiddleware, async (req: Request, res
     if (!pool) { res.json({ code: 500, message: '运营商信息不完整', data: null }); return; }
 
     // 查询当前密码
-    const [admin] = await pool.execute(
+    const [adminRows] = await pool.execute(
       `SELECT password_hash FROM merchant_admin WHERE id = ?`,
       [adminId]
     );
-    const adminRow = admin as any;
+    const adminRow = (adminRows as any[])?.[0];
 
     if (!adminRow) {
       res.json({ code: 404, message: '账号不存在', data: null });
@@ -330,7 +331,7 @@ router.get('/profile', merchantAuthMiddleware, async (req: Request, res: Respons
     const pool = await resolveMerchantOpPool(req);
     if (!pool) { res.json({ code: 500, message: '运营商信息不完整', data: null }); return; }
 
-    const [admin] = await pool.execute(
+    const [adminRows] = await pool.execute(
       `SELECT ma.id, ma.username, ma.phone, ma.real_name, ma.status, ma.last_login_time, ma.created_at,
               m.id as merchant_id, m.merchant_name, m.merchant_address, m.contact_phone, m.qrcode_url,
               m.region, m.business_hours, m.audit_status,
@@ -340,7 +341,7 @@ router.get('/profile', merchantAuthMiddleware, async (req: Request, res: Respons
        WHERE ma.id = ?`,
       [adminId]
     );
-    const adminRow = admin as any;
+    const adminRow = (adminRows as any[])?.[0];
 
     if (!adminRow) {
       res.json({ code: 404, message: '账号不存在', data: null });
