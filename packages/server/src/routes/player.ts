@@ -1267,7 +1267,6 @@ router.post('/order/:id/confirm-payment', authMiddleware, async (req: Request, r
         console.error('[Player] confirm-payment side-effects error:', sideErr.message?.substring(0, 200));
       }
     }
-    }
 
     console.log(`[Player] confirm-payment order=${id} user=${userId} changes=${changes}`);
     res.json({ code: 0, data: { status: 'paid', updated: changes > 0 } });
