@@ -925,8 +925,17 @@ router.get('/orders', authMiddleware, async (req: Request, res: Response) => {
       params.push(month);
     }
     sql += ` ORDER BY o.created_at DESC`;
+    
+    // 同时查询用户有订单的月份列表
+    const monthsResult = await queryOp<any>(req,
+      `SELECT DISTINCT DATE_FORMAT(created_at, '%Y-%m') AS month
+       FROM orders WHERE user_id = $1 ORDER BY month DESC`,
+      [userId]
+    );
+    const availableMonths = (monthsResult || []).map((r: any) => r.month);
+
     const orders = await queryOp<any>(req, sql, params);
-    res.json({ code: 0, data: { list: orders || [] } });
+    res.json({ code: 0, data: { list: orders || [], availableMonths } });
   } catch (e: any) {
     console.error('[玩家] 查询订单失败:', e?.message || e);
     res.json({ code: 500, message: '查询失败', data: null });
