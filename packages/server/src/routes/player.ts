@@ -953,7 +953,7 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
         if (deductionCents > 0) {
           const usedPoints = Math.ceil(deductionCents * rate / 100);
           await executeOp(req,
-            `INSERT INTO points_transactions (id, user_id, points, reason, operator_id, created_at)
+            `INSERT INTO points_transactions (id, user_id, points, type, operator_id, created_at)
              VALUES ($1, $2, $3, 'order_deduction', $4, NOW())`,
             ['PT_' + uuidv4().slice(0, 8), userId, -usedPoints, (req.user as any)?.operatorId || '']
           );

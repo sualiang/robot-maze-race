@@ -300,3 +300,34 @@ CREATE TABLE IF NOT EXISTS referee_invites (
   KEY idx_token (token),
   KEY idx_operator (operator_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ==================== 结算表（财务双重记账 - common 库） ====================
+CREATE TABLE IF NOT EXISTS settlements (
+  id VARCHAR(36) PRIMARY KEY,
+  order_id VARCHAR(36) NOT NULL,
+  amount_cents INT NOT NULL,
+  commission_cents INT NOT NULL,
+  operator_id VARCHAR(36) NOT NULL DEFAULT '',
+  status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  settled_at DATETIME,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX IF NOT EXISTS idx_settlements_status ON settlements(status);
+CREATE INDEX IF NOT EXISTS idx_settlements_operator ON settlements(operator_id);
+
+-- ==================== 支付流水表（财务双重记账 - common 库） ====================
+CREATE TABLE IF NOT EXISTS payment_transactions (
+  id VARCHAR(36) PRIMARY KEY,
+  order_id VARCHAR(36) NOT NULL,
+  user_id VARCHAR(36) NOT NULL,
+  amount INT NOT NULL,
+  transaction_id VARCHAR(64),
+  payment_method VARCHAR(32) DEFAULT 'wechat_pay',
+  status VARCHAR(16) DEFAULT 'pending',
+  refund_id VARCHAR(64),
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX IF NOT EXISTS idx_pt_order ON payment_transactions(order_id);
+CREATE INDEX IF NOT EXISTS idx_pt_user ON payment_transactions(user_id);

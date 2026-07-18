@@ -136,6 +136,86 @@ router.get('/summary', authMiddleware, operatorOnly, async (req: Request, res: R
 });
 
 /**
+ * GET /api/v1/operator/finance/revenue-details
+ * 按日期分组的营收明细（含订单详情、积分抵扣）
+ */
+router.get('/revenue-details', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
+  try {
+    const operatorId = req.user!.userId;
+    const startDate = (req.query.startDate as string) || '';
+    const endDate = (req.query.endDate as string) || '';
+    const sortOrder = (req.query.sortOrder as string) === 'asc' ? 'ASC' : 'DESC';
+
+    let dateFilter = '';
+    const params: any[] = [operatorId];
+    if (startDate && endDate) {
+      dateFilter = `AND o.paid_at >= $2 AND o.paid_at < $3`;
+      params.push(startDate, endDate + ' 23:59:59');
+    }
+
+    // 按日期汇总：日期, 订单数, 总营收, 总积分抵扣
+    const dailyRows = await queryOp<any>(req,
+      `SELECT
+         DATE(o.paid_at) as date,
+         COUNT(*) as order_count,
+         COALESCE(SUM(o.amount_cents), 0) as total_revenue,
+         COALESCE(SUM(o.discount_cents), 0) as total_discount,
+         (SELECT COALESCE(SUM(ABS(pt.points)), 0) FROM points_transactions pt
+          WHERE pt.operator_id = o.operator_id
+            AND DATE(pt.created_at) = DATE(o.paid_at)
+            AND pt.type = 'order_deduction') as total_points_deducted
+       FROM orders o
+       WHERE o.operator_id = $1
+         AND o.status = 'paid'
+         ${dateFilter}
+       GROUP BY DATE(o.paid_at)
+       ORDER BY DATE(o.paid_at) ${sortOrder}`,
+      params
+    );
+
+    // 每个日期的订单列表（含积分抵扣详情）
+    const result = await Promise.all((dailyRows || []).map(async (day: any) => {
+      const orderRows = await queryOp<any>(req,
+        `SELECT o.id, o.order_no, o.amount_cents, o.discount_cents, o.paid_at, o.package_id,
+                (SELECT COALESCE(SUM(ABS(pt.points)), 0) FROM points_transactions pt
+                 WHERE pt.user_id = o.user_id AND DATE(pt.created_at) = ?
+                   AND pt.type = 'order_deduction') as order_points_deducted
+         FROM orders o
+         WHERE o.operator_id = $1
+           AND DATE(o.paid_at) = ?
+           AND o.status = 'paid'
+         ORDER BY o.paid_at DESC`,
+        [day.date, operatorId, day.date]
+      );
+
+      const orders = (orderRows || []).map((o: any) => ({
+        id: o.id,
+        orderNo: o.order_no,
+        amountCents: o.amount_cents || 0,
+        discountCents: o.discount_cents || 0,
+        pointsDeducted: o.order_points_deducted || 0,
+        paidAt: o.paid_at,
+        packageId: o.package_id,
+      }));
+
+      return {
+        date: day.date,
+        orderCount: parseInt(day.order_count, 10) || 0,
+        revenue: day.total_revenue || 0,
+        discount: day.total_discount || 0,
+        pointsDeducted: day.total_points_deducted || 0,
+        orders,
+      };
+    }));
+
+    return res.json({ code: 0, message: 'ok', data: result });
+  } catch (error: any) {
+    console.error('[OperatorFinance] revenue-details error:', error.message);
+    return res.status(500).json({ code: 500, message: '获取营收明细失败', data: null });
+  }
+});
+
+/**
  * GET /api/v1/operator/finance/export
  * 导出财务流水 CSV
  */

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Card, Table, Statistic, Row, Col, Button, Space, Tag,
-  DatePicker, Tabs, message,
+  Card, Table, Statistic, Row, Col, Button, Space,
+  DatePicker, Tabs, message, Modal, Tag,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -12,10 +12,21 @@ import api from '../../../utils/api';
 
 interface RevenueItem {
   date: string;
-  order_count: number;
+  orderCount: number;
   revenue: number;
-  settlement: number;
-  status: string;
+  discount: number;
+  pointsDeducted: number;
+  orders: OrderDetail[];
+}
+
+interface OrderDetail {
+  id: string;
+  orderNo: string;
+  amountCents: number;
+  discountCents: number;
+  pointsDeducted: number;
+  paidAt: string;
+  packageId: string;
 }
 
 interface SettlementItem {
@@ -44,6 +55,10 @@ export default function FinanceCenter() {
   const [settlementList, setSettlementList] = useState<SettlementItem[]>([]);
   const [loadingRevenue, setLoadingRevenue] = useState(false);
   const [loadingSettlement, setLoadingSettlement] = useState(false);
+  const [revenueSort, setRevenueSort] = useState<'desc' | 'asc'>('desc');
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [detailDate, setDetailDate] = useState('');
+  const [detailOrders, setDetailOrders] = useState<OrderDetail[]>([]);
 
   // 统计数据 — 只保留4个
   const [todayRevenue, setTodayRevenue] = useState(0);
@@ -56,11 +71,21 @@ export default function FinanceCenter() {
     try {
       const res: any = await api.get('/operator/finance/summary');
       const s = res?.settlements ?? {};
-      setRevenueList([]);
       setTodayRevenue(Math.round((s.settled_amount_cents ?? 0) / 100));
       setTodayOrders(s.settled_count ?? 0);
       setMonthRevenue(Math.round(((s.settled_amount_cents ?? 0) + (s.pending_amount_cents ?? 0)) / 100));
       setMonthOrders((s.settled_count ?? 0) + (s.pending_count ?? 0));
+    } catch { }
+    finally { setLoadingRevenue(false); }
+  }, []);
+
+  const fetchRevenueDetails = useCallback(async (sort: string = 'desc') => {
+    setLoadingRevenue(true);
+    try {
+      const res: any = await api.get('/operator/finance/revenue-details', {
+        params: { sortOrder: sort },
+      });
+      setRevenueList(res?.data ?? res ?? []);
     } catch { setRevenueList([]); }
     finally { setLoadingRevenue(false); }
   }, []);
@@ -68,7 +93,7 @@ export default function FinanceCenter() {
   const fetchSettlements = useCallback(async () => {
     setLoadingSettlement(true);
     try {
-      const res: any = await api.get('/operator/finance/summary');
+      await api.get('/operator/finance/summary');
       setSettlementList([]);
     } catch { setSettlementList([]); }
     finally { setLoadingSettlement(false); }
@@ -76,8 +101,9 @@ export default function FinanceCenter() {
 
   useEffect(() => {
     fetchRevenue();
+    fetchRevenueDetails();
     fetchSettlements();
-  }, [fetchRevenue, fetchSettlements]);
+  }, [fetchRevenue, fetchRevenueDetails, fetchSettlements]);
 
   const handleExport = async () => {
     try {
@@ -94,27 +120,47 @@ export default function FinanceCenter() {
     } catch { message.error('导出失败'); }
   };
 
+  const handleSortRevenue = () => {
+    const next = revenueSort === 'desc' ? 'asc' : 'desc';
+    setRevenueSort(next);
+    fetchRevenueDetails(next);
+  };
+
+  const showDetail = (item: RevenueItem) => {
+    setDetailDate(item.date);
+    setDetailOrders(item.orders || []);
+    setDetailModalOpen(true);
+  };
+
   const revenueColumns: ColumnsType<RevenueItem> = [
     { title: '日期', dataIndex: 'date', key: 'date', width: 120 },
     {
-      title: '订单数', dataIndex: 'order_count', key: 'order_count', width: 90,
+      title: '订单数', dataIndex: 'orderCount', key: 'orderCount', width: 90,
       render: (v: number) => `${v}笔`,
     },
     {
-      title: '营收', dataIndex: 'revenue', key: 'revenue', width: 120,
-      render: (v: number) => <span style={{ fontWeight: 600 }}>¥{(v / 100).toFixed(2)}</span>,
-      sorter: (a: RevenueItem, b: RevenueItem) => a.revenue - b.revenue,
+      title: (
+        <span onClick={handleSortRevenue} style={{ cursor: 'pointer' }}>
+          营收 {revenueSort === 'desc' ? '↓' : '↑'}
+        </span>
+      ),
+      dataIndex: 'revenue', key: 'revenue', width: 150,
+      render: (v: number, r: RevenueItem) => {
+        const ptsYuan = (r.pointsDeducted || 0) / 100;
+        return (
+          <span>
+            <span style={{ fontWeight: 600 }}>¥{(v / 100).toFixed(2)}</span>
+            {ptsYuan > 0 ? <span style={{ color: '#faad14', fontSize: 12, marginLeft: 4 }}>(积分抵扣 ¥{ptsYuan.toFixed(2)})</span> : null}
+          </span>
+        );
+      },
     },
     {
-      title: '结算金额', dataIndex: 'settlement', key: 'settlement', width: 120,
-      render: (v: number) => `¥${(v / 100).toFixed(2)}`,
-    },
-    {
-      title: '结算状态', dataIndex: 'status', key: 'status', width: 100,
-      render: (s: string) => (
-        <Tag color={settlementStatusColors[s] || 'default'}>
-          {settlementStatusLabels[s] || s}
-        </Tag>
+      title: '详情', dataIndex: 'detail', key: 'detail', width: 100,
+      render: (_: any, item: RevenueItem) => (
+        <Button type="link" size="small" onClick={() => showDetail(item)}>
+          查看详情
+        </Button>
       ),
     },
   ];
@@ -160,6 +206,24 @@ export default function FinanceCenter() {
           size="small"
         />
       ),
+    },
+  ];
+
+  const detailColumns: ColumnsType<OrderDetail> = [
+    { title: '订单号', dataIndex: 'orderNo', key: 'orderNo', width: 200, ellipsis: true },
+    {
+      title: '实付金额', dataIndex: 'amountCents', key: 'amountCents', width: 100,
+      render: (v: number) => `¥${(v / 100).toFixed(2)}`,
+    },
+    {
+      title: '积分抵扣', dataIndex: 'pointsDeducted', key: 'pointsDeducted', width: 100,
+      render: (v: number) => v > 0
+        ? <Tag color="gold">{v} 积分（抵 ¥{(v / 100).toFixed(2)}）</Tag>
+        : <span style={{ color: '#999' }}>未使用</span>,
+    },
+    {
+      title: '支付时间', dataIndex: 'paidAt', key: 'paidAt', width: 160,
+      render: (v: string) => v ? new Date(v).toLocaleString('zh-CN') : '-',
     },
   ];
 
@@ -230,6 +294,34 @@ export default function FinanceCenter() {
       >
         <Tabs items={tabItems} />
       </Card>
+      {/* 详情弹窗 */}
+      <Modal
+        title={`${detailDate} 订单详情`}
+        open={detailModalOpen}
+        onCancel={() => setDetailModalOpen(false)}
+        footer={null}
+        width={700}
+      >
+        <Table
+          columns={detailColumns}
+          dataSource={detailOrders}
+          rowKey="id"
+          pagination={{ pageSize: 5, showTotal: (t: number) => `共 ${t} 笔订单` }}
+          size="small"
+          summary={() => {
+            const totalAmount = detailOrders.reduce((s, o) => s + o.amountCents, 0);
+            const totalPts = detailOrders.reduce((s, o) => s + (o.pointsDeducted || 0), 0);
+            return (
+              <Table.Summary.Row>
+                <Table.Summary.Cell index={0}><strong>合计</strong></Table.Summary.Cell>
+                <Table.Summary.Cell index={1}><strong>¥{(totalAmount / 100).toFixed(2)}</strong></Table.Summary.Cell>
+                <Table.Summary.Cell index={2}><strong>{totalPts} 积分</strong></Table.Summary.Cell>
+                <Table.Summary.Cell index={3}></Table.Summary.Cell>
+              </Table.Summary.Row>
+            );
+          }}
+        />
+      </Modal>
     </div>
   );
 }
