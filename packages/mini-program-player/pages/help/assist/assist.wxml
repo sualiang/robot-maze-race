@@ -33,7 +33,7 @@
       <view class="invite-icon-row">
         <text class="invite-icon">🤝</text>
       </view>
-      <text class="invite-title">你的朋友 <text class="inviter-name">{{inviterName || activity.initiatorNickname || '好友'}}</text> 邀请你帮他助力</text>
+      <text class="invite-title">你的朋友 <text class="inviter-name">{{inviterName || activity.creatorNickname || '好友'}}</text> 邀请你帮他助力</text>
       <view class="invite-progress-row">
         <view class="invite-progress-bar-bg">
           <view class="invite-progress-bar-fill" style="width: {{activity.progressPercent}}%"></view>
@@ -47,10 +47,10 @@
       <text class="preview-title">已有 {{activity.helpers.length}} 位好友助力</text>
       <view class="preview-avatar-row">
         <block wx:for="{{activity.helpers}}" wx:key="id">
-          <image wx:if="{{item.helperAvatarUrl}}" class="preview-avatar"
-            src="{{item.helperAvatarUrl}}" mode="aspectFill"></image>
+          <image wx:if="{{item.avatar}}" class="preview-avatar"
+            src="{{item.avatar}}" mode="aspectFill"></image>
           <view wx:else class="preview-avatar preview-avatar-placeholder">
-            <text class="preview-placeholder-text">{{item.helperNickname ? item.helperNickname.slice(0, 1) : '?'}}</text>
+            <text class="preview-placeholder-text">{{item.nickname ? item.nickname.slice(0, 1) : '?'}}</text>
           </view>
         </block>
       </view>

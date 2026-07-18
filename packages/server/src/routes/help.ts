@@ -48,17 +48,36 @@ router.get('/help/detail', async (req: Request, res: Response) => {
       avatar: h.avatar_url || '',
     }));
 
+    // 检查当前访问者是否已登录 + 是否已助力
+    let canHelp = true;
+    let needLogin = false;
+    const visitorId = (req as any).user?.userId;
+    if (!visitorId) {
+      needLogin = true;
+    } else {
+      const alreadyHelped = await queryOne<any>(
+        `SELECT id FROM help_helpers WHERE help_id = $1 AND user_id = $2`,
+        [helpId, visitorId]
+      );
+      if (alreadyHelped) canHelp = false;
+    }
+
     res.json({
       code: 0,
       data: {
-        helpId: help.id,
-        creatorNickname: help.creator_nickname || '',
-        creatorAvatar: help.creator_avatar || '',
-        status: help.status,
-        helpersCount: help.current_help_count || 0,
-        helpersTotal: help.required_help_count || 0,
-        helpers: helperList,
-        packageName: help.package_name || '',
+        activity: {
+          id: help.id,
+          helpId: help.id,
+          creatorNickname: help.creator_nickname || '',
+          creatorAvatar: help.creator_avatar || '',
+          status: help.status,
+          currentHelpCount: help.current_help_count || 0,
+          requiredHelpCount: help.required_help_count || 0,
+          helpers: helperList,
+          packageName: help.package_name || '',
+        },
+        canHelp,
+        needLogin,
       },
     });
   } catch (e: any) {
@@ -247,6 +266,81 @@ router.post('/help/create', authMiddleware, async (req: Request, res: Response) 
   } catch (e: any) {
     console.error('[Help] create error:', e?.message || e);
     res.json({ code: 500, message: '创建助力活动失败', data: null });
+  }
+});
+
+/**
+ * POST /player/help/assist
+ * 好友点击助力
+ */
+router.post('/help/assist', authMiddleware, async (req: Request, res: Response) => {
+  const userId = req.user!.userId;
+  const { helpId } = req.body;
+
+  if (!helpId) {
+    res.json({ code: 400, message: '缺少 helpId 参数', data: null });
+    return;
+  }
+
+  try {
+    // 查询助力活动
+    const help = await queryOne<any>(
+      `SELECT id, initiator_id, required_help_count, current_help_count, status, expires_at
+       FROM helps WHERE id = $1`,
+      [helpId]
+    );
+
+    if (!help) {
+      res.json({ code: 404, message: '助力活动不存在', data: null });
+      return;
+    }
+
+    if (help.status !== 'initiated' && help.status !== 'in_progress') {
+      res.json({ code: 400, message: '该助力活动已结束', data: null });
+      return;
+    }
+
+    if (help.expires_at && new Date(help.expires_at) < new Date()) {
+      res.json({ code: 400, message: '该助力活动已过期', data: null });
+      return;
+    }
+
+    // 不能助力自己
+    if (help.initiator_id === userId) {
+      res.json({ code: 400, message: '不能助力自己', data: null });
+      return;
+    }
+
+    // 检查是否已助力过
+    const already = await queryOne<any>(
+      `SELECT id FROM help_helpers WHERE help_id = $1 AND user_id = $2`,
+      [helpId, userId]
+    );
+    if (already) {
+      res.json({ code: 400, message: '你已经助力过了', data: null });
+      return;
+    }
+
+    // 写入助力记录
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    await execute(
+      `INSERT INTO help_helpers (id, help_id, user_id, helped_at)
+       VALUES ($1, $2, $3, $4)`,
+      [uuidv4(), helpId, userId, now]
+    );
+
+    // 更新助力计数
+    const newCount = (help.current_help_count || 0) + 1;
+    const newStatus = newCount >= help.required_help_count ? 'completed' : 'in_progress';
+    await execute(
+      `UPDATE helps SET current_help_count = $1, status = $2 WHERE id = $3`,
+      [newCount, newStatus, helpId]
+    );
+
+    res.json({ code: 0, data: { success: true } });
+  } catch (e: any) {
+    console.error('[Help] assist error:', e?.message || e);
+    res.json({ code: 500, message: '助力失败', data: null });
   }
 });
 
