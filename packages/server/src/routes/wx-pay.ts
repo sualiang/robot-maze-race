@@ -203,8 +203,9 @@ router.post('/unified-order', authMiddleware, async (req: Request, res: Response
       user_id: string;
       amount: number;
       status: string;
+      operator_id: string;
     }>(req, 
-      `SELECT id, order_no, user_id, amount_cents as amount, status FROM orders WHERE id = ?`,
+      `SELECT id, order_no, user_id, amount_cents as amount, status, operator_id FROM orders WHERE id = ?`,
       [order_id]
     );
 
@@ -274,7 +275,7 @@ router.post('/unified-order', authMiddleware, async (req: Request, res: Response
         payer: {
           openid: req.user!.openid,
         },
-        attach: JSON.stringify({ order_id, operatorId: (req.user as any)?.operatorId || '' }),
+        attach: JSON.stringify({ order_id, operatorId: order.operator_id || '' }),
       });
 
       // 5. 保存 prepay_id
@@ -369,6 +370,22 @@ router.post('/notify', async (req: Request, res: Response) => {
         'SELECT db_name FROM operators_registry WHERE operator_id = ?', [attachOperatorId]
       ))?.db_name;
       if (opDbName) opPool = getOperatorPool(opDbName);
+    }
+    // failback: 遍历所有运营商库通过 order_no 查找订单
+    if (!opPool) {
+      const regRows = await query<any[]>('SELECT operator_id, db_name FROM operators_registry');
+      for (const row of regRows as any[]) {
+        const pool = getOperatorPool(row.db_name);
+        if (!pool) continue;
+        try {
+          const [cRows] = await pool.execute(`SELECT id FROM orders WHERE order_no = ? LIMIT 1`, [outTradeNo]);
+          if (cRows && (Array.isArray(cRows) ? cRows.length > 0 : true)) {
+            opPool = pool;
+            attachOperatorId = row.operator_id;
+            break;
+          }
+        } catch { /* continue */ }
+      }
     }
     if (!opPool) {
       console.error('[WxPay] 无法定位运营商 pool:', outTradeNo);
