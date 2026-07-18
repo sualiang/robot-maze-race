@@ -568,7 +568,7 @@ router.get('/match/queue', authMiddleware, async (req: Request, res: Response) =
     if (allUserIds.length > 0) {
       try {
         const placeholders = allUserIds.map(() => '?').join(',');
-        const userRows = await query<any[]>(
+        const userRows: any[] = await query(
           `SELECT id, nickname, avatar_url FROM users WHERE id IN (${placeholders})`,
           allUserIds
         );
@@ -1553,7 +1553,7 @@ async function broadcastAfterUpdate(req: Request) {
     if (allUserIds.length > 0) {
       try {
         const placeholders = allUserIds.map(() => '?').join(',');
-        const userRows = await query<any[]>(
+        const userRows: any[] = await query(
           `SELECT id, nickname, avatar_url FROM users WHERE id IN (${placeholders})`,
           allUserIds
         );
