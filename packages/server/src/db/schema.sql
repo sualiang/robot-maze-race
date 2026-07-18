@@ -118,6 +118,7 @@ CREATE TABLE IF NOT EXISTS orders (
   package_id TEXT NOT NULL REFERENCES race_packages(id),
   amount_cents INTEGER NOT NULL,
   discount_cents INTEGER DEFAULT 0,
+  points_deduction_cents INTEGER DEFAULT 0,
   coupon_multiplier INTEGER NOT NULL DEFAULT 1,
   status VARCHAR(20) NOT NULL DEFAULT 'pending',
   payment_method VARCHAR(20),

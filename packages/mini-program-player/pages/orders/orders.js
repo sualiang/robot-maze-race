@@ -50,6 +50,9 @@ Page({
           amount_cents: o.amount_cents || 0,
           amount_text: ((o.amount_cents || 0) / 100).toFixed(2),
           discount_cents: o.discount_cents || 0,
+          points_deduction_cents: o.points_deduction_cents || 0,
+          points_deduction_text: ((o.points_deduction_cents || 0) / 100).toFixed(2),
+          has_points_deduction: (o.points_deduction_cents || 0) > 0,
           status: o.status || 'pending',
           paid_at: (o.paid_at || '').replace('T', ' ').substring(0, 19),
           created_at: (o.created_at || '').replace('T', ' ').substring(0, 19)

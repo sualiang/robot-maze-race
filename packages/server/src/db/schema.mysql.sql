@@ -139,6 +139,7 @@ CREATE TABLE IF NOT EXISTS orders (
   package_id VARCHAR(36) NOT NULL,
   amount_cents INT NOT NULL,
   discount_cents INT DEFAULT 0,
+  points_deduction_cents INT DEFAULT 0,
   coupon_multiplier INT DEFAULT 1,
   status VARCHAR(20) NOT NULL DEFAULT 'pending',
   payment_method VARCHAR(20),

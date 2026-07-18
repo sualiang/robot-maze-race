@@ -915,7 +915,7 @@ router.get('/orders', authMiddleware, async (req: Request, res: Response) => {
   const { month } = req.query; // YYYY-MM
   try {
     let sql = `SELECT o.id, o.order_no, o.package_id, rp.name as package_name, o.amount_cents, o.discount_cents,
-              o.status, o.paid_at, o.created_at
+              o.points_deduction_cents, o.status, o.paid_at, o.created_at
        FROM orders o
        LEFT JOIN race_packages rp ON o.package_id = rp.id
        WHERE o.user_id = $1`;
@@ -1012,10 +1012,10 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
     // 创建订单（status='pending'，支付回调成功后改为 'paid'）
     await queryOp(req, 
       `INSERT INTO orders (id, order_no, user_id, package_id, amount_cents, discount_cents,
-               remaining_times, remaining_growth, status, created_at, operator_id, prepay_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', NOW(), $9, '')`,
-      [orderId, orderNo, userId, packageId, pkg.price_cents, deductionCents,
-       remainingTimes, remainingGrowth,
+               points_deduction_cents, remaining_times, remaining_growth, status, created_at, operator_id, prepay_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', NOW(), $10, '')`,
+      [orderId, orderNo, userId, packageId, pkg.price_cents, 0,
+       deductionCents, remainingTimes, remainingGrowth,
        (req.user as any)?.operatorId || '']
     );
 

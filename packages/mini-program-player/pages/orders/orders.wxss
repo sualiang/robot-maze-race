@@ -96,6 +96,11 @@
   font-weight: 600;
 }
 
+.order-discount {
+  color: #4ade80;
+  font-weight: 600;
+}
+
 .empty {
   display: flex;
   flex-direction: column;

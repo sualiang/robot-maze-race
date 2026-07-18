@@ -25,6 +25,10 @@
           <text class="order-label">金额</text>
           <text class="order-value order-amount">¥{{item.amount_text}}</text>
         </view>
+        <view wx:if="{{item.has_points_deduction}}" class="order-info">
+          <text class="order-label">积分抵扣</text>
+          <text class="order-value order-discount">-¥{{item.points_deduction_text}}</text>
+        </view>
         <view class="order-info">
           <text class="order-label">购买时间</text>
           <text class="order-value">{{item.created_at}}</text>
