@@ -44,7 +44,7 @@ router.get('/help/detail', async (req: Request, res: Response) => {
         if (opDb) {
           const { getOperatorPool } = require('../config/database');
           const opPool = getOperatorPool(opDb);
-          const [pkgs] = await opPool.query<any[]>(
+          const [pkgs] = await (opPool.query as any)(
             `SELECT name FROM race_packages WHERE id = ? LIMIT 1`,
             [help.target_package_id]
           );
