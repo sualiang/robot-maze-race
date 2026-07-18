@@ -240,7 +240,7 @@ router.get('/revenue-details', authMiddleware, operatorOnly, async (req: Request
         amountCents: o.amount_cents || 0,
         discountCents: o.discount_cents || 0,
         pointsDeducted: o.points_deduction_cents || 0, // 金额分
-        paidAt: o.paid_at,
+        paidAt: typeof o.paid_at === 'string' ? o.paid_at.split('T')[0] : o.paid_at,
         packageId: o.package_id,
       }));
 

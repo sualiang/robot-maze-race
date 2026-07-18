@@ -136,7 +136,8 @@ export default function FinanceCenter() {
   };
 
   const revenueColumns: ColumnsType<RevenueItem> = [
-    { title: '日期', dataIndex: 'date', key: 'date', width: 120 },
+    { title: '日期', dataIndex: 'date', key: 'date', width: 120,
+      render: (v: string) => typeof v === 'string' ? v.split('T')[0] : v },
     {
       title: '订单数', dataIndex: 'orderCount', key: 'orderCount', width: 90,
       render: (v: number) => `${v}笔`,
@@ -226,7 +227,7 @@ export default function FinanceCenter() {
     },
     {
       title: '支付时间', dataIndex: 'paidAt', key: 'paidAt', width: 160,
-      render: (v: string) => v ? new Date(v).toLocaleString('zh-CN') : '-',
+      render: (v: string) => v ? (typeof v === 'string' ? v.split('T')[0] : v) : '-',
     },
   ];
 
