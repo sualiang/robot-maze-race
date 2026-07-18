@@ -108,7 +108,7 @@ Page({
       var d = data.data || data;
       var points = d.pointsBalance || 0;
       that.setData({
-        remainCount: d.remainCount || 0,
+        remainCount: d.raceCount || 0,
         couponValue: d.couponTotalYuan || 0,
         pointsBalance: points
       });
@@ -133,12 +133,14 @@ Page({
     }
 
     request.silentGet('/player/me/profile').then(function (data) {
-      var remain = data.remainCount || data.raceCount || 0;
+      var remain = (typeof data.race_count !== 'undefined') ? data.race_count :
+                   (data.raceCount || data.remainCount || 0);
       that.setData({ remainCount: remain });
     }).catch(function () {
       // fallback: 尝试旧的 profile-check 接口
       request.silentGet('/player/me/profile-check').then(function (data) {
-        var remain = data.remainCount || data.raceCount || 0;
+        var remain = (typeof data.race_count !== 'undefined') ? data.race_count :
+                     (data.raceCount || data.ticketCount || 0);
         that.setData({ remainCount: remain });
       }).catch(function () {
         // 静默失败，使用默认值
