@@ -10,21 +10,13 @@ page {
 }
 
 /* ===== 头像区 — 顶部居中 120rpx 圆形 ===== */
-.avatar-area,
-button.avatar-area {
+.avatar-area {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin: 0 0 40rpx;
+  justify-content: center;
+  margin: 0 auto 40rpx;
   padding: 0;
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  line-height: 1;
-}
-
-button.avatar-area::after {
-  border: none;
 }
 
 .avatar-circle {

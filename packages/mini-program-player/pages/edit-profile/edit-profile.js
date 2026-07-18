@@ -26,30 +26,37 @@ Page({
     });
   },
 
-  // ===== 选择头像（button open-type=chooseAvatar + uploadFile） =====
-  onChooseAvatar: function (e) {
+  // ===== 选择头像（wx.chooseMedia 兼容新版隐私协议） =====
+  onChooseAvatar: function () {
     var that = this;
-    var tempPath = e.detail.avatarUrl;
-    that.setData({ avatar: tempPath });
-    
-    // 上传头像到服务器
-    var token = wx.getStorageSync('player_token');
-    wx.uploadFile({
-      url: (request.getBaseUrl ? request.getBaseUrl() : 'https://dog.amberrobot.com.cn/api/v1') + '/auth/upload-avatar',
-      filePath: tempPath,
-      name: 'file',
-      header: { 'Authorization': 'Bearer ' + token },
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['image'],
+      sourceType: ['album', 'camera'],
       success: function (res) {
-        var data = JSON.parse(res.data);
-        if (data.code === 0 && data.url) {
-          var fullUrl = 'https://dog.amberrobot.com.cn' + data.url;
-          that.setData({ avatar: fullUrl });
-          // 更新全局状态
-          var app = getApp();
-          var user = app.globalData.userInfo || {};
-          user.avatar_url = fullUrl;
-          app.globalData.userInfo = user;
-        }
+        var tempPath = res.tempFiles[0].tempFilePath;
+        that.setData({ avatar: tempPath });
+
+        // 上传头像到服务器
+        var token = wx.getStorageSync('player_token');
+        wx.uploadFile({
+          url: (request.getBaseUrl ? request.getBaseUrl() : 'https://dog.amberrobot.com.cn/api/v1') + '/auth/upload-avatar',
+          filePath: tempPath,
+          name: 'file',
+          header: { 'Authorization': 'Bearer ' + token },
+          success: function (res) {
+            var data = JSON.parse(res.data);
+            if (data.code === 0 && data.url) {
+              var fullUrl = 'https://dog.amberrobot.com.cn' + data.url;
+              that.setData({ avatar: fullUrl });
+              // 更新全局状态
+              var app = getApp();
+              var user = app.globalData.userInfo || {};
+              user.avatar_url = fullUrl;
+              app.globalData.userInfo = user;
+            }
+          }
+        });
       }
     });
   },
