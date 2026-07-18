@@ -885,16 +885,20 @@ router.get('/coupons', authMiddleware, async (req: Request, res: Response) => {
  */
 router.get('/orders', authMiddleware, async (req: Request, res: Response) => {
   const userId = req.user!.userId;
+  const { month } = req.query; // YYYY-MM
   try {
-    const orders = await queryOp<any>(req, 
-      `SELECT o.id, o.order_no, o.package_id, rp.name as package_name, o.amount_cents, o.discount_cents,
+    let sql = `SELECT o.id, o.order_no, o.package_id, rp.name as package_name, o.amount_cents, o.discount_cents,
               o.status, o.paid_at, o.created_at
        FROM orders o
        LEFT JOIN race_packages rp ON o.package_id = rp.id
-       WHERE o.user_id = $1
-       ORDER BY o.created_at DESC`,
-      [userId]
-    );
+       WHERE o.user_id = $1`;
+    const params: any[] = [userId];
+    if (month && typeof month === 'string' && /^\d{4}-\d{2}$/.test(month)) {
+      sql += ` AND DATE_FORMAT(o.created_at, '%Y-%m') = $2`;
+      params.push(month);
+    }
+    sql += ` ORDER BY o.created_at DESC`;
+    const orders = await queryOp<any>(req, sql, params);
     res.json({ code: 0, data: { list: orders || [] } });
   } catch (e: any) {
     console.error('[玩家] 查询订单失败:', e?.message || e);
