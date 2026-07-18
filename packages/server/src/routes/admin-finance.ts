@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../config/database';
+import { query, queryOne, execute, queryOp, queryOpOne, executeOp, getOperatorPool } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import { checkPermission } from '../middleware/rbac';
 
@@ -14,7 +14,7 @@ async function getOperatorName(opId: string): Promise<string> {
   }
   if (operatorNameCache.has(opId)) return operatorNameCache.get(opId)!;
   try {
-    const op = await queryOne<{ name: string }>('SELECT name FROM operators WHERE id = $1', [opId]);
+    const op = await queryOne<{ name: string }>('SELECT name FROM operators WHERE id = ?', [opId]);
     const name = op?.name || '未知运营商';
     operatorNameCache.set(opId, name);
     return name;
@@ -23,12 +23,83 @@ async function getOperatorName(opId: string): Promise<string> {
   }
 }
 
+/**
+ * 超管（operatorId=null）遍历所有运营商库执行查询并聚合结果
+ * 普通运营商管理员走 queryOp 单库
+ */
+async function queryAllOperators<T = any>(
+  req: Request,
+  sql: string,
+  params: any[] = [],
+): Promise<T[]> {
+  const opId = (req.user as any)?.operatorId || null;
+  if (opId) {
+    return queryOp<T>(req, sql, params);
+  }
+  // 超管：遍历所有运营商库
+  const opRegs = await query<any>('SELECT db_name, operator_id FROM operators_registry WHERE db_name IS NOT NULL', []);
+  const allRows: T[] = [];
+  for (const reg of opRegs) {
+    try {
+      const pool = getOperatorPool(reg.db_name);
+      const [regRows] = await pool.query<any[]>(sql, params);
+      allRows.push(...regRows);
+    } catch { /* skip unavailable operator dbs */ }
+  }
+  return allRows;
+}
+
+async function queryAllOperatorsOne<T = any>(
+  req: Request,
+  sql: string,
+  params: any[] = [],
+): Promise<T | null> {
+  const opId = (req.user as any)?.operatorId || null;
+  if (opId) {
+    return queryOpOne<T>(req, sql, params);
+  }
+  const opRegs = await query<any>('SELECT db_name FROM operators_registry WHERE db_name IS NOT NULL', []);
+  for (const reg of opRegs) {
+    try {
+      const pool = getOperatorPool(reg.db_name);
+      const [rows] = await pool.query<any[]>(sql, params);
+      if (rows && rows.length > 0) return rows[0] as T;
+    } catch { /* skip */ }
+  }
+  return null;
+}
+
+/**
+ * 超管执行写操作：遍历所有运营商库执行
+ */
+async function executeAllOperators(
+  req: Request,
+  sql: string,
+  params: any[] = [],
+): Promise<{ changes: number }> {
+  const opId = (req.user as any)?.operatorId || null;
+  if (opId) {
+    const r = await executeOp(req, sql, params);
+    return { changes: r.changes };
+  }
+  let total = 0;
+  const opRegs = await query<any>('SELECT db_name FROM operators_registry WHERE db_name IS NOT NULL', []);
+  for (const reg of opRegs) {
+    try {
+      const pool = getOperatorPool(reg.db_name);
+      const [r] = await pool.execute(sql, params);
+      total += (r as any).affectedRows || 0;
+    } catch { /* skip */ }
+  }
+  return { changes: total };
+}
+
 const router = Router();
 
 /**
  * GET /api/v1/admin/finance/withdraws
  * 运营商提现审核 — finance:withdraw
- * 修复: users 在 common 库，settlements 在 operator 库
+ * 超管遍历所有运营商库，普通管理员走 queryOp 单库
  */
 router.get('/withdraws', authMiddleware, checkPermission('finance:withdraw'), async (req: Request, res: Response) => {
   try {
@@ -37,14 +108,14 @@ router.get('/withdraws', authMiddleware, checkPermission('finance:withdraw'), as
     const params: any[] = [];
 
     if (filterStatus) {
-      conditions.push(`s.status = $${params.length + 1}`);
+      conditions.push(`s.status = ?`);
       params.push(filterStatus);
     }
 
     const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
 
-    // operator 库查 settlements
-    const withdraws = await queryOp<any>(req, 
+    // 超管遍历所有运营商库，普通管理员走单库
+    const withdraws = await queryAllOperators<any>(req,
       `SELECT s.id, s.operator_id,
               s.amount_cents as amount,
               s.status,
@@ -54,7 +125,7 @@ router.get('/withdraws', authMiddleware, checkPermission('finance:withdraw'), as
        FROM settlements s
        ${whereClause}
        ORDER BY s.created_at DESC`,
-      params.length > 0 ? params : undefined
+      params
     );
 
     // common 库补查运营商名称
@@ -62,7 +133,7 @@ router.get('/withdraws', authMiddleware, checkPermission('finance:withdraw'), as
     const opMap = new Map<string, string>();
     if (opIds.length > 0) {
       const ops = await query<any>(
-        `SELECT id, name FROM operators WHERE id IN (${opIds.map((_, i) => '$' + (i + 1)).join(',')})`,
+        `SELECT id, name FROM operators WHERE id IN (${opIds.map(() => '?').join(',')})`,
         opIds
       );
       for (const op of ops) {
@@ -87,7 +158,7 @@ router.get('/withdraws', authMiddleware, checkPermission('finance:withdraw'), as
 // ============================================================
 // GET /api/v1/admin/finance/history-withdraws
 // 历史提现查询（按时间段筛选，任意状态）— finance:history
-// 修复: users 在 common 库
+// 超管遍历所有运营商库汇总分页
 // ============================================================
 router.get('/history-withdraws', authMiddleware, checkPermission('finance:history'), async (req: Request, res: Response) => {
   try {
@@ -101,49 +172,67 @@ router.get('/history-withdraws', authMiddleware, checkPermission('finance:histor
     const page = Math.max(1, parseInt(pageStr as string, 10) || 1);
     const pageSize = Math.min(100, Math.max(1, parseInt(pageSizeStr as string, 10) || 20));
     const offset = (page - 1) * pageSize;
+    const opId = (req.user as any)?.operatorId || null;
 
     const conditions: string[] = [];
     const params: any[] = [];
 
     if (start_date) {
-      conditions.push(`created_at >= $${params.length + 1}`);
+      conditions.push(`created_at >= ?`);
       params.push(start_date);
     }
     if (end_date) {
-      conditions.push(`created_at <= $${params.length + 1}`);
+      conditions.push(`created_at <= ?`);
       params.push(end_date);
     }
 
-    const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    // 总数（operator 库）
-    const countResult = await queryOpOne<{ count: number }>(req, 
-      `SELECT COUNT(*) as count FROM settlements s ${whereClause}`,
-      params.length > 0 ? params : undefined
-    );
-    const total = countResult?.count || 0;
+    let withdraws: any[] = [];
+    let total = 0;
 
-    // 分页数据（operator 库）
-    const withdraws = await queryOp<any>(req, 
-      `SELECT s.id, s.order_id, s.operator_id,
-              s.amount_cents as amount,
-              s.commission_cents,
-              s.status,
-              s.created_at as applied_at,
-              s.settled_at as processed_at
-       FROM settlements s
-       ${whereClause}
-       ORDER BY s.created_at DESC
-       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
-      [...params, pageSize, offset]
-    );
+    if (opId) {
+      const countResult = await queryOpOne<{ count: number }>(req,
+        `SELECT COUNT(*) as count FROM settlements s ${whereClause}`, params
+      );
+      total = countResult?.count || 0;
+      withdraws = await queryOp<any>(req,
+        `SELECT s.id, s.order_id, s.operator_id,
+                s.amount_cents as amount,
+                s.commission_cents,
+                s.status,
+                s.created_at as applied_at,
+                s.settled_at as processed_at
+         FROM settlements s
+         ${whereClause}
+         ORDER BY s.created_at DESC
+         LIMIT ? OFFSET ?`,
+        [...params, pageSize, offset]
+      );
+    } else {
+      // 超管：遍历所有运营商库汇总后内存分页
+      const allRows = await queryAllOperators<any>(req,
+        `SELECT s.id, s.order_id, s.operator_id,
+                s.amount_cents as amount,
+                s.commission_cents,
+                s.status,
+                s.created_at as applied_at,
+                s.settled_at as processed_at
+         FROM settlements s
+         ${whereClause}
+         ORDER BY s.created_at DESC`,
+        params
+      );
+      total = allRows.length;
+      withdraws = allRows.slice(offset, offset + pageSize);
+    }
 
     // common 库补查运营商名称
     const opIds = [...new Set(withdraws.map((w: any) => w.operator_id).filter(Boolean))];
     const opMap = new Map<string, any>();
     if (opIds.length > 0) {
       const ops = await query<any>(
-        `SELECT id, name, phone FROM operators WHERE id IN (${opIds.map((_, i) => '$' + (i + 1)).join(',')})`,
+        `SELECT id, name, phone FROM operators WHERE id IN (${opIds.map(() => '?').join(',')})`,
         opIds
       );
       for (const op of ops) {
@@ -171,13 +260,14 @@ router.get('/history-withdraws', authMiddleware, checkPermission('finance:histor
 // ============================================================
 // POST /api/v1/admin/finance/withdraws/:id/approve
 // 批准提现 — finance:withdraw
+// 超管遍历所有运营商库查找并更新
 // ============================================================
 router.post('/withdraws/:id/approve', authMiddleware, checkPermission('finance:withdraw'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const existing = await queryOpOne<{ id: string; status: string }>(req, 
-      'SELECT id, status FROM settlements WHERE id = $1',
+    const existing = await queryAllOperatorsOne<{ id: string; status: string }>(req,
+      'SELECT id, status FROM settlements WHERE id = ?',
       [id]
     );
 
@@ -188,8 +278,8 @@ router.post('/withdraws/:id/approve', authMiddleware, checkPermission('finance:w
       return res.status(400).json({ code: 400, message: '只能审核待处理状态的提现', data: null });
     }
 
-    await executeOp(req, 
-      'UPDATE settlements SET status = $1, settled_at = NOW() WHERE id = $2',
+    await executeAllOperators(req,
+      'UPDATE settlements SET status = ?, settled_at = NOW() WHERE id = ?',
       ['approved', id]
     );
 
@@ -203,13 +293,14 @@ router.post('/withdraws/:id/approve', authMiddleware, checkPermission('finance:w
 // ============================================================
 // POST /api/v1/admin/finance/withdraws/:id/reject
 // 拒绝提现 — finance:withdraw
+// 超管遍历所有运营商库查找并更新
 // ============================================================
 router.post('/withdraws/:id/reject', authMiddleware, checkPermission('finance:withdraw'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const existing = await queryOpOne<{ id: string; status: string }>(req, 
-      'SELECT id, status FROM settlements WHERE id = $1',
+    const existing = await queryAllOperatorsOne<{ id: string; status: string }>(req,
+      'SELECT id, status FROM settlements WHERE id = ?',
       [id]
     );
 
@@ -220,8 +311,8 @@ router.post('/withdraws/:id/reject', authMiddleware, checkPermission('finance:wi
       return res.status(400).json({ code: 400, message: '只能审核待处理状态的提现', data: null });
     }
 
-    await executeOp(req, 
-      'UPDATE settlements SET status = $1, settled_at = NOW() WHERE id = $2',
+    await executeAllOperators(req,
+      'UPDATE settlements SET status = ?, settled_at = NOW() WHERE id = ?',
       ['rejected', id]
     );
 
@@ -235,7 +326,7 @@ router.post('/withdraws/:id/reject', authMiddleware, checkPermission('finance:wi
 /**
  * GET /api/v1/admin/finance/withdraw-export
  * 提现审核数据导出 — finance:withdraw
- * 修复: users 在 common 库
+ * 超管遍历所有运营商库汇总导出
  */
 router.get('/withdraw-export', authMiddleware, checkPermission('finance:withdraw'), async (req: Request, res: Response) => {
   try {
@@ -245,18 +336,18 @@ router.get('/withdraw-export', authMiddleware, checkPermission('finance:withdraw
     const params: any[] = [];
 
     if (start_date) {
-      conditions.push(`s.created_at >= $${params.length + 1}`);
+      conditions.push(`s.created_at >= ?`);
       params.push(start_date);
     }
     if (end_date) {
-      conditions.push(`s.created_at <= $${params.length + 1}`);
+      conditions.push(`s.created_at <= ?`);
       params.push(end_date);
     }
 
     const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
 
-    // operator 库查 settlements
-    const withdrawals = await queryOp<any>(req, 
+    // 超管遍历所有运营商库，普通管理员走单库
+    const withdrawals = await queryAllOperators<any>(req,
       `SELECT s.id, s.operator_id,
               s.amount_cents as amount,
               s.status,
@@ -265,7 +356,7 @@ router.get('/withdraw-export', authMiddleware, checkPermission('finance:withdraw
        FROM settlements s
        ${whereClause}
        ORDER BY s.created_at DESC`,
-      params.length > 0 ? params : undefined
+      params
     );
 
     // common 库补查运营商名称
@@ -273,7 +364,7 @@ router.get('/withdraw-export', authMiddleware, checkPermission('finance:withdraw
     const opMap = new Map<string, string>();
     if (opIds.length > 0) {
       const ops = await query<any>(
-        `SELECT id, name FROM operators WHERE id IN (${opIds.map((_, i) => '$' + (i + 1)).join(',')})`,
+        `SELECT id, name FROM operators WHERE id IN (${opIds.map(() => '?').join(',')})`,
         opIds
       );
       for (const op of ops) {
@@ -376,27 +467,42 @@ router.get('/orders', authMiddleware, checkPermission('finance:read'), async (re
 /**
  * GET /api/v1/admin/finance/pending
  * 待处理提现列表 — finance:withdraw
+ * 超管遍历所有运营商库汇总分页
  */
 router.get('/pending', authMiddleware, checkPermission('finance:withdraw'), async (req: Request, res: Response) => {
   try {
     const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
     const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string, 10) || 20));
     const offset = (page - 1) * pageSize;
-    const countRow = await queryOpOne<{ count: string }>(req,
-      'SELECT COUNT(*) as count FROM settlements WHERE status = $1', ['pending']
-    );
-    const total = parseInt(countRow?.count || '0', 10);
-    const rows = await queryOp<any>(req,
-      'SELECT * FROM settlements WHERE status = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3',
-      ['pending', pageSize, offset]
-    );
+    const opId = (req.user as any)?.operatorId || null;
+
+    let rows: any[] = [];
+    let total = 0;
+
+    if (opId) {
+      const countRow = await queryOpOne<{ count: string }>(req,
+        'SELECT COUNT(*) as count FROM settlements WHERE status = ?', ['pending']
+      );
+      total = parseInt(countRow?.count || '0', 10);
+      rows = await queryOp<any>(req,
+        'SELECT * FROM settlements WHERE status = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
+        ['pending', pageSize, offset]
+      );
+    } else {
+      const allRows = await queryAllOperators<any>(req,
+        'SELECT * FROM settlements WHERE status = ? ORDER BY created_at DESC',
+        ['pending']
+      );
+      total = allRows.length;
+      rows = allRows.slice(offset, offset + pageSize);
+    }
 
     // common 库补查运营商名称
     const opIds = [...new Set(rows.map((r: any) => r.operator_id).filter(Boolean))];
     const opMap = new Map<string, string>();
     if (opIds.length > 0) {
       const ops = await query<any>(
-        `SELECT id, name FROM operators WHERE id IN (${opIds.map((_, i) => '$' + (i + 1)).join(',')})`,
+        `SELECT id, name FROM operators WHERE id IN (${opIds.map(() => '?').join(',')})`,
         opIds
       );
       for (const op of ops) {
