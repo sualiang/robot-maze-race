@@ -275,6 +275,7 @@ CREATE TABLE IF NOT EXISTS settlements (
   order_id VARCHAR(36) NOT NULL,
   operator_id VARCHAR(36) NOT NULL,
   amount_cents INT NOT NULL,
+  points_deduction_cents INT NOT NULL DEFAULT 0,
   commission_cents INT NOT NULL,
   status VARCHAR(20) NOT NULL DEFAULT 'pending',
   settled_at DATETIME,

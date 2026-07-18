@@ -388,7 +388,7 @@ router.post('/notify', async (req: Request, res: Response) => {
 
     // 3. 查询订单（手动 pool，无 auth）
     const [orderRow] = await opPool.execute(
-      `SELECT id, status, amount_cents as amount FROM orders WHERE order_no = ?`,
+      `SELECT id, status, amount_cents as amount, discount_cents, points_deduction_cents FROM orders WHERE order_no = ?`,
       [outTradeNo]
     );
     const order = orderRow as any;
@@ -438,9 +438,9 @@ router.post('/notify', async (req: Request, res: Response) => {
         );
         if (!stlRows || (Array.isArray(stlRows) && stlRows.length === 0)) {
           await opPool.execute(
-            `INSERT INTO settlements (id, order_id, amount_cents, commission_cents, operator_id, status, created_at)
-             VALUES (?, ?, ?, 0, ?, 'pending', NOW())`,
-            [uuidv4(), order.id, order.amount, attachOperatorId]
+            `INSERT INTO settlements (id, order_id, amount_cents, points_deduction_cents, commission_cents, operator_id, status, created_at)
+             VALUES (?, ?, ?, ?, 0, ?, 'pending', NOW())`,
+            [uuidv4(), order.id, order.amount, order.points_deduction_cents || 0, attachOperatorId]
           );
         }
       } catch (e: any) {
@@ -454,9 +454,9 @@ router.post('/notify', async (req: Request, res: Response) => {
         );
         if (!commonStl || commonStl.length === 0) {
           await execute(
-            `INSERT INTO settlements (id, order_id, operator_id, amount_cents, commission_cents, status, created_at)
-             VALUES (?, ?, ?, ?, 0, 'pending', NOW())`,
-            [uuidv4(), order.id, attachOperatorId, order.amount]
+            `INSERT INTO settlements (id, order_id, operator_id, amount_cents, points_deduction_cents, commission_cents, status, created_at)
+             VALUES (?, ?, ?, ?, ?, 0, 'pending', NOW())`,
+            [uuidv4(), order.id, attachOperatorId, order.amount, order.points_deduction_cents || 0]
           );
         }
       } catch (e: any) {

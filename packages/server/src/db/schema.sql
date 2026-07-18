@@ -233,6 +233,7 @@ CREATE TABLE IF NOT EXISTS settlements (
   order_id TEXT NOT NULL REFERENCES orders(id),
   operator_id TEXT NOT NULL REFERENCES users(id),
   amount_cents INTEGER NOT NULL,
+  points_deduction_cents INTEGER NOT NULL DEFAULT 0,
   commission_cents INTEGER NOT NULL,
   status VARCHAR(20) NOT NULL DEFAULT 'pending',
   settled_at TEXT,

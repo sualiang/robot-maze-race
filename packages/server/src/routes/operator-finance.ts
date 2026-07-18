@@ -5,7 +5,7 @@ import { authMiddleware } from '../middleware/auth';
 const router = Router();
 
 // ============================================================
-// Operator Finance 路由 — 运营商财务（需要 operator 角色）
+// Operator Finance 路由 - 运营商财务(需要 operator 角色)
 // ============================================================
 
 function operatorOnly(req: Request, res: Response, next: Function): void {
@@ -18,7 +18,7 @@ function operatorOnly(req: Request, res: Response, next: Function): void {
 
 /**
  * GET /api/v1/operator/finance
- * 根路径，等同 /summary
+ * 根路径,等同 /summary
  */
 router.get('/', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
@@ -31,18 +31,20 @@ router.get('/', authMiddleware, operatorOnly, async (req: Request, res: Response
        FROM operators WHERE id = $1`,
       [operatorId]
     );
-    const venueCount = await queryOpOne<{ count: string }>(req, 
+    const venueCount = await queryOpOne<{ count: string }>(req,
       'SELECT COUNT(*) as count FROM venues WHERE operator_id = $1',
       [operatorId]
     );
     const settlementStats = await queryOpOne<{
       total_amount_cents: number; total_commission_cents: number;
+      total_points_deduction_cents: number;
       total_settled_cents: number; total_pending_cents: number;
       settled_count: number; pending_count: number;
-    }>(req, 
+    }>(req,
       `SELECT
          COALESCE(SUM(amount_cents), 0) as total_amount_cents,
          COALESCE(SUM(commission_cents), 0) as total_commission_cents,
+         COALESCE(SUM(points_deduction_cents), 0) as total_points_deduction_cents,
          COALESCE(SUM(CASE WHEN status = 'settled' THEN amount_cents ELSE 0 END), 0) as total_settled_cents,
          COALESCE(SUM(CASE WHEN status = 'pending' THEN amount_cents ELSE 0 END), 0) as total_pending_cents,
          COALESCE(SUM(CASE WHEN status = 'settled' THEN 1 ELSE 0 END), 0) as settled_count,
@@ -51,13 +53,6 @@ router.get('/', authMiddleware, operatorOnly, async (req: Request, res: Response
       [operatorId]
     );
     const netIncome = (settlementStats?.total_amount_cents || 0) - (settlementStats?.total_commission_cents || 0);
-
-    // 积分抵扣汇总（从 orders 表）
-    const pointsStats = await queryOpOne<{ total_points_deduction_cents: number }>(req,
-      `SELECT COALESCE(SUM(points_deduction_cents), 0) as total_points_deduction_cents
-       FROM orders WHERE operator_id = $1 AND status = 'paid'`,
-      [operatorId]
-    );
 
     return res.json({
       code: 0, message: 'ok',
@@ -72,7 +67,7 @@ router.get('/', authMiddleware, operatorOnly, async (req: Request, res: Response
           pending_amount_cents: settlementStats?.total_pending_cents || 0,
           settled_count: settlementStats?.settled_count || 0,
           pending_count: settlementStats?.pending_count || 0,
-          total_points_deduction_cents: pointsStats?.total_points_deduction_cents || 0,
+          total_points_deduction_cents: settlementStats?.total_points_deduction_cents || 0,
         },
       },
     });
@@ -99,19 +94,21 @@ router.get('/summary', authMiddleware, operatorOnly, async (req: Request, res: R
       [operatorId]
     );
 
-    const venueCount = await queryOpOne<{ count: string }>(req, 
+    const venueCount = await queryOpOne<{ count: string }>(req,
       'SELECT COUNT(*) as count FROM venues WHERE operator_id = $1',
       [operatorId]
     );
 
     const settlementStats = await queryOpOne<{
       total_amount_cents: number; total_commission_cents: number;
+      total_points_deduction_cents: number;
       total_settled_cents: number; total_pending_cents: number;
       settled_count: number; pending_count: number;
-    }>(req, 
+    }>(req,
       `SELECT
          COALESCE(SUM(amount_cents), 0) as total_amount_cents,
          COALESCE(SUM(commission_cents), 0) as total_commission_cents,
+         COALESCE(SUM(points_deduction_cents), 0) as total_points_deduction_cents,
          COALESCE(SUM(CASE WHEN status = 'settled' THEN amount_cents ELSE 0 END), 0) as total_settled_cents,
          COALESCE(SUM(CASE WHEN status = 'pending' THEN amount_cents ELSE 0 END), 0) as total_pending_cents,
          COALESCE(SUM(CASE WHEN status = 'settled' THEN 1 ELSE 0 END), 0) as settled_count,
@@ -121,13 +118,6 @@ router.get('/summary', authMiddleware, operatorOnly, async (req: Request, res: R
     );
 
     const netIncome = (settlementStats?.total_amount_cents || 0) - (settlementStats?.total_commission_cents || 0);
-
-    // 积分抵扣汇总（从 orders 表）
-    const pointsStats = await queryOpOne<{ total_points_deduction_cents: number }>(req,
-      `SELECT COALESCE(SUM(points_deduction_cents), 0) as total_points_deduction_cents
-       FROM orders WHERE operator_id = $1 AND status = 'paid'`,
-      [operatorId]
-    );
 
     return res.json({
       code: 0, message: 'ok',
@@ -142,7 +132,7 @@ router.get('/summary', authMiddleware, operatorOnly, async (req: Request, res: R
           pending_amount_cents: settlementStats?.total_pending_cents || 0,
           settled_count: settlementStats?.settled_count || 0,
           pending_count: settlementStats?.pending_count || 0,
-          total_points_deduction_cents: pointsStats?.total_points_deduction_cents || 0,
+          total_points_deduction_cents: settlementStats?.total_points_deduction_cents || 0,
         },
       },
     });
@@ -154,7 +144,7 @@ router.get('/summary', authMiddleware, operatorOnly, async (req: Request, res: R
 
 /**
  * GET /api/v1/operator/finance/revenue-details
- * 按日期分组的营收明细（含订单详情、积分抵扣）
+ * 按日期分组的营收明细(含订单详情、积分抵扣)
  */
 router.get('/revenue-details', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
@@ -170,7 +160,7 @@ router.get('/revenue-details', authMiddleware, operatorOnly, async (req: Request
       params.push(startDate, endDate + ' 23:59:59');
     }
 
-    // 按日期汇总：日期, 订单数, 总营收, 总积分抵扣
+    // 按日期汇总:日期, 订单数, 总营收, 总积分抵扣
     const dailyRows = await queryOp<any>(req,
       `SELECT
          DATE(o.paid_at) as date,
@@ -186,7 +176,7 @@ router.get('/revenue-details', authMiddleware, operatorOnly, async (req: Request
       params
     );
 
-    // 每个日期的订单列表（含积分抵扣详情）
+    // 每个日期的订单列表(含积分抵扣详情)
     const result = await Promise.all((dailyRows || []).map(async (day: any) => {
       const orderRows = await queryOp<any>(req,
         `SELECT o.id, o.order_no, o.amount_cents, o.discount_cents,
@@ -233,7 +223,7 @@ router.get('/revenue-details', authMiddleware, operatorOnly, async (req: Request
 router.get('/export', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
     const operatorId = req.user!.userId;
-    const rows = await queryOp<any>(req, 
+    const rows = await queryOp<any>(req,
       `SELECT o.created_at, o.order_no, o.amount_cents, o.discount_cents,
               o.points_deduction_cents, o.status, o.paid_at
        FROM orders o
@@ -244,7 +234,7 @@ router.get('/export', authMiddleware, operatorOnly, async (req: Request, res: Re
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename=finance.csv');
     res.write('\uFEFF'); // BOM for Excel
-    res.write('日期,订单号,金额（元）,积分抵扣（元）,状态,支付时间\n');
+    res.write('日期,订单号,金额(元),积分抵扣(元),状态,支付时间\n');
     for (const r of rows) {
       const amount = ((r.amount_cents || 0) / 100).toFixed(2);
       const pointsDeducted = ((r.points_deduction_cents || 0) / 100).toFixed(2);
