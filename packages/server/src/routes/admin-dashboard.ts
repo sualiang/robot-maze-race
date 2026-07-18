@@ -82,40 +82,38 @@ router.get('/', authMiddleware, checkPermission('dashboard:read'), async (req: R
 // GET /api/v1/admin/dashboard/stats
 // 全平台统计总览 — dashboard:read
 // ============================================================
-// GET /api/v1/admin/dashboard/stats
-// 全平台 GMV — dashboard:read
-// payments 表聚合，跨库但快
+// GET /api/v1/admin/dashboard/stats-fast
+// 快速指标：GMV + 订单数（均从 payments 表聚合，不跨 orders 表）
 // ============================================================
-router.get('/stats', authMiddleware, checkPermission('dashboard:read'), async (req: Request, res: Response) => {
+router.get('/stats-fast', authMiddleware, checkPermission('dashboard:read'), async (req: Request, res: Response) => {
   try {
     const revenueResult = await queryAllOpDashOne<{ total: string }>(req, 
       `SELECT COALESCE(SUM(amount_cents), 0) as total FROM payments WHERE status = 'paid'`
     );
     const totalRevenue = parseInt(revenueResult?.total || '0', 10);
 
+    const orderResult = await queryAllOpDashOne<{ total: string }>(req, 
+      `SELECT COUNT(*) as total FROM payments WHERE status = 'paid'`
+    );
+    const totalOrders = parseInt(orderResult?.total || '0', 10);
+
     return res.json({
       code: 0,
       message: 'ok',
-      data: { total_revenue: totalRevenue },
+      data: { total_revenue: totalRevenue, total_orders: totalOrders },
     });
   } catch (error: any) {
-    console.error('[AdminDashboard] stats error:', error.message);
+    console.error('[AdminDashboard] stats-fast error:', error.message);
     return res.status(500).json({ code: 500, message: '获取统计总览失败', data: null });
   }
 });
 
 // ============================================================
-// GET /api/v1/admin/dashboard/stats-cross
-// 跨库聚合指标（慢查询，按需加载）
-// 返回: total_orders, platform_profit, pending_withdraw
+// GET /api/v1/admin/dashboard/stats-slow
+// 慢查询指标：平台收入 + 待审核提现（均从 settlements 跨库聚合）
 // ============================================================
-router.get('/stats-cross', authMiddleware, checkPermission('dashboard:read'), async (req: Request, res: Response) => {
+router.get('/stats-slow', authMiddleware, checkPermission('dashboard:read'), async (req: Request, res: Response) => {
   try {
-    const orderResult = await queryAllOpDashOne<{ total: string }>(req, 
-      `SELECT COUNT(*) as total FROM orders`
-    );
-    const totalOrders = parseInt(orderResult?.total || '0', 10);
-
     const profitResult = await queryAllOpDashOne<{ total: string }>(req, 
       `SELECT COALESCE(SUM(commission_cents), 0) as total FROM settlements WHERE status = 'settled'`
     );
@@ -129,14 +127,10 @@ router.get('/stats-cross', authMiddleware, checkPermission('dashboard:read'), as
     return res.json({
       code: 0,
       message: 'ok',
-      data: {
-        total_orders: totalOrders,
-        platform_profit: platformProfit,
-        pending_withdraw: pendingWithdraw,
-      },
+      data: { platform_profit: platformProfit, pending_withdraw: pendingWithdraw },
     });
   } catch (error: any) {
-    console.error('[AdminDashboard] stats-cross error:', error.message);
+    console.error('[AdminDashboard] stats-slow error:', error.message);
     return res.status(500).json({ code: 500, message: '获取跨库统计失败', data: null });
   }
 });

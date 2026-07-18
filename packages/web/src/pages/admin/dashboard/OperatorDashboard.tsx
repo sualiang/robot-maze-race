@@ -70,8 +70,8 @@ export default function OperatorDashboard() {
     total_revenue: 0, total_orders: 0, platform_profit: 0, pending_withdraw: 0,
   });
   const [loadingStats, setLoadingStats] = useState(false);
-  const [loadingCross, setLoadingCross] = useState(false);
-  const [crossLoaded, setCrossLoaded] = useState(false);
+  const [loadingSlow, setLoadingSlow] = useState(false);
+  const [slowLoaded, setSlowLoaded] = useState(false);
 
 
 
@@ -95,13 +95,17 @@ export default function OperatorDashboard() {
 
 
 
-  /* ── Fetch stats (GMV only, fast) ── */
+  /* ── Fetch fast stats (GMV + 订单数, payments table) ── */
   const fetchStats = useCallback(async () => {
     setLoadingStats(true);
     try {
-      const res: any = await api.get('/admin/dashboard/stats');
+      const res: any = await api.get('/admin/dashboard/stats-fast');
       if (res) {
-        setStats(prev => ({ ...prev, total_revenue: res.total_revenue ?? 0 }));
+        setStats(prev => ({
+          ...prev,
+          total_revenue: res.total_revenue ?? 0,
+          total_orders: res.total_orders ?? 0,
+        }));
       }
     } catch {
       // no-op
@@ -110,27 +114,26 @@ export default function OperatorDashboard() {
     }
   }, []);
 
-  /* ── Fetch cross-DB stats (slow, on demand) ── */
-  const fetchCrossStats = useCallback(async () => {
-    if (crossLoaded) return;
-    setLoadingCross(true);
+  /* ── Fetch slow stats (platform profit + pending withdraw, settlements cross-DB) ── */
+  const fetchSlowStats = useCallback(async () => {
+    if (slowLoaded) return;
+    setLoadingSlow(true);
     try {
-      const res: any = await api.get('/admin/dashboard/stats-cross');
+      const res: any = await api.get('/admin/dashboard/stats-slow');
       if (res) {
         setStats(prev => ({
           ...prev,
-          total_orders: res.total_orders ?? 0,
           platform_profit: res.platform_profit ?? 0,
           pending_withdraw: res.pending_withdraw ?? 0,
         }));
-        setCrossLoaded(true);
+        setSlowLoaded(true);
       }
     } catch {
       // no-op
     } finally {
-      setLoadingCross(false);
+      setLoadingSlow(false);
     }
-  }, [crossLoaded]);
+  }, [slowLoaded]);
 
   /* ── Fetch top operators ── */
   const fetchTopOperators = useCallback(async (page: number) => {
@@ -304,41 +307,44 @@ export default function OperatorDashboard() {
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
-          <Card loading={loadingCross}>
+          <Card loading={loadingStats}>
+            <Statistic title="全平台订单" value={stats.total_orders}
+              prefix={<WalletOutlined />} suffix="笔" />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card loading={loadingSlow}>
             <Statistic
               title={
                 <Space size={4}>
-                  <span>全平台订单</span>
+                  <span>预估平台收入</span>
                   <Button type="link" size="small" icon={<ReloadOutlined />}
-                    onClick={fetchCrossStats} loading={loadingCross && !crossLoaded}
+                    onClick={fetchSlowStats} loading={loadingSlow && !slowLoaded}
                     style={{ padding: 0, fontSize: 12 }} />
                 </Space>
               }
-              value={crossLoaded ? stats.total_orders : '--'}
-              suffix={crossLoaded ? '笔' : undefined}
-              prefix={crossLoaded ? <WalletOutlined /> : undefined}
+              value={slowLoaded ? (stats.platform_profit / 100).toFixed(2) : '--'}
+              suffix={slowLoaded ? '元' : undefined}
+              prefix={slowLoaded ? <BankOutlined /> : undefined}
+              valueStyle={slowLoaded ? { color: '#52c41a' } : undefined}
             />
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
-          <Card loading={loadingCross}>
+          <Card loading={loadingSlow}>
             <Statistic
-              title="预估平台收入"
-              value={crossLoaded ? (stats.platform_profit / 100).toFixed(2) : '--'}
-              suffix={crossLoaded ? '元' : undefined}
-              prefix={crossLoaded ? <BankOutlined /> : undefined}
-              valueStyle={crossLoaded ? { color: '#52c41a' } : undefined}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card loading={loadingCross}>
-            <Statistic
-              title="待审核提现"
-              value={crossLoaded ? (stats.pending_withdraw / 100).toFixed(2) : '--'}
-              suffix={crossLoaded ? '元' : undefined}
-              prefix={crossLoaded ? <DollarOutlined /> : undefined}
-              valueStyle={crossLoaded ? { color: '#faad14' } : undefined}
+              title={
+                <Space size={4}>
+                  <span>待审核提现</span>
+                  <Button type="link" size="small" icon={<ReloadOutlined />}
+                    onClick={fetchSlowStats} loading={loadingSlow && !slowLoaded}
+                    style={{ padding: 0, fontSize: 12 }} />
+                </Space>
+              }
+              value={slowLoaded ? (stats.pending_withdraw / 100).toFixed(2) : '--'}
+              suffix={slowLoaded ? '元' : undefined}
+              prefix={slowLoaded ? <DollarOutlined /> : undefined}
+              valueStyle={slowLoaded ? { color: '#faad14' } : undefined}
             />
           </Card>
         </Col>
