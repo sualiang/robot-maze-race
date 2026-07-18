@@ -310,29 +310,50 @@ router.get('/withdraw-export', authMiddleware, checkPermission('finance:withdraw
 /**
  * GET /api/v1/admin/finance/orders
  * 平台订单列表 — finance:read
- * 修复: player_profiles 在 common 库，orders 在 operator 库
+ * 超管(opId=null)遍历所有运营商库汇总，普通运营商走单库
  */
 router.get('/orders', authMiddleware, checkPermission('finance:read'), async (req: Request, res: Response) => {
   try {
     const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
     const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string, 10) || 20));
     const offset = (page - 1) * pageSize;
+    const opId = (req.user as any)?.operatorId || null;
 
-    // operator 库查 orders（带 operator_id 过滤）
-    const opId = (req.user as any)?.operatorId || '';
-    const countRow = await queryOpOne<{ count: string }>(req, 'SELECT COUNT(*) as count FROM orders WHERE operator_id = $1', [opId]);
-    const total = parseInt(countRow?.count || '0', 10);
-    const rows = await queryOp<any>(req,
-      'SELECT o.* FROM orders o WHERE o.operator_id = $1 ORDER BY o.created_at DESC LIMIT $2 OFFSET $3',
-      [opId, pageSize, offset]
-    );
+    let rows: any[] = [];
+    let total = 0;
+
+    if (opId) {
+      // 普通运营商：单个 operator 库
+      const countRow = await queryOpOne<{ count: string }>(req, 'SELECT COUNT(*) as count FROM orders WHERE operator_id = ?', [opId]);
+      total = parseInt(countRow?.count || '0', 10);
+      rows = await queryOp<any>(req,
+        'SELECT o.* FROM orders o WHERE o.operator_id = ? ORDER BY o.created_at DESC LIMIT ? OFFSET ?',
+        [opId, pageSize, offset]
+      );
+    } else {
+      // 超管：遍历所有运营商库汇总
+      const { getOperatorPool } = require('../config/database');
+      const opRegs = await query<any>('SELECT db_name, operator_id FROM operators_registry WHERE db_name IS NOT NULL', []);
+      const allRows: any[] = [];
+      for (const reg of opRegs) {
+        try {
+          const pool = getOperatorPool(reg.db_name);
+          const [regRows] = await pool.query<any[]>('SELECT o.*, ? as _op_id FROM orders o ORDER BY o.created_at DESC', [reg.operator_id]);
+          allRows.push(...regRows);
+        } catch { /* skip unavailable operator dbs */ }
+      }
+      total = allRows.length;
+      // 内存分页
+      allRows.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      rows = allRows.slice(offset, offset + pageSize);
+    }
 
     // common 库补查 player_profiles nickname
     const userIds = [...new Set(rows.map((r: any) => r.user_id).filter(Boolean))];
     const playerMap = new Map<string, string>();
     if (userIds.length > 0) {
       const profiles = await query<any>(
-        `SELECT user_id, nickname FROM player_profiles WHERE user_id IN (${userIds.map((_, i) => '$' + (i + 1)).join(',')})`,
+        `SELECT user_id, nickname FROM player_profiles WHERE user_id IN (${userIds.map(() => '?').join(',')})`,
         userIds
       );
       for (const p of profiles) {
