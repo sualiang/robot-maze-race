@@ -195,7 +195,7 @@ export default function MatchPage() {
   const selectRacer = async (racerId: string) => {
     const racer = queue.find((r) => r.id === racerId); if (!racer) return;
     setActionLoading(true);
-    try { await api.post('/referees/match/select-racer', { racerId }); setQueue(queue.map((r) => ({ ...r, isCurrent: r.id === racerId }))); setCurrentRacer(racer); setStatus('idle'); setElapsed(0); setPausedElapsed(0); setErrorMsg('已叫号: ' + (racer.nickname || racer.name)); setTimeout(() => setErrorMsg(''), 2000); }
+    try { await api.post('/referees/match/select-racer', { racerId }); loadQueue(); setCurrentRacer(racer); setStatus('idle'); setElapsed(0); setPausedElapsed(0); setErrorMsg('已叫号: ' + (racer.nickname || racer.name)); setTimeout(() => setErrorMsg(''), 2000); }
     catch {} finally { setActionLoading(false); }
   };
 
@@ -216,11 +216,11 @@ export default function MatchPage() {
     if (!currentRacer) { setErrorMsg('请先选择比赛选手'); return; }
     if (status === 'running') { setErrorMsg('比赛已在进行中'); return; }
     setActionLoading(true);
-    try { await api.post('/referees/match/start', { racerId: currentRacer.id }); clearTimer(); const now = Date.now(); const base = status === 'paused' ? pausedElapsed : elapsed; setStatus('running'); setElapsed(base); setPausedElapsed(0); startTimerInternal(base, now); }
+    try { await api.post('/referees/match/start', { racerId: currentRacer.id }); loadQueue(); clearTimer(); const now = Date.now(); const base = status === 'paused' ? pausedElapsed : elapsed; setStatus('running'); setElapsed(base); setPausedElapsed(0); startTimerInternal(base, now); }
     catch {} finally { setActionLoading(false); }
   };
 
-  const pauseRace = async () => { if (status !== 'running') return; clearTimer(); setStatus('paused'); setPausedElapsed(elapsed); try { await api.post('/referees/match/pause', { racerId: currentRacer?.id, elapsed }); } catch {}; setErrorMsg('⏸ 已暂停'); setTimeout(() => setErrorMsg(''), 1500); };
+  const pauseRace = async () => { if (status !== 'running') return; clearTimer(); setStatus('paused'); setPausedElapsed(elapsed); try { await api.post('/referees/match/pause', { racerId: currentRacer?.id, elapsed }); loadQueue(); } catch {}; setErrorMsg('⏸ 已暂停'); setTimeout(() => setErrorMsg(''), 1500); };
 
   const endRace = async () => {
     if (status !== 'running' && status !== 'paused') return; clearTimer();
@@ -238,6 +238,7 @@ export default function MatchPage() {
       setTimeout(() => setErrorMsg(''), 2000);
       setStatus('finished');
       setPausedElapsed(0);
+      loadQueue();
     }
     finally { setActionLoading(false); }
   };
@@ -266,6 +267,7 @@ export default function MatchPage() {
       setPausedElapsed(0);
       setStatus('malfunctioned');
       setErrorMsg('🤖 故障已登记，**' + racerName + '** 请重新开始');
+      loadQueue();
     }).catch(() => { setErrorMsg('网络异常，操作已本地缓存'); }).finally(() => setActionLoading(false));
   };
 

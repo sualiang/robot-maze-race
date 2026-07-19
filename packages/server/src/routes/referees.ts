@@ -893,8 +893,8 @@ router.post('/match/end', authMiddleware, async (req: Request, res: Response) =>
       return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
     }
 
-    let row = await refQueryOpOne<RacerRow>(req,
-      `SELECT id, user_id, venue_id, remaining_races FROM race_queues
+    let row = await refQueryOpOne<any>(req,
+      `SELECT id, user_id, venue_id, remaining_races, checkin_id FROM race_queues
        WHERE id = $1`,
       [racerId]
     );
@@ -920,6 +920,14 @@ router.post('/match/end', authMiddleware, async (req: Request, res: Response) =>
        WHERE id = $4`,
       [elapsed, finishStatus, newRemaining, racerId]
     );
+
+    // 同步更新 checkins 表（签到排队表，标记已完成）
+    if (row.checkin_id) {
+      await refExecuteOp(req,
+        `UPDATE checkins SET status = 'completed', updated_at = NOW() WHERE id = $1 AND status = 'queued'`,
+        [row.checkin_id]
+      );
+    }
 
     // 同步写入 race_records（成绩记录）
     if (row.user_id && row.venue_id) {
