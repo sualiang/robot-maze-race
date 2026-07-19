@@ -482,20 +482,79 @@ router.post('/operator-login', async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /api/v1/auth/send-code
+ * 发送手机验证码（裁判登录用）
+ * @param body.phone - 手机号
+ * @returns { code: 0, message: '验证码已发送' }
+ */
+router.post('/send-code', async (req: Request, res: Response) => {
+  try {
+    const { phone } = req.body;
+    if (!phone || !/^1[3-9]\d{9}$/.test(phone)) {
+      return res.status(400).json({ code: 400, message: '手机号格式不正确', data: null });
+    }
+
+    // 检查是否为已注册裁判手机号
+    let found = false;
+    try {
+      const regRows = await query<{ db_name: string }>(
+        `SELECT db_name FROM operators_registry WHERE db_name LIKE 'op_%'`,
+        []
+      );
+      for (const reg of regRows) {
+        try {
+          const pool = getOperatorPool(reg.db_name);
+          const [rows] = await pool.execute(
+            'SELECT id FROM referees WHERE phone = ? LIMIT 1',
+            [phone]
+          ) as any[];
+          if ((rows as any[])?.[0]) { found = true; break; }
+        } catch (e: any) { /* pool not ready, skip */ }
+      }
+    } catch (e: any) { /* ignore */ }
+
+    if (!found) {
+      return res.status(404).json({ code: 404, message: '该手机号未注册裁判账号', data: null });
+    }
+
+    // 生成 6 位数字验证码
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+
+    // 存入 Redis，5 分钟过期
+    const redis = await getRedis();
+    await redis.set(`sms_code:${phone}`, code, { EX: 300 });
+
+    // 打印验证码到日志（接入短信服务商后可删除此行）
+    console.log(`[SMS] 裁判登录验证码 → ${phone}: ${code}`);
+
+    return res.json({
+      code: 0,
+      message: '验证码已发送',
+      data: null,
+    });
+  } catch (err: any) {
+    console.error('[Auth] send-code error:', err.message);
+    return res.status(500).json({ code: 500, message: '发送验证码失败，请稍后重试', data: null });
+  }
+});
+
+/**
  * POST /api/v1/auth/login
  * 统一登录
  * - role='operator': 运营商超管（查 operator_members 表，phone + password）
  * - role='operator_member': 运营商子账号（查 operator_members 表，phone + password）
- * - 无 role / 其他: 裁判/玩家（查 referees 表 / users 表，phone + password）
+ * - role='referee': 裁判登录（phone + password，或 phone + code 验证码）
+ * - 无 role / 其他: 玩家（查 users 表，phone + password）
  * @param body.username - 手机号（role='operator'时传入 username 字段）
- * @param body.phone - 手机号（role='operator_member' 或无 role 时）
- * @param body.password - 密码（必填）
- * @param body.role - 角色：operator | operator_member | 不传/其他
+ * @param body.phone - 手机号（role='operator_member' / referee / 无 role 时）
+ * @param body.password - 密码（密码登录时必填）
+ * @param body.code - 验证码（验证码登录时必填，仅 referee 支持）
+ * @param body.role - 角色：operator | operator_member | referee | 不传/其他
  * @returns { token, user }
  */
 router.post('/login', async (req: Request, res: Response) => {
   try {
-    const { username, phone, password, role } = req.body;
+    const { username, phone, password, code, role } = req.body;
 
     if (role === 'operator') {
       // ===== 运营商超管登录（统一走 operator_members 表） =====
@@ -660,7 +719,81 @@ router.post('/login', async (req: Request, res: Response) => {
       });
     }
 
-    // ===== 裁判/玩家登录 =====
+    // ===== 裁判登录（role=referee 或 不传 role 但手机号匹配 referees 表） =====
+    if (role === 'referee' || (!role && !password)) {
+      if (!phone) {
+        return res.status(400).json({ code: 400, message: '请输入手机号', data: null });
+      }
+
+      // 验证码登录：phone + code
+      if (code && !password) {
+        if (!/^\d{6}$/.test(code)) {
+          return res.status(400).json({ code: 400, message: '验证码格式不正确', data: null });
+        }
+
+        // 校验 Redis 中的验证码
+        const redis = await getRedis();
+        const storedCode = await redis.get(`sms_code:${phone}`);
+        if (!storedCode || storedCode !== code) {
+          return res.status(401).json({ code: 401, message: '验证码错误或已过期', data: null });
+        }
+        // 验证成功，删除验证码（防重用）
+        await redis.del(`sms_code:${phone}`);
+
+        // 查找裁判
+        let refereeInfoByCode: { id: string; phone: string; name: string; operatorId: string; password: string; isFirstLogin: boolean } | null = null;
+        try {
+          const regRows = await query<{ db_name: string }>(
+            `SELECT db_name FROM operators_registry WHERE db_name LIKE 'op_%'`,
+            []
+          );
+          for (const reg of regRows) {
+            try {
+              const pool = getOperatorPool(reg.db_name);
+              const [rows] = await pool.execute(
+                'SELECT r.id, r.phone, r.name, r.password, r.is_first_login, r.operator_id FROM referees r WHERE r.phone = ? LIMIT 1',
+                [phone]
+              ) as any[];
+              if ((rows as any[])?.[0]) {
+                refereeInfoByCode = { ...rows[0], operatorId: rows[0].operator_id, isFirstLogin: rows[0].is_first_login === 1 };
+                break;
+              }
+            } catch (e: any) { /* pool not found, try next */ }
+          }
+        } catch (e: any) { /* ignore */ }
+
+        if (!refereeInfoByCode) {
+          return res.status(404).json({ code: 404, message: '该手机号未注册裁判账号', data: null });
+        }
+
+        const payload: AuthPayload = {
+          userId: refereeInfoByCode.id,
+          openid: 'ref_sms_' + refereeInfoByCode.id,
+          role: 'referee',
+          operatorId: refereeInfoByCode.operatorId,
+        };
+        const token = jwt.sign(payload, config.jwt.secret, { expiresIn: config.jwt.expiresIn as any });
+        return res.json({
+          code: 0,
+          message: '登录成功',
+          data: {
+            token,
+            user: {
+              id: refereeInfoByCode.id,
+              nickname: refereeInfoByCode.name || phone,
+              phone: refereeInfoByCode.phone,
+              role: 'referee',
+              operatorId: refereeInfoByCode.operatorId,
+              isFirstLogin: refereeInfoByCode.isFirstLogin,
+            },
+          },
+        });
+      }
+
+      // 密码登录：phone + password（原有逻辑）
+    }
+
+    // ===== 裁判/玩家登录（不传 role，回退到密码验证） =====
     if (!phone || !password) {
       return res.status(400).json({ code: 400, message: '缺少手机号或密码', data: null });
     }
