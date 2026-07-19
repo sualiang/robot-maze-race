@@ -14,6 +14,7 @@ interface QueueItem {
   queue_number: number;
   nickname: string;
   status: string;
+  avatar_url?: string;
 }
 
 interface ScreenData {
@@ -25,7 +26,7 @@ interface ScreenData {
   race_status: string;
   leaderboard: LeaderboardEntry[];
   queue: QueueItem[];
-  next_racer: { nickname: string; queue_number: number } | null;
+  next_racer: { nickname: string; queue_number: number; avatar_url?: string } | null;
   start_time?: number;
   last_result?: { racerName: string; racerAvatar?: string; elapsed: number };
 }
@@ -244,6 +245,17 @@ export default function ScreenDisplay() {
     return formatTime(ms);
   };
 
+  // 头像渲染：URL 用 img，纯 emoji/文字 用 span
+  const renderAvatar = (avatar: string | undefined, size: number = 40, defaultEmoji: string = '🤖') => {
+    if (!avatar) {
+      return <span style={{ fontSize: size * 0.8, lineHeight: 1 }}>{defaultEmoji}</span>;
+    }
+    if (avatar.startsWith('http://') || avatar.startsWith('https://') || avatar.startsWith('data:')) {
+      return <img src={avatar} alt="avatar" style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover' }} />;
+    }
+    return <span style={{ fontSize: size * 0.8, lineHeight: 1 }}>{avatar}</span>;
+  };
+
   // 默认场地数据（API 获取失败时的回退值）
   // 默认数据（当 WebSocket 返回 undefined 时的回退值）
   const fallbackData: ScreenData = {
@@ -456,11 +468,11 @@ export default function ScreenDisplay() {
                   flexShrink: 0,
                   background: 'linear-gradient(135deg, #ffd700, #ffaa00)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 36, lineHeight: 1,
+                  overflow: 'hidden',
                   border: '2px solid rgba(255,215,0,0.5)',
                   boxShadow: '0 0 20px rgba(255,215,0,0.5)',
                 }}>
-                  {displayData.last_result?.racerAvatar || '🤖'}
+                  {renderAvatar(displayData.last_result?.racerAvatar, 64)}
                 </div>
                 <div className="text-one-line" style={{
                   fontSize: 36, fontWeight: 700, color: '#ffd700',
@@ -483,11 +495,11 @@ export default function ScreenDisplay() {
                   flexShrink: 0,
                   background: 'linear-gradient(135deg, #ff6b35, #ff9a3c)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 36, lineHeight: 1,
+                  overflow: 'hidden',
                   border: '2px solid rgba(255,255,255,0.3)',
                   boxShadow: '0 0 20px rgba(255,107,53,0.5)',
                 }}>
-                  {displayData.current_racer.avatar_url || '🤖'}
+                  {renderAvatar(displayData.current_racer.avatar_url, 64)}
                 </div>
                 <div className="text-one-line" style={{
                   fontSize: 42, fontWeight: 700,
@@ -563,14 +575,28 @@ export default function ScreenDisplay() {
                     border: i === 0 ? '1px solid rgba(255,107,53,0.4)' : '1px solid transparent',
                     textAlign: 'center',
                     boxSizing: 'border-box',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 8,
                   }}>
                     {i === 0 ? (
                       <div style={{
                         fontSize: 13, fontWeight: 700, color: '#ff6b35',
-                        marginBottom: 4,
+                        marginBottom: 0,
                       }}>👇 下一个</div>
                     ) : (
-                      <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>&nbsp;</div>
+                      <div style={{ fontSize: 12, color: '#666', marginBottom: 0 }}>&nbsp;</div>
+                    )}
+                    {q.avatar_url && (
+                      <div style={{
+                        width: 36, height: 36, borderRadius: '50%',
+                        overflow: 'hidden',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        flexShrink: 0,
+                      }}>
+                        {renderAvatar(q.avatar_url, 36)}
+                      </div>
                     )}
                     <div style={{ fontSize: 17, fontWeight: 600, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', wordBreak: 'break-all' }}>{q.nickname}</div>
                   </div>
@@ -664,9 +690,11 @@ export default function ScreenDisplay() {
                     </div>
                     <div style={{ flex: 1, fontSize: 17, fontWeight: entry.rank <= 3 ? 600 : 400, display: 'flex', alignItems: 'center', gap: 10, paddingLeft: 20, overflow: 'hidden' }}>
                       {entry.avatar_url && (
-                        <span style={{ fontSize: 22, flexShrink: 0 }}>{entry.avatar_url}</span>
+                        <span style={{ width: 32, height: 32, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {renderAvatar(entry.avatar_url, 32)}
+                        </span>
                       )}
-                      <span>{entry.nickname}</span>
+                      <span className="text-one-line" style={{ maxWidth: 'calc(100% - 42px)' }}>{entry.nickname}</span>
                     </div>
                     <div style={{
                       width: 120, fontSize: 16, textAlign: 'right',
