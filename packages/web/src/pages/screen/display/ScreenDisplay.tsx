@@ -75,14 +75,16 @@ export default function ScreenDisplay() {
       setReconnecting(false);
       ws.send(JSON.stringify({ type: 'subscribe', channel: 'screen' }));
 
-      // 生成激活码并通过 WS 发给后端（无激活状态时显示给裁判扫码）
-      const code = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
-      setActivationCode(code);
-      ws.send(JSON.stringify({
-        type: 'screen_login',
-        activation_code: code,
-        venueId: venueId || undefined,
-      }));
+      // 仅首次连接生成激活码，重连不生成
+      if (!reconnectingRef.current) {
+        const code = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
+        setActivationCode(code);
+        ws.send(JSON.stringify({
+          type: 'screen_login',
+          activation_code: code,
+          venueId: venueId || undefined,
+        }));
+      }
 
       // 请求一次当前数据（防止签到后打开大屏没有初始数据）
       ws.send(JSON.stringify({ type: 'get_screen_data' }));
