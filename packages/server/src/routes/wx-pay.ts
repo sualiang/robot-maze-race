@@ -489,13 +489,14 @@ router.post('/notify', async (req: Request, res: Response) => {
         );
         if (!stlRows || (Array.isArray(stlRows) && stlRows.length === 0)) {
           await opPool.execute(
-            `INSERT INTO settlements (id, order_id, amount_cents, points_deduction_cents, commission_cents, operator_id, status, created_at)
-             VALUES (?, ?, ?, ?, 0, ?, 'pending', NOW())`,
-            [uuidv4(), order.id, order.amount, order.points_deduction_cents || 0, attachOperatorId]
+            `INSERT INTO settlements (id, order_id, amount_cents, commission_cents, operator_id, status, created_at)
+             VALUES (?, ?, ?, 0, ?, 'pending', NOW())`,
+            [uuidv4(), order.id, order.amount, attachOperatorId || order.operator_id || '']
           );
         }
       } catch (e: any) {
-        console.warn('[WxPay] settlements idempotent insert warning:', e.message?.substring(0, 100));
+        console.error('[WxPay] settlements INSERT 失败! outTradeNo:', outTradeNo, 'orderId:', order.id, 'err:', e.message);
+        throw e;
       }
 
       // P0-14: 写入总部 common 库 settlements（跨运营商分账报表）
@@ -505,13 +506,14 @@ router.post('/notify', async (req: Request, res: Response) => {
         );
         if (!commonStl || commonStl.length === 0) {
           await execute(
-            `INSERT INTO settlements (id, order_id, operator_id, amount_cents, points_deduction_cents, commission_cents, status, created_at)
-             VALUES (?, ?, ?, ?, ?, 0, 'pending', NOW())`,
-            [uuidv4(), order.id, attachOperatorId, order.amount, order.points_deduction_cents || 0]
+            `INSERT INTO settlements (id, order_id, operator_id, amount_cents, commission_cents, status, created_at)
+             VALUES (?, ?, ?, ?, 0, 'pending', NOW())`,
+            [uuidv4(), order.id, attachOperatorId || order.operator_id || '', order.amount]
           );
         }
       } catch (e: any) {
-        console.warn('[WxPay] common settlements insert warning:', e.message?.substring(0, 100));
+        console.error('[WxPay] common settlements INSERT 失败! outTradeNo:', outTradeNo, 'orderId:', order.id, 'err:', e.message);
+        throw e;
       }
 
       // ===== 支付成功后执行 side effects =====
@@ -618,6 +620,16 @@ router.get('/query/:orderId', authMiddleware, async (req: Request, res: Response
             );
           } catch (e: any) {
             console.error('[WxPay] 兜底 payments INSERT 失败:', e.message);
+          }
+          // 兜底也写 settlements（幂等）
+          try {
+            await executeOp(req,
+              `INSERT IGNORE INTO settlements (id, order_id, amount_cents, commission_cents, operator_id, status, created_at)
+               VALUES (?, ?, ?, 0, ?, 'pending', NOW())`,
+              [uuidv4(), order.id, order.amount, orderDetail?.[0]?.operator_id || '']
+            );
+          } catch (e: any) {
+            console.error('[WxPay] 兜底 settlements INSERT 失败:', e.message);
           }
           order.status = 'paid';
           order.transaction_id = wxOrder.transaction_id;
