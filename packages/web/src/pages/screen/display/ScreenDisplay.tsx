@@ -145,6 +145,11 @@ export default function ScreenDisplay() {
             // 闲置：固定显示 elapsed_ms
             setElapsed(screenData.elapsed_ms || 0);
           }
+        } else if (msg.type === 'deactivated') {
+          // 大屏被解除绑定，回到激活码输入状态
+          sessionStorage.removeItem('screen_activated');
+          const vid = data?.venueId || new URLSearchParams(window.location.search).get('venueId') || '';
+          window.location.replace(`/screen/login${vid ? `?venueId=${vid}` : ''}`);
         } else if (msg.event === 'venue_closed') {
           // 签退后直接跳激活码页面，不走守卫循环
           sessionStorage.removeItem('screen_activated');
