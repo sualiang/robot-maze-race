@@ -492,7 +492,7 @@ router.get('/queue/current', authMiddleware, rateLimiter(10, 60), async (req: Re
       [userId]
     );
     if (lastResultRow) {
-      const s = lastResultRow.score_ms ?? 0;
+      const s = (lastResultRow.score_ms ?? 0) / 1000;
       let scoreText = '--';
       if (typeof s === 'number') {
         if (s < 60) scoreText = s.toFixed(1) + 's';
