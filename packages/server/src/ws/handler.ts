@@ -2,6 +2,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { IncomingMessage } from 'http';
 import { Server } from 'http';
 import { getCurrentScreenData } from '../routes/referees';
+import { getRedis } from '../config/redis';
 
 // 存储所有连接的客户端，按房间分组
 const rooms = new Map<string, Set<WebSocket>>();
@@ -9,34 +10,21 @@ const clientRooms = new Map<WebSocket, string>();
 const screenClients = new Set<WebSocket>();
 const refereeClients = new Set<WebSocket>();
 
-// 激活码映射: code → { ws, venueId?, venueName?, createdAt }
-const activationCodes = new Map<string, {
-  ws: WebSocket;
-  venueId?: string;
-  venueName?: string;
-  createdAt: number;
-}>();
+const ACTIVATION_CODE_PREFIX = 'activation_code:';
+const ACTIVATION_CODE_TTL = 60; // 秒（Redis SETEX用）
 
-const ACTIVATION_CODE_TTL = 60_000; // 60秒
-
-function cleanExpiredCodes() {
-  const now = Date.now();
-  for (const [code, entry] of activationCodes.entries()) {
-    if (now - entry.createdAt > ACTIVATION_CODE_TTL) {
-      activationCodes.delete(code);
-    }
-  }
-}
-
-export function validateActivationCode(code: string): { valid: boolean; ws?: WebSocket; venueId?: string; venueName?: string } {
-  cleanExpiredCodes();
-  const entry = activationCodes.get(code);
-  if (!entry) return { valid: false };
-  if (Date.now() - entry.createdAt > ACTIVATION_CODE_TTL) {
-    activationCodes.delete(code);
+export async function validateActivationCode(code: string): Promise<{ valid: boolean; venueId?: string; venueName?: string }> {
+  if (!code) return { valid: false };
+  try {
+    const redis = await getRedis();
+    const data = await redis.get(ACTIVATION_CODE_PREFIX + code);
+    if (!data) return { valid: false };
+    const entry = JSON.parse(data);
+    return { valid: true, venueId: entry.venueId, venueName: entry.venueName };
+  } catch (e: any) {
+    console.error('[ActivationCode] Redis read error:', e.message);
     return { valid: false };
   }
-  return { valid: true, ws: entry.ws, venueId: entry.venueId, venueName: entry.venueName };
 }
 
 function handleConnection(ws: WebSocket, req: IncomingMessage) {
@@ -68,10 +56,7 @@ function handleConnection(ws: WebSocket, req: IncomingMessage) {
 function handleClose(ws: WebSocket) {
   screenClients.delete(ws);
   refereeClients.delete(ws);
-  // 清理该 ws 对应的激活码映射
-  for (const [code, entry] of activationCodes.entries()) {
-    if (entry.ws === ws) activationCodes.delete(code);
-  }
+  // Redis TTL handles activation code expiry; no manual cleanup needed
   const room = clientRooms.get(ws);
   if (room) {
     const clients = rooms.get(room);
@@ -120,22 +105,41 @@ function handleMessage(ws: WebSocket, msg: any) {
     }
 
     case 'screen_login': {
-      // 大屏生成激活码后注册映射（含 venueId 关联）
+      // 大屏生成激活码后存 Redis（含 venueId 关联）
       const code = msg.activation_code;
       if (!code || typeof code !== 'string') break;
       const venueId = msg.venueId || undefined;
-      cleanExpiredCodes();
-      activationCodes.set(code, { ws, venueId, createdAt: Date.now() });
+      const venueName = msg.venueName || undefined;
+      (async () => {
+        try {
+          const redis = await getRedis();
+          await redis.setEx(
+            ACTIVATION_CODE_PREFIX + code,
+            ACTIVATION_CODE_TTL,
+            JSON.stringify({ venueId, venueName, createdAt: Date.now() })
+          );
+          console.log('[ActivationCode] Stored in Redis:', code.substring(0, 8) + '...');
+        } catch (e: any) {
+          console.error('[ActivationCode] Redis write error:', e.message);
+        }
+      })();
       ws.send(JSON.stringify({ type: 'login_ack', message: '等待裁判扫码' }));
       break;
     }
 
     case 'get_activation_code': {
-      // 查询有效激活码列表（不暴露 ws 对象）
-      cleanExpiredCodes();
-      const codes: string[] = [];
-      activationCodes.forEach((_entry, c) => codes.push(c));
-      ws.send(JSON.stringify({ type: 'activation_codes', codes }));
+      // 查询有效激活码列表（从 Redis 读取）
+      (async () => {
+        try {
+          const redis = await getRedis();
+          const keys = await redis.keys(ACTIVATION_CODE_PREFIX + '*');
+          const codes = keys.map(k => k.replace(ACTIVATION_CODE_PREFIX, ''));
+          ws.send(JSON.stringify({ type: 'activation_codes', codes }));
+        } catch (e: any) {
+          console.error('[ActivationCode] Redis keys error:', e.message);
+          ws.send(JSON.stringify({ type: 'activation_codes', codes: [] }));
+        }
+      })();
       break;
     }
 

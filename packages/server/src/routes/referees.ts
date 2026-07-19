@@ -1324,8 +1324,8 @@ router.post('/attendance/check-in-by-qr', authMiddleware, async (req: Request, r
       return res.status(400).json({ code: 400, message: '缺少激活码', data: null });
     }
 
-    // 1. 验证激活码
-    const validation = validateActivationCode(activationCode);
+    // 1. 验证激活码（Redis，进程重启不丢）
+    const validation = await validateActivationCode(activationCode);
     if (!validation.valid) {
       return res.status(400).json({ code: 400, message: '激活码无效或已过期，请刷新大屏二维码', data: null });
     }
@@ -1394,13 +1394,11 @@ router.post('/attendance/check-in-by-qr', authMiddleware, async (req: Request, r
     // 回写 venues 表
     try { await executeOp(req, 'UPDATE venues SET status = \'open\' WHERE id = $1', [venue.id]); } catch (_) {}
 
-    // 8. 通知大屏激活
-    if (validation.ws && validation.ws.readyState === WebSocket.OPEN) {
-      validation.ws.send(JSON.stringify({
-        type: 'activated',
-        data: { venue_name: venue.name, venue_id: venue.id },
-      }));
-    }
+    // 8. 广播大屏激活（通过 WebSocket broadcast 而非旧的内存 ws 引用）
+    broadcastToScreen({
+      type: 'activated',
+      data: { venue_name: venue.name, venue_id: venue.id },
+    });
 
     // 9. 广播 screen_data 更新
     const screenData = getCurrentScreenData();
