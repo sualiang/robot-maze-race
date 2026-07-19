@@ -1888,9 +1888,9 @@ export async function pushCurrentScreenData(ws: WebSocket) {
       [venueId]
     ))[0] || null;
 
-    // 排行榜 top 10
+    // 排行榜 top 10 —— 按 finish_time_ms 升序，与 broadcastAfterUpdate 对齐
     const leaderRows: any[] = await runSql(
-      `SELECT rq.user_id, MIN(rq.score) as best_score, COUNT(*) as total_races FROM race_queues rq WHERE rq.venue_id=? AND rq.status='finished' AND rq.score IS NOT NULL GROUP BY rq.user_id ORDER BY best_score ASC LIMIT 10`,
+      `SELECT rq.* FROM race_queues rq WHERE rq.venue_id=? AND rq.status='finished' AND rq.finish_status != 'invalid' ORDER BY rq.finish_time_ms ASC LIMIT 10`,
       [venueId]
     );
 
