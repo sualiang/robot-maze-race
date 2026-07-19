@@ -972,19 +972,24 @@
 /* 排队名字 */
 .referee-queue-name {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   overflow: hidden;
   min-width: 0;
   font-size: 15px;
   font-weight: 500;
+  gap: 2px;
 }
 .referee-queue-name .text-one-line {
-  display: inline;
+  display: block;
+  max-width: 100%;
 }
 .referee-queue-remaining {
   font-size: 12px;
   color: var(--ref-text-dim);
   font-weight: 400;
-  margin-left: 4px;
+  margin-left: 0;
 }
 .referee-queue-remaining strong {
   color: #e94560;
