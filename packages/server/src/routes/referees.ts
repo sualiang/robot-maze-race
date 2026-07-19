@@ -1966,35 +1966,35 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response<ApiRespo
 
 /**
  * POST /api/v1/referees/register
- * 裁判注册（公开接口，phone+name → 随机密码 → INSERT users + referees）
+ * 裁判注册（运营商后台专用）
+ * @header Authorization: Bearer <operator_token>
  * @body phone - 手机号（必填，11位）
  * @body name - 姓名（必填）
- * @body operator_id - 运营商ID（必填，指明注册到哪个运营商下）
  * @returns 裁判信息 + 系统生成的登录密码
  */
-router.post('/register', async (req: Request, res: Response) => {
+router.post('/register', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const { phone, name, operator_id } = req.body;
+    const { phone, name } = req.body;
+    const operatorId = (req.user as any)?.operatorId;
 
+    if (!operatorId) {
+      return res.status(400).json({ code: 400, message: '缺少运营商ID', data: null });
+    }
     if (!phone || !name) {
       return res.status(400).json({ code: 400, message: '请填写手机号和姓名', data: null });
     }
-    if (!/^\d{11}$/.test(phone)) {
+    if (!/^1[3-9]\d{9}$/.test(phone)) {
       return res.status(400).json({ code: 400, message: '手机号格式不正确', data: null });
-    }
-    if (!operator_id) {
-      return res.status(400).json({ code: 400, message: '缺少运营商ID', data: null });
     }
 
     // 查找运营商库
     const opRegistry = await queryOne<{ db_name: string; operator_name: string }>(
       'SELECT db_name, operator_name FROM operators_registry WHERE operator_id = $1',
-      [operator_id]
+      [operatorId]
     );
     if (!opRegistry || !opRegistry.db_name) {
       return res.status(400).json({ code: 400, message: '指定的运营商不存在', data: null });
     }
-
 
     const opPool = getOperatorPool(opRegistry.db_name);
 
@@ -2025,7 +2025,6 @@ router.post('/register', async (req: Request, res: Response) => {
       );
     } else {
       userId = existingUser.id;
-      // 更新 nickname 和 role
       await execute(
         `UPDATE users SET nickname = $1, role = $2, updated_at = NOW() WHERE id = $3`,
         [name, 'referee', userId]
@@ -2037,7 +2036,7 @@ router.post('/register', async (req: Request, res: Response) => {
     await opPool.execute(
       `INSERT INTO referees (id, user_id, phone, password, is_first_login, name, operator_id)
        VALUES (?, ?, ?, ?, 1, ?, ?)`,
-      [refereeId, userId, phone, hashedPwd, name, operator_id]
+      [refereeId, userId, phone, hashedPwd, name, operatorId]
     );
 
     return res.status(201).json({
@@ -2049,7 +2048,7 @@ router.post('/register', async (req: Request, res: Response) => {
         name,
         phone,
         password: generatedPassword,
-        operator_id,
+        operator_id: operatorId,
       },
     });
   } catch (error: any) {

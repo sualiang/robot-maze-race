@@ -99,7 +99,6 @@ export default function RefereeList() {
       const data: any = await api.post('/referees/register', {
         phone: values.phone,
         name: values.name,
-        operator_id: effectiveOperatorId,
       });
       message.success('裁判创建成功');
       setCreateOpen(false);
