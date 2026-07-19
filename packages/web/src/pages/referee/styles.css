@@ -984,6 +984,9 @@
 .referee-queue-name .text-one-line {
   display: block;
   max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .referee-queue-remaining {
   font-size: 12px;
