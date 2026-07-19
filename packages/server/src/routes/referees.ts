@@ -1910,7 +1910,7 @@ export async function pushCurrentScreenData(ws: WebSocket) {
     const userMap = new Map<string, { nickname: string; avatar_url: string }>();
     if (allUserIds.length > 0) {
       const placeholders = allUserIds.map((_, i) => '$' + (i + 1)).join(',');
-      const userRows: any[] = await q(
+      const userRows: any[] = await query(
         `SELECT id, nickname, avatar_url FROM users WHERE id IN (${placeholders})`,
         allUserIds
       );
