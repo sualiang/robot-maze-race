@@ -8,6 +8,16 @@ import dayjs from 'dayjs';
 import { useSearchParams } from 'react-router-dom';
 import api from '../../../utils/api';
 
+function formatRaceTime(ms: number | null): string {
+  if (ms === null || ms === undefined || ms <= 0) return '-';
+  const v = ms < 1000 ? Math.round(ms * 1000) : Math.round(ms);
+  const totalSec = Math.floor(v / 1000);
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  const cs = Math.floor((v % 1000) / 10);
+  return String(min).padStart(2, '0') + ':' + String(sec).padStart(2, '0') + '.' + String(cs).padStart(2, '0');
+}
+
 interface PlayerItem {
   id: string;
   nickname: string;
@@ -165,7 +175,7 @@ export default function AdminPlayers() {
     },
     {
       title: '最佳成绩', dataIndex: 'best_score', key: 'best_score', width: 90,
-      render: (v: number) => (v != null ? `${v}s` : '-'),
+      render: (v: number) => (v != null ? formatRaceTime(v) : '-'),
     },
     {
       title: '注册时间', dataIndex: 'created_at', key: 'created_at', width: 160,

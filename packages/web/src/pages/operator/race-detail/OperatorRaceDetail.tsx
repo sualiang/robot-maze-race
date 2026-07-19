@@ -65,7 +65,13 @@ const CLASS_MAP: Record<string, string> = {
 
 function formatScore(score: number): string {
   if (score === undefined || score === null || score <= 0) return '--';
-  return `${score.toFixed(2)}s`;
+  // 成绩单位可能是秒也可能是毫秒，统一按毫秒格式化 mm:ss.ms
+  const ms = score < 1000 ? Math.round(score * 1000) : Math.round(score);
+  const totalSec = Math.floor(ms / 1000);
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  const cs = Math.floor((ms % 1000) / 10);
+  return String(min).padStart(2, '0') + ':' + String(sec).padStart(2, '0') + '.' + String(cs).padStart(2, '0');
 }
 
 function formatRank(rank: number): string {
