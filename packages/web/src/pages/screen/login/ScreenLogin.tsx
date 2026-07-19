@@ -11,7 +11,7 @@ export default function ScreenLogin() {
   const [activated, setActivated] = useState(false);
   const [venueName, setVenueName] = useState('');
   const [venueClosed, setVenueClosed] = useState(false);
-  const [countdown, setCountdown] = useState(60);
+  const [countdown, setCountdown] = useState(0);
   const [expired, setExpired] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -40,19 +40,8 @@ export default function ScreenLogin() {
     const code = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
     setActivationCode(code);
     setExpired(false);
-    setCountdown(60);
-
+    // 不再倒计时 — 激活码永久有效
     if (timerRef.current) clearInterval(timerRef.current);
-    timerRef.current = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          setExpired(true);
-          if (timerRef.current) clearInterval(timerRef.current);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
 
     return code;
   }, []);
@@ -186,20 +175,14 @@ export default function ScreenLogin() {
           {activationCode}
         </div>
 
-        {/* 倒计时 */}
-        <div style={{ fontSize: 14, color: expired ? '#f5222d' : '#999', marginBottom: 16 }}>
-          {expired ? (
-            <span>激活码已过期，请刷新</span>
-          ) : (
-            <>
-              <span style={{
-                display: 'inline-block', width: 8, height: 8,
-                borderRadius: '50%', background: '#52c41a',
-                marginRight: 6,
-              }} />
-              有效期剩余 {countdown} 秒
-            </>
-          )}
+        {/* 激活码永久有效 */}
+        <div style={{ fontSize: 14, color: '#999', marginBottom: 16 }}>
+          <span style={{
+            display: 'inline-block', width: 8, height: 8,
+            borderRadius: '50%', background: '#52c41a',
+            marginRight: 6,
+          }} />
+          激活码长期有效
         </div>
 
         <div
