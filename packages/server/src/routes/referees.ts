@@ -1444,21 +1444,7 @@ function getOpPoolFromJwt(req: Request): MysqlPool | null {
   if (opId) {
     try { return getOperatorPool('op_' + opId); } catch { /* fall through */ }
   }
-  // 降级：referee-bind 旧 token 可能不带 operatorId，根据 userId 从 referees 查 operator_id
-  const userId = jwt?.userId;
-  if (!userId) return null;
-  // 遍历所有已知 op_* 库（从 common 库 operators_registry 拿列表）
-  try {
-    const common = getCommonPool();
-    const [regRows] = (await common.query('SELECT db_name FROM operators_registry WHERE db_name IS NOT NULL')) as any[];
-    for (const reg of (regRows as any[] || [])) {
-      try {
-        const pool = getOperatorPool(reg.db_name);
-        const [rows] = await pool.execute('SELECT id, operator_id FROM referees WHERE user_id = ? OR id = ? LIMIT 1', [userId, userId]) as any[];
-        if ((rows as any[])?.[0]) return pool;
-      } catch { /* skip unreachable DB */ }
-    }
-  } catch { /* operators_registry 可能不存在 */ }
+  // JWT 无 operatorId 时无法确定库，返回 null
   return null;
 }
 
