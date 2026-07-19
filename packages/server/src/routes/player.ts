@@ -365,9 +365,9 @@ router.post('/checkin', authMiddleware, async (req: Request, res: Response) => {
         `UPDATE race_queues SET status = 'waiting', queue_number = ?, checkin_id = ?, updated_at = NOW()
          WHERE user_id = ? AND venue_id = ? AND status != 'waiting'`,
         [queueNumber, checkinId, userId, venueId]
-      ) as any) as { affectedRows?: number };
+      ) as any) as { changes?: number };
       // 如果没有更新到（该用户没有旧记录），则 INSERT 新记录
-      if (!updateResult?.affectedRows) {
+      if (!updateResult?.changes) {
         const raceQueueId = uuidv4();
         await executeOp(req,
           `INSERT INTO race_queues (id, user_id, venue_id, queue_number, status, remaining_races, checkin_id, created_at, updated_at)
