@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { Pool as MysqlPool } from 'mysql2/promise';
 import { broadcastToScreen, validateActivationCode } from '../ws/handler';
+import { getRedis } from '../config/redis';
 import { WebSocket } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
 import { hashSync } from '../config/bcrypt';
@@ -1448,7 +1449,18 @@ async function refExecuteOp(req: Request, sql: string, params?: any[]): Promise<
 
 async function getOpPoolFromJwt(req: Request): Promise<MysqlPool | null> {
   const jwt = req.user as any;
-  const opId = jwt?.operatorId;
+  let opId = jwt?.operatorId;
+  // fallback: 从 Redis operator_context 读取（JWT 没有 operatorId 时）
+  if (!opId) {
+    try {
+      const redis = await getRedis();
+      const ctxData = await redis.get(`operator_context:${jwt.userId}`);
+      if (ctxData) {
+        const ctx = JSON.parse(ctxData);
+        if (ctx.operatorId) opId = ctx.operatorId;
+      }
+    } catch { /* ignore redis errors */ }
+  }
   if (!opId) return null;
 
   // 1) 查询 operators_registry 获取真正的 db_name
