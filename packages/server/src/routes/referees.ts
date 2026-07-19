@@ -4,7 +4,7 @@ import { broadcastToScreen, validateActivationCode } from '../ws/handler';
 import { WebSocket } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
 import { hashSync } from '../config/bcrypt';
-import { query, queryOne, execute, queryOp, queryOpOne, executeOp, getOperatorPool } from '../config/database';
+import { query, queryOne, execute, getOperatorPool } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import {
   ApiResponse,
@@ -188,7 +188,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response<ApiResponse<P
         ))?.operator_id
         || req.user!.userId;
 
-      const operatorVenues = await queryOp<{ id: string }>(req,
+      const operatorVenues = await refQueryOp<{ id: string }>(req,
         'SELECT id FROM venues WHERE operator_id = $1',
         [owneOpId]
       );
@@ -299,7 +299,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response<ApiResponse<P
 
     // ---- operator 路径（直接用 JWT operatorId 连 op_* 库，不依赖 resolveOperatorDb） ----
 
-    const opPool = getOpPoolFromJwt(req);
+    const opPool = await getOpPoolFromJwt(req);
     if (!opPool) {
       return res.json({ code: 0, message: 'ok', data: { list: [], total: 0, page, pageSize } });
     }
@@ -370,7 +370,7 @@ router.get('/my', authMiddleware, async (req: Request, res: Response<ApiResponse
   try {
     const userId = req.user!.userId;
 
-    const referee = await queryOpOne<RefereeWithUser>(req, 
+    const referee = await refQueryOpOne<RefereeWithUser>(req, 
       `SELECT r.id, r.user_id, r.venue_id, r.status,
               r.name,
               r.phone, r.id_number, r.cert_image,
@@ -408,7 +408,7 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response<ApiRespons
   try {
     const { id } = req.params;
 
-    const row = await queryOpOne<any>(req, 
+    const row = await refQueryOpOne<any>(req, 
       `SELECT r.id, r.user_id, r.venue_id, r.status,
               r.name,
               r.phone, r.id_number, r.cert_image,
@@ -486,7 +486,7 @@ router.put('/:id/bind-venue', authMiddleware, async (req: Request, res: Response
     }
 
     // 验证赛场存在
-    const venue = await queryOpOne<{ id: string }>(req, 
+    const venue = await refQueryOpOne<{ id: string }>(req, 
       'SELECT id FROM venues WHERE id = $1',
       [venue_id]
     );
@@ -494,11 +494,11 @@ router.put('/:id/bind-venue', authMiddleware, async (req: Request, res: Response
       return res.status(404).json({ code: 404, message: '赛场不存在', data: null as any });
     }
 
-    await executeOp(req, 
+    await refExecuteOp(req, 
       'UPDATE referees SET venue_id = $1, updated_at = NOW() WHERE id = $2',
       [venue_id, id]
     );
-    const referee = await queryOpOne<Referee>(req, 
+    const referee = await refQueryOpOne<Referee>(req, 
       'SELECT id, user_id, venue_id, phone, id_number, cert_image, id_card_front, id_card_back last_checkin_at, created_at, updated_at FROM referees WHERE id = $1',
       [id]
     );
@@ -530,11 +530,11 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response<ApiResp
     }
 
     // 先取 user_id 再删裁判，同时清理 users 表残留
-    const ref = await queryOpOne<{ user_id: string }>(req, 
+    const ref = await refQueryOpOne<{ user_id: string }>(req, 
       'SELECT user_id FROM referees WHERE id = $1', [id]
     );
 
-    const result = await executeOp(req, 
+    const result = await refExecuteOp(req, 
       'DELETE FROM referees WHERE id = $1',
       [id]
     );
@@ -580,7 +580,7 @@ router.patch('/:id/status', authMiddleware, async (req: Request, res: Response<A
     }
 
     // 获取裁判关联的 user_id
-    const referee = await queryOpOne<{ id: string; user_id: string }>(req, 
+    const referee = await refQueryOpOne<{ id: string; user_id: string }>(req, 
       'SELECT id, user_id FROM referees WHERE id = $1',
       [id]
     );
@@ -591,7 +591,7 @@ router.patch('/:id/status', authMiddleware, async (req: Request, res: Response<A
 
     // 更新裁判表
     console.log('[Referees] status change:', { id, status, user_id: referee.user_id });
-    await executeOp(req, 'UPDATE referees SET status = $1 WHERE id = $2', [status, id]);
+    await refExecuteOp(req, 'UPDATE referees SET status = $1 WHERE id = $2', [status, id]);
     console.log('[Referees] referees status updated');
 
     // 同步更新 users 表状态
@@ -649,7 +649,7 @@ router.get('/match/queue', authMiddleware, async (req: Request, res: Response) =
   try {
     const venueId = (req as any).venueId || (req.query as any).venueId;
     if (!venueId) {
-      const ref = await queryOpOne<{ venue_id: string }>(req,
+      const ref = await refQueryOpOne<{ venue_id: string }>(req,
         'SELECT venue_id FROM referees WHERE user_id = $1 LIMIT 1',
         [req.user!.userId]
       );
@@ -661,14 +661,14 @@ router.get('/match/queue', authMiddleware, async (req: Request, res: Response) =
     const vid = (req as any).venueId || venueId;
 
     // 分两段查询：race_queues 在运营商库，users 在 common 库，不能直接 JOIN
-    const queueRows = await queryOp<RacerRow>(req,
+    const queueRows = await refQueryOp<RacerRow>(req,
       `SELECT rq.* FROM race_queues rq
        WHERE rq.venue_id = $1 AND rq.status IN ('waiting','called','skipped')
        ORDER BY rq.queue_number ASC`,
       [vid]
     );
 
-    const currentRow = await queryOpOne<RacerRow>(req,
+    const currentRow = await refQueryOpOne<RacerRow>(req,
       `SELECT rq.* FROM race_queues rq
        WHERE rq.venue_id = $1 AND rq.status IN ('racing','paused','malfunction')
        ORDER BY rq.created_at DESC LIMIT 1`,
@@ -752,7 +752,7 @@ router.post('/match/select-racer', authMiddleware, async (req: Request, res: Res
 
     if (!racerId) {
       // 自动选第一个 waiting 的选手
-      const first = await queryOpOne<RacerRow>(req,
+      const first = await refQueryOpOne<RacerRow>(req,
         `SELECT id FROM race_queues WHERE status IN ('waiting','skipped') ORDER BY CASE WHEN status = 'skipped' THEN 0 ELSE 1 END, queue_number ASC LIMIT 1`, []
       );
       if (!first) {
@@ -764,14 +764,14 @@ router.post('/match/select-racer', authMiddleware, async (req: Request, res: Res
     const rid = racerId || (req.body as any).racerId;
 
     // 如果已有当前选手在比赛，先放回队列
-    await executeOp(req,
+    await refExecuteOp(req,
       `UPDATE race_queues SET status = 'waiting', start_time_ms = NULL, paused_elapsed_ms = 0
        WHERE status IN ('called','malfunction') AND id != $1`,
       [rid]
     );
 
     // 更新该选手状态为 called（$1 先出现，避免 expandParams 重排参数）
-    await executeOp(req,
+    await refExecuteOp(req,
       `UPDATE race_queues SET status = 'called', start_time_ms = NULL, paused_elapsed_ms = 0, finish_time_ms = NULL, referee_id = $1
        WHERE id = $2`,
       [req.user!.userId, rid]
@@ -799,7 +799,7 @@ router.post('/match/start', authMiddleware, async (req: Request, res: Response) 
       return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
     }
 
-    const row = await queryOpOne<RacerRow>(req,
+    const row = await refQueryOpOne<RacerRow>(req,
       `SELECT id, status, paused_elapsed_ms FROM race_queues WHERE id = $1`,
       [racerId]
     );
@@ -809,7 +809,7 @@ router.post('/match/start', authMiddleware, async (req: Request, res: Response) 
 
     // 从 paused_elapsed_ms 继续计时
     const adjustStart = now - (row.paused_elapsed_ms || 0);
-    await executeOp(req,
+    await refExecuteOp(req,
       `UPDATE race_queues SET status = 'racing', start_time_ms = $1, paused_elapsed_ms = 0 WHERE id = $2`,
       [adjustStart, racerId]
     );
@@ -835,7 +835,7 @@ router.post('/match/pause', authMiddleware, async (req: Request, res: Response) 
     }
 
     const pausedMs = elapsed != null ? elapsed : 0;
-    await executeOp(req,
+    await refExecuteOp(req,
       `UPDATE race_queues SET status = 'paused', paused_elapsed_ms = $1 WHERE id = $2 AND status = 'racing'`,
       [pausedMs, racerId]
     );
@@ -858,7 +858,7 @@ router.post('/match/resume', authMiddleware, async (req: Request, res: Response)
       return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
     }
 
-    const row = await queryOpOne<RacerRow>(req,
+    const row = await refQueryOpOne<RacerRow>(req,
       `SELECT paused_elapsed_ms FROM race_queues WHERE id = $1 AND status = 'paused'`,
       [racerId]
     );
@@ -867,7 +867,7 @@ router.post('/match/resume', authMiddleware, async (req: Request, res: Response)
     }
 
     const adjustStart = Date.now() - (row.paused_elapsed_ms || 0);
-    await executeOp(req,
+    await refExecuteOp(req,
       `UPDATE race_queues SET status = 'racing', start_time_ms = $1, paused_elapsed_ms = 0 WHERE id = $2`,
       [adjustStart, racerId]
     );
@@ -892,7 +892,7 @@ router.post('/match/end', authMiddleware, async (req: Request, res: Response) =>
       return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
     }
 
-    let row = await queryOpOne<RacerRow>(req,
+    let row = await refQueryOpOne<RacerRow>(req,
       `SELECT id, user_id, venue_id, remaining_races FROM race_queues
        WHERE id = $1`,
       [racerId]
@@ -913,7 +913,7 @@ router.post('/match/end', authMiddleware, async (req: Request, res: Response) =>
     const finishStatus = raceStatus === 'timeout' ? 'timeout' : 'finished';
     const newRemaining = Math.max(0, row.remaining_races - 1);
 
-    await executeOp(req,
+    await refExecuteOp(req,
       `UPDATE race_queues SET status = 'finished', finish_time_ms = $1, finish_status = $2,
        remaining_races = $3, start_time_ms = NULL, paused_elapsed_ms = 0
        WHERE id = $4`,
@@ -922,7 +922,7 @@ router.post('/match/end', authMiddleware, async (req: Request, res: Response) =>
 
     // 同步写入 race_records（成绩记录）
     if (row.user_id && row.venue_id) {
-      await executeOp(req,
+      await refExecuteOp(req,
         `INSERT INTO race_records (id, race_id, player_id, score, duration_seconds, status, started_at, finished_at, operator_id)
          VALUES ($1, NULL, $2, $3, $4, $5, NOW() - INTERVAL $6/1000 SECOND, NOW(), $7)`,
         [uuidv4(), row.user_id, elapsed, Math.round(elapsed / 1000), finishStatus, elapsed, row.nickname]
@@ -956,7 +956,7 @@ router.post('/match/re-enter', authMiddleware, async (req: Request, res: Respons
       return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
     }
 
-    await executeOp(req,
+    await refExecuteOp(req,
       `UPDATE race_queues SET status = 'waiting', start_time_ms = NULL, paused_elapsed_ms = 0,
        finish_time_ms = NULL, finish_status = NULL
        WHERE id = $1`,
@@ -983,7 +983,7 @@ router.post('/match/call-next', authMiddleware, async (req: Request, res: Respon
       return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
     }
 
-    const row = await queryOpOne<RacerRow>(req,
+    const row = await refQueryOpOne<RacerRow>(req,
       `SELECT id, venue_id, remaining_races FROM race_queues WHERE id = $1`,
       [racerId]
     );
@@ -993,12 +993,12 @@ router.post('/match/call-next', authMiddleware, async (req: Request, res: Respon
 
     if (row.remaining_races > 0) {
       // 获取当前最大排队号 + 1
-      const maxQ = await queryOpOne<{ max_q: number }>(req,
+      const maxQ = await refQueryOpOne<{ max_q: number }>(req,
         `SELECT COALESCE(MAX(queue_number), 0) as max_q FROM race_queues WHERE venue_id = $1`,
         [row.venue_id]
       );
       const nextQ = (maxQ?.max_q ?? 0) + 1;
-      await executeOp(req,
+      await refExecuteOp(req,
         `UPDATE race_queues SET status = 'waiting', queue_number = $2, start_time_ms = NULL,
          paused_elapsed_ms = 0, finish_time_ms = NULL, finish_status = NULL
          WHERE id = $1`,
@@ -1027,7 +1027,7 @@ router.post('/match/malfunction', authMiddleware, async (req: Request, res: Resp
       return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
     }
 
-    const row = await queryOpOne<RacerRow>(req,
+    const row = await refQueryOpOne<RacerRow>(req,
       `SELECT id, user_id FROM race_queues
        WHERE id = $1`,
       [racerId]
@@ -1041,7 +1041,7 @@ router.post('/match/malfunction', authMiddleware, async (req: Request, res: Resp
     }
     if (row) { row.nickname = malfunctionUserInfo.nickname || ''; row.avatar_url = malfunctionUserInfo.avatar_url || ''; }
 
-    await executeOp(req,
+    await refExecuteOp(req,
       `UPDATE race_queues SET status = 'malfunction', start_time_ms = NULL,
        paused_elapsed_ms = 0, fault_reason = '机器狗故障'
        WHERE id = $1`,
@@ -1076,7 +1076,7 @@ router.post('/match/forfeit', authMiddleware, async (req: Request, res: Response
       return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
     }
 
-    let row = await queryOpOne<RacerRow>(req,
+    let row = await refQueryOpOne<RacerRow>(req,
       `SELECT id, user_id, venue_id, remaining_races FROM race_queues
        WHERE id = $1`,
       [racerId]
@@ -1096,12 +1096,12 @@ router.post('/match/forfeit', authMiddleware, async (req: Request, res: Response
     if (newRemaining > 0) {
       // 放回队首
       // 先把当前所有 waiting 选手的 queue_number + 1 腾出位置
-      await executeOp(req,
+      await refExecuteOp(req,
         `UPDATE race_queues SET queue_number = queue_number + 1
          WHERE venue_id = $1 AND status = 'waiting' AND id != $2`,
         [row.venue_id, racerId]
       );
-      await executeOp(req,
+      await refExecuteOp(req,
         `UPDATE race_queues SET status = 'waiting', queue_number = 1, remaining_races = $2,
          start_time_ms = NULL, paused_elapsed_ms = 0, finish_time_ms = NULL, finish_status = 'forfeit'
          WHERE id = $1`,
@@ -1109,7 +1109,7 @@ router.post('/match/forfeit', authMiddleware, async (req: Request, res: Response
       );
     } else {
       // 次数用尽，标记为 forfeit
-      await executeOp(req,
+      await refExecuteOp(req,
         `UPDATE race_queues SET status = 'forfeit', remaining_races = 0, finish_status = 'forfeit'
          WHERE id = $1`,
         [racerId]
@@ -1142,7 +1142,7 @@ router.post('/match/invalidate', authMiddleware, async (req: Request, res: Respo
       return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
     }
 
-    let row = await queryOpOne<RacerRow>(req,
+    let row = await refQueryOpOne<RacerRow>(req,
       `SELECT id, user_id, finish_time_ms, finish_status FROM race_queues
        WHERE id = $1`,
       [racerId]
@@ -1156,14 +1156,14 @@ router.post('/match/invalidate', authMiddleware, async (req: Request, res: Respo
       row.nickname = ui.nickname || '';
     } catch { /* ignore */ }
 
-    await executeOp(req,
+    await refExecuteOp(req,
       `UPDATE race_queues SET finish_status = 'invalid', fault_reason = '成绩无效'
        WHERE id = $1`,
       [racerId]
     );
 
     // 同步标记 race_records 为 invalid
-    await executeOp(req,
+    await refExecuteOp(req,
       `UPDATE race_records SET status = 'invalid' WHERE player_id = $1 AND status = 'finished' ORDER BY created_at DESC LIMIT 1`,
       [row.nickname]
     );
@@ -1194,7 +1194,7 @@ router.post('/match/skip', authMiddleware, async (req: Request, res: Response) =
       return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
     }
 
-    const row = await queryOpOne<RacerRow>(req,
+    const row = await refQueryOpOne<RacerRow>(req,
       `SELECT id, venue_id FROM race_queues WHERE id = $1`,
       [racerId]
     );
@@ -1203,7 +1203,7 @@ router.post('/match/skip', authMiddleware, async (req: Request, res: Response) =
     }
 
     // 保持原 queue_number，仅更新状态为 skipped
-    await executeOp(req,
+    await refExecuteOp(req,
       `UPDATE race_queues SET status = 'skipped' WHERE id = $1`,
       [racerId]
     );
@@ -1238,14 +1238,14 @@ router.get('/attendance/status', authMiddleware, async (req: Request, res: Respo
   try {
     const userId = req.user!.userId;
     // 从 referees 表查真实 referee_id
-    const ref = await queryOpOne<{ id: string; phone: string }>(req, 
+    const ref = await refQueryOpOne<{ id: string; phone: string }>(req, 
       'SELECT id, phone FROM referees WHERE user_id = $1', [userId]
     );
     if (!ref) return res.status(401).json({ code: 401, message: '未找到裁判记录', data: null });
     const refereeId = ref.id;
 
     // 查询今日签到
-    const todayCheckin = await queryOpOne<any>(req, 
+    const todayCheckin = await refQueryOpOne<any>(req, 
       `SELECT id, checkin_at, checkout_at, venue_id FROM attendance
        WHERE referee_id = $1 AND date(checkin_at) = CURDATE() ORDER BY checkin_at DESC LIMIT 1`,
       [refereeId]
@@ -1255,7 +1255,7 @@ router.get('/attendance/status', authMiddleware, async (req: Request, res: Respo
     let venueName = '';
     let venueAddress = '';
     if (todayCheckin?.venue_id) {
-      const venueRow = await queryOpOne<{ name: string; address: string }>(req, 
+      const venueRow = await refQueryOpOne<{ name: string; address: string }>(req, 
         'SELECT name, address FROM venues WHERE id = $1',
         [todayCheckin.venue_id]
       );
@@ -1302,7 +1302,7 @@ router.post('/attendance/check-in', authMiddleware, async (req: Request, res: Re
     }
 
     // 从 referees 表查找真实 referee_id
-    const refRow = await queryOpOne<{ id: string; phone: string }>(req, 
+    const refRow = await refQueryOpOne<{ id: string; phone: string }>(req, 
       'SELECT id, phone FROM referees WHERE user_id = $1', [userId]
     );
     if (!refRow) {
@@ -1312,7 +1312,7 @@ router.post('/attendance/check-in', authMiddleware, async (req: Request, res: Re
     const phone = refRow.phone || req.user!.openid?.replace('mock_openid_', '') || '13800138000';
 
     // 检查今日是否已签到
-    const existing = await queryOpOne<any>(req, 
+    const existing = await refQueryOpOne<any>(req, 
       `SELECT id, checkout_at FROM attendance
        WHERE referee_id = $1 AND date(checkin_at) = CURDATE()`,
       [refereeId]
@@ -1325,7 +1325,7 @@ router.post('/attendance/check-in', authMiddleware, async (req: Request, res: Re
     // 执行签到记录插入
     const id = uuidv4();
     const now = new Date().toLocaleString('zh-CN');
-    await executeOp(req, 
+    await refExecuteOp(req, 
       'INSERT INTO attendance (id, referee_id, venue_id, checkin_at) VALUES ($1, $2, $3, NOW())',
       [id, refereeId, finalVenueId]
     );
@@ -1335,7 +1335,7 @@ router.post('/attendance/check-in', authMiddleware, async (req: Request, res: Re
     cachedVenueStatus = 'open';
 
     // 回写 venues 表，确保 REST API 也返回正确状态
-    try { await executeOp(req, 'UPDATE venues SET status = \'open\' LIMIT 1'); } catch (_) {}
+    try { await refExecuteOp(req, 'UPDATE venues SET status = \'open\' LIMIT 1'); } catch (_) {}
 
     // 广播赛场重新开放到大屏，大屏恢复全新状态
     broadcastToScreen({
@@ -1350,7 +1350,7 @@ router.post('/attendance/check-in', authMiddleware, async (req: Request, res: Re
     // 从数据库获取真实的赛场信息
     let venueName = finalVenueId;
     let venueAddress = '';
-    const venueRow = await queryOpOne<{ name: string; address: string }>(req, 
+    const venueRow = await refQueryOpOne<{ name: string; address: string }>(req, 
       'SELECT name, address FROM venues WHERE id = $1',
       [finalVenueId]
     );
@@ -1379,7 +1379,7 @@ router.post('/attendance/check-out', authMiddleware, async (req: Request, res: R
     if (!userId) return res.status(401).json({ code: 401, message: '未登录', data: null });
 
     // 直接用 JWT operatorId 连 op_* 库
-    const pool = getOpPoolFromJwt(req);
+    const pool = await getOpPoolFromJwt(req);
     if (!pool) {
       console.error('[check-out] getOpPoolFromJwt returned null, userId=', userId, 'operatorId=', (req.user as any)?.operatorId);
       return res.status(401).json({ code: 401, message: '未找到裁判记录', data: null });
@@ -1444,14 +1444,52 @@ router.post('/attendance/check-out', authMiddleware, async (req: Request, res: R
  * 比赛专用直接签到 — 不依赖激活码/Redis
  * 裁判已登录 + venueId 匹配即可签到
  */
-function getOpPoolFromJwt(req: Request): MysqlPool | null {
+// ==================== op 库查询包装（从 JWT 取 operatorId 连库） ====================
+
+async function refQueryOp<T>(req: Request, sql: string, params?: any[]): Promise<T[]> {
+  const pool = await getOpPoolFromJwt(req);
+  if (!pool) return [];
+  sql = sql.replace(/\$(\d+)/g, '?');
+  const [rows] = await pool.execute(sql, params || []) as any[];
+  return rows as T[];
+}
+
+async function refQueryOpOne<T>(req: Request, sql: string, params?: any[]): Promise<T | null> {
+  const pool = await getOpPoolFromJwt(req);
+  if (!pool) return null;
+  sql = sql.replace(/\$(\d+)/g, '?');
+  const [rows] = await pool.execute(sql, params || []) as any[];
+  return (rows as any[])?.length > 0 ? rows[0] as T : null;
+}
+
+async function refExecuteOp(req: Request, sql: string, params?: any[]): Promise<{ changes: number; lastInsertRowid: number | bigint }> {
+  const pool = await getOpPoolFromJwt(req);
+  if (!pool) return { changes: 0, lastInsertRowid: 0 };
+  sql = sql.replace(/\$(\d+)/g, '?');
+  const [result] = await pool.execute(sql, params || []) as any;
+  return { changes: result.affectedRows ?? 0, lastInsertRowid: result.insertId ?? 0 };
+}
+
+// ==================== 从 JWT 获取 op 库连接池 ====================
+
+async function getOpPoolFromJwt(req: Request): Promise<MysqlPool | null> {
   const jwt = req.user as any;
   const opId = jwt?.operatorId;
-  if (opId) {
-    try { return getOperatorPool('op_' + opId); } catch { /* fall through */ }
-  }
-  // JWT 无 operatorId 时无法确定库，返回 null
-  return null;
+  if (!opId) return null;
+
+  // 1) 查询 operators_registry 获取真正的 db_name
+  try {
+    const regRow = await queryOne<{ db_name: string }>(
+      'SELECT db_name FROM operators_registry WHERE operator_id = $1',
+      [opId]
+    );
+    if (regRow?.db_name) {
+      return getOperatorPool(regRow.db_name);
+    }
+  } catch { /* fall through if registry unavailable */ }
+
+  // 2) fallback: 直接用 op_{operatorId}
+  try { return getOperatorPool('op_' + opId); } catch { return null; }
 }
 
 router.post('/attendance/check-in-direct', authMiddleware, async (req: Request, res: Response) => {
@@ -1465,7 +1503,7 @@ router.post('/attendance/check-in-direct', authMiddleware, async (req: Request, 
     if (!userId) return res.status(401).json({ code: 401, message: '未登录', data: null });
 
     // 裁判接口直接用 JWT operatorId 连接，不依赖 resolveOperatorDb
-    const pool = getOpPoolFromJwt(req);
+    const pool = await getOpPoolFromJwt(req);
     if (!pool) return res.status(400).json({ code: 400, message: '未找到裁判记录', data: null });
 
     // 1. 查 referee
@@ -1538,7 +1576,7 @@ router.post('/attendance/check-in-by-qr', authMiddleware, async (req: Request, r
     if (!userId) return res.status(401).json({ code: 401, message: '未登录', data: null });
 
     // 裁判接口直接用 JWT operatorId 连接，不依赖 resolveOperatorDb
-    const pool = getOpPoolFromJwt(req);
+    const pool = await getOpPoolFromJwt(req);
     if (!pool) {
       console.log('[QR签到] getOpPoolFromJwt 返回 null, userId=' + userId + ', operatorId=' + (req.user as any)?.operatorId);
       return res.status(400).json({ code: 400, message: '未找到裁判记录，请先完成注册', data: null });
@@ -1686,7 +1724,7 @@ router.get('/attendance/records', authMiddleware, async (req: Request, res: Resp
 
     const { date } = req.query;
     // 从 referees 表查真实 referee_id
-    const ref = await queryOpOne<{ id: string }>(req, 'SELECT id FROM referees WHERE user_id = $1', [userId]);
+    const ref = await refQueryOpOne<{ id: string }>(req, 'SELECT id FROM referees WHERE user_id = $1', [userId]);
     if (!ref) return res.json({ code: 0, message: 'ok', data: [] });
     const refereeId = ref.id;
 
@@ -1759,28 +1797,28 @@ async function broadcastAfterUpdate(req: Request) {
     const venueId = cachedVenueId;
 
     // 分两段查询：race_queues 在运营商库，users 在 common 库
-    const queueRows = await queryOp<RacerRow>(req,
+    const queueRows = await refQueryOp<RacerRow>(req,
       `SELECT rq.* FROM race_queues rq
        WHERE rq.venue_id = $1 AND rq.status IN ('waiting','called','skipped')
        ORDER BY rq.queue_number ASC`,
       [venueId]
     );
 
-    const currentRow = await queryOpOne<RacerRow>(req,
+    const currentRow = await refQueryOpOne<RacerRow>(req,
       `SELECT rq.* FROM race_queues rq
        WHERE rq.venue_id = $1 AND rq.status IN ('racing','paused')
        ORDER BY rq.created_at DESC LIMIT 1`,
       [venueId]
     );
 
-    const lastFinished = await queryOpOne<RacerRow>(req,
+    const lastFinished = await refQueryOpOne<RacerRow>(req,
       `SELECT rq.* FROM race_queues rq
        WHERE rq.venue_id = $1 AND rq.status = 'finished' AND rq.finish_status != 'invalid'
        ORDER BY rq.updated_at DESC LIMIT 1`,
       [venueId]
     );
 
-    const leaderboardRows = await queryOp<RacerRow>(req,
+    const leaderboardRows = await refQueryOp<RacerRow>(req,
       `SELECT rq.* FROM race_queues rq
        WHERE rq.venue_id = $1 AND rq.status = 'finished' AND rq.finish_status != 'invalid'
        ORDER BY rq.finish_time_ms ASC LIMIT 10`,
@@ -1863,12 +1901,12 @@ async function broadcastAfterUpdate(req: Request) {
 /** 写入比赛成绩 */
 async function writeRaceResult(req: Request, userId: string, venueId: string, nickname: string | undefined, elapsed: number, status: string) {
   try {
-    const existing = await queryOpOne<{ id: string }>(req,
+    const existing = await refQueryOpOne<{ id: string }>(req,
       `SELECT id FROM race_results WHERE user_id = $1 AND created_at > NOW() - INTERVAL 10 SECOND`,
       [userId]
     );
     if (!existing) {
-      await executeOp(req,
+      await refExecuteOp(req,
         `INSERT INTO race_results (id, checkin_id, user_id, venue_id, referee_id, score_ms, status, race_type, finished_at)
          VALUES ($1, NULL, $2, $3, $4, $5, 'completed', 1, NOW())`,
         [uuidv4(), userId, venueId, req.user!.userId, elapsed]
@@ -1891,11 +1929,11 @@ router.patch('/:id/profile', authMiddleware, async (req: Request, res: Response)
     if (!name || !phone) return res.status(400).json({ code: 400, message: '请填写姓名和手机号', data: null });
     if (!/^\d{11}$/.test(phone)) return res.status(400).json({ code: 400, message: '手机号格式不正确', data: null });
 
-    const referee = await queryOpOne<{ id: string; user_id: string }>(req, 
+    const referee = await refQueryOpOne<{ id: string; user_id: string }>(req, 
       'SELECT id, user_id FROM referees WHERE id = $1', [id]);
     if (!referee) return res.status(404).json({ code: 404, message: '裁判记录不存在', data: null });
 
-    await executeOp(req, 'UPDATE referees SET name = $1, phone = $2, updated_at = NOW() WHERE id = $3', [name, phone, id]);
+    await refExecuteOp(req, 'UPDATE referees SET name = $1, phone = $2, updated_at = NOW() WHERE id = $3', [name, phone, id]);
     if (referee.user_id) {
       await execute('UPDATE users SET nickname = $1, phone = $2, updated_at = NOW() WHERE id = $3', [name, phone, referee.user_id]);
     }
@@ -1919,7 +1957,7 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response<ApiRespo
     const { id } = req.params;
     const { venue_id, name, phone } = req.body;
 
-    const existing = await queryOpOne<{ id: string }>(req, 
+    const existing = await refQueryOpOne<{ id: string }>(req, 
       'SELECT id FROM referees WHERE id = $1',
       [id]
     );
@@ -1951,7 +1989,7 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response<ApiRespo
     fields.push('updated_at = NOW()');
     values.push(id);
 
-    await queryOp(req, 
+    await refQueryOp(req, 
       `UPDATE referees SET ${fields.join(', ')} WHERE id = $${paramIdx}`,
       values
     );
