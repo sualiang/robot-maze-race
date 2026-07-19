@@ -35,7 +35,7 @@ api.interceptors.response.use(
       console.warn('[API] 401 未授权');
       // 非登录页和裁判页才清除 token 并跳转
       const path = window.location.pathname;
-      if (path.startsWith('/operator/login') || path.startsWith('/referee')) {
+      if (path.startsWith('/operator/login') || path.startsWith('/referee') || path.startsWith('/screen')) {
         // 裁判页面不自动跳转运营商登录
         return Promise.reject(error);
       }
