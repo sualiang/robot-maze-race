@@ -45,6 +45,7 @@ export default function ScreenDisplay() {
   const [elapsed, setElapsed] = useState(0);
   const [connected, setConnected] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
+  const reconnectingRef = useRef(false);
   const [forfeitMessage, setForfeitMessage] = useState('');
   const [forfeitName, setForfeitName] = useState('');
   const [forfeitHint, setForfeitHint] = useState('');
@@ -216,10 +217,15 @@ export default function ScreenDisplay() {
       if (timerRef.current) clearInterval(timerRef.current);
       // 断网或者新开一局，重置结束标记让新 race 能正常启动计时
       raceEndedRef.current = false;
-      // 断网自动重连（更快重连，减轻短时掉线的感知）
-      if (!reconnecting) {
+      // 断网自动重连
+      if (!reconnectingRef.current) {
+        reconnectingRef.current = true;
         setReconnecting(true);
-        reconnectTimerRef.current = setTimeout(connect, 1000);
+        reconnectTimerRef.current = setTimeout(() => {
+          reconnectingRef.current = false;
+          setReconnecting(false);
+          connect();
+        }, 2000);
       }
     };
 
@@ -228,7 +234,7 @@ export default function ScreenDisplay() {
     };
 
     wsRef.current = ws;
-  }, [reconnecting]);
+  }, []); // 空依赖——connect 只创建一次，重连靠 onclose 内的闭包
 
   useEffect(() => {
     connect();
