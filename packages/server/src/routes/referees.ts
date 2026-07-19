@@ -1861,13 +1861,26 @@ export async function pushCurrentScreenData(ws: WebSocket) {
 
     // 直接连 op 库（通过 cachedOperatorId 获取）
     let pool: MysqlPool | null = null;
-    if (cachedOperatorId) {
+    let opId = cachedOperatorId;
+
+    // 如果 cachedOperatorId 为空但有 venueId，从 common 库 venues 表查 operator_id
+    if (!opId) {
+      const venueOp = await queryOne<{ operator_id: string }>(
+        'SELECT operator_id FROM venues WHERE id = $1',
+        [venueId]
+      );
+      if (venueOp?.operator_id) {
+        opId = venueOp.operator_id;
+      }
+    }
+
+    if (opId) {
       // 先查 operators_registry 获取真正的 db_name
       const regRow = await queryOne<{ db_name: string }>(
         'SELECT db_name FROM operators_registry WHERE operator_id = $1',
-        [cachedOperatorId]
+        [opId]
       );
-      const dbName = regRow?.db_name || ('op_' + cachedOperatorId);
+      const dbName = regRow?.db_name || ('op_' + opId);
       pool = getOperatorPool(dbName);
     }
     if (!pool) {
