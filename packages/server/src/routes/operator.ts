@@ -386,7 +386,7 @@ router.delete('/rbac/users/:id', authMiddleware, operatorOnly, async (req: Reque
     // 不允许删除最后一个总管理员
     if (existing.role_id === 'op_super_admin') {
       const adminCount = await queryOne<{ count: number }>(
-        'SELECT COUNT(*) as count FROM operator_members WHERE role_id = ? AND operator_id = ?',
+        'SELECT COUNT(*) as count FROM operator_members WHERE role_id = $1 AND operator_id = $2',
         ['op_super_admin', operatorId]
       );
       if (adminCount && adminCount.count <= 1) {

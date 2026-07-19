@@ -1720,7 +1720,7 @@ router.get('/scan-login-status', async (req: Request, res: Response) => {
     // 已扫码 → 检查 openid 对应用户的手机号
     // 从公共库 users 表查手机号
     const user = await queryOne<any>(
-      'SELECT id, phone FROM users WHERE openid = ? LIMIT 1',
+      'SELECT id, phone FROM users WHERE openid = $1 LIMIT 1',
       [openid]
     );
 

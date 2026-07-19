@@ -1,0 +1,44 @@
+167:      if (Array.isArray(data)) {
+168:        list = data;
+169:      } else if (data && Array.isArray(data.list)) {
+170:        list = data.list;
+171:      } else if (data && data.data && Array.isArray(data.data.list)) {
+172:        list = data.data.list;
+173:      }
+174:
+175:      // 计算券数量和总价值
+176:      for (var i = 0; i < list.length; i++) {
+177:        var c = list[i];
+178:        if (c.value) totalValue += Number(c.value);
+179:        else if (c.amount) totalValue += Number(c.amount);
+180:        else if (c.denomination) totalValue += Number(c.denomination);
+181:      }
+182:
+183:      that.setData({
+184:        couponCount: list.length,
+185:        couponValue: totalValue
+186:      });
+187:    }).catch(function () {
+188:      // 静默失败
+189:    });
+190:  },
+191:
+192:  /**
+193:   * 获取参赛包列表 /api/v1/player/packages
+194:   */
+195:  fetchPackages: function () {
+196:    var that = this;
+197:
+198:    request.silentGet('/player/packages').then(function (data) {
+199:      var rawList = [];
+200:      if (Array.isArray(data)) {
+201:        rawList = data;
+202:      } else if (data && Array.isArray(data.list)) {
+203:        rawList = data.list;
+204:      } else if (data && data.data && Array.isArray(data.data.list)) {
+205:        rawList = data.data.list;
+206:      }
+207:
+208:      var mapped = rawList.map(function (p) {
+209:        return {
+210:          id: p.id || p._id,

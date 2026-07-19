@@ -1,0 +1,5 @@
+8187fbb fix: 比赛Tab状态1去掉扫码参赛按钮，改为纯文字引导
+17df459 feat: 订单页三合一 — picker日期选择器 + 多状态文案(paid/pending/cancelled/refunding/refunded/abnormal) + 时间格式兜底去掉T
+14019c1 fix: 订单页数据不显示 — silentGet已解包data层，取值路径去掉多余data.data
+7807c8a feat: 默认头像改为铁甲快狗logo
+817df89 merge: 小C全部34个commit（7/18工作板已完成任务） - 小程序19项细节优化（卡片011a6129） - 积分抵扣后端+前端（卡片48dbbe9a） - 财务中心+总部看板+settlements（卡片501007c8） - app.json chooseAvatar修复 - 微信支付真对接 - 比赛系统5项修复 - 助力功能 - 排行榜改版 - 多租户operator_id隔离 - 历史参赛记录改造 - 好友助力跨库JOIN修复 - race-history独立页面 - 卡券入口删除 - 消费券标题更正 - 首页/排行榜/比赛Tab多项优化 - player.ts重复变量声明删除

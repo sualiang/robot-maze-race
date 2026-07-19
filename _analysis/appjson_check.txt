@@ -1,0 +1,2 @@
+requiredPrivateInfos: ["getLocation"]
+__usePrivacyCheck__: False

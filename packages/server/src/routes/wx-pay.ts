@@ -228,7 +228,7 @@ router.post('/unified-order', authMiddleware, async (req: Request, res: Response
     let outTradeNo = order.order_no;
     if (!outTradeNo) {
       outTradeNo = generateOutTradeNo();
-      await executeOp(req, 'UPDATE orders SET order_no = ? WHERE id = ?', [outTradeNo, order_id]);
+      await executeOp(req, 'UPDATE orders SET order_no = $1 WHERE id = $2', [outTradeNo, order_id]);
     }
 
     // 开发模式：模拟支付
@@ -238,7 +238,7 @@ router.post('/unified-order', authMiddleware, async (req: Request, res: Response
       // 模拟 prepay_id
       const prepayId = `prepay_mock_${Date.now()}`;
       await executeOp(req, 
-        `UPDATE orders SET payment_method = 'wechat_pay', prepay_id = ? WHERE id = ?`,
+        "UPDATE orders SET payment_method = 'wechat_pay', prepay_id = $1 WHERE id = $2",
         [prepayId, order_id]
       );
       releasePayLock(order_id);
@@ -280,7 +280,7 @@ router.post('/unified-order', authMiddleware, async (req: Request, res: Response
 
       // 5. 保存 prepay_id
       await executeOp(req, 
-        `UPDATE orders SET payment_method = 'wechat_pay', prepay_id = ? WHERE id = ?`,
+        "UPDATE orders SET payment_method = 'wechat_pay', prepay_id = $1 WHERE id = $2",
         [wxOrder.prepay_id, order_id]
       );
 
@@ -578,18 +578,18 @@ router.get('/query/:orderId', authMiddleware, async (req: Request, res: Response
         if (wxOrder.trade_state === 'SUCCESS') {
           // 兜底更新为已支付
           await executeOp(req, 
-            `UPDATE orders SET status = 'paid', transaction_id = ?, paid_at = NOW(), updated_at = NOW() WHERE id = ? AND status = 'pending'`,
+            "UPDATE orders SET status = 'paid', transaction_id = $1, paid_at = NOW(), updated_at = NOW() WHERE id = $2 AND status = 'pending'",
             [wxOrder.transaction_id, order.id]
           );
           // 兜底也写 payments（幂等，INSERT IGNORE 防重）
           const [orderDetail] = await queryOp<any[]>(req,
-            `SELECT operator_id, user_id FROM orders WHERE id = ?`, [order.id]
+            "SELECT operator_id, user_id FROM orders WHERE id = $1", [order.id]
           );
           const txnId = (wxOrder.transaction_id || '').slice(0, 128);
           try {
             await executeOp(req,
-              `INSERT IGNORE INTO payments (id, order_id, operator_id, user_id, transaction_id, amount_cents, channel, status, pay_time, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, 'wechat_pay', 'success', NOW(), NOW())`,
+              "INSERT IGNORE INTO payments (id, order_id, operator_id, user_id, transaction_id, amount_cents, channel, status, pay_time, created_at)
+               VALUES ($1, $2, $3, $4, $5, $6, 'wechat_pay', 'success', NOW(), NOW())",
               [uuidv4(), order.id,
                orderDetail?.[0]?.operator_id || '',
                orderDetail?.[0]?.user_id || '',
@@ -601,8 +601,8 @@ router.get('/query/:orderId', authMiddleware, async (req: Request, res: Response
           // 兜底也写 settlements（幂等）
           try {
             await executeOp(req,
-              `INSERT IGNORE INTO settlements (id, order_id, amount_cents, commission_cents, operator_id, status, created_at)
-               VALUES (?, ?, ?, 0, ?, 'pending', NOW())`,
+              "INSERT IGNORE INTO settlements (id, order_id, amount_cents, commission_cents, operator_id, status, created_at)
+               VALUES ($1, $2, $3, 0, $4, 'pending', NOW())",
               [uuidv4(), order.id, order.amount, orderDetail?.[0]?.operator_id || '']
             );
           } catch (e: any) {
@@ -613,7 +613,7 @@ router.get('/query/:orderId', authMiddleware, async (req: Request, res: Response
           console.log('[WxPay] 兜底发现已支付订单:', order.order_no, 'transaction_id:', wxOrder.transaction_id);
         } else if (['CLOSED', 'PAYERROR'].includes(wxOrder.trade_state)) {
           await executeOp(req, 
-            `UPDATE orders SET status = 'cancelled' WHERE id = ? AND status = 'pending'`,
+            "UPDATE orders SET status = 'cancelled' WHERE id = $1 AND status = 'pending'",
             [order.id]
           );
           order.status = 'cancelled';
@@ -829,7 +829,7 @@ router.post('/mock-pay-success', authMiddleware, async (req: Request, res: Respo
 
     const mockTxnId = `test_txn_${Date.now()}`;
     await executeOp(req, 
-      `UPDATE orders SET status = 'paid', transaction_id = ?, paid_at = NOW(), updated_at = NOW() WHERE id = ? AND status = 'pending'`,
+      "UPDATE orders SET status = 'paid', transaction_id = $1, paid_at = NOW(), updated_at = NOW() WHERE id = $2 AND status = 'pending'",
       [mockTxnId, order_id]
     );
 

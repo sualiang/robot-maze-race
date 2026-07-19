@@ -14,7 +14,7 @@ async function getOperatorName(opId: string): Promise<string> {
   }
   if (operatorNameCache.has(opId)) return operatorNameCache.get(opId)!;
   try {
-    const op = await queryOne<{ name: string }>('SELECT name FROM operators WHERE id = ?', [opId]);
+    const op = await queryOne<{ name: string }>('SELECT name FROM operators WHERE id = $1', [opId]);
     const name = op?.name || '未知运营商';
     operatorNameCache.set(opId, name);
     return name;
@@ -440,10 +440,10 @@ router.get('/orders', authMiddleware, checkPermission('finance:read'), async (re
 
     if (opId) {
       // 普通运营商：单个 operator 库
-      const countRow = await queryOpOne<{ count: string }>(req, 'SELECT COUNT(*) as count FROM orders WHERE operator_id = ?', [opId]);
+      const countRow = await queryOpOne<{ count: string }>(req, 'SELECT COUNT(*) as count FROM orders WHERE operator_id = $1', [opId]);
       total = parseInt(countRow?.count || '0', 10);
       rows = await queryOp<any>(req,
-        'SELECT o.* FROM orders o WHERE o.operator_id = ? ORDER BY o.created_at DESC LIMIT ? OFFSET ?',
+        'SELECT o.* FROM orders o WHERE o.operator_id = $1 ORDER BY o.created_at DESC LIMIT $2 OFFSET $3',
         [opId, pageSize, offset]
       );
     } else {
@@ -506,16 +506,16 @@ router.get('/pending', authMiddleware, checkPermission('finance:withdraw'), asyn
 
     if (opId) {
       const countRow = await queryOpOne<{ count: string }>(req,
-        'SELECT COUNT(*) as count FROM settlements WHERE status = ?', ['pending']
+        "SELECT COUNT(*) as count FROM settlements WHERE status = $1", ['pending']
       );
       total = parseInt(countRow?.count || '0', 10);
       rows = await queryOp<any>(req,
-        'SELECT * FROM settlements WHERE status = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
+        'SELECT * FROM settlements WHERE status = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3',
         ['pending', pageSize, offset]
       );
     } else {
       const allRows = await queryAllOperators<any>(req,
-        'SELECT * FROM settlements WHERE status = ? ORDER BY created_at DESC',
+        "SELECT * FROM settlements WHERE status = $1 ORDER BY created_at DESC",
         ['pending']
       );
       total = allRows.length;
@@ -598,8 +598,8 @@ router.get('/payment-records', authMiddleware, checkPermission('admin:finance'),
                p.amount_cents, p.status, p.pay_time, p.created_at
         FROM payments p
         JOIN orders o ON p.order_id = o.id
-        WHERE o.operator_id = ? ${whereClause}
-        ORDER BY p.pay_time DESC LIMIT ? OFFSET ?
+        WHERE o.operator_id = $1 ${whereClause}
+        ORDER BY p.pay_time DESC LIMIT $2 OFFSET $3
       `;
       allRows = await queryOp<any>(req, pageSql, [opId, ...params, pageSize, offset]);
     } else {
@@ -632,7 +632,7 @@ router.get('/payment-records', authMiddleware, checkPermission('admin:finance'),
 
     // 运营商名（普通管理员只有自己，但格式一致）
     if (opId) {
-      const myOp = await queryOne<{ name: string }>('SELECT name FROM operators WHERE id = ?', [opId]);
+      const myOp = await queryOne<{ name: string }>('SELECT name FROM operators WHERE id = $1', [opId]);
       const myName = myOp?.name || '未知运营商';
       for (const r of allRows) r.operator_name = myName;
     }
