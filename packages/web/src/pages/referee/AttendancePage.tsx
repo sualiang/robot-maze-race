@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../utils/api';
-import { useOperatorContext } from '../../hooks/useOperatorContext';
-import NoContextBanner from '../../components/NoContextBanner';
 
 interface VenueInfo {
   id: string;
@@ -25,7 +23,6 @@ export default function AttendancePage() {
   const [scanError, setScanError] = useState('');
   const checkInTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const destroyedRef = useRef(false);
-  const { hasContext, loading: contextLoading } = useOperatorContext();
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -117,22 +114,6 @@ export default function AttendancePage() {
   const stopCheckInTimer = () => { if (checkInTimerRef.current) { clearInterval(checkInTimerRef.current); checkInTimerRef.current = null; } };
 
   if (pageLoading) return <div className="referee-loading-mask"><div className="referee-loading-spinner">加载中...</div></div>;
-
-  // 无运营商上下文：隐藏签到入口
-  if (!hasContext && !contextLoading) {
-    return (
-      <div className="referee-page">
-        <NoContextBanner />
-        <div className="referee-card" style={{ marginBottom: 16, padding: 24, textAlign: 'center' }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>📍</div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ref-text)', marginBottom: 8 }}>签到功能暂未开放</div>
-          <div style={{ fontSize: 14, color: 'var(--ref-text-dim)', lineHeight: 1.6 }}>
-            请前往线下赛场扫描官方小程序码<br />解锁签到、排队等全部功能
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="referee-page">
