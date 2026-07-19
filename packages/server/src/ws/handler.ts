@@ -54,9 +54,8 @@ function handleConnection(ws: WebSocket, req: IncomingMessage) {
           const vid = activeIds[0]; // 取第一个激活的赛场
           const info = await redis.hGetAll('active_venue:' + vid);
           if (info && info.name) {
+            // 大屏重连自动恢复：跳过激活码阶段，直接进入比赛画面
             ws.send(JSON.stringify({ type: 'activated', data: { venue_name: info.name, venue_id: vid } }));
-            // 注意：screen_data 会在 referees 的 broadcastAfterUpdate 推送完整队列
-            // 这里只在没有新推送时不发重复的 screen_data
           }
         }
       } catch (_) { /* ignore */ }
@@ -134,15 +133,7 @@ function handleMessage(ws: WebSocket, msg: any) {
             JSON.stringify({ venueId, venueName, createdAt: Date.now() })
           );
           console.log('[ActivationCode] Stored in Redis:', code.substring(0, 8) + '...');
-          
-          // 检查该 venue 是否已激活（大屏断线重连自动恢复）
-          if (venueId) {
-            const isActive = await redis.sIsMember('active_venues', venueId);
-            if (isActive) {
-              const info = await redis.hGetAll('active_venue:' + venueId);
-              ws.send(JSON.stringify({ type: 'activated', data: { venue_name: info.name || venueName, venue_id: venueId } }));
-            }
-          }
+          // 不在此处发送 activated —— 激活由 check-in-by-qr 的 broadcastToScreen 触发
         } catch (e: any) {
           console.error('[ActivationCode] Redis write error:', e.message);
         }
