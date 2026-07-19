@@ -1617,8 +1617,8 @@ async function writeRaceResult(req: Request, userId: string, venueId: string, ni
     if (!existing) {
       await executeOp(req,
         `INSERT INTO race_results (id, checkin_id, user_id, venue_id, referee_id, score_ms, status, race_type, finished_at)
-         VALUES ($1, NULL, $2, $3, $4, $5, $6, 1, NOW())`,
-        [uuidv4(), userId, venueId, req.user!.userId, elapsed, status]
+         VALUES ($1, NULL, $2, $3, $4, $5, 'completed', 1, NOW())`,
+        [uuidv4(), userId, venueId, req.user!.userId, elapsed]
       );
     }
   } catch (e: any) {
