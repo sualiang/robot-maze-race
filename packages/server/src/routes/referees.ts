@@ -1564,6 +1564,13 @@ router.post('/attendance/check-in-direct', authMiddleware, async (req: Request, 
     cachedVenueId = venue.id;
     try { await pool.execute('UPDATE venues SET status = \'open\' WHERE id = ?', [venue.id]); } catch (_) {}
 
+    // 6.5 写入 Redis active_venues（大屏重连时自动恢复激活状态）
+    try {
+      const redis = await getRedis();
+      await redis.sadd('active_venues', venue.id);
+      await redis.hset('active_venue:' + venue.id, 'name', venue.name, 'activatedAt', String(Date.now()));
+    } catch (_) { /* Redis 不可用时不影响主流程 */ }
+
     // 7. 广播
     broadcastToScreen({ type: 'activated', data: { venue_name: venue.name, venue_id: venue.id } });
     broadcastToScreen({ type: 'screen_data', data: getCurrentScreenData() });
@@ -1775,7 +1782,20 @@ let cachedVenueId = '';
 let cachedVenueStatus = 'inactive';
 
 export function setVenueActive(active: boolean) {
-  // venActive 由签到/签退控制
+  // 同步到 Redis，让大屏重连时能自动恢复
+  if (cachedVenueId) {
+    (async () => {
+      try {
+        const redis = await getRedis();
+        if (active) {
+          await redis.sadd('active_venues', cachedVenueId);
+        } else {
+          await redis.srem('active_venues', cachedVenueId);
+          await redis.del('active_venue:' + cachedVenueId);
+        }
+      } catch (_) { /* Redis 不可用不影响主流程 */ }
+    })();
+  }
 }
 
 export async function initVenueCache(): Promise<void> { return; }

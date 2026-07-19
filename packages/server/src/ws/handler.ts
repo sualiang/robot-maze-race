@@ -45,6 +45,22 @@ function handleConnection(ws: WebSocket, req: IncomingMessage) {
     if (screenData) {
       ws.send(JSON.stringify({ type: 'screen_data', data: screenData }));
     }
+    // 检查是否有已激活的赛场，自动恢复（大屏断线重连）
+    (async () => {
+      try {
+        const redis = await getRedis();
+        const activeIds = await redis.smembers('active_venues');
+        if (activeIds.length > 0) {
+          const vid = activeIds[0]; // 取第一个激活的赛场
+          const info = await redis.hgetall('active_venue:' + vid);
+          if (info && info.name) {
+            ws.send(JSON.stringify({ type: 'activated', data: { venue_name: info.name, venue_id: vid } }));
+            // 注意：screen_data 会在 referees 的 broadcastAfterUpdate 推送完整队列
+            // 这里只在没有新推送时不发重复的 screen_data
+          }
+        }
+      } catch (_) { /* ignore */ }
+    })();
   }
 
   // 裁判客户端单独跟踪（用于推送 venue 状态变更）
@@ -118,6 +134,15 @@ function handleMessage(ws: WebSocket, msg: any) {
             JSON.stringify({ venueId, venueName, createdAt: Date.now() })
           );
           console.log('[ActivationCode] Stored in Redis:', code.substring(0, 8) + '...');
+          
+          // 检查该 venue 是否已激活（大屏断线重连自动恢复）
+          if (venueId) {
+            const isActive = await redis.sismember('active_venues', venueId);
+            if (isActive) {
+              const info = await redis.hgetall('active_venue:' + venueId);
+              ws.send(JSON.stringify({ type: 'activated', data: { venue_name: info.name || venueName, venue_id: venueId } }));
+            }
+          }
         } catch (e: any) {
           console.error('[ActivationCode] Redis write error:', e.message);
         }
