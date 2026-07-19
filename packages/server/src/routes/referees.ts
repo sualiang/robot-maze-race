@@ -1319,21 +1319,12 @@ router.post('/attendance/check-out', authMiddleware, async (req: Request, res: R
  */
 router.post('/attendance/check-in-by-qr', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const { activationCode } = req.body;
-    if (!activationCode) {
-      return res.status(400).json({ code: 400, message: '缺少激活码', data: null });
-    }
-
-    // 1. 验证激活码（Redis，进程重启不丢）
-    const validation = await validateActivationCode(activationCode);
-    if (!validation.valid) {
-      return res.status(400).json({ code: 400, message: '激活码无效或已过期，请刷新大屏二维码', data: null });
-    }
+    const { activationCode, venueId: bodyVenueId } = req.body;
 
     const userId = req.user!.userId;
     if (!userId) return res.status(401).json({ code: 401, message: '未登录', data: null });
 
-    // 2. 从 referees 表查真实 referee_id
+    // 1. 从 referees 表查真实 referee_id + 绑定的 venue_id
     const refRow = await queryOpOne<{ id: string; venue_id: string | null }>(req, 
       'SELECT id, venue_id FROM referees WHERE user_id = $1', [userId]
     );
@@ -1341,25 +1332,62 @@ router.post('/attendance/check-in-by-qr', authMiddleware, async (req: Request, r
       return res.status(400).json({ code: 400, message: '未找到裁判记录，请先完成注册', data: null });
     }
 
-    // 3. 取激活码绑定的场地（如果大屏传了 venueId 则用它，否则取第一个）
+    // 2. 确定签到场地（优先级：激活码 > body venueId > 裁判绑定的 venue_id）
+    let venueId: string | null = null;
     let venue: { id: string; name: string; address: string } | null = null;
-    if (validation.venueId) {
+    let usedFallback = false;
+
+    // 尝试验证激活码（Redis）
+    if (activationCode) {
+      try {
+        const validation = await validateActivationCode(activationCode);
+        if (validation.valid && validation.venueId) {
+          venueId = validation.venueId;
+        }
+      } catch (e: any) {
+        console.warn('[QR签到] Redis 激活码验证异常:', e.message);
+      }
+    }
+
+    // 降级1: body 直接传 venueId
+    if (!venueId && bodyVenueId) {
+      venueId = bodyVenueId;
+      usedFallback = true;
+      console.log('[QR签到] 降级：使用 body venueId');
+    }
+
+    // 降级2: 用裁判绑定的 venue_id
+    if (!venueId && refRow.venue_id) {
+      venueId = refRow.venue_id;
+      usedFallback = true;
+      console.log('[QR签到] 降级：使用裁判绑定 venue_id');
+    }
+
+    // 从 DB 查 venue 信息
+    if (venueId) {
       venue = await queryOpOne<{ id: string; name: string; address: string }>(req, 
         'SELECT id, name, COALESCE(address, \'\') as address FROM venues WHERE id = $1',
-        [validation.venueId]
+        [venueId]
       );
     }
+
+    // 最终降级：取第一个场地
     if (!venue) {
       venue = await queryOpOne<{ id: string; name: string; address: string }>(req, 
         'SELECT id, name, COALESCE(address, \'\') as address FROM venues LIMIT 1'
       );
+      if (venue) {
+        usedFallback = true;
+        console.log('[QR签到] 降级：使用第一个可用场地');
+      }
     }
+
     if (!venue) {
       return res.status(500).json({ code: 500, message: '没有可用赛场', data: null });
     }
 
-    // 3.5 验证裁判是否已绑定该赛场
-    if (refRow.venue_id && refRow.venue_id !== venue.id) {
+    // 验证裁判是否已绑定该赛场（降级时跳过严格校验）
+    if (!usedFallback && refRow.venue_id && refRow.venue_id !== venue.id) {
       return res.status(403).json({ code: 403, message: '抱歉，您并没有绑定本赛场', data: null });
     }
 
