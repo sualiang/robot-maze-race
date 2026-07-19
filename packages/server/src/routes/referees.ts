@@ -135,6 +135,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response<ApiResponse<P
     const {
       venue_id,
       status,
+      operator_id,
       page: pageStr = '1',
       pageSize: pageSizeStr = '20',
     } = req.query;
@@ -142,6 +143,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response<ApiResponse<P
     const page = Math.max(1, parseInt(pageStr as string, 10) || 1);
     const pageSize = Math.min(100, Math.max(1, parseInt(pageSizeStr as string, 10) || 20));
     const offset = (page - 1) * pageSize;
+    const role = req.user!.role;
 
     const conditions: string[] = [];
     const params: any[] = [];
@@ -168,47 +170,135 @@ router.get('/', authMiddleware, async (req: Request, res: Response<ApiResponse<P
         params.push('rejected');
         paramIdx++;
       }
-      // 不支持其他 status 值，忽略
     }
 
-    // operator 可看自己管理的赛场下的裁判 + 未绑定赛场的裁判（自己创建的）
-    if (req.user!.role === 'operator') {
-      // 统一获取运营商ID：先查 operator_members 表再回退
-      const roleMember = await queryOne<{ operator_id: string }>(
-          'SELECT operator_id FROM operator_members WHERE id = ?',
-        [req.user!.userId]
-      );
-      const opUserId = roleMember?.operator_id || 
-        (req.user as any).operatorId || 
-        req.user!.userId;
-      const operatorVenues = await queryOp<{ id: string }>(req, 
+    // operator: 只看自己的运营商 + venue 过滤
+    if (role === 'operator') {
+      const owneOpId = (req.user as any)?.operatorId
+        || (await queryOne<{ operator_id: string }>(
+          'SELECT operator_id FROM operator_members WHERE id = $1',
+          [req.user!.userId]
+        ))?.operator_id
+        || req.user!.userId;
+
+      const operatorVenues = await queryOp<{ id: string }>(req,
         'SELECT id FROM venues WHERE operator_id = $1',
-        [opUserId]
+        [owneOpId]
       );
       const venueIds = operatorVenues.map((v) => v.id);
       if (venueIds.length > 0) {
-        const placeholders = venueIds.map((_, i) => `$${paramIdx + i}`).join(', ');
-        // 自己赛场的裁判 OR 未绑定的裁判
-        conditions.push(`(r.venue_id IN (${placeholders}) OR r.venue_id IS NULL)`);
+        const ph = venueIds.map((_, i) => `$${paramIdx + i}`).join(', ');
+        conditions.push(`(r.venue_id IN (${ph}) OR r.venue_id IS NULL)`);
         params.push(...venueIds);
         paramIdx += venueIds.length;
       } else {
-        // 没有赛场，只看未绑定的裁判
         conditions.push('r.venue_id IS NULL');
       }
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    // COUNT: only from operator DB (no cross-DB JOIN on users)
-    const countResult = await queryOpOne<{ count: string }>(req, 
+    // admin: 遍历所有运营商库汇总（或按 ?operator_id 指定单个）
+    // operator: 走 resolveOperatorDb 单库查询
+    const isAdmin = role === 'admin';
+
+    if (isAdmin) {
+      // 收集所有目标运营商库的 db_name
+      let targetDbNames: string[] = [];
+      if (operator_id && (operator_id as string) !== '') {
+        const opReg = await queryOne<{ db_name: string }>(
+          'SELECT db_name FROM operators_registry WHERE operator_id = $1',
+          [operator_id as string]
+        );
+        if (opReg?.db_name) targetDbNames = [opReg.db_name];
+      } else {
+        const allRegs = await query<{ db_name: string }>(
+          'SELECT db_name FROM operators_registry WHERE db_name IS NOT NULL'
+        );
+        targetDbNames = allRegs.map((r: any) => r.db_name).filter(Boolean);
+      }
+
+      if (targetDbNames.length === 0) {
+        return res.json({ code: 0, message: 'ok', data: { list: [], total: 0, page, pageSize } });
+      }
+
+      // 从每个运营商库拉 referees
+      type RawRow = any;
+      const allRows: RawRow[] = [];
+      for (const dbName of targetDbNames) {
+        try {
+          const pool = getOperatorPool(dbName);
+          const [countRows] = await pool.execute(
+            `SELECT COUNT(*) as count FROM referees r ${whereClause.replace(/\$(\d+)/g, '?')}`,
+            params
+          ) as any[];
+          if (((countRows as any[])?.[0]?.count || 0) > 0) {
+            const [rows] = await pool.execute(
+              `SELECT r.id, r.user_id, r.venue_id, r.status,
+                      r.name, r.phone, r.id_number, r.cert_image,
+                      r.last_checkin_at, r.created_at, r.updated_at,
+                      r.apply_remark, r.review_remark, r.reviewed_at, r.operator_id,
+                      v.name as venue_name
+               FROM referees r
+               LEFT JOIN venues v ON r.venue_id = v.id
+               ${whereClause.replace(/\$(\d+)/g, '?')}
+               ORDER BY r.created_at DESC`,
+              params
+            ) as any[];
+            allRows.push(...(rows || []));
+          }
+        } catch { /* skip unreachable DB */ }
+      }
+
+      // JS 层排序 + 分页
+      allRows.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      const total = allRows.length;
+      const paged = allRows.slice(offset, offset + pageSize);
+
+      // 组装用户/运营商名称
+      const userIds = [...new Set(paged.map((r: any) => r.user_id).filter(Boolean))];
+      const opIds = [...new Set(paged.map((r: any) => r.operator_id).filter(Boolean))];
+      const userMap: Record<string, any> = {};
+      const opMap: Record<string, any> = {};
+
+      if (userIds.length > 0) {
+        try {
+          const users = await query<any>(
+            `SELECT id, nickname, avatar_url FROM users WHERE id IN (${userIds.map((_, i) => `$${i + 1}`).join(', ')})`,
+            userIds
+          );
+          users.forEach((u: any) => { userMap[u.id] = u; });
+        } catch { /* ignore */ }
+      }
+      if (opIds.length > 0) {
+        try {
+          const ops = await query<any>(
+            `SELECT id, name FROM operators WHERE id IN (${opIds.map((_, i) => `$${i + 1}`).join(', ')})`,
+            opIds
+          );
+          ops.forEach((o: any) => { opMap[o.id] = o; });
+        } catch { /* ignore */ }
+      }
+
+      const list: RefereeWithUser[] = paged.map((r: any) => ({
+        ...r,
+        nickname: userMap[r.user_id]?.nickname || null,
+        avatar_url: userMap[r.user_id]?.avatar_url || null,
+        operator_name: opMap[r.operator_id]?.name || null,
+      }));
+
+      return res.json({ code: 0, message: 'ok', data: { list, total, page, pageSize } });
+    }
+
+    // ---- operator 路径（原有逻辑） ----
+
+    const countResult = await queryOpOne<{ count: string }>(req,
       `SELECT COUNT(*) as count FROM referees r ${whereClause}`,
       params
     );
     const total = parseInt(countResult?.count || '0', 10);
 
-    // 1) 从运营商库查 referees + venues
-    const rows = await queryOp<any>(req, 
+    const rows = await queryOp<any>(req,
       `SELECT r.id, r.user_id, r.venue_id, r.status,
               r.name,
               r.phone, r.id_number, r.cert_image,
@@ -223,7 +313,6 @@ router.get('/', authMiddleware, async (req: Request, res: Response<ApiResponse<P
       [...params, pageSize, offset]
     );
 
-    // 2) 收集 user_id 和 operator_id，批量查公共库的 users 和 operators
     const userIds = [...new Set(rows.map((r: any) => r.user_id).filter(Boolean))];
     const opIds = [...new Set(rows.map((r: any) => r.operator_id).filter(Boolean))];
     const userMap: Record<string, any> = {};
@@ -244,7 +333,6 @@ router.get('/', authMiddleware, async (req: Request, res: Response<ApiResponse<P
       } catch { /* ignore if operators query fails */ }
     }
 
-    // 3) JS 层组装
     const list: RefereeWithUser[] = rows.map((r: any) => ({
       ...r,
       nickname: userMap[r.user_id]?.nickname || null,
@@ -252,11 +340,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response<ApiResponse<P
       operator_name: opMap[r.operator_id]?.name || null,
     }));
 
-    return res.json({
-      code: 0,
-      message: 'ok',
-      data: { list, total, page, pageSize },
-    });
+    return res.json({ code: 0, message: 'ok', data: { list, total, page, pageSize } });
   } catch (error: any) {
     console.error('[Referees] list error:', error.message);
     return res.status(500).json({ code: 500, message: '获取裁判列表失败', data: null as any });
