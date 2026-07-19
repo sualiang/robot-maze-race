@@ -146,13 +146,6 @@ export default function MatchPage() {
     catch { setErrorMsg('加载失败，请重试'); } finally { setPageLoading(false); }
   };
 
-  // 定时轮询排队列表，保持昵称/头像数据显示
-  useEffect(() => {
-    if (!checkedIn) return;
-    const poll = setInterval(() => { loadQueue(true); }, 2000);
-    return () => clearInterval(poll);
-  }, [checkedIn]);
-
   const checkAttendanceStatus = async () => {
     try {
       const res: any = await api.get('/referees/attendance/status');
