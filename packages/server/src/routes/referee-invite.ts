@@ -23,11 +23,17 @@ router.post('/invite', authMiddleware, async (req: Request, res: Response) => {
     if (role !== 'admin' && role !== 'operator') {
       return res.status(403).json({ code: 403, message: '仅管理员或运营商可生成邀请', data: null });
     }
-    const { phone, venue_id, note } = req.body;
+    const { phone, venue_id, note, operator_id } = req.body;
     let operatorId = '';
     if (role === 'operator') {
       // JWT 中 userId 和 operatorId 都是 operators.id
       operatorId = (req.user as any).operatorId || req.user!.userId;
+    } else if (role === 'admin') {
+      // 管理员必须指定目标运营商
+      operatorId = operator_id;
+      if (!operatorId) {
+        return res.status(400).json({ code: 400, message: '管理员生成邀请需指定运营商', data: null });
+      }
     }
     const inviteToken = uuidv4();
     const inviteId = uuidv4();
@@ -52,7 +58,7 @@ router.post('/invite', authMiddleware, async (req: Request, res: Response) => {
     await execute(
       `INSERT INTO referee_invites (id, operator_id, phone, venue_id, token, note, status, ticket, expires_at, created_at, updated_at)
        VALUES ($1,$2,$3,$4,$5,$6,'active',$7,$8,$9,$10)`,
-      [inviteId, operatorId || '', phone || null, venue_id || null, inviteToken, note || null,
+      [inviteId, operatorId, phone || null, venue_id || null, inviteToken, note || null,
        ticket || null, toStr(expiresAt), toStr(now), toStr(now)]
     );
 
