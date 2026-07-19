@@ -43,7 +43,7 @@ router.post('/create-by-operator', authMiddleware, async (req: Request, res: Res
     }
 
     // 解析目标运营商 ID
-    const targetOperatorId = req.user?.operatorId || operator_id;
+    const targetOperatorId = operator_id || req.user?.operatorId;
     if (!targetOperatorId) {
       return res.status(400).json({ code: 400, message: 'admin 创建裁判需指定 operator_id', data: null });
     }
