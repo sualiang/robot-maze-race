@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { broadcastToScreen, validateActivationCode } from '../ws/handler';
 import { WebSocket } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
-import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../config/database';
+import { query, queryOne, execute, queryOp, queryOpOne, executeOp, getOperatorPool } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import {
   ApiResponse,
