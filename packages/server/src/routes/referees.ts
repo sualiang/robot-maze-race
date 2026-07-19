@@ -692,6 +692,7 @@ router.get('/match/queue', authMiddleware, async (req: Request, res: Response) =
         for (const u of (userRows || [])) {
           userMap.set(u.id, { nickname: u.nickname, avatar_url: u.avatar_url });
         }
+        console.log('[Match] match/queue userMap: ids=' + JSON.stringify(allUserIds) + ' size=' + userMap.size);
       } catch (e: any) {
         console.warn('[Match] query users from common DB failed:', e.message);
       }
