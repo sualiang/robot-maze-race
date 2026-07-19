@@ -1476,23 +1476,28 @@ async function getOpPoolFromJwt(req: Request): Promise<MysqlPool | null> {
   const jwt = req.user as any;
   const opId = jwt?.operatorId;
 
-  // 裁判 JWT 里没有 operatorId，通过 referees.user_id 查找运营商
+  // 裁判 JWT 里没有 operatorId，遍历所有运营商库查找 referees 表
+  // referees 表在 op_* 库里，不在 common 库
   if (!opId && jwt?.role === 'referee' && jwt?.userId) {
     try {
-      const ref = await queryOne<{ operator_id: string }>(
-        'SELECT operator_id FROM referees WHERE user_id = $1',
-        [jwt.userId]
+      const common = getCommonPool();
+      const [allOps] = await common.query<any[]>(
+        `SELECT db_name, operator_id FROM operators_registry WHERE db_name IS NOT NULL`
       );
-      if (ref?.operator_id) {
-        const regRow = await queryOne<{ db_name: string }>(
-          'SELECT db_name FROM operators_registry WHERE operator_id = $1',
-          [ref.operator_id]
-        );
-        if (regRow?.db_name) {
-          return getOperatorPool(regRow.db_name);
+      if (allOps && allOps.length > 0) {
+        for (const opReg of allOps) {
+          if (!opReg.db_name) continue;
+          try {
+            const pool = getOperatorPool(opReg.db_name);
+            const [rows] = await pool.execute(
+              `SELECT operator_id FROM referees WHERE user_id = ? LIMIT 1`,
+              [jwt.userId]
+            );
+            if (rows && Array.isArray(rows) && rows.length > 0 && rows[0].operator_id) {
+              return pool;
+            }
+          } catch { /* skip */ }
         }
-        // operators_registry 里没有，fallback
-        try { return getOperatorPool('op_' + ref.operator_id); } catch { return null; }
       }
     } catch { /* fall through */ }
     return null;
