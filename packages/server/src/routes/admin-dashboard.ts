@@ -110,7 +110,7 @@ router.get('/stats-fast', authMiddleware, checkPermission('dashboard:read'), asy
 
 // ============================================================
 // GET /api/v1/admin/dashboard/stats-slow
-// 慢查询指标：平台收入 + 待审核提现（均从 settlements 跨库聚合）
+// 慢查询指标：平台收入（settlements settled）+ 预估待审核提现（GMV - 平台收入）
 // ============================================================
 router.get('/stats-slow', authMiddleware, checkPermission('dashboard:read'), async (req: Request, res: Response) => {
   try {
@@ -119,10 +119,14 @@ router.get('/stats-slow', authMiddleware, checkPermission('dashboard:read'), asy
     );
     const platformProfit = parseInt(profitResult?.total || '0', 10);
 
-    const pendingResult = await queryAllOpDashOne<{ total: string }>(req, 
-      `SELECT COALESCE(SUM(amount_cents), 0) as total FROM settlements WHERE status = 'pending'`
+    // GMV: 各库 payments 已支付总额
+    const gmvResult = await queryAllOpDashOne<{ total: string }>(req, 
+      `SELECT COALESCE(SUM(amount_cents), 0) as total FROM payments WHERE status = 'paid'`
     );
-    const pendingWithdraw = parseInt(pendingResult?.total || '0', 10);
+    const totalGMV = parseInt(gmvResult?.total || '0', 10);
+
+    // 预估待审核提现 = GMV - 平台收入
+    const pendingWithdraw = Math.max(0, totalGMV - platformProfit);
 
     return res.json({
       code: 0,
