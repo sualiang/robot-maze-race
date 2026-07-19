@@ -1238,6 +1238,7 @@ interface AttendanceRecord {
 router.get('/attendance/status', authMiddleware, async (req: Request, res: Response<ApiResponse<any>>) => {
   try {
     const userId = req.user!.userId;
+    console.log('[DEBUG attendance/status] userId=' + userId + ' operatorId=' + ((req.user as any)?.operatorId || 'NONE') + ' role=' + ((req.user as any)?.role || 'NONE'));
     // 从 referees 表查真实 referee_id
     const ref = await refQueryOpOne<{ id: string; phone: string }>(req, 
       'SELECT id, phone FROM referees WHERE user_id = $1', [userId]
@@ -1454,7 +1455,23 @@ async function getOpPoolFromJwt(req: Request): Promise<MysqlPool | null> {
   if (!opId) {
     try {
       const redis = await getRedis();
-      const ctxData = await redis.get(`operator_context:${jwt.userId}`);
+      // JWT userId 可能是 referee.id 或 users.id，两者都试
+      let ctxData = await redis.get(`operator_context:${jwt.userId}`);
+      // 如果当前 userId 是 referee.id，再试 users.id（查 common 库）
+      if (!ctxData) {
+        try {
+          const userRow = await queryOne<{ id: string }>('SELECT id FROM users WHERE id = $1', [jwt.userId]);
+          if (!userRow) {
+            // 不是 users.id，可能是 referee.id → 查 referees 表获取 user_id
+            const refRow = await queryOne<{ user_id: string }>(
+              'SELECT r.user_id FROM referees r WHERE r.id = $1', [jwt.userId]
+            );
+            if (refRow?.user_id) {
+              ctxData = await redis.get(`operator_context:${refRow.user_id}`);
+            }
+          }
+        } catch { /* ignore */ }
+      }
       if (ctxData) {
         const ctx = JSON.parse(ctxData);
         if (ctx.operatorId) opId = ctx.operatorId;
