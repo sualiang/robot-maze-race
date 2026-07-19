@@ -656,8 +656,8 @@ router.post('/match/select-racer', authMiddleware, async (req: Request, res: Res
 
     // 更新该选手状态为 called
     await executeOp(req,
-      `UPDATE race_queues SET status = 'called', start_time_ms = NULL, paused_elapsed_ms = 0, finish_time_ms = NULL, referee_id = $2
-       WHERE id = $1`,
+      `UPDATE race_queues SET status = 'called', start_time_ms = NULL, paused_elapsed_ms = 0, finish_time_ms = NULL
+       WHERE id = $1, referee_id = $2`,
       [rid, req.user!.userId]
     );
 
