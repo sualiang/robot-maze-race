@@ -12,7 +12,7 @@ function hideLoadingSafe() {
 }
 
 function request(url, options) {
-  const { method = 'GET', data, header = {}, showLoading = true } = options || {};
+  const { method = 'GET', data, header = {}, showLoading = true, silent = false } = options || {};
 
   if (showLoading) {
     loadingCount++;
@@ -45,13 +45,13 @@ function request(url, options) {
           reject({ code: 401, message: '登录已过期' });
         } else {
           var errMsg = (body && body.message) || '请求失败(' + res.statusCode + ')';
-          wx.showToast({ title: errMsg, icon: 'none', duration: 2000 });
+          if (!silent) wx.showToast({ title: errMsg, icon: 'none', duration: 2000 });
           reject(body || { code: res.statusCode, message: errMsg });
         }
       },
       fail(err) {
         if (showLoading) hideLoadingSafe();
-        wx.showToast({ title: '网络异常，请重试', icon: 'none' });
+        if (!silent) wx.showToast({ title: '网络异常，请重试', icon: 'none' });
         reject(err);
       }
     });
@@ -95,11 +95,11 @@ function silentGet(url, params) {
     }
     if (parts.length > 0) fullUrl += '?' + parts.join('&');
   }
-  return request(fullUrl, { method: 'GET', showLoading: false });
+  return request(fullUrl, { method: 'GET', showLoading: false, silent: true });
 }
 
 function silentPost(url, data) {
-  return request(url, { method: 'POST', data: data, showLoading: false });
+  return request(url, { method: 'POST', data: data, showLoading: false, silent: true });
 }
 
 module.exports = {
