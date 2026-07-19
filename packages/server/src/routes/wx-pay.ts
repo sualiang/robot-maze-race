@@ -505,8 +505,9 @@ router.post('/notify', async (req: Request, res: Response) => {
           const { user_id: uid, race_count: rc } = orderDetail;
 
           // 更新用户参赛次数（抵扣卡赠送已废弃，改用积分抵扣）
+          // users 表在 robot_maze_race_common 公共库，不用 opPool
           if (rc > 0) {
-            await opPool.execute(
+            await execute(
               `UPDATE users SET race_count = COALESCE(race_count, 0) + ?, updated_at = NOW() WHERE id = ?`,
               [rc, uid]
             );
