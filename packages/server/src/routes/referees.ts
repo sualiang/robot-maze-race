@@ -1435,10 +1435,15 @@ router.post('/attendance/check-in-direct', authMiddleware, async (req: Request, 
     const userId = req.user!.userId;
     if (!userId) return res.status(401).json({ code: 401, message: '未登录', data: null });
 
-    // 1. 查 referee
-    const refRow = await queryOpOne<{ id: string; venue_id: string | null }>(req,
+    // 1. 查 referee（authMiddleware 放到了 user_id；referee-bind 放的是 referee.id）
+    let refRow = await queryOpOne<{ id: string; venue_id: string | null }>(req,
       'SELECT id, venue_id FROM referees WHERE user_id = $1', [userId]
     );
+    if (!refRow) {
+      refRow = await queryOpOne<{ id: string; venue_id: string | null }>(req,
+        'SELECT id, venue_id FROM referees WHERE id = $1', [userId]
+      );
+    }
     if (!refRow) {
       return res.status(400).json({ code: 400, message: '未找到裁判记录', data: null });
     }
