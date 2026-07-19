@@ -1912,8 +1912,8 @@ export async function pushCurrentScreenData(ws: WebSocket) {
       for (const u of (userRows || [])) {
         userMap.set(u.id, { nickname: u.nickname, avatar_url: u.avatar_url });
       }
+      console.log('[Broadcast] user query: ids=' + JSON.stringify(allUserIds) + ' rows=' + (userRows?.length || 0));
     }
-    console.log('[Broadcast] user query: ids=' + JSON.stringify(allUserIds) + ' rows=' + (userRows?.length || 0));
 
     const attachUser = (row: any) => {
       if (!row?.user_id) return row;
