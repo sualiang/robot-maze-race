@@ -8,10 +8,10 @@ import { getRedis } from '../config/redis';
 const rooms = new Map<string, Set<WebSocket>>();
 const clientRooms = new Map<WebSocket, string>();
 const screenClients = new Set<WebSocket>();
+const screenActivationCodes = new Map<WebSocket, string>(); // ws → activation_code，用于断线时清理
 const refereeClients = new Set<WebSocket>();
 
 export const ACTIVATION_CODE_PREFIX = 'activation_code:';
-const ACTIVATION_CODE_TTL = 60; // 秒（Redis SETEX用）
 
 export async function validateActivationCode(code: string): Promise<{ valid: boolean; venueId?: string; venueName?: string }> {
   if (!code) return { valid: false };
@@ -69,9 +69,24 @@ function handleConnection(ws: WebSocket, req: IncomingMessage) {
 }
 
 function handleClose(ws: WebSocket) {
+  // 大屏断线时清理激活码，防止重连后找不到
+  if (screenClients.has(ws)) {
+    const code = screenActivationCodes.get(ws);
+    if (code) {
+      (async () => {
+        try {
+          const redis = await getRedis();
+          await redis.del(ACTIVATION_CODE_PREFIX + code);
+          console.log('[ActivationCode] Cleaned up on disconnect:', code.substring(0, 8) + '...');
+        } catch (e: any) {
+          console.error('[ActivationCode] Cleanup error:', e.message);
+        }
+      })();
+    }
+    screenActivationCodes.delete(ws);
+  }
   screenClients.delete(ws);
   refereeClients.delete(ws);
-  // Redis TTL handles activation code expiry; no manual cleanup needed
   const room = clientRooms.get(ws);
   if (room) {
     const clients = rooms.get(room);
@@ -121,7 +136,7 @@ function handleMessage(ws: WebSocket, msg: any) {
     }
 
     case 'screen_login': {
-      // 大屏生成激活码后存 Redis（含 venueId 关联）
+      // 大屏生成激活码后存 Redis（含 venueId 关联），不设 TTL，断线时主动清理
       const code = msg.activation_code;
       if (!code || typeof code !== 'string') break;
       const venueId = msg.venueId || undefined;
@@ -133,6 +148,7 @@ function handleMessage(ws: WebSocket, msg: any) {
             ACTIVATION_CODE_PREFIX + code,
             JSON.stringify({ venueId, venueName, createdAt: Date.now() })
           );
+          screenActivationCodes.set(ws, code);
           console.log('[ActivationCode] Stored in Redis:', code.substring(0, 8) + '...');
           // 不在此处发送 activated —— 激活由 check-in-by-qr 的 broadcastToScreen 触发
         } catch (e: any) {
@@ -194,7 +210,7 @@ function setupWSS(wss: WebSocketServer) {
       }
     });
     ws.on('close', (code, reason) => { console.log(`[WS] 关闭: code=${code} reason=${reason?.toString() || ''}`); handleClose(ws); });
-    ws.on('error', (err) => console.error('[WS] 连接错误:', err.message));
+    ws.on('error', (err) => { console.error('[WS] 连接错误:', err.message); handleClose(ws); });
   });
 }
 
