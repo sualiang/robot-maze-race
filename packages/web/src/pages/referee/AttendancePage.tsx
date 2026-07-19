@@ -10,14 +10,54 @@ interface VenueInfo {
 
 type AttendanceStatus = 'unchecked' | 'checked' | 'loading';
 
+const CHECKIN_CACHE_KEY = 'referee_checkin_status';
+
+function saveCheckinCache(vi: VenueInfo, checkinAt: string) {
+  try {
+    sessionStorage.setItem(CHECKIN_CACHE_KEY, JSON.stringify({ vi, checkinAt, ts: Date.now() }));
+  } catch { /* ignore */ }
+}
+
+function loadCheckinCache(): { vi: VenueInfo; checkinAt: string } | null {
+  try {
+    const raw = sessionStorage.getItem(CHECKIN_CACHE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (data?.vi && data?.checkinAt) return data;
+    return null;
+  } catch { return null; }
+}
+
+function clearCheckinCache() {
+  try { sessionStorage.removeItem(CHECKIN_CACHE_KEY); } catch { /* ignore */ }
+}
+
 export default function AttendancePage() {
   const navigate = useNavigate();
-  const [status, setStatus] = useState<AttendanceStatus>('unchecked');
+  const [status, setStatus] = useState<AttendanceStatus>(() => {
+    const cached = loadCheckinCache();
+    return cached ? 'checked' : 'unchecked';
+  });
   const [actionLoading, setActionLoading] = useState(false);
-  const [venueInfo, setVenueInfo] = useState<VenueInfo | null>(null);
-  const [checkInTime, setCheckInTime] = useState('');
-  const [durationText, setDurationText] = useState('');
-  const [pageLoading, setPageLoading] = useState(true);
+  const [venueInfo, setVenueInfo] = useState<VenueInfo | null>(() => {
+    const cached = loadCheckinCache();
+    return cached?.vi || null;
+  });
+  const [checkInTime, setCheckInTime] = useState(() => {
+    const cached = loadCheckinCache();
+    return cached?.checkinAt || '';
+  });
+  const [durationText, setDurationText] = useState(() => {
+    const cached = loadCheckinCache();
+    if (cached?.checkinAt) {
+      const elapsed = Date.now() - new Date(cached.checkinAt).getTime();
+      const h = Math.floor(elapsed / 3600000);
+      const m = Math.floor((elapsed % 3600000) / 60000);
+      return h > 0 ? h + ' 小时 ' + m + ' 分钟' : m + ' 分钟';
+    }
+    return '';
+  });
+  const [pageLoading, setPageLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [inputCode, setInputCode] = useState('');
   const [scanError, setScanError] = useState('');
@@ -27,7 +67,17 @@ export default function AttendancePage() {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) { navigate('/referee/login', { replace: true }); return; }
-    destroyedRef.current = false; initPage();
+    destroyedRef.current = false;
+
+    const cached = loadCheckinCache();
+    if (cached) {
+      // 从缓存恢复后立即启动计时器
+      startCheckInTimer();
+    }
+
+    // 异步同步后端状态
+    initPage();
+
     return () => { destroyedRef.current = true; stopCheckInTimer(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -48,7 +98,12 @@ export default function AttendancePage() {
           address: res.venueInfo?.address || '',
         };
         setStatus('checked'); setVenueInfo(vi); setCheckInTime(res.checkinRecord.checkin_at || '');
-        localStorage.setItem('referee_venue', JSON.stringify(vi)); startCheckInTimer();
+        saveCheckinCache(vi, res.checkinRecord.checkin_at);
+        startCheckInTimer();
+      } else if (res.checkedIn === false || (!res.checkinRecord)) {
+        // 后端说未签到，清除前端缓存
+        setStatus('unchecked'); setVenueInfo(null); setCheckInTime(''); setDurationText('');
+        clearCheckinCache(); stopCheckInTimer();
       }
     } catch (e: any) {
       console.error('[签到状态] 查询失败:', e?.message || e);
@@ -60,9 +115,10 @@ export default function AttendancePage() {
     try {
       const res: any = await api.post('/referees/attendance/check-in-by-qr', { activationCode });
       const vi = { id: res.venueId, name: res.venueName, address: '' };
-      setStatus('checked'); setVenueInfo(vi); setCheckInTime(res.checkinAt);
+      const checkinAt = res.checkinAt;
+      setStatus('checked'); setVenueInfo(vi); setCheckInTime(checkinAt);
       setInputCode('');
-      localStorage.setItem('referee_venue', JSON.stringify(vi)); startCheckInTimer();
+      saveCheckinCache(vi, checkinAt); startCheckInTimer();
       setErrorMsg('✅ 签到成功！赛场已激活');
       setTimeout(() => setErrorMsg(''), 2000);
     } catch (e: any) {
@@ -94,9 +150,9 @@ export default function AttendancePage() {
     setActionLoading(true);
     try {
       await api.post('/referees/attendance/check-out');
-      stopCheckInTimer(); setStatus('unchecked'); setVenueInfo(null); setCheckInTime(''); setDurationText('');
+      clearCheckinCache(); stopCheckInTimer(); setStatus('unchecked'); setVenueInfo(null); setCheckInTime(''); setDurationText('');
       setErrorMsg('🏁 签退成功！赛场已暂停'); setTimeout(() => setErrorMsg(''), 2000);
-    } catch { setStatus('unchecked'); setVenueInfo(null); setCheckInTime(''); setDurationText(''); setErrorMsg('网络异常，签退已本地缓存'); setTimeout(() => setErrorMsg(''), 2000); }
+    } catch { clearCheckinCache(); setStatus('unchecked'); setVenueInfo(null); setCheckInTime(''); setDurationText(''); setErrorMsg('网络异常，签退已本地缓存'); setTimeout(() => setErrorMsg(''), 2000); }
     finally { setActionLoading(false); }
   };
 
@@ -113,7 +169,7 @@ export default function AttendancePage() {
 
   const stopCheckInTimer = () => { if (checkInTimerRef.current) { clearInterval(checkInTimerRef.current); checkInTimerRef.current = null; } };
 
-  if (pageLoading) return <div className="referee-loading-mask"><div className="referee-loading-spinner">加载中...</div></div>;
+  if (pageLoading && status !== 'checked') return <div className="referee-loading-mask"><div className="referee-loading-spinner">加载中...</div></div>;
 
   return (
     <div className="referee-page">

@@ -1319,7 +1319,7 @@ router.post('/attendance/check-in', authMiddleware, async (req: Request, res: Re
     );
 
     if (existing && !existing.checkout_at) {
-      return res.status(400).json({ code: 400, message: '今日已签到，请勿重复签到', data: null });
+      return res.json({ code: 200, message: '今日已签到，请勿重复签到', data: null });
     }
 
     // 执行签到记录插入
@@ -1535,7 +1535,7 @@ router.post('/attendance/check-in-direct', authMiddleware, async (req: Request, 
       [refRow.id]
     ) as any[];
     if ((attRows as any[])?.[0]) {
-      return res.status(400).json({ code: 400, message: '今日已签到，请先签退', data: null });
+      return res.json({ code: 200, message: '今日已签到，请先签退', data: null });
     }
 
     // 5. 写入签到记录
@@ -1664,7 +1664,7 @@ router.post('/attendance/check-in-by-qr', authMiddleware, async (req: Request, r
     ) as any[];
     if ((attRows as any[])?.[0]) {
       console.log('[QR签到] 今日已签到, refRow.id=' + refRow.id);
-      return res.status(400).json({ code: 400, message: '今日已签到，请先签退', data: null });
+      return res.json({ code: 200, message: '今日已签到，请先签退', data: null });
     }
 
     // 5. 写入 attendance 签到记录
