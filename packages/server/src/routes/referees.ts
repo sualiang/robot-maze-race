@@ -637,7 +637,7 @@ router.post('/match/select-racer', authMiddleware, async (req: Request, res: Res
     if (!racerId) {
       // 自动选第一个 waiting 的选手
       const first = await queryOpOne<RacerRow>(req,
-        `SELECT id FROM race_queues WHERE status = 'waiting' ORDER BY queue_number ASC LIMIT 1`, []
+        `SELECT id FROM race_queues WHERE status IN ('waiting','skipped') ORDER BY CASE WHEN status = 'skipped' THEN 0 ELSE 1 END, queue_number ASC LIMIT 1`, []
       );
       if (!first) {
         return res.status(400).json({ code: 400, message: '队列为空', data: null });
@@ -1086,18 +1086,10 @@ router.post('/match/skip', authMiddleware, async (req: Request, res: Response) =
       return res.status(404).json({ code: 404, message: '选手未在队列中', data: null });
     }
 
-    // 获取当前最大排队号
-    const maxQ = await queryOpOne<{ max_q: number }>(req,
-      `SELECT COALESCE(MAX(queue_number), 0) as max_q FROM race_queues WHERE venue_id = $1`,
-      [row.venue_id]
-    );
-    const nextQ = (maxQ?.max_q ?? 0) + 1;
-
-    // 将选手排到下一位（最后）
+    // 保持原 queue_number，仅更新状态为 skipped
     await executeOp(req,
-      `UPDATE race_queues SET queue_number = $2, status = 'skipped'
-       WHERE id = $1`,
-      [racerId, nextQ]
+      `UPDATE race_queues SET status = 'skipped' WHERE id = $1`,
+      [racerId]
     );
 
     await broadcastAfterUpdate(req);
