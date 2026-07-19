@@ -16,6 +16,8 @@ Page({
 
     // 模块3: 参赛状态&福利
     couponValue: 0,
+    bestScoreDisplay: '--',
+    rankDisplay: '--',
     // 模块4: 福利条
     promoText: '',
     // 模块5: 参赛包
@@ -61,6 +63,7 @@ Page({
     that.fetchSeasonUserInfo();
     that.fetchSeasonConfig();
     that.fetchAnnouncement();
+    that.fetchBestScore();
 
     return Promise.resolve();
   },
@@ -188,6 +191,49 @@ Page({
       });
     }).catch(function () {
       // 静默失败
+    });
+  },
+
+  /**
+   * 格式化毫秒为 mm:ss.ff 显示格式
+   */
+  formatScoreDisplay: function (ms) {
+    if (ms === null || ms === undefined || isNaN(ms)) return '--';
+    var totalSeconds = ms / 1000;
+    var min = Math.floor(totalSeconds / 60);
+    var sec = Math.floor(totalSeconds % 60);
+    var centi = Math.floor((totalSeconds % 1) * 100);
+    return ('00' + min).slice(-2) + ':' + ('00' + sec).slice(-2) + '.' + ('00' + centi).slice(-2);
+  },
+
+  /**
+   * 获取用户最佳成绩和排名 /api/v1/player/me/best-score
+   */
+  fetchBestScore: function () {
+    var that = this;
+    var app = getApp();
+
+    if (!app.globalData.isLoggedIn) {
+      that.setData({ bestScoreDisplay: '--', rankDisplay: '--' });
+      return;
+    }
+
+    request.silentGet('/player/me/best-score').then(function (data) {
+      var d = data.data || data;
+      var bestScore = d.bestScore;
+      var rank = d.rank;
+
+      var scoreDisplay = that.formatScoreDisplay(bestScore);
+      var rankDisplay = rank !== null && rank !== undefined
+        ? '当前排名 第' + rank + '名'
+        : '--';
+
+      that.setData({
+        bestScoreDisplay: scoreDisplay,
+        rankDisplay: rankDisplay
+      });
+    }).catch(function () {
+      that.setData({ bestScoreDisplay: '--', rankDisplay: '--' });
     });
   },
 

@@ -754,6 +754,48 @@ router.get('/me/stats', authMiddleware, async (req: Request, res: Response) => {
 });
 
 /**
+ * GET /player/me/best-score
+ * 返回当前用户的最佳成绩和同运营商内排名
+ * 从 race_records 表查询（score = finish_time_ms 单位毫秒）
+ */
+router.get('/me/best-score', authMiddleware, async (req: Request, res: Response) => {
+  const userId = req.user!.userId;
+
+  try {
+    // 查询用户最好成绩（score 越小越好）
+    const bestRow = await queryOpOne<{ best_score: number }>(req,
+      `SELECT MIN(score) as best_score FROM race_records WHERE player_id = $1 AND status = 'finished'`,
+      [userId]
+    );
+
+    const bestScore = bestRow?.best_score ?? null;
+
+    let rank: number | null = null;
+    if (bestScore !== null && bestScore !== undefined) {
+      // 计算排名：score < 用户最好成绩 的玩家数 + 1
+      const rankRow = await queryOpOne<{ player_count: number }>(req,
+        `SELECT COUNT(DISTINCT player_id) as player_count
+         FROM race_records
+         WHERE status = 'finished' AND score < $1`,
+        [bestScore]
+      );
+      rank = (rankRow?.player_count ?? 0) + 1;
+    }
+
+    res.json({
+      code: 0,
+      data: {
+        bestScore,   // 毫秒, null 表示无成绩
+        rank,        // 排名, null 表示无成绩
+      }
+    });
+  } catch (e: any) {
+    console.error('[Player] best-score error:', e.message);
+    res.json({ code: 0, data: { bestScore: null, rank: null } });
+  }
+});
+
+/**
  * GET /player/me/race-records
  * 返回历史参赛记录列表
  * 支持 ?month=YYYY-MM 按月筛选

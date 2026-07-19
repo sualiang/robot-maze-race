@@ -38,14 +38,13 @@
       <!-- 分割线 -->
       <view class="status-divider"></view>
 
-      <!-- 右侧: 我的福利 -->
-      <view class="status-right" bindtap="onGoCouponFromBenefits">
-        <text class="status-label">我的福利</text>
+      <!-- 右侧: 我的最佳成绩 -->
+      <view class="status-right">
+        <text class="status-label">我的最佳成绩</text>
         <view class="status-number-wrap">
-          <text class="status-number-gold">¥{{couponValue}}</text>
-          <text class="status-arrow">›</text>
+          <text class="status-number-gold">{{bestScoreDisplay}}</text>
         </view>
-        <text class="status-subtext">含餐饮/游乐/兑换券</text>
+        <text class="status-subtext">{{rankDisplay}}</text>
       </view>
     </view>
   </view>
