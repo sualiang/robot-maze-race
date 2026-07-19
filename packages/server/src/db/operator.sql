@@ -60,6 +60,7 @@ CREATE INDEX idx_referees_status ON referees(status);
 -- ==================== 参赛包表 ====================
 CREATE TABLE IF NOT EXISTS race_packages (
   id VARCHAR(36) PRIMARY KEY,
+  operator_id VARCHAR(36) NOT NULL DEFAULT '',
   name VARCHAR(128) NOT NULL,
   description TEXT,
   price_cents INT NOT NULL,
@@ -289,6 +290,7 @@ CREATE TABLE IF NOT EXISTS ticket_redemptions (
 -- ==================== 商家优惠券模板表 ====================
 CREATE TABLE IF NOT EXISTS merchant_coupons (
   id VARCHAR(36) PRIMARY KEY,
+  operator_id VARCHAR(36) NOT NULL DEFAULT '',
   merchant_id VARCHAR(36) NOT NULL,
   name VARCHAR(128) NOT NULL,
   description TEXT,
