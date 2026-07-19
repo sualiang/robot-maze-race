@@ -1475,34 +1475,6 @@ async function refExecuteOp(req: Request, sql: string, params?: any[]): Promise<
 async function getOpPoolFromJwt(req: Request): Promise<MysqlPool | null> {
   const jwt = req.user as any;
   const opId = jwt?.operatorId;
-
-  // 裁判 JWT 里没有 operatorId，遍历所有运营商库查找 referees 表
-  // referees 表在 op_* 库里，不在 common 库
-  if (!opId && jwt?.role === 'referee' && jwt?.userId) {
-    try {
-      const common = getCommonPool();
-      const [allOps] = await common.query<any[]>(
-        `SELECT db_name, operator_id FROM operators_registry WHERE db_name IS NOT NULL`
-      );
-      if (allOps && allOps.length > 0) {
-        for (const opReg of allOps) {
-          if (!opReg.db_name) continue;
-          try {
-            const pool = getOperatorPool(opReg.db_name);
-            const [rows] = await pool.execute(
-              `SELECT operator_id FROM referees WHERE user_id = ? LIMIT 1`,
-              [jwt.userId]
-            );
-            if (rows && Array.isArray(rows) && rows.length > 0 && rows[0].operator_id) {
-              return pool;
-            }
-          } catch { /* skip */ }
-        }
-      }
-    } catch { /* fall through */ }
-    return null;
-  }
-
   if (!opId) return null;
 
   // 1) 查询 operators_registry 获取真正的 db_name
