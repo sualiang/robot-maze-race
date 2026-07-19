@@ -518,11 +518,14 @@ Page({
 });
 
 function formatScore(score) {
-  if (typeof score !== 'number') return '--';
-  if (score < 60) return score.toFixed(1) + 's';
-  var m = Math.floor(score / 60);
-  var s = (score % 60).toFixed(1);
-  return m + 'm' + s + 's';
+  if (typeof score !== 'number' || score <= 0) return '--';
+  // 兼容毫秒和秒两种输入
+  var ms = score < 1000 ? Math.round(score * 1000) : Math.round(score);
+  var totalSec = Math.floor(ms / 1000);
+  var min = Math.floor(totalSec / 60);
+  var sec = totalSec % 60;
+  var cs = Math.floor((ms % 1000) / 10);
+  return pad(min) + ':' + pad(sec) + '.' + pad(cs);
 }
 
 function pad(n) {

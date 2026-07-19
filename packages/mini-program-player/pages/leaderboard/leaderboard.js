@@ -7,6 +7,17 @@ var request = require('../../utils/request');
 var PHASE_MAP = { not_started: 0, registration: 1, ongoing: 2, ended: 3 };
 var PHASE_LABELS = { not_started: '赛事预告', registration: '报名中', ongoing: '进行中', ended: '已结束' };
 
+function formatRaceTime(ms) {
+  if (!ms || ms <= 0) return '--';
+  var v = ms < 1000 ? Math.round(ms * 1000) : Math.round(ms);
+  var totalSec = Math.floor(v / 1000);
+  var min = Math.floor(totalSec / 60);
+  var sec = totalSec % 60;
+  var cs = Math.floor((v % 1000) / 10);
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  return pad(min) + ':' + pad(sec) + '.' + pad(cs);
+}
+
 Page({
   data: {
     pageLoading: true,
@@ -137,12 +148,7 @@ Page({
       var list = (res && res.entries) || [];
       var mr = (res && res.myRanking) || {};
       var myId = that.data.myUserId;
-      var fmt = function (ms) {
-        if (!ms) return '--';
-        if (ms < 1000) return ms + 'ms';
-        if (ms < 60000) return (ms / 1000).toFixed(2) + 's';
-        return Math.floor(ms / 60000) + '\'' + ((ms % 60000) / 1000).toFixed(1) + '"';
-      };
+      var fmt = formatRaceTime;
       that.setData({
         myRanking: {
           rank: mr.rank || '-',
@@ -169,12 +175,7 @@ Page({
     var that = this;
     that.setData({ listLoading: true });
     return request.silentGet('/rank/final-result', { season: season }).then(function (res) {
-      var fmt = function (ms) {
-        if (!ms) return '--';
-        if (ms < 1000) return ms + 'ms';
-        if (ms < 60000) return (ms / 1000).toFixed(2) + 's';
-        return Math.floor(ms / 60000) + '\'' + ((ms % 60000) / 1000).toFixed(1) + '"';
-      };
+      var fmt = formatRaceTime;
       var myId = that.data.myUserId;
       var list = (res && res.list) || [];
       list = list.map(function (item) {
@@ -201,9 +202,6 @@ Page({
 
   // ===== 格式化 =====
   fmtMs: function (ms) {
-    if (!ms) return '--';
-    if (ms < 1000) return ms + 'ms';
-    if (ms < 60000) return (ms / 1000).toFixed(2) + 's';
-    return Math.floor(ms / 60000) + '\'' + ((ms % 60000) / 1000).toFixed(1) + '"';
+    return formatRaceTime(ms);
   }
 });

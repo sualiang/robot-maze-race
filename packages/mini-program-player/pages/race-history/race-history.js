@@ -33,13 +33,13 @@ Page({
 
         var scoreText = '--';
         if (scoreNum > 0) {
-          if (scoreNum < 60) {
-            scoreText = scoreNum.toFixed(1) + 's';
-          } else {
-            var m = Math.floor(scoreNum / 60);
-            var s = (scoreNum % 60).toFixed(1);
-            scoreText = m + 'm' + s + 's';
-          }
+          var ms = scoreNum < 1000 ? Math.round(scoreNum * 1000) : Math.round(scoreNum);
+          var totalSec2 = Math.floor(ms / 1000);
+          var min2 = Math.floor(totalSec2 / 60);
+          var sec2 = totalSec2 % 60;
+          var cs2 = Math.floor((ms % 1000) / 10);
+          function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+          scoreText = pad2(min2) + ':' + pad2(sec2) + '.' + pad2(cs2);
         }
 
         var rank = item.rank || 0;
