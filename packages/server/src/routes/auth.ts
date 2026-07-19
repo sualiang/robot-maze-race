@@ -666,7 +666,7 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     // 检查是否是裁判手机号（遍历 op_* 库 referees 表）
-    let refereeInfo: { id: string; phone: string; name: string; operatorId: string; password: string } | null = null;
+    let refereeInfo: { id: string; phone: string; name: string; operatorId: string; password: string; isFirstLogin: boolean } | null = null;
     try {
       const regRows = await query<{ db_name: string }>(
         `SELECT db_name FROM operators_registry WHERE db_name LIKE 'op_%'`,
@@ -676,11 +676,11 @@ router.post('/login', async (req: Request, res: Response) => {
         try {
           const pool = getOperatorPool(reg.db_name);
           const [rows] = await pool.execute(
-            'SELECT r.id, r.phone, r.name, r.password, r.operator_id FROM referees r WHERE r.phone = ? LIMIT 1',
+            'SELECT r.id, r.phone, r.name, r.password, r.is_first_login, r.operator_id FROM referees r WHERE r.phone = ? LIMIT 1',
             [phone]
           ) as any[];
           if ((rows as any[])?.[0]) {
-            refereeInfo = { ...rows[0], operatorId: rows[0].operator_id };
+            refereeInfo = { ...rows[0], operatorId: rows[0].operator_id, isFirstLogin: rows[0].is_first_login === 1 };
             break;
           }
         } catch { /* skip inaccessible dbs */ }
@@ -711,6 +711,7 @@ router.post('/login', async (req: Request, res: Response) => {
             phone: refereeInfo.phone,
             role: 'referee',
             operatorId: refereeInfo.operatorId,
+            isFirstLogin: refereeInfo.isFirstLogin,
           },
         },
       });

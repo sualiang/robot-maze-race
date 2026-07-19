@@ -27,10 +27,9 @@ const router = Router();
  * @header Authorization: Bearer <token> (operator 或 admin)
  * @body name - 裁判姓名
  * @body phone - 裁判手机号（必填，用于登录）
- * @body password - 登录密码（必填）
  * @body venue_id - 绑定的赛场 ID（可选）
  * @body operator_id - admin 创建时必填，指定目标运营商 ID（operator 角色忽略此参数）
- * @returns 创建的裁判信息
+ * @returns 创建的裁判信息 + 系统生成的登录密码
  */
 router.post('/create-by-operator', authMiddleware, async (req: Request, res: Response) => {
   try {
@@ -39,11 +38,14 @@ router.post('/create-by-operator', authMiddleware, async (req: Request, res: Res
       return res.status(403).json({ code: 403, message: '仅管理员或运营商可创建裁判', data: null });
     }
 
-    const { name, phone, password, venue_id, operator_id } = req.body;
+    const { name, phone, venue_id, operator_id } = req.body;
 
-    if (!name || !phone || !password) {
-      return res.status(400).json({ code: 400, message: '请填写裁判姓名、手机号和密码', data: null });
+    if (!name || !phone) {
+      return res.status(400).json({ code: 400, message: '请填写裁判姓名和手机号', data: null });
     }
+
+    // 随机生成 8 位数字密码
+    const generatedPassword = Math.floor(10000000 + Math.random() * 90000000).toString();
 
     // 解析目标运营商 ID
     const targetOperatorId = operator_id || req.user?.operatorId;
@@ -92,10 +94,10 @@ router.post('/create-by-operator', authMiddleware, async (req: Request, res: Res
     }
 
     const refereeId = uuidv4();
-    const hashedPwd = hashSync(password, 10);
+    const hashedPwd = hashSync(generatedPassword, 10);
     await opPool.execute(
-      `INSERT INTO referees (id, user_id, phone, password, venue_id, name, operator_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO referees (id, user_id, phone, password, is_first_login, venue_id, name, operator_id)
+       VALUES (?, ?, ?, ?, 1, ?, ?, ?)`,
       [refereeId, userId, phone, hashedPwd, venue_id || null, name, targetOperatorId]
     );
 
@@ -107,6 +109,7 @@ router.post('/create-by-operator', authMiddleware, async (req: Request, res: Res
         user_id: userId,
         name,
         phone,
+        password: generatedPassword,  // 明文返回给运营商展示
         venue_id: venue_id || null,
       },
     });
@@ -1536,7 +1539,10 @@ router.post('/attendance/check-in-by-qr', authMiddleware, async (req: Request, r
 
     // 裁判接口直接用 JWT operatorId 连接，不依赖 resolveOperatorDb
     const pool = getOpPoolFromJwt(req);
-    if (!pool) return res.status(400).json({ code: 400, message: '未找到裁判记录，请先完成注册', data: null });
+    if (!pool) {
+      console.log('[QR签到] getOpPoolFromJwt 返回 null, userId=' + userId + ', operatorId=' + (req.user as any)?.operatorId);
+      return res.status(400).json({ code: 400, message: '未找到裁判记录，请先完成注册', data: null });
+    }
 
     // 1. 从 referees 表查真实 referee_id + 绑定的 venue_id
     const [refRows] = await pool.execute(
@@ -1544,6 +1550,7 @@ router.post('/attendance/check-in-by-qr', authMiddleware, async (req: Request, r
     ) as any[];
     const refRow: { id: string; venue_id: string | null } | null = (refRows as any[])?.[0] || null;
     if (!refRow) {
+      console.log('[QR签到] referees 表未查到 userId=' + userId);
       return res.status(400).json({ code: 400, message: '未找到裁判记录，请先完成注册', data: null });
     }
 
@@ -1600,11 +1607,15 @@ router.post('/attendance/check-in-by-qr', authMiddleware, async (req: Request, r
     }
 
     if (!venue) {
+      console.log('[QR签到] 无可用赛场, usedFallback=' + usedFallback + ', refRow.venue_id=' + (refRow.venue_id || 'null'));
       return res.status(500).json({ code: 500, message: '没有可用赛场', data: null });
     }
 
+    console.log('[QR签到] 最终 venue=' + venue.id + ' (' + venue.name + '), usedFallback=' + usedFallback + ', refRow.venue_id=' + (refRow.venue_id || 'null'));
+
     // 验证裁判是否已绑定该赛场（降级时跳过严格校验）
     if (!usedFallback && refRow.venue_id && refRow.venue_id !== venue.id) {
+      console.log('[QR签到] 场地不匹配: ref.venue_id=' + refRow.venue_id + ' vs venue.id=' + venue.id);
       return res.status(403).json({ code: 403, message: '抱歉，您并没有绑定本赛场', data: null });
     }
 
@@ -1614,6 +1625,7 @@ router.post('/attendance/check-in-by-qr', authMiddleware, async (req: Request, r
       [refRow.id]
     ) as any[];
     if ((attRows as any[])?.[0]) {
+      console.log('[QR签到] 今日已签到, refRow.id=' + refRow.id);
       return res.status(400).json({ code: 400, message: '今日已签到，请先签退', data: null });
     }
 
