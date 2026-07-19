@@ -1863,7 +1863,13 @@ export async function pushCurrentScreenData(ws: WebSocket) {
     // 直接连 op 库（通过 cachedOperatorId 获取）
     let pool: MysqlPool | null = null;
     if (cachedOperatorId) {
-      pool = getOperatorPool(cachedOperatorId);
+      // 先查 operators_registry 获取真正的 db_name
+      const regRow = await q1<{ db_name: string }>(
+        'SELECT db_name FROM operators_registry WHERE operator_id = $1',
+        [cachedOperatorId]
+      );
+      const dbName = regRow?.db_name || ('op_' + cachedOperatorId);
+      pool = getOperatorPool(dbName);
     }
     if (!pool) {
       ws.send(JSON.stringify({ type: 'screen_data', data: getCurrentScreenData() }));
