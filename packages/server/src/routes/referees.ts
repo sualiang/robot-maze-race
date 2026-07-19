@@ -2105,4 +2105,35 @@ router.post('/register', authMiddleware, async (req: Request, res: Response) => 
     return res.status(500).json({ code: 500, message: '注册失败: ' + error.message, data: null });
   }
 });
+
+/**
+ * POST /api/v1/referees/:refereeId/reset-password
+ * 重置裁判密码为默认密码 Admin@123
+ */
+router.post('/:refereeId/reset-password', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { refereeId } = req.params;
+
+    const referee = await refQueryOpOne<{ id: string }>(req,
+      'SELECT id FROM referees WHERE id = $1',
+      [refereeId]
+    );
+    if (!referee) {
+      return res.status(404).json({ code: 404, message: '裁判不存在', data: null });
+    }
+
+    const defaultPassword = 'Admin@123';
+    const hashed = hashSync(defaultPassword);
+    await refExecuteOp(req,
+      'UPDATE referees SET password = $1 WHERE id = $2',
+      [hashed, refereeId]
+    );
+
+    return res.json({ code: 0, message: '密码已重置为默认密码' });
+  } catch (error: any) {
+    console.error('[Referees] reset-password error:', error.message);
+    return res.status(500).json({ code: 500, message: '密码重置失败', data: null });
+  }
+});
+
 export default router;
