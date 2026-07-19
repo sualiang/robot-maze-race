@@ -48,6 +48,7 @@ export default function OperatorManage() {
   const navigate = useNavigate();
   const [list, setList] = useState<OperatorItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -237,6 +238,8 @@ export default function OperatorManage() {
   } : () => {};
 
   const handleSave = async () => {
+    if (submitting) return;
+    setSubmitting(true);
     try {
       const values = await form.validateFields();
       // 从 Cascader 数组拆出省/市/区
@@ -267,6 +270,8 @@ export default function OperatorManage() {
         const msg = err?.message || (typeof err === 'string' ? err : '操作失败');
         message.error(msg);
       }
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -422,6 +427,7 @@ export default function OperatorManage() {
         title={editingId ? '编辑运营商' : '新建运营商'}
         open={modalOpen}
         onOk={handleSave}
+        confirmLoading={submitting}
         onCancel={() => setModalOpen(false)}
         width={640}
 
