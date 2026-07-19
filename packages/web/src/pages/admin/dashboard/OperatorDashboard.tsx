@@ -7,11 +7,11 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import {
   DollarOutlined, WalletOutlined, BankOutlined, ArrowUpOutlined,
-  ArrowDownOutlined, DownloadOutlined,
+  ArrowDownOutlined, DownloadOutlined, ReloadOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import api from '../../../utils/api';
-import RegionRevenueDrilldown from './RegionRevenueMap';
+import PaymentRecords from './PaymentRecords';
 
 const { RangePicker } = DatePicker;
 
@@ -70,6 +70,8 @@ export default function OperatorDashboard() {
     total_revenue: 0, total_orders: 0, platform_profit: 0, pending_withdraw: 0,
   });
   const [loadingStats, setLoadingStats] = useState(false);
+  const [loadingSlow, setLoadingSlow] = useState(false);
+  const [slowLoaded, setSlowLoaded] = useState(false);
 
 
 
@@ -93,24 +95,45 @@ export default function OperatorDashboard() {
 
 
 
-  /* ── Fetch stats ── */
+  /* ── Fetch fast stats (GMV + 订单数, payments table) ── */
   const fetchStats = useCallback(async () => {
     setLoadingStats(true);
     try {
-      const res: any = await api.get('/admin/dashboard/stats');
-      if (res) setStats(res);
+      const res: any = await api.get('/admin/dashboard/stats-fast');
+      if (res) {
+        setStats(prev => ({
+          ...prev,
+          total_revenue: res.total_revenue ?? 0,
+          total_orders: res.total_orders ?? 0,
+        }));
+      }
     } catch {
-      // fallback
-      setStats({
-        total_revenue: 0,
-        total_orders: 0,
-        platform_profit: 0,
-        pending_withdraw: 0,
-      });
+      // no-op
     } finally {
       setLoadingStats(false);
     }
   }, []);
+
+  /* ── Fetch slow stats (platform profit + pending withdraw, settlements cross-DB) ── */
+  const fetchSlowStats = useCallback(async () => {
+    if (slowLoaded) return;
+    setLoadingSlow(true);
+    try {
+      const res: any = await api.get('/admin/dashboard/stats-slow');
+      if (res) {
+        setStats(prev => ({
+          ...prev,
+          platform_profit: res.platform_profit ?? 0,
+          pending_withdraw: res.pending_withdraw ?? 0,
+        }));
+        setSlowLoaded(true);
+      }
+    } catch {
+      // no-op
+    } finally {
+      setLoadingSlow(false);
+    }
+  }, [slowLoaded]);
 
   /* ── Fetch top operators ── */
   const fetchTopOperators = useCallback(async (page: number) => {
@@ -136,6 +159,7 @@ export default function OperatorDashboard() {
   useEffect(() => {
     fetchStats();
     fetchTopOperators(1);
+    // cross-stats loaded on demand via button click
   }, [fetchStats, fetchTopOperators]);
 
   /* ── Open operator orders modal ── */
@@ -188,11 +212,11 @@ export default function OperatorDashboard() {
     { title: '市', dataIndex: 'city', key: 'city', width: 80 },
     { title: '区', dataIndex: 'district', key: 'district', width: 80 },
     {
-      title: '预估平台收入', dataIndex: 'total_revenue', key: 'total_revenue', width: 130,
+      title: '营收', dataIndex: 'total_revenue', key: 'total_revenue', width: 130,
       render: (v: number) => `¥${(v / 100).toFixed(2)}`,
     },
     {
-      title: '平台收入', dataIndex: 'total_platform_profit', key: 'total_platform_profit', width: 130,
+      title: '预估平台收入', dataIndex: 'total_platform_profit', key: 'total_platform_profit', width: 130,
       render: (v: number) => `¥${(v / 100).toFixed(2)}`,
     },
     {
@@ -202,15 +226,11 @@ export default function OperatorDashboard() {
 
 
 
-  /* ── 默认 Tab 为营收排行，区域钻取延迟加载避免 GeoJSON 大文件卡死 ── */
+  /* ── 默认 Tab 为营收排行 ── */
   const [activeTab, setActiveTab] = useState('topops');
-  const [regionLoaded, setRegionLoaded] = useState(false);
 
   const handleTabChange = (key: string) => {
     setActiveTab(key);
-    if (key === 'region' && !regionLoaded) {
-      setRegionLoaded(true);
-    }
   };
 
   /* ── Tab items ── */
@@ -270,9 +290,9 @@ export default function OperatorDashboard() {
       ),
     },
     {
-      key: 'region',
-      label: '区域营收钻取',
-      children: regionLoaded ? <RegionRevenueDrilldown /> : <div style={{ textAlign: 'center', padding: 48, color: '#999' }}>点击此标签页加载数据</div>,
+      key: 'payments',
+      label: '支付凭证',
+      children: <PaymentRecords />,
     },
   ];
 
@@ -282,25 +302,50 @@ export default function OperatorDashboard() {
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={24} sm={12} lg={6}>
           <Card loading={loadingStats}>
-            <Statistic title="全平台GMV" value={stats.total_revenue / 100} precision={2}
+            <Statistic title="全平台营收" value={stats.total_revenue / 100} precision={2}
               prefix={<DollarOutlined />} suffix="元" />
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <Card loading={loadingStats}>
-            <Statistic title="全平台订单" value={stats.total_orders} prefix={<WalletOutlined />} suffix="笔" />
+            <Statistic title="全平台订单" value={stats.total_orders}
+              prefix={<WalletOutlined />} suffix="笔" />
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
-          <Card loading={loadingStats}>
-            <Statistic title="平台收入" value={stats.platform_profit / 100} precision={2}
-              prefix={<BankOutlined />} suffix="元" valueStyle={{ color: '#52c41a' }} />
+          <Card loading={loadingSlow}>
+            <Statistic
+              title={
+                <Space size={4}>
+                  <span>预估平台收入</span>
+                  <Button type="link" size="small" icon={<ReloadOutlined />}
+                    onClick={fetchSlowStats} loading={loadingSlow && !slowLoaded}
+                    style={{ padding: 0, fontSize: 12 }} />
+                </Space>
+              }
+              value={slowLoaded ? (stats.platform_profit / 100).toFixed(2) : '--'}
+              suffix={slowLoaded ? '元' : undefined}
+              prefix={slowLoaded ? <BankOutlined /> : undefined}
+              valueStyle={slowLoaded ? { color: '#52c41a' } : undefined}
+            />
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
-          <Card loading={loadingStats}>
-            <Statistic title="待审核提现" value={stats.pending_withdraw / 100} precision={2}
-              prefix={<DollarOutlined />} suffix="元" valueStyle={{ color: '#faad14' }} />
+          <Card loading={loadingSlow}>
+            <Statistic
+              title={
+                <Space size={4}>
+                  <span>待审核提现</span>
+                  <Button type="link" size="small" icon={<ReloadOutlined />}
+                    onClick={fetchSlowStats} loading={loadingSlow && !slowLoaded}
+                    style={{ padding: 0, fontSize: 12 }} />
+                </Space>
+              }
+              value={slowLoaded ? (stats.pending_withdraw / 100).toFixed(2) : '--'}
+              suffix={slowLoaded ? '元' : undefined}
+              prefix={slowLoaded ? <DollarOutlined /> : undefined}
+              valueStyle={slowLoaded ? { color: '#faad14' } : undefined}
+            />
           </Card>
         </Col>
       </Row>
