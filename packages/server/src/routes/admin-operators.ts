@@ -35,10 +35,11 @@ interface Operator {
 }
 
 /** 查询字段列表 */
-const SELECT_FIELDS = `id, name, phone, email, company_name, status,
+const SELECT_FIELDS = `id, name, phone, contact_phone, email, company_name, status,
   venue_count, total_revenue, profit_share_rate,
   bank_account, bank_name, contact_person,
   province, city, district, company_address,
+  operator_username,
   created_by, created_at, updated_at`;
 
 /**

@@ -18,6 +18,7 @@ interface OperatorItem {
   id: string;
   name: string;
   phone: string;
+  contact_phone?: string;
   email: string;
   company_name: string;
   status: 'active' | 'disabled';
@@ -105,7 +106,7 @@ export default function OperatorManage() {
   const handleBankChange = (value: string) => {
     if (value === '其他银行') {
       setIsOtherBank(true);
-      form.setFieldValue('bank_name', otherBankName);
+      form.setFieldValue('bank_name', otherBankName || '');
     } else {
       setIsOtherBank(false);
       setOtherBankName('');
@@ -217,15 +218,14 @@ export default function OperatorManage() {
         ? [record.province, record.city, record.district].filter(Boolean)
         : undefined,
     });
-    // 回填 bank_name 联动状态：判断是否为常见银行列表中的值
+    // 回填 bank_name：不管是否在 COMMON_BANKS 列表中，都要设到 form
+    form.setFieldValue('bank_name', record.bank_name || '');
     if (record.bank_name) {
       const matched = COMMON_BANKS.find(b => b.value === record.bank_name);
       if (matched && !matched.other) {
-        // 是列表内的银行 → 直接选中
         setIsOtherBank(false);
         setOtherBankName('');
       } else {
-        // 不在列表中 → 切换到"其他银行"模式并回填
         setIsOtherBank(true);
         setOtherBankName(record.bank_name);
       }
@@ -253,9 +253,7 @@ export default function OperatorManage() {
         await api.put(`/admin/operators/${editingId}`, payload);
         message.success('更新成功');
       } else {
-        // 新建时不传分润比例，让后端从系统设置读取默认值
-        const { profit_share_rate: _, ...createPayload } = payload;
-        const res: any = await api.post('/admin/operators', createPayload);
+        const res: any = await api.post('/admin/operators', payload);
         setAccountInfo({ account: res.account, password: res.password });
       }
       setModalOpen(false);
@@ -495,9 +493,6 @@ export default function OperatorManage() {
               </Form.Item>
             )}
           </Space>
-          <Form.Item name="bank_branch" label="支行名称" rules={[{ required: true, message: '请输入支行名称' }]}>
-            <Input placeholder="支行名称，如：解放碑支行" style={{ width: 480 }} />
-          </Form.Item>
           <Form.Item name="bank_account" label="银行账号" rules={[{ required: true, message: '请输入银行账号' }]}>
             <Input placeholder="银行账号" style={{ width: 480 }} />
           </Form.Item>
