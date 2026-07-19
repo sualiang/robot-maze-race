@@ -1340,6 +1340,18 @@ router.post('/attendance/check-in', authMiddleware, async (req: Request, res: Re
       [id, refereeId, finalVenueId]
     );
 
+    // 从数据库获取真实的赛场信息
+    let venueName = finalVenueId;
+    let venueAddress = '';
+    const venueRow = await refQueryOpOne<{ name: string; address: string }>(req, 
+      'SELECT name, address FROM venues WHERE id = $1',
+      [finalVenueId]
+    );
+    if (venueRow) {
+      venueName = venueRow.name;
+      venueAddress = venueRow.address || '';
+    }
+
     // 标记赛场已激活
     setVenueActive(true);
     cachedVenueStatus = 'open';
@@ -1363,18 +1375,6 @@ router.post('/attendance/check-in', authMiddleware, async (req: Request, res: Re
     // 再推送一次当前 screen_data，让大屏直接显示比赛界面
     const screenData = getCurrentScreenData();
     broadcastToScreen({ type: 'screen_data', data: screenData });
-
-    // 从数据库获取真实的赛场信息
-    let venueName = finalVenueId;
-    let venueAddress = '';
-    const venueRow = await refQueryOpOne<{ name: string; address: string }>(req, 
-      'SELECT name, address FROM venues WHERE id = $1',
-      [finalVenueId]
-    );
-    if (venueRow) {
-      venueName = venueRow.name;
-      venueAddress = venueRow.address || '';
-    }
 
     return res.json({
       code: 0,
