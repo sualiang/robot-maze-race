@@ -668,6 +668,7 @@ router.get('/match/queue', authMiddleware, async (req: Request, res: Response) =
        ORDER BY rq.queue_number ASC`,
       [vid]
     );
+    console.log('[Match] queueRows count=' + queueRows.length + ' firstUser_id=' + (queueRows[0]?.user_id || 'none'));
 
     const currentRow = await refQueryOpOne<RacerRow>(req,
       `SELECT rq.* FROM race_queues rq
