@@ -431,19 +431,55 @@ router.post('/notify', async (req: Request, res: Response) => {
         [transaction.transaction_id, order.id]
       );
 
-      // 写入 payments 表
-      await opPool.execute(
-        `INSERT INTO payments (id, order_id, operator_id, user_id, transaction_id, amount_cents, status, pay_time, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, 'paid', NOW(), NOW())`,
-        [uuidv4(), order.id, order.operator_id, order.user_id, transaction.transaction_id, order.amount]
+      // 记录支付流水到 payments 表（主流水表）—— 幂等：先查后插
+      const [existingPmt] = await opPool.execute(
+        `SELECT id FROM payments WHERE order_id = ? LIMIT 1`,
+        [order.id]
       );
+      if (!existingPmt || (Array.isArray(existingPmt) && existingPmt.length === 0)) {
+        try {
+          await opPool.execute(
+            `INSERT INTO payments (id, order_id, operator_id, user_id, transaction_id, amount_cents, status, pay_time, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, 'paid', NOW(), NOW())`,
+            [uuidv4(), order.id, order.operator_id || '', order.user_id || '',
+             (transaction.transaction_id || '').slice(0, 128), order.amount]
+          );
+          console.log('[WxPay] payments INSERT 成功:', outTradeNo);
+        } catch (pmtErr: any) {
+          console.error('[WxPay] payments INSERT 失败! outTradeNo:', outTradeNo, 'orderId:', order.id,
+            'txn_id:', transaction.transaction_id, 'err:', pmtErr.message);
+          // 如果是唯一键冲突（微信重推），不抛异常继续
+          if (!pmtErr.message?.includes('Duplicate') && !pmtErr.message?.includes('duplicate')) {
+            throw pmtErr;
+          }
+        }
+      } else {
+        console.log('[WxPay] payments 已存在（幂等跳过）:', outTradeNo);
+      }
 
-      // 记录支付流水
-      await opPool.execute(
-        `INSERT INTO payment_transactions (id, order_id, user_id, amount, transaction_id, payment_method, status, created_at)
-         VALUES (?, ?, (SELECT user_id FROM orders WHERE id = ?), ?, ?, 'wechat_pay', 'success', NOW())`,
-        [uuidv4(), order.id, order.id, order.amount, transaction.transaction_id]
+      // 记录支付流水到 payment_transactions 表（扩展流水表）—— 幂等：先查后插
+      const [existingTxn] = await opPool.execute(
+        `SELECT id FROM payment_transactions WHERE order_id = ? LIMIT 1`,
+        [order.id]
       );
+      if (!existingTxn || (Array.isArray(existingTxn) && existingTxn.length === 0)) {
+        try {
+          await opPool.execute(
+            `INSERT INTO payment_transactions (id, order_id, user_id, amount, transaction_id, payment_method, status, created_at)
+             VALUES (?, ?, ?, ?, ?, 'wechat_pay', 'success', NOW())`,
+            [uuidv4(), order.id, order.user_id || '', order.amount,
+             (transaction.transaction_id || '').slice(0, 64)]
+          );
+        } catch (txnErr: any) {
+          console.error('[WxPay] payment_transactions INSERT 失败! outTradeNo:', outTradeNo, 'orderId:', order.id,
+            'txn_id:', transaction.transaction_id, 'err:', txnErr.message);
+          if (!txnErr.message?.includes('Duplicate') && !txnErr.message?.includes('duplicate')) {
+            throw txnErr;
+          }
+        }
+      } else {
+        console.log('[WxPay] payment_transactions 已存在（幂等跳过）:', outTradeNo);
+      }
 
       // P0-14: 幂等创建结算记录（运营商库）
       try {
@@ -566,6 +602,17 @@ router.get('/query/:orderId', authMiddleware, async (req: Request, res: Response
             `UPDATE orders SET status = 'paid', transaction_id = ?, paid_at = NOW(), updated_at = NOW() WHERE id = ? AND status = 'pending'`,
             [wxOrder.transaction_id, order.id]
           );
+          // 兜底也写 payments（幂等，INSERT IGNORE 防重）
+          const txnId = (wxOrder.transaction_id || '').slice(0, 128);
+          try {
+            await executeOp(req,
+              `INSERT IGNORE INTO payments (id, order_id, transaction_id, amount_cents, channel, status, paid_at, created_at)
+               VALUES (?, ?, ?, ?, 'wechat_pay', 'success', NOW(), NOW())`,
+              [uuidv4(), order.id, txnId, order.amount]
+            );
+          } catch (e: any) {
+            console.error('[WxPay] 兜底 payments INSERT 失败:', e.message);
+          }
           order.status = 'paid';
           order.transaction_id = wxOrder.transaction_id;
           console.log('[WxPay] 兜底发现已支付订单:', order.order_no, 'transaction_id:', wxOrder.transaction_id);
@@ -789,10 +836,22 @@ router.post('/mock-pay-success', authMiddleware, async (req: Request, res: Respo
       return res.status(400).json({ code: 400, message: `订单状态不支持模拟支付: ${order.status}`, data: null });
     }
 
+    const mockTxnId = `test_txn_${Date.now()}`;
     await executeOp(req, 
       `UPDATE orders SET status = 'paid', transaction_id = ?, paid_at = NOW(), updated_at = NOW() WHERE id = ? AND status = 'pending'`,
-      [`test_txn_${Date.now()}`, order_id]
+      [mockTxnId, order_id]
     );
+
+    // 模拟支付也写入 payments 表
+    try {
+      await executeOp(req,
+        `INSERT IGNORE INTO payments (id, order_id, transaction_id, amount_cents, channel, status, paid_at, created_at)
+         SELECT ?, ?, ?, amount_cents, 'wechat_pay', 'success', NOW(), NOW() FROM orders WHERE id = ?`,
+        [uuidv4(), order_id, mockTxnId, order_id]
+      );
+    } catch (e: any) {
+      console.error('[WxPay] mock-pay payments INSERT 失败:', e.message);
+    }
 
     return res.json({ code: 0, message: '模拟支付成功' });
   } catch (error: any) {
