@@ -654,11 +654,11 @@ router.post('/match/select-racer', authMiddleware, async (req: Request, res: Res
       [rid]
     );
 
-    // 更新该选手状态为 called
+    // 更新该选手状态为 called（$1 先出现，避免 expandParams 重排参数）
     await executeOp(req,
-      `UPDATE race_queues SET status = 'called', start_time_ms = NULL, paused_elapsed_ms = 0, finish_time_ms = NULL
-       WHERE id = $1, referee_id = $2`,
-      [rid, req.user!.userId]
+      `UPDATE race_queues SET status = 'called', start_time_ms = NULL, paused_elapsed_ms = 0, finish_time_ms = NULL, referee_id = $1
+       WHERE id = $2`,
+      [req.user!.userId, rid]
     );
 
     await broadcastAfterUpdate(req);
