@@ -3,6 +3,7 @@ import { Pool as MysqlPool } from 'mysql2/promise';
 import { broadcastToScreen, validateActivationCode } from '../ws/handler';
 import { WebSocket } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
+import { hashSync } from '../config/bcrypt';
 import { query, queryOne, execute, queryOp, queryOpOne, executeOp, getOperatorPool } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import {
@@ -26,9 +27,10 @@ const router = Router();
  * @header Authorization: Bearer <token> (operator 或 admin)
  * @body name - 裁判姓名
  * @body phone - 裁判手机号（必填，用于登录）
+ * @body password - 登录密码（必填）
  * @body venue_id - 绑定的赛场 ID（可选）
  * @body operator_id - admin 创建时必填，指定目标运营商 ID（operator 角色忽略此参数）
- * @returns 创建的裁判信息 + 初始密码
+ * @returns 创建的裁判信息
  */
 router.post('/create-by-operator', authMiddleware, async (req: Request, res: Response) => {
   try {
@@ -37,10 +39,10 @@ router.post('/create-by-operator', authMiddleware, async (req: Request, res: Res
       return res.status(403).json({ code: 403, message: '仅管理员或运营商可创建裁判', data: null });
     }
 
-    const { name, phone, venue_id, operator_id } = req.body;
+    const { name, phone, password, venue_id, operator_id } = req.body;
 
-    if (!name || !phone) {
-      return res.status(400).json({ code: 400, message: '请填写裁判姓名和手机号', data: null });
+    if (!name || !phone || !password) {
+      return res.status(400).json({ code: 400, message: '请填写裁判姓名、手机号和密码', data: null });
     }
 
     // 解析目标运营商 ID
@@ -77,7 +79,7 @@ router.post('/create-by-operator', authMiddleware, async (req: Request, res: Res
     );
 
     let userId: string;
-    // 创建 users 记录（裁判仅微信OAuth登录，无需密码）
+    // 创建 users 记录（裁判支持手机号+密码登录）
     if (!existingUser) {
       userId = uuidv4();
       await execute(
@@ -90,10 +92,11 @@ router.post('/create-by-operator', authMiddleware, async (req: Request, res: Res
     }
 
     const refereeId = uuidv4();
+    const hashedPwd = hashSync(password, 10);
     await opPool.execute(
-      `INSERT INTO referees (id, user_id, phone, venue_id, name, operator_id)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [refereeId, userId, phone, venue_id || null, name, targetOperatorId]
+      `INSERT INTO referees (id, user_id, phone, password, venue_id, name, operator_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [refereeId, userId, phone, hashedPwd, venue_id || null, name, targetOperatorId]
     );
 
     return res.json({

@@ -666,7 +666,7 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     // 检查是否是裁判手机号（遍历 op_* 库 referees 表）
-    let refereeInfo: { id: string; phone: string; name: string; operatorId: string } | null = null;
+    let refereeInfo: { id: string; phone: string; name: string; operatorId: string; password: string } | null = null;
     try {
       const regRows = await query<{ db_name: string }>(
         `SELECT db_name FROM operators_registry WHERE db_name LIKE 'op_%'`,
@@ -676,7 +676,7 @@ router.post('/login', async (req: Request, res: Response) => {
         try {
           const pool = getOperatorPool(reg.db_name);
           const [rows] = await pool.execute(
-            'SELECT r.id, r.phone, r.name, r.operator_id FROM referees r WHERE r.phone = ? LIMIT 1',
+            'SELECT r.id, r.phone, r.name, r.password, r.operator_id FROM referees r WHERE r.phone = ? LIMIT 1',
             [phone]
           ) as any[];
           if ((rows as any[])?.[0]) {
@@ -688,7 +688,11 @@ router.post('/login', async (req: Request, res: Response) => {
     } catch { /* operators_registry table may not exist */ }
 
     if (refereeInfo) {
-      // 裁判手机号登录 — 开发阶段免密
+      // 裁判手机号+密码登录
+      const valid = compareSync(password, refereeInfo.password);
+      if (!valid) {
+        return res.status(401).json({ code: 401, message: '手机号或密码错误', data: null });
+      }
       const payload: AuthPayload = {
         userId: refereeInfo.id,
         openid: 'ref_sms_' + refereeInfo.id,
