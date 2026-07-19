@@ -492,9 +492,15 @@ router.get('/queue/current', authMiddleware, rateLimiter(10, 60), async (req: Re
       [userId]
     );
     if (lastResultRow) {
+      const s = lastResultRow.score ?? 0;
+      let scoreText = '--';
+      if (typeof s === 'number') {
+        if (s < 60) scoreText = s.toFixed(1) + 's';
+        else { const m = Math.floor(s / 60); const sec = (s % 60).toFixed(1); scoreText = m + 'm' + sec + 's'; }
+      }
       lastRaceResult = {
-        score: lastResultRow.score ?? 0,
-        scoreText: formatScore(lastResultRow.score ?? 0),
+        score: s,
+        scoreText,
         rank: lastResultRow.rank ?? 0,
         totalRacers: lastResultRow.total_racers ?? 0,
       };
