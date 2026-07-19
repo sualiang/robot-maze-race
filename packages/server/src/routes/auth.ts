@@ -1845,7 +1845,7 @@ router.post('/referee-bind', async (req: Request, res: Response) => {
 
     // 在公共库 users 表按 phone 查 openid
     const userRow = await queryOne<any>(
-      'SELECT id, openid FROM users WHERE phone = ? LIMIT 1',
+      'SELECT id, openid FROM users WHERE phone = $1 LIMIT 1',
       [phone]
     );
     const openid = userRow?.openid || '';
