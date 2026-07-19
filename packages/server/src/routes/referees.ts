@@ -1857,14 +1857,13 @@ export async function pushCurrentScreenData(ws: WebSocket) {
     return;
   }
   try {
-    const { query: q, queryOne: q1 } = require('../config/database');
     const venueId = cachedVenueId;
 
     // 直接连 op 库（通过 cachedOperatorId 获取）
     let pool: MysqlPool | null = null;
     if (cachedOperatorId) {
       // 先查 operators_registry 获取真正的 db_name
-      const regRow = await q1<{ db_name: string }>(
+      const regRow = await queryOne<{ db_name: string }>(
         'SELECT db_name FROM operators_registry WHERE operator_id = $1',
         [cachedOperatorId]
       );
