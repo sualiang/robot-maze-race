@@ -38,13 +38,23 @@ interface VenueOption {
   name: string;
 }
 
-// 从 localStorage 获取当前用户角色和运营商ID
+// 从 JWT token 解析 operatorId（优先），fallback 到 operator_user_info
+const currentOperatorId: string = (() => {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) return '';
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.operatorId || payload.operator_id || '';
+  } catch { return ''; }
+})();
+
+// 从 localStorage 获取当前用户角色
 const operatorUserInfo = (() => {
   try { return JSON.parse(localStorage.getItem('operator_user_info') || '{}'); } catch { return {}; }
 })();
 const operatorRoleId: string = operatorUserInfo.role_id || '';
 const operatorPermissions: string[] = operatorUserInfo.permissions || [];
-const currentOperatorId: string = operatorUserInfo.operator_id || '';
+const effectiveOperatorId: string = currentOperatorId || operatorUserInfo.operator_id || '';
 const isOperatorManager = operatorRoleId === 'op_super_admin' || operatorPermissions.includes('*');
 
 export default function RefereeList() {
@@ -89,7 +99,7 @@ export default function RefereeList() {
       const data: any = await api.post('/referees/register', {
         phone: values.phone,
         name: values.name,
-        operator_id: currentOperatorId,
+        operator_id: effectiveOperatorId,
       });
       message.success('裁判创建成功');
       setCreateOpen(false);
