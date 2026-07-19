@@ -1,7 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { IncomingMessage } from 'http';
 import { Server } from 'http';
-import { getCurrentScreenData } from '../routes/referees';
+import { getCurrentScreenData, pushCurrentScreenData } from '../routes/referees';
 import { getRedis } from '../config/redis';
 
 // 存储所有连接的客户端，按房间分组
@@ -110,12 +110,13 @@ function handleMessage(ws: WebSocket, msg: any) {
       rooms.get(newRoom)!.add(ws);
       clientRooms.set(ws, newRoom);
       ws.send(JSON.stringify({ event: 'subscribed', data: { room: newRoom } }));
+      // 推送当前完整数据（含 queue、nickname、avatar）
+      pushCurrentScreenData(ws);
       break;
 
     case 'get_screen_data': {
-      // 客户端主动请求当前数据
-      const data = getCurrentScreenData();
-      ws.send(JSON.stringify({ type: 'screen_data', data }));
+      // 推送包含 DB 数据的 screen_data
+      pushCurrentScreenData(ws);
       break;
     }
 

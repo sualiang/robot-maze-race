@@ -1343,13 +1343,14 @@ router.post('/attendance/check-in', authMiddleware, async (req: Request, res: Re
     // 从数据库获取真实的赛场信息
     let venueName = finalVenueId;
     let venueAddress = '';
-    const venueRow = await refQueryOpOne<{ name: string; address: string }>(req, 
-      'SELECT name, address FROM venues WHERE id = $1',
+    const venueRow = await refQueryOpOne<{ name: string; address: string; operator_id: string }>(req, 
+      'SELECT name, address, operator_id FROM venues WHERE id = $1',
       [finalVenueId]
     );
     if (venueRow) {
       venueName = venueRow.name;
       venueAddress = venueRow.address || '';
+      cachedOperatorId = venueRow.operator_id || '';
     }
 
     // 标记赛场已激活
@@ -1669,7 +1670,7 @@ router.post('/attendance/check-in-by-qr', authMiddleware, async (req: Request, r
     // 从 DB 查 venue 信息
     if (venueId) {
       const [vRows] = await pool.execute(
-        'SELECT id, name, COALESCE(address, \'\') as address FROM venues WHERE id = ?',
+        'SELECT id, name, COALESCE(address, \'\') as address, operator_id FROM venues WHERE id = ?',
         [venueId]
       ) as any[];
       venue = (vRows as any[])?.[0] || null;
@@ -1726,6 +1727,7 @@ router.post('/attendance/check-in-by-qr', authMiddleware, async (req: Request, r
     cachedVenueStatus = 'open';
     cachedVenueName = venue.name;
     cachedVenueId = venue.id;
+    cachedOperatorId = venue.operator_id || '';
 
     // 回写 venues 表
     try { await pool.execute('UPDATE venues SET status = \'open\' WHERE id = ?', [venue.id]); } catch (_) {}
@@ -1804,6 +1806,7 @@ router.get('/attendance/records', authMiddleware, async (req: Request, res: Resp
 
 let cachedVenueName = '机器狗迷宫赛场';
 let cachedVenueId = '';
+let cachedOperatorId = '';
 let cachedVenueStatus = 'inactive';
 
 export function setVenueActive(active: boolean) {
@@ -1843,6 +1846,100 @@ export function getCurrentScreenData() {
     last_result: undefined,
     timestamp: new Date().toLocaleString('zh-CN'),
   };
+}
+
+/** 给 handler.ts 调用的版本——不依赖 req，直接从 DB 查并推送给指定 ws */
+export async function pushCurrentScreenData(ws: WebSocket) {
+  if (!cachedVenueId) {
+    ws.send(JSON.stringify({ type: 'screen_data', data: getCurrentScreenData() }));
+    return;
+  }
+  try {
+    const { query: q, queryOne: q1 } = require('../config/database');
+    const venueId = cachedVenueId;
+
+    // 直接连 op 库（通过 cachedOperatorId 获取）
+    let pool: MysqlPool | null = null;
+    if (cachedOperatorId) {
+      pool = getOperatorPool(cachedOperatorId);
+    }
+    if (!pool) {
+      ws.send(JSON.stringify({ type: 'screen_data', data: getCurrentScreenData() }));
+      return;
+    }
+
+    const runSql = async (sql: string, p: any[]) => {
+      const [rows] = await pool!.execute(sql, p) as any[];
+      return rows;
+    };
+
+    const queueRows: any[] = await runSql(
+      `SELECT rq.* FROM race_queues rq WHERE rq.venue_id=? AND rq.status IN ('waiting','called','skipped') ORDER BY rq.queue_number ASC`,
+      [venueId]
+    );
+    const currentRow: any = (await runSql(
+      `SELECT rq.* FROM race_queues rq WHERE rq.venue_id=? AND rq.status IN ('racing','paused','called') ORDER BY rq.created_at DESC LIMIT 1`,
+      [venueId]
+    ))[0] || null;
+    const lastFinished: any = (await runSql(
+      `SELECT rq.* FROM race_queues rq WHERE rq.venue_id=? AND rq.status='finished' AND rq.finish_status!='invalid' ORDER BY rq.updated_at DESC LIMIT 1`,
+      [venueId]
+    ))[0] || null;
+
+    // 排行榜 top 10
+    const leaderRows: any[] = await runSql(
+      `SELECT rq.user_id, MIN(rq.score) as best_score, COUNT(*) as total_races FROM race_queues rq WHERE rq.venue_id=? AND rq.status='finished' AND rq.score IS NOT NULL GROUP BY rq.user_id ORDER BY best_score ASC LIMIT 10`,
+      [venueId]
+    );
+
+    // 收集所有 user_id
+    const allUserIds: string[] = [];
+    for (const r of queueRows) if (r.user_id) allUserIds.push(r.user_id);
+    if (currentRow?.user_id) allUserIds.push(currentRow.user_id);
+    if (lastFinished?.user_id) allUserIds.push(lastFinished.user_id);
+    for (const r of leaderRows) if (r.user_id) allUserIds.push(r.user_id);
+
+    // 查 common 库 user info
+    const userMap = new Map<string, { nickname: string; avatar_url: string }>();
+    if (allUserIds.length > 0) {
+      const placeholders = allUserIds.map(() => '?').join(',');
+      const userRows: any[] = await q(
+        `SELECT id, nickname, avatar_url FROM users WHERE id IN (${placeholders})`,
+        allUserIds
+      );
+      for (const u of (userRows || [])) {
+        userMap.set(u.id, { nickname: u.nickname, avatar_url: u.avatar_url });
+      }
+    }
+
+    const attachUser = (row: any) => {
+      if (!row?.user_id) return row;
+      const u = userMap.get(row.user_id);
+      return { ...row, nickname: u?.nickname || '', avatar_url: u?.avatar_url || '' };
+    };
+
+    const currentUser = currentRow?.user_id ? userMap.get(currentRow.user_id) : null;
+
+    const screenData = {
+      race_status: currentRow ? (currentRow.status === 'racing' ? 'racing' : currentRow.status === 'paused' ? 'paused' : 'idle') : (lastFinished ? 'finished' : 'idle'),
+      venue_status: cachedVenueStatus,
+      current_racer: currentRow ? attachUser(currentRow) : null,
+      elapsed_ms: currentRow?.start_time ? Date.now() - new Date(currentRow.start_time).getTime() : (currentRow?.elapsed_ms ?? 0),
+      start_time: currentRow?.start_time || null,
+      next_racer: queueRows.length > 0 ? attachUser(queueRows[0]) : null,
+      queue: queueRows.map(attachUser),
+      venue_name: cachedVenueName,
+      venue_id: cachedVenueId,
+      leaderboard: leaderRows.map((r, i) => ({ rank: i + 1, ...attachUser(r) })),
+      last_result: lastFinished ? attachUser(lastFinished) : undefined,
+      timestamp: new Date().toLocaleString('zh-CN'),
+    };
+
+    ws.send(JSON.stringify({ type: 'screen_data', data: screenData }));
+  } catch (e: any) {
+    console.error('[pushCurrentScreenData] error:', e.message);
+    ws.send(JSON.stringify({ type: 'screen_data', data: getCurrentScreenData() }));
+  }
 }
 
 /** 从 DB 查询当前状态并广播 screen_data 到大屏 */
