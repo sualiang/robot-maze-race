@@ -32,12 +32,9 @@ interface ScreenData {
 }
 
 export default function ScreenDisplay() {
-  // 激活守卫：未通过 ScreenLogin 激活则重定向回 /screen
-  useEffect(() => {
-    if (sessionStorage.getItem('screen_activated') !== 'true') {
-      window.location.replace('/screen/login');
-    }
-  }, []);
+  // 激活状态跟踪：不再依赖 sessionStorage，由 WS screen_data 的 venue_status 决定
+  const [isActivated, setIsActivated] = useState(false);
+  const [venueName, setVenueName] = useState('');
 
   const [data, setData] = useState<ScreenData | null>(null);
   const [elapsed, setElapsed] = useState(0);
@@ -90,6 +87,14 @@ export default function ScreenDisplay() {
           const screenData = msg.data as ScreenData;
           const prevStatus = prevStatusRef.current;
           prevStatusRef.current = screenData.race_status;
+
+          // 根据 venue_status 更新大屏激活状态
+          if (screenData.venue_status === 'open') {
+            setIsActivated(true);
+            setVenueName(screenData.venue_name || '');
+          } else {
+            setIsActivated(false);
+          }
 
           setData(screenData);
 
@@ -145,16 +150,16 @@ export default function ScreenDisplay() {
             // 闲置：固定显示 elapsed_ms
             setElapsed(screenData.elapsed_ms || 0);
           }
-        } else if (msg.type === 'deactivated') {
-          // 大屏被解除绑定，回到激活码输入状态
-          sessionStorage.removeItem('screen_activated');
-          const vid = data?.venueId || new URLSearchParams(window.location.search).get('venueId') || '';
-          window.location.replace(`/screen/login${vid ? `?venueId=${vid}` : ''}`);
-        } else if (msg.event === 'venue_closed') {
-          // 签退后直接跳激活码页面，不走守卫循环
-          sessionStorage.removeItem('screen_activated');
-          const vid = data?.venueId || new URLSearchParams(window.location.search).get('venueId') || '';
-          window.location.replace(`/screen/login${vid ? `?venueId=${vid}` : ''}`);
+        } else if (msg.type === 'activated') {
+          // 大屏收到激活，切换到已激活状态
+          setIsActivated(true);
+          setVenueName(msg.data?.venue_name || '');
+        } else if (msg.type === 'deactivated' || msg.event === 'venue_closed') {
+          // 大屏收到去激活，回到激活码输入状态
+          setIsActivated(false);
+          setVenueName('');
+          setData(null);
+          setElapsed(0);
         } else if (msg.event === 'venue_reopen') {
           setForfeitMessage('');
           setForfeitName('');
@@ -346,7 +351,7 @@ export default function ScreenDisplay() {
   return (
     <div className="screen-display" style={{ height: '100vh', width: '100vw', background: 'linear-gradient(135deg, #0a0a1a 0%, #1a1040 50%, #0d0d2b 100%)', fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", color: '#fff', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
       {/* 赛场未激活状态 */}
-      {displayData.venue_status === 'inactive' && (
+      {!isActivated && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
           background: '#0a0a1a', zIndex: 9999,
@@ -358,6 +363,11 @@ export default function ScreenDisplay() {
           <div style={{ fontSize: 18, color: 'rgba(255,255,255,0.5)', letterSpacing: 1 }}>
             等待裁判签到激活…
           </div>
+          {connected && (
+            <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.3)' }}>
+              已连接，等待裁判扫码
+            </div>
+          )}
           <div style={{
             width: 4, height: 40,
             background: 'linear-gradient(180deg, transparent, rgba(99,102,241,0.4), transparent)',
