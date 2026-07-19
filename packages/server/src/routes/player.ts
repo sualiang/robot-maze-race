@@ -359,29 +359,16 @@ router.post('/checkin', authMiddleware, async (req: Request, res: Response) => {
     );
 
     // 同时写入 race_queues，让裁判端和大屏能看到排队
+    // 复用 checkins INSERT 已用过的 connection（resolveOperatorDb 结果一致）
     try {
-      // 先尝试 UPDATE 已有记录（比赛结束后重新排队）
       await queryOp(req,
-        `UPDATE race_queues SET status = 'waiting', queue_number = ?, checkin_id = ?, updated_at = NOW()
-         WHERE user_id = ? AND venue_id = ? AND status != 'waiting'`,
-        [queueNumber, checkinId, userId, venueId]
+        `INSERT INTO race_queues (id, user_id, venue_id, queue_number, status, remaining_races, checkin_id, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, 'waiting', 1, $5, NOW(), NOW())
+         ON DUPLICATE KEY UPDATE status = 'waiting', queue_number = $4, checkin_id = $5, updated_at = NOW()`,
+        [uuidv4(), userId, venueId, queueNumber, checkinId]
       );
-      // 查是否已有 waiting 记录（UPDATE 成功或已有）
-      const existing = await queryOpOne<{ id: string }>(req,
-        `SELECT id FROM race_queues WHERE user_id = ? AND venue_id = ? AND status = 'waiting'`,
-        [userId, venueId]
-      );
-      if (!existing) {
-        const raceQueueId = uuidv4();
-        await queryOp(req,
-          `INSERT INTO race_queues (id, user_id, venue_id, queue_number, status, remaining_races, checkin_id, created_at, updated_at)
-           VALUES (?, ?, ?, ?, 'waiting', 1, ?, NOW(), NOW())`,
-          [raceQueueId, userId, venueId, queueNumber, checkinId]
-        );
-      }
     } catch (e: any) {
       console.error('[签到] race_queues 写入失败:', e?.message || e);
-      // 不阻断签到流程
     }
 
     // 成长值发放：从已购且还有剩余次数的参赛包中，按包扣减
