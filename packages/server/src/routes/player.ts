@@ -361,11 +361,11 @@ router.post('/checkin', authMiddleware, async (req: Request, res: Response) => {
     // 同时写入 race_queues，让裁判端和大屏能看到排队
     try {
       // 先尝试 UPDATE 已有记录（比赛结束后重新排队）
-      const updateResult = await executeOp(req, as any) as { affectedRows?: number };
+      const updateResult = await (executeOp(req,
         `UPDATE race_queues SET status = 'waiting', queue_number = ?, checkin_id = ?, updated_at = NOW()
          WHERE user_id = ? AND venue_id = ? AND status != 'waiting'`,
         [queueNumber, checkinId, userId, venueId]
-      );
+      ) as any) as { affectedRows?: number };
       // 如果没有更新到（该用户没有旧记录），则 INSERT 新记录
       if (!updateResult?.affectedRows) {
         const raceQueueId = uuidv4();
