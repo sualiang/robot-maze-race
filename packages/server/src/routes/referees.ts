@@ -2043,9 +2043,9 @@ async function broadcastAfterUpdate(req: Request) {
       venue_id: cachedVenueId,
       leaderboard: leaderboardRows.map((r, i) => ({
         rank: i + 1,
-        name: r.nickname || '选手',
-        avatar: r.avatar_url || undefined,
-        elapsed: r.finish_time_ms || 0,
+        nickname: r.nickname || '选手',
+        avatar_url: r.avatar_url || undefined,
+        finish_time_ms: r.finish_time_ms || 0,
         status: r.finish_status || 'finished',
       })),
       last_result: lastResult,
