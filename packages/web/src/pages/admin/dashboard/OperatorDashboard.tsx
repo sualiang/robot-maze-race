@@ -116,7 +116,6 @@ export default function OperatorDashboard() {
 
   /* ── Fetch slow stats (platform profit + pending withdraw, settlements cross-DB) ── */
   const fetchSlowStats = useCallback(async () => {
-    if (slowLoaded) return;
     setLoadingSlow(true);
     try {
       const res: any = await api.get('/admin/dashboard/stats-slow');
@@ -298,26 +297,47 @@ export default function OperatorDashboard() {
 
   return (
     <div>
-      {/* 板块一：核心指标 */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+      {/* 板块一：核心指标 — 行1: GMV + 订单（stats-fast）*/}
+      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={24} sm={12} lg={6}>
           <Card loading={loadingStats}>
-            <Statistic title="全平台营收" value={stats.total_revenue / 100} precision={2}
+            <Statistic
+              title={
+                <Space size={4}>
+                  <span>全平台营收</span>
+                  <Button type="link" size="small" icon={<ReloadOutlined />}
+                    onClick={fetchStats} loading={loadingStats}
+                    style={{ padding: 0, fontSize: 12 }} />
+                </Space>
+              }
+              value={stats.total_revenue / 100} precision={2}
               prefix={<DollarOutlined />} suffix="元" />
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <Card loading={loadingStats}>
-            <Statistic title="全平台订单" value={stats.total_orders}
+            <Statistic
+              title={
+                <Space size={4}>
+                  <span>全平台订单</span>
+                  <Button type="link" size="small" icon={<ReloadOutlined />}
+                    onClick={fetchStats} loading={loadingStats}
+                    style={{ padding: 0, fontSize: 12 }} />
+                </Space>
+              }
+              value={stats.total_orders}
               prefix={<WalletOutlined />} suffix="笔" />
           </Card>
         </Col>
+      </Row>
+      {/* 行2: 平台收入 + 预估待审核提现（stats-slow）*/}
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={24} sm={12} lg={6}>
           <Card loading={loadingSlow}>
             <Statistic
               title={
                 <Space size={4}>
-                  <span>预估平台收入</span>
+                  <span>平台收入</span>
                   <Button type="link" size="small" icon={<ReloadOutlined />}
                     onClick={fetchSlowStats} loading={loadingSlow && !slowLoaded}
                     style={{ padding: 0, fontSize: 12 }} />
@@ -335,7 +355,7 @@ export default function OperatorDashboard() {
             <Statistic
               title={
                 <Space size={4}>
-                  <span>待审核提现</span>
+                  <span>预估待审核提现</span>
                   <Button type="link" size="small" icon={<ReloadOutlined />}
                     onClick={fetchSlowStats} loading={loadingSlow && !slowLoaded}
                     style={{ padding: 0, fontSize: 12 }} />
