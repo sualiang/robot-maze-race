@@ -934,9 +934,9 @@ router.post('/match/end', authMiddleware, async (req: Request, res: Response) =>
     // 同步写入 race_records（成绩记录）
     if (row.user_id && row.venue_id) {
       await refExecuteOp(req,
-        `INSERT INTO race_records (id, race_id, player_id, score, duration_seconds, status, started_at, finished_at, operator_id)
-         VALUES ($1, NULL, $2, $3, $4, $5, NOW() - INTERVAL $6/1000 SECOND, NOW(), $7)`,
-        [uuidv4(), row.user_id, elapsed, Math.round(elapsed / 1000), finishStatus, elapsed, row.nickname]
+        `INSERT INTO race_records (id, race_id, player_id, score, duration_seconds, status, started_at, finished_at)
+         VALUES ($1, NULL, $2, $3, $4, $5, NOW() - INTERVAL $6/1000 SECOND, NOW())`,
+        [uuidv4(), row.user_id, elapsed, Math.round(elapsed / 1000), finishStatus, elapsed]
       );
     }
 
