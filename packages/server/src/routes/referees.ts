@@ -1568,7 +1568,8 @@ router.post('/attendance/check-in-direct', authMiddleware, async (req: Request, 
     try {
       const redis = await getRedis();
       await redis.sAdd('active_venues', venue.id);
-      await redis.hSet('active_venue:' + venue.id, 'name', venue.name, 'activatedAt', String(Date.now()));
+      await redis.hSet('active_venue:' + venue.id, 'name', venue.name);
+      await redis.hSet('active_venue:' + venue.id, 'activatedAt', String(Date.now()));
     } catch (_) { /* Redis 不可用时不影响主流程 */ }
 
     // 7. 广播
