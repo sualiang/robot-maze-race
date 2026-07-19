@@ -92,8 +92,8 @@ router.put('/', authMiddleware, operatorOnly, async (req: Request, res: Response
       const opId = String(venue_id).replace(/^operator_/, '');
       if (opId && String(venue_id).startsWith('operator_')) {
         await executeOp(req, 
-          'INSERT IGNORE INTO venues (id, name, status) VALUES ($1, $2, $3, \'active\')',
-          [String(venue_id), String(venue_id), opId]
+          'INSERT IGNORE INTO venues (id, name, status) VALUES ($1, $2, $3, $4)',
+          [String(venue_id), String(venue_id), opId, 'active']
         );
       }
 
@@ -109,7 +109,7 @@ router.put('/', authMiddleware, operatorOnly, async (req: Request, res: Response
       return res.status(201).json({ code: 0, message: '营销配置已创建', data: created! });
     }
   } catch (error: any) {
-    console.error('[OperatorMarketing] upsert error:', error.message);
+    console.error('[OperatorMarketing] PUT upsert error:', error.message);
     return res.status(500).json({ code: 500, message: '更新营销配置失败', data: null });
   }
 });
@@ -138,8 +138,8 @@ router.post('/', authMiddleware, operatorOnly, async (req: Request, res: Respons
   const opId = String(venue_id).replace(/^operator_/, '');
   if (opId && String(venue_id).startsWith('operator_')) {
     await executeOp(req, 
-      'INSERT IGNORE INTO venues (id, name, status) VALUES ($1, $2, $3, \'active\')',
-      [String(venue_id), String(venue_id), opId]
+      'INSERT IGNORE INTO venues (id, name, status) VALUES ($1, $2, $3, $4)',
+      [String(venue_id), String(venue_id), opId, 'active']
     );
   }
   const id = uuidv4();

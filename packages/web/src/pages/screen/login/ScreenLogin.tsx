@@ -15,6 +15,7 @@ export default function ScreenLogin() {
   const [expired, setExpired] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // 加载赛场名称
   useEffect(() => {
@@ -58,6 +59,13 @@ export default function ScreenLogin() {
         activation_code: code,
         venueId: venueId,
       }));
+      // 心跳保活，防止 NAT/防火墙空闲断开
+      if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+      heartbeatRef.current = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ event: 'ping' }));
+        }
+      }, 30000);
     };
 
     ws.onmessage = (event) => {
@@ -70,7 +78,10 @@ export default function ScreenLogin() {
       } catch { /* ignore */ }
     };
 
-    ws.onerror = () => ws.close();
+    ws.onerror = () => {
+      if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+      ws.close();
+    };
     wsRef.current = ws;
   }, [venueId]);
 
@@ -80,6 +91,7 @@ export default function ScreenLogin() {
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      if (heartbeatRef.current) clearInterval(heartbeatRef.current);
       wsRef.current?.close();
     };
   }, [generateCode, connectWS]);
