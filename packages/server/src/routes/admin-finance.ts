@@ -606,7 +606,7 @@ router.get('/payment-records', authMiddleware, checkPermission('admin:finance'),
       // 超管：跨库聚合
       const opRegs = await query<any>('SELECT db_name, operator_id, operator_name FROM operators_registry WHERE db_name IS NOT NULL', []);
       const opNameMap = new Map<string, string>();
-      for (const reg of opRegs) opNameMap.set(reg.operator_id, reg.name);
+      for (const reg of opRegs) opNameMap.set(reg.operator_id, reg.operator_name);
 
       let allDbRows: any[] = [];
       for (const reg of opRegs) {
