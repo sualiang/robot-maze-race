@@ -1508,9 +1508,14 @@ router.post('/attendance/check-in-by-qr', authMiddleware, async (req: Request, r
     if (!userId) return res.status(401).json({ code: 401, message: '未登录', data: null });
 
     // 1. 从 referees 表查真实 referee_id + 绑定的 venue_id
-    const refRow = await queryOpOne<{ id: string; venue_id: string | null }>(req, 
+    let refRow = await queryOpOne<{ id: string; venue_id: string | null }>(req,
       'SELECT id, venue_id FROM referees WHERE user_id = $1', [userId]
     );
+    if (!refRow) {
+      refRow = await queryOpOne<{ id: string; venue_id: string | null }>(req,
+        'SELECT id, venue_id FROM referees WHERE id = $1', [userId]
+      );
+    }
     if (!refRow) {
       return res.status(400).json({ code: 400, message: '未找到裁判记录，请先完成注册', data: null });
     }
