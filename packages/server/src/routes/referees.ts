@@ -685,7 +685,7 @@ router.get('/match/queue', authMiddleware, async (req: Request, res: Response) =
     const userMap = new Map<string, { nickname: string; avatar_url: string }>();
     if (allUserIds.length > 0) {
       try {
-        const placeholders = allUserIds.map(() => '?').join(',');
+        const placeholders = allUserIds.map((_, i) => '$' + (i + 1)).join(',');
         const userRows: any[] = await query(
           `SELECT id, nickname, avatar_url FROM users WHERE id IN (${placeholders})`,
           allUserIds
@@ -1904,7 +1904,7 @@ export async function pushCurrentScreenData(ws: WebSocket) {
     // 查 common 库 user info
     const userMap = new Map<string, { nickname: string; avatar_url: string }>();
     if (allUserIds.length > 0) {
-      const placeholders = allUserIds.map(() => '?').join(',');
+      const placeholders = allUserIds.map((_, i) => '$' + (i + 1)).join(',');
       const userRows: any[] = await q(
         `SELECT id, nickname, avatar_url FROM users WHERE id IN (${placeholders})`,
         allUserIds
@@ -1913,6 +1913,7 @@ export async function pushCurrentScreenData(ws: WebSocket) {
         userMap.set(u.id, { nickname: u.nickname, avatar_url: u.avatar_url });
       }
     }
+    console.log('[Broadcast] user query: ids=' + JSON.stringify(allUserIds) + ' rows=' + (userRows?.length || 0));
 
     const attachUser = (row: any) => {
       if (!row?.user_id) return row;
@@ -1990,7 +1991,7 @@ async function broadcastAfterUpdate(req: Request) {
     const broadcastUserMap = new Map<string, { nickname: string; avatar_url: string }>();
     if (allUserIds.length > 0) {
       try {
-        const placeholders = allUserIds.map(() => '?').join(',');
+        const placeholders = allUserIds.map((_, i) => '$' + (i + 1)).join(',');
         const userRows: any[] = await query(
           `SELECT id, nickname, avatar_url FROM users WHERE id IN (${placeholders})`,
           allUserIds
