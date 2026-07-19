@@ -440,21 +440,22 @@ router.get('/checkin/queue', authMiddleware, async (req: Request, res: Response)
  * GET /player/queue/current
  * 获取当前赛场实时排队列表（供小程序比赛Tab展示）
  * 通过 resolveOperatorDb 获取玩家所在赛场的 venue_id
+ * 新增 myStatus + lastRaceResult
  */
 router.get('/queue/current', authMiddleware, rateLimiter(10, 60), async (req: Request, res: Response) => {
   try {
+    const userId = req.user!.userId;
+
     // 获取该玩家的 operator context，查找所在 venue
     const dbName = await resolveOperatorDb(req);
     if (!dbName) {
-      // 玩家未扫场馆码，无操作上下文
-      return res.json({ code: 0, message: 'ok', data: { queue: [], currentRacer: null } });
+      return res.json({ code: 0, message: 'ok', data: { queue: [], currentRacer: null, myStatus: 'idle', lastRaceResult: null } });
     }
 
-    // 通过 operator_context 里的 operator_id 找对应 venue
-    const ctx = await getOperatorContext(req.user!.userId);
+    const ctx = await getOperatorContext(userId);
     const operatorId = ctx?.operator_id;
     if (!operatorId) {
-      return res.json({ code: 0, message: 'ok', data: { queue: [], currentRacer: null } });
+      return res.json({ code: 0, message: 'ok', data: { queue: [], currentRacer: null, myStatus: 'idle', lastRaceResult: null } });
     }
 
     // 查 venues 表找到该运营商的 open 赛场
@@ -463,12 +464,43 @@ router.get('/queue/current', authMiddleware, rateLimiter(10, 60), async (req: Re
       [operatorId]
     );
     if (!venueRow?.id) {
-      return res.json({ code: 0, message: 'ok', data: { queue: [], currentRacer: null } });
+      return res.json({ code: 0, message: 'ok', data: { queue: [], currentRacer: null, myStatus: 'idle', lastRaceResult: null } });
     }
 
     const venueId = venueRow.id;
 
-    // 队列: waiting/called/skipped（运营商库查 race_queues，不 JOIN users）
+    // 1) myStatus: 查当前用户在 race_queues 中的状态
+    let myStatus = 'idle' as string;
+    const myQueueRow = await queryOpOne<any>(req,
+      `SELECT status FROM race_queues WHERE venue_id = $1 AND user_id = $2 ORDER BY created_at DESC LIMIT 1`,
+      [venueId, userId]
+    );
+    if (myQueueRow) {
+      if (myQueueRow.status === 'waiting') myStatus = 'waiting';
+      else if (myQueueRow.status === 'called') myStatus = 'called';
+      else if (myQueueRow.status === 'skipped') myStatus = 'skipped';
+      else if (myQueueRow.status === 'racing' || myQueueRow.status === 'paused') myStatus = 'racing';
+    }
+
+    // 2) lastRaceResult: 用户最近一次 completed 比赛成绩
+    let lastRaceResult: any = null;
+    const lastResultRow = await queryOpOne<any>(req,
+      `SELECT id, score, rank, total_racers, created_at
+       FROM race_results
+       WHERE user_id = $1 AND status = 'completed'
+       ORDER BY created_at DESC LIMIT 1`,
+      [userId]
+    );
+    if (lastResultRow) {
+      lastRaceResult = {
+        score: lastResultRow.score ?? 0,
+        scoreText: formatScore(lastResultRow.score ?? 0),
+        rank: lastResultRow.rank ?? 0,
+        totalRacers: lastResultRow.total_racers ?? 0,
+      };
+    }
+
+    // 3) 队列: waiting/called/skipped
     const queueRows = await queryOp<any>(req,
       `SELECT rq.id, rq.user_id, rq.queue_number, rq.status, rq.remaining_races, rq.race_type
        FROM race_queues rq
@@ -477,7 +509,7 @@ router.get('/queue/current', authMiddleware, rateLimiter(10, 60), async (req: Re
       [venueId]
     );
 
-    // 当前选手: racing/paused（运营商库查 race_queues，不 JOIN users）
+    // 4) 当前选手: racing/paused
     const currentRow = await queryOpOne<any>(req,
       `SELECT rq.id, rq.user_id, rq.queue_number, rq.status, rq.remaining_races, rq.race_type,
               rq.start_time_ms, rq.paused_elapsed_ms
@@ -487,7 +519,7 @@ router.get('/queue/current', authMiddleware, rateLimiter(10, 60), async (req: Re
       [venueId]
     );
 
-    // 收集所有需要查询的用户 ID（队列 + 当前选手）
+    // 收集所有需要查询的用户 ID
     const allUserIds: string[] = [];
     for (const r of queueRows) {
       if (r.user_id) allUserIds.push(r.user_id);
@@ -518,8 +550,11 @@ router.get('/queue/current', authMiddleware, rateLimiter(10, 60), async (req: Re
       message: 'ok',
       data: {
         venueId,
+        myStatus,
+        lastRaceResult,
         queue: queueRows.map((r: any) => ({
           id: r.id,
+          userId: r.user_id,
           queueNumber: r.queue_number,
           nickname: userFor(r.user_id).nickname || '选手',
           avatarUrl: userFor(r.user_id).avatar_url || undefined,
@@ -541,7 +576,7 @@ router.get('/queue/current', authMiddleware, rateLimiter(10, 60), async (req: Re
     });
   } catch (e: any) {
     console.error('[Player] queue/current error:', e.message);
-    return res.json({ code: 0, message: 'ok', data: { queue: [], currentRacer: null } });
+    return res.json({ code: 0, message: 'ok', data: { queue: [], currentRacer: null, myStatus: 'idle', lastRaceResult: null } });
   }
 });
 

@@ -34,8 +34,12 @@
         <text class="venue-badge-name">{{venueName || '当前赛场'}}</text>
       </view>
 
-      <!-- 实时排队列表 -->
-      <view wx:if="{{queueVisible}}" class="queue-section">
+      <!-- ============================================================ -->
+      <!-- myStatus 驱动的比赛交互区 -->
+      <!-- ============================================================ -->
+
+      <!-- 实时排队列表（waiting/called/skipped/racing 都显示） -->
+      <view wx:if="{{queueVisible || myStatus !== 'idle'}}" class="queue-section">
         <text class="history-title" style="margin-bottom: 16rpx;">实时排队</text>
 
         <!-- 当前选手 -->
@@ -48,10 +52,11 @@
         </view>
 
         <!-- 排队列表 -->
-        <view wx:for="{{queueList}}" wx:key="id" class="queue-item">
+        <view wx:for="{{queueList}}" wx:key="id" class="queue-item {{item.userId === currentUserId ? 'queue-item-self' : ''}}">
           <view class="queue-item-num">#{{item.queueNumber}}</view>
           <view class="queue-item-name">{{item.nickname || '选手'}}</view>
-          <text wx:if="{{item.raceType === 'final'}}" class="queue-item-tag">决赛</text>
+          <text wx:if="{{item.userId === currentUserId}}" class="queue-item-tag queue-item-tag-self">我</text>
+          <text wx:elif="{{item.raceType === 'final'}}" class="queue-item-tag">决赛</text>
         </view>
 
         <view wx:if="{{currentRacer == null && queueList.length === 0}}" class="history-empty">
@@ -59,40 +64,80 @@
         </view>
       </view>
 
-      <!-- 赛季最佳成绩卡片（有记录时） -->
-      <view wx:if="{{hasSeasonBest}}" class="best-card" bindtap="onGoLeaderboard">
-        <text class="best-card-label">本赛季最佳成绩</text>
-        <text class="best-card-score">{{seasonBest.scoreText}}</text>
-        <text class="best-card-desc">
-          最佳排名 第{{seasonBest.rank}}名 · 已超 {{seasonBest.beatPercent}}% 玩家
-        </text>
-        <text class="best-card-tip">继续参赛刷新成绩，冲击决赛名额</text>
+      <!-- myStatus 状态提示卡片 -->
+      <!-- called: 已叫号 -->
+      <view wx:if="{{myStatus === 'called'}}" class="status-card status-card-called">
+        <text class="status-card-icon">🔔</text>
+        <text class="status-card-text">已叫到您，请前往赛场就位！</text>
+        <text class="status-card-hint">超时180秒将自动顺延</text>
       </view>
 
-      <!-- 无记录时的副标题 -->
-      <view wx:if="{{!hasSeasonBest}}" class="action-empty" style="padding-top: 40rpx;">
-        <text class="action-empty-title" style="font-size: 32rpx;">准备好上场了吗？</text>
-        <text class="action-empty-desc">创造你的最佳记录</text>
+      <!-- skipped: 过号 -->
+      <view wx:if="{{myStatus === 'skipped'}}" class="status-card status-card-skipped">
+        <text class="status-card-icon">⚠️</text>
+        <text class="status-card-text">您已过号</text>
+        <text class="status-card-hint">当前选手结束后将重新叫号，请做好准备</text>
+      </view>
+
+      <!-- waiting: 等待中 -->
+      <view wx:if="{{myStatus === 'waiting'}}" class="status-card status-card-waiting">
+        <text class="status-card-icon">⏳</text>
+        <text class="status-card-text">等待叫号中</text>
+        <text class="status-card-hint">请留意现场大屏和本页面通知</text>
+      </view>
+
+      <!-- racing: 正在比赛 -->
+      <view wx:if="{{myStatus === 'racing'}}" class="status-card status-card-racing">
+        <text class="status-card-icon">🏃</text>
+        <text class="status-card-text">正在比赛中...</text>
+      </view>
+
+      <!-- 比赛结束成绩卡片（从 racing 变 idle 时显示，3-5秒自动消失） -->
+      <view wx:if="{{showResultCard && lastRaceResult}}" class="result-card">
+        <text class="result-card-title">比赛结束</text>
+        <text class="result-card-score">{{lastRaceResult.scoreText}}</text>
+        <text class="result-card-rank">排名: 第{{lastRaceResult.rank}}名 / 共{{lastRaceResult.totalRacers}}人</text>
       </view>
 
       <!-- ============================================================ -->
-      <!-- 状态2: 有次数 → 立即参赛 -->
+      <!-- idle: 赛季最佳成绩卡片 + CTA -->
       <!-- ============================================================ -->
-      <view wx:if="{{remainCount > 0}}" class="race-cta-wrap">
-        <view class="race-cta-btn" bindtap="onRaceNow">
-          <text class="race-cta-text">立即参赛（剩余 {{remainCount}} 次）</text>
+      <block wx:if="{{myStatus === 'idle'}}">
+        <!-- 赛季最佳成绩卡片（有记录时） -->
+        <view wx:if="{{hasSeasonBest}}" class="best-card" bindtap="onGoLeaderboard">
+          <text class="best-card-label">本赛季最佳成绩</text>
+          <text class="best-card-score">{{seasonBest.scoreText}}</text>
+          <text class="best-card-desc">
+            最佳排名 第{{seasonBest.rank}}名 · 已超 {{seasonBest.beatPercent}}% 玩家
+          </text>
+          <text class="best-card-tip">继续参赛刷新成绩，冲击决赛名额</text>
         </view>
-      </view>
 
-      <!-- ============================================================ -->
-      <!-- 状态3: 次数 = 0 → 购买参赛包 -->
-      <!-- ============================================================ -->
-      <view wx:if="{{remainCount <= 0}}" class="race-cta-wrap">
-        <view class="race-cta-btn race-cta-buy" bindtap="onBuyPackage">
-          <text class="race-cta-text">参赛次数不足，请购买参赛包</text>
+        <!-- 无记录时的副标题 -->
+        <view wx:if="{{!hasSeasonBest && !showResultCard}}" class="action-empty" style="padding-top: 40rpx;">
+          <text class="action-empty-title" style="font-size: 32rpx;">准备好上场了吗？</text>
+          <text class="action-empty-desc">创造你的最佳记录</text>
         </view>
-        <text class="race-cta-hint race-cta-hint-empty">当前无可用参赛次数</text>
-      </view>
+
+        <!-- ============================================================ -->
+        <!-- 状态2: 有次数 → 立即参赛 -->
+        <!-- ============================================================ -->
+        <view wx:if="{{remainCount > 0}}" class="race-cta-wrap">
+          <view class="race-cta-btn" bindtap="onRaceNow">
+            <text class="race-cta-text">立即参赛（剩余 {{remainCount}} 次）</text>
+          </view>
+        </view>
+
+        <!-- ============================================================ -->
+        <!-- 状态3: 次数 = 0 → 购买参赛包 -->
+        <!-- ============================================================ -->
+        <view wx:if="{{remainCount <= 0}}" class="race-cta-wrap">
+          <view class="race-cta-btn race-cta-buy" bindtap="onBuyPackage">
+            <text class="race-cta-text">参赛次数不足，请购买参赛包</text>
+          </view>
+          <text class="race-cta-hint race-cta-hint-empty">当前无可用参赛次数</text>
+        </view>
+      </block>
 
     </block>
 

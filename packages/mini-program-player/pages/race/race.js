@@ -18,6 +18,14 @@ Page({
     venueName: '',
     venueId: '',
     remainCount: 0,
+    currentUserId: '',
+
+    // 比赛状态
+    myStatus: 'idle', // idle | waiting | called | skipped | racing
+    prevMyStatus: 'idle',
+    lastRaceResult: null, // 最近一次比赛成绩
+    showResultCard: false,
+    resultCardTimer: null,
 
     // 赛季最佳成绩
     seasonBest: null,
@@ -76,13 +84,23 @@ Page({
     var that = this;
     var app = getApp();
 
+    // 获取当前用户 ID
+    var userId = '';
+    if (app.globalData.userInfo && app.globalData.userInfo.id) {
+      userId = app.globalData.userInfo.id;
+    }
+
     if (app.globalData.isLoggedIn) {
-      this.setData({ isLoggedIn: true });
+      this.setData({ isLoggedIn: true, currentUserId: userId });
       this.fetchAll();
     } else {
       var auth = require('../../utils/auth');
       auth.wxLogin().then(function () {
-        that.setData({ isLoggedIn: true });
+        var uid = '';
+        if (getApp().globalData.userInfo && getApp().globalData.userInfo.id) {
+          uid = getApp().globalData.userInfo.id;
+        }
+        that.setData({ isLoggedIn: true, currentUserId: uid });
         that.fetchAll();
       }).catch(function () {
         that.setData({
@@ -156,6 +174,10 @@ Page({
       clearInterval(this.data.queueTimer);
       this.data.queueTimer = null;
     }
+    if (this.data.resultCardTimer) {
+      clearTimeout(this.data.resultCardTimer);
+      this.data.resultCardTimer = null;
+    }
   },
 
   /**
@@ -170,11 +192,31 @@ Page({
       }
       var list = data.queue || [];
       var current = data.currentRacer || null;
-      that.setData({
+      var newStatus = data.myStatus || 'idle';
+      var prevStatus = that.data.myStatus;
+      var lastResult = data.lastRaceResult || null;
+
+      var updateData = {
         queueList: list,
         currentRacer: current,
-        queueVisible: list.length > 0 || current != null
-      });
+        queueVisible: list.length > 0 || current != null,
+        myStatus: newStatus,
+        prevMyStatus: prevStatus
+      };
+
+      // 检测状态变化: 从非 idle 变为 idle → 显示成绩卡片
+      if (prevStatus !== 'idle' && newStatus === 'idle' && lastResult) {
+        updateData.lastRaceResult = lastResult;
+        updateData.showResultCard = true;
+        // 3-5秒后自动消失
+        if (that.data.resultCardTimer) clearTimeout(that.data.resultCardTimer);
+        var timer = setTimeout(function () {
+          that.setData({ showResultCard: false });
+        }, 4000);
+        that.data.resultCardTimer = timer;
+      }
+
+      that.setData(updateData);
     }).catch(function () {
       // 静默失败
     });
@@ -380,7 +422,9 @@ Page({
     if (venueId && venueName) {
       wx.showModal({
         title: '确认参赛',
-        content: '即将进入 ' + venueName + ' 的比赛队列，是否确认？',
+        content: '确认后，会扣除 1 次参赛次数，并进入排队。请注意比赛现场大屏叫号，如叫号后 180 秒内未就位，将自动顺延至下一位。',
+        confirmText: '确认参赛',
+        cancelText: '取消',
         success: function (modalRes) {
           if (modalRes.confirm) {
             that.doCheckin(venueId);
