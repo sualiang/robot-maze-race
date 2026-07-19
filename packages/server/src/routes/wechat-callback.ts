@@ -288,6 +288,43 @@ router.get('/callback', async (req: Request, res: Response) => {
       }
       console.log('[WechatCallback] openid=' + openid);
 
+      // --- 扫码登录流程：state 以 scan_ 开头 → 写 openid 到 Redis，返回成功页 ---
+      if (token.startsWith('scan_')) {
+        try {
+          const { getRedis } = require('../config/redis');
+          const redis = await getRedis();
+          const key = `scan_login:${token}`;
+          await redis.setEx(key, 300, openid); // TTL 5 分钟
+          console.log('[WechatCallback] scan login: openid=' + openid + ' state=' + token);
+        } catch (redisErr: any) {
+          console.error('[WechatCallback] Redis 写入失败:', redisErr.message);
+        }
+        return res.send(`
+          <!DOCTYPE html>
+          <html lang="zh">
+          <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+          <title>扫码登录</title>
+          <style>
+            * { margin:0; padding:0; box-sizing:border-box; }
+            body { background:#0a0e27; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; font-family:-apple-system,BlinkMacSystemFont,sans-serif; }
+            .box { text-align:center; background:rgba(255,255,255,0.05); padding:48px 40px; border-radius:24px; border:1px solid rgba(255,255,255,0.08); max-width:320px; }
+            .icon { font-size:64px; margin-bottom:24px; }
+            h2 { font-size:20px; font-weight:600; margin-bottom:8px; }
+            p { color:rgba(255,255,255,0.4); font-size:14px; }
+          </style></head>
+          <body>
+            <div class="box">
+              <div class="icon">✅</div>
+              <h2>登录成功</h2>
+              <p>请返回浏览器继续操作</p>
+            </div>
+          </body>
+          </html>
+        `);
+      }
+
+      // --- 以下为原有的 invite/register/__login__ 流程 ---
+
       // Check if this openid is already a referee
       const existingReferee = await queryOpOne<{ id: string; name: string }>(req, 
         'SELECT r.id, r.name FROM referees r INNER JOIN users u ON r.user_id = u.id WHERE u.openid = $1 LIMIT 1',

@@ -7,6 +7,7 @@ import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../con
 import { queryCommonOne } from '../db/router';
 import { authMiddleware, optionalAuth, AuthPayload } from '../middleware/auth';
 import { getAccessToken } from '../services/wechat-token';
+import { getRedis } from '../config/redis';
 import {
   ApiResponse,
   WxLoginRequest,
@@ -1637,6 +1638,70 @@ router.get('/mp-oauth/subscribe-status', authMiddleware, async (req: Request, re
     return res.json({ code: 0, message: 'ok', data: { subscribed } });
   } catch (error: any) {
     console.error('[Auth] subscribe-status error:', error.message);
+    return res.status(500).json({ code: 500, message: '查询失败', data: null });
+  }
+});
+
+/**
+ * GET /api/v1/auth/scan-login-status
+ * 扫码登录状态轮询接口
+ * 前端扫码后每隔 1.5s 轮询，等待 OAuth 回调写入 Redis
+ * @param state - 扫码时前端生成的随机 state
+ */
+router.get('/scan-login-status', async (req: Request, res: Response) => {
+  try {
+    const { state } = req.query;
+    if (!state || typeof state !== 'string') {
+      return res.status(400).json({ code: 400, message: '缺少 state 参数', data: null });
+    }
+
+    const redis = await getRedis();
+    const key = `scan_login:${state}`;
+    const openid = await redis.get(key);
+
+    if (!openid) {
+      return res.json({ code: 0, message: 'pending', data: { status: 'pending' } });
+    }
+
+    // 删除 Redis key（一次性有效）
+    await redis.del(key);
+
+    // 用 openid 走 wx-mp-login 逻辑完成登录
+    // 先检查该 openid 是否有裁判身份
+    const referee = await queryOpOne<{ id: string; name: string }>(req,
+      `SELECT r.id, r.name FROM referees r
+       INNER JOIN users u ON r.user_id = u.id
+       WHERE u.openid = $1 LIMIT 1`,
+      [openid]
+    );
+
+    if (!referee) {
+      return res.json({
+        code: 0,
+        message: 'not_registered',
+        data: { status: 'not_registered', openid },
+      });
+    }
+
+    // 生成 JWT token（复用 wx-mp-login 逻辑）
+    const payload = {
+      userId: referee.id,
+      openid,
+      role: 'referee' as const,
+    };
+    const token = jwt.sign(payload, config.jwt.secret, { expiresIn: config.jwt.expiresIn as any });
+
+    return res.json({
+      code: 0,
+      message: '登录成功',
+      data: {
+        status: 'success',
+        token,
+        user: { id: referee.id, name: referee.name, openid },
+      },
+    });
+  } catch (error: any) {
+    console.error('[Auth] scan-login-status error:', error.message);
     return res.status(500).json({ code: 500, message: '查询失败', data: null });
   }
 });
