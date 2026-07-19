@@ -660,22 +660,55 @@ router.post('/login', async (req: Request, res: Response) => {
       });
     }
 
-    // ===== 裁判登录（仅微信OAuth，不支持手机号+密码） =====
+    // ===== 裁判/玩家登录 =====
     if (!phone || !password) {
       return res.status(400).json({ code: 400, message: '缺少手机号或密码', data: null });
     }
 
-    // 检查是否是裁判手机号（referees 在 operator 库）
-    const refereePhone = await queryOpOne<{ id: string; phone: string; nickname: string }>(req,
-      'SELECT id, phone, name FROM referees WHERE phone = $1',
-      [phone]
-    );
+    // 检查是否是裁判手机号（遍历 op_* 库 referees 表）
+    let refereeInfo: { id: string; phone: string; name: string; operatorId: string } | null = null;
+    try {
+      const regRows = await query<{ db_name: string }>(
+        `SELECT db_name FROM operators_registry WHERE db_name LIKE 'op_%'`,
+        []
+      );
+      for (const reg of regRows) {
+        try {
+          const pool = getOperatorPool(reg.db_name);
+          const [rows] = await pool.execute(
+            'SELECT r.id, r.phone, r.name, r.operator_id FROM referees r WHERE r.phone = ? LIMIT 1',
+            [phone]
+          ) as any[];
+          if ((rows as any[])?.[0]) {
+            refereeInfo = { ...rows[0], operatorId: rows[0].operator_id };
+            break;
+          }
+        } catch { /* skip inaccessible dbs */ }
+      }
+    } catch { /* operators_registry table may not exist */ }
 
-    if (refereePhone) {
-      return res.status(400).json({
-        code: 400,
-        message: '裁判请使用微信授权登录，不支持手机号+密码登录',
-        data: null
+    if (refereeInfo) {
+      // 裁判手机号登录 — 开发阶段免密
+      const payload: AuthPayload = {
+        userId: refereeInfo.id,
+        openid: 'ref_sms_' + refereeInfo.id,
+        role: 'referee',
+        operatorId: refereeInfo.operatorId,
+      };
+      const token = jwt.sign(payload, config.jwt.secret, { expiresIn: config.jwt.expiresIn as any });
+      return res.json({
+        code: 0,
+        message: '登录成功',
+        data: {
+          token,
+          user: {
+            id: refereeInfo.id,
+            nickname: refereeInfo.name || phone,
+            phone: refereeInfo.phone,
+            role: 'referee',
+            operatorId: refereeInfo.operatorId,
+          },
+        },
       });
     }
 
