@@ -1317,6 +1317,81 @@ router.post('/attendance/check-out', authMiddleware, async (req: Request, res: R
  * POST /attendance/check-in-by-qr
  * 裁判扫大屏二维码签到 + 激活大屏
  */
+/**
+ * POST /attendance/check-in-direct
+ * 比赛专用直接签到 — 不依赖激活码/Redis
+ * 裁判已登录 + venueId 匹配即可签到
+ */
+router.post('/attendance/check-in-direct', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { venueId } = req.body;
+    if (!venueId) {
+      return res.status(400).json({ code: 400, message: '缺少 venueId', data: null });
+    }
+
+    const userId = req.user!.userId;
+    if (!userId) return res.status(401).json({ code: 401, message: '未登录', data: null });
+
+    // 1. 查 referee
+    const refRow = await queryOpOne<{ id: string; venue_id: string | null }>(req,
+      'SELECT id, venue_id FROM referees WHERE user_id = $1', [userId]
+    );
+    if (!refRow) {
+      return res.status(400).json({ code: 400, message: '未找到裁判记录', data: null });
+    }
+
+    // 2. 验证 venueId 与裁判绑定一致
+    if (refRow.venue_id && refRow.venue_id !== venueId) {
+      return res.status(403).json({ code: 403, message: '场地不匹配', data: null });
+    }
+
+    // 3. 查 venue
+    const venue = await queryOpOne<{ id: string; name: string; address: string }>(req,
+      'SELECT id, name, COALESCE(address, \'\') as address FROM venues WHERE id = $1', [venueId]
+    );
+    if (!venue) {
+      return res.status(404).json({ code: 404, message: '场地不存在', data: null });
+    }
+
+    // 4. 查今日是否已签到且未签退
+    const existing = await queryOpOne<any>(req,
+      'SELECT id FROM attendance WHERE referee_id = $1 AND date(checkin_at) = CURDATE() AND checkout_at IS NULL LIMIT 1',
+      [refRow.id]
+    );
+    if (existing) {
+      return res.status(400).json({ code: 400, message: '今日已签到，请先签退', data: null });
+    }
+
+    // 5. 写入签到记录
+    const attendanceId = uuidv4();
+    await executeOp(req,
+      'INSERT INTO attendance (id, referee_id, user_id, venue_id, checkin_at) VALUES ($1, $2, $3, $4, NOW())',
+      [attendanceId, refRow.id, userId, venue.id]
+    );
+    await executeOp(req, 'UPDATE referees SET last_checkin_at = NOW() WHERE id = $1', [refRow.id]);
+
+    // 6. 标记赛场已激活
+    setVenueActive(true);
+    cachedVenueStatus = 'open';
+    cachedVenueName = venue.name;
+    cachedVenueId = venue.id;
+    try { await executeOp(req, 'UPDATE venues SET status = \'open\' WHERE id = $1', [venue.id]); } catch (_) {}
+
+    // 7. 广播
+    broadcastToScreen({ type: 'activated', data: { venue_name: venue.name, venue_id: venue.id } });
+    broadcastToScreen({ type: 'screen_data', data: getCurrentScreenData() });
+
+    return res.json({
+      code: 0,
+      message: '签到成功',
+      data: { attendanceId, venueId: venue.id, venueName: venue.name },
+    });
+  } catch (error: any) {
+    console.error('[Direct签到] 失败:', error.message);
+    return res.status(500).json({ code: 500, message: '签到失败', data: null });
+  }
+});
+
 router.post('/attendance/check-in-by-qr', authMiddleware, async (req: Request, res: Response) => {
   try {
     const { activationCode, venueId: bodyVenueId } = req.body;
