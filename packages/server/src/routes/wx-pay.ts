@@ -106,17 +106,17 @@ async function wechatPayRequest<T = any>(
 /** 解密回调通知中的 ciphertext */
 function decryptNotify(ciphertext: string, associatedData: string, nonce: string): string {
   const key = config.wechatPay.apiV3Key;
-  const decipher = crypto.createDecipheriv(
-    'aes-256-gcm',
-    Buffer.from(key, 'utf-8'),
-    Buffer.from(nonce, 'utf-8')
-  );
+  const rawCipher = Buffer.from(ciphertext, 'base64');
+  if (rawCipher.length < 17) {
+    console.error('[WxPay] decryptNotify: ciphertext too short, len:', rawCipher.length);
+    return '';
+  }
+  const authTag = rawCipher.slice(rawCipher.length - 16);
+  const ct = rawCipher.slice(0, rawCipher.length - 16);
+  const decipher = crypto.createDecipheriv('aes-256-gcm', Buffer.from(key, 'utf-8'), Buffer.from(nonce, 'utf-8'));
   decipher.setAAD(Buffer.from(associatedData, 'utf-8'));
-  decipher.setAuthTag(Buffer.from(ciphertext.slice(-32), 'hex'));
-  const decrypted = Buffer.concat([
-    decipher.update(Buffer.from(ciphertext.slice(0, -32), 'hex')),
-    decipher.final(),
-  ]);
+  decipher.setAuthTag(authTag);
+  const decrypted = Buffer.concat([decipher.update(ct), decipher.final()]);
   return decrypted.toString('utf-8');
 }
 
@@ -379,7 +379,7 @@ router.post('/notify', async (req: Request, res: Response) => {
         if (!pool) continue;
         try {
           const [cRows] = await pool.execute(`SELECT id FROM orders WHERE order_no = ? LIMIT 1`, [outTradeNo]);
-          if (cRows && (Array.isArray(cRows) ? cRows.length > 0 : true)) {
+          if (cRows && Array.isArray(cRows) && cRows.length > 0) {
             opPool = pool;
             attachOperatorId = row.operator_id;
             break;
@@ -395,11 +395,11 @@ router.post('/notify', async (req: Request, res: Response) => {
     console.log('[WxPay] 支付回调:', outTradeNo, 'state:', tradeState, 'amount:', transaction.amount?.total);
 
     // 3. 查询订单（手动 pool，无 auth）
-    const [orderRow] = await opPool.execute(
+    const [orderRowArr] = await opPool.execute(
       `SELECT id, status, amount_cents as amount, discount_cents, points_deduction_cents, user_id, operator_id FROM orders WHERE order_no = ?`,
       [outTradeNo]
     );
-    const order = orderRow as any;
+    const order = (Array.isArray(orderRowArr) && orderRowArr.length > 0 ? orderRowArr[0] : null) as any;
 
     if (!order) {
       console.error('[WxPay] 回调订单不存在:', outTradeNo);
@@ -432,11 +432,11 @@ router.post('/notify', async (req: Request, res: Response) => {
       );
 
       // 记录支付流水到 payments 表（主流水表）—— 幂等：先查后插
-      const [existingPmt] = await opPool.execute(
+      const [existingPmtArr] = await opPool.execute(
         `SELECT id FROM payments WHERE order_id = ? LIMIT 1`,
         [order.id]
       );
-      if (!existingPmt || (Array.isArray(existingPmt) && existingPmt.length === 0)) {
+      if (!existingPmtArr || (Array.isArray(existingPmtArr) && existingPmtArr.length === 0)) {
         try {
           await opPool.execute(
             `INSERT INTO payments (id, order_id, operator_id, user_id, transaction_id, amount_cents, channel, status, pay_time, created_at)
@@ -459,11 +459,11 @@ router.post('/notify', async (req: Request, res: Response) => {
 
       // P0-14: 幂等创建结算记录（运营商库）
       try {
-        const [stlRows] = await opPool.execute(
+        const [stlRowArr] = await opPool.execute(
           `SELECT id FROM settlements WHERE order_id = ? LIMIT 1`,
           [order.id]
         );
-        if (!stlRows || (Array.isArray(stlRows) && stlRows.length === 0)) {
+        if (!stlRowArr || (Array.isArray(stlRowArr) && stlRowArr.length === 0)) {
           await opPool.execute(
             `INSERT INTO settlements (id, order_id, amount_cents, commission_cents, operator_id, status, created_at)
              VALUES (?, ?, ?, 0, ?, 'pending', NOW())`,
@@ -494,13 +494,13 @@ router.post('/notify', async (req: Request, res: Response) => {
 
       // ===== 支付成功后执行 side effects =====
       try {
-        const [orderDetailRows] = await opPool.execute(
+        const [orderDetailRowArr] = await opPool.execute(
           `SELECT o.user_id, o.package_id, rp.race_count
            FROM orders o JOIN race_packages rp ON o.package_id = rp.id
            WHERE o.id = ?`,
           [order.id]
         );
-        const orderDetail = (orderDetailRows as any[])?.[0];
+        const orderDetail = (Array.isArray(orderDetailRowArr) && orderDetailRowArr.length > 0 ? orderDetailRowArr[0] : null) as any;
         if (orderDetail) {
           const { user_id: uid, race_count: rc } = orderDetail;
 
