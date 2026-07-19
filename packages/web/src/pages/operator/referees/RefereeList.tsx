@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Card, Table, Button, Space, Tag, Modal, Select, Popconfirm, Input,
-  message, Descriptions, Badge,
+  message, Descriptions, Badge, Form,
 } from 'antd';
 import {
   CheckOutlined, CloseOutlined, EyeOutlined, KeyOutlined, ReloadOutlined,
-  SwapOutlined, SearchOutlined, PlusOutlined, CopyOutlined, DownloadOutlined, QrcodeOutlined,
+  SwapOutlined, SearchOutlined, PlusOutlined,
 } from '@ant-design/icons';
 import AccountInfoModal from '../../../components/AccountInfoModal';
 import type { ColumnsType } from 'antd/es/table';
@@ -33,32 +33,18 @@ interface RefereeItem {
   operator_id?: string;
 }
 
-interface InviteItem {
-  id: string;
-  operator_id: string;
-  phone: string | null;
-  venue_id: string | null;
-  token: string;
-  note: string | null;
-  status: string;
-  openid: string | null;
-  expires_at: string;
-  created_at: string;
-  invite_url: string;
-  qrcode_url: string;
-}
-
 interface VenueOption {
   id: string;
   name: string;
 }
 
-// 从 localStorage 获取当前用户角色
+// 从 localStorage 获取当前用户角色和运营商ID
 const operatorUserInfo = (() => {
   try { return JSON.parse(localStorage.getItem('operator_user_info') || '{}'); } catch { return {}; }
 })();
 const operatorRoleId: string = operatorUserInfo.role_id || '';
 const operatorPermissions: string[] = operatorUserInfo.permissions || [];
+const currentOperatorId: string = operatorUserInfo.operator_id || '';
 const isOperatorManager = operatorRoleId === 'op_super_admin' || operatorPermissions.includes('*');
 
 export default function RefereeList() {
@@ -72,16 +58,11 @@ export default function RefereeList() {
   const [bindVenueId, setBindVenueId] = useState<string>('');
   const [searchName, setSearchName] = useState('');
 
-  // 邀请裁判 — 弹窗展示二维码
-  const [inviteGenerating, setInviteGenerating] = useState(false);
-  const [inviteModalOpen, setInviteModalOpen] = useState(false);
-  const [inviteResult, setInviteResult] = useState<{ token: string; invite_url: string; qrcode_url: string; expires_at: string } | null>(null);
-  const [copied, setCopied] = useState(false);
+  // 新建裁判
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
+  const [createForm] = Form.useForm();
   const [accountInfo, setAccountInfo] = useState<{ account: string; password: string } | null>(null);
-
-  // 邀请记录
-  const [inviteList, setInviteList] = useState<InviteItem[]>([]);
-  const [inviteLoading, setInviteLoading] = useState(false);
 
   const fetchList = useCallback(async () => {
     setLoading(true);
@@ -91,14 +72,6 @@ export default function RefereeList() {
     } catch { setList([]); } finally { setLoading(false); }
   }, [searchName]);
 
-  const fetchInviteList = useCallback(async () => {
-    setInviteLoading(true);
-    try {
-      const data: any = await api.get('/referee/invitations', { params: { pageSize: 50 } });
-      setInviteList(data?.list ?? []);
-    } catch { setInviteList([]); } finally { setInviteLoading(false); }
-  }, []);
-
   const fetchVenues = useCallback(async () => {
     try {
       const data: any = await api.get('/venues', { params: { pageSize: 1000 } });
@@ -107,36 +80,31 @@ export default function RefereeList() {
     } catch { /* ignore */ }
   }, []);
 
-  useEffect(() => { fetchList(); fetchVenues(); fetchInviteList(); }, [fetchList, fetchVenues, fetchInviteList]);
+  useEffect(() => { fetchList(); fetchVenues(); }, [fetchList, fetchVenues]);
 
-  const handleGenerateInvite = async () => {
-    setInviteGenerating(true);
+  const handleCreateReferee = async () => {
     try {
-      const data: any = await api.post('/referee/invite', {});
-      setInviteResult(data);
-      setInviteModalOpen(true);
-      message.success('邀请生成成功');
-      fetchInviteList();
+      const values = await createForm.validateFields();
+      setCreateLoading(true);
+      const data: any = await api.post('/referees/register', {
+        phone: values.phone,
+        name: values.name,
+        operator_id: currentOperatorId,
+      });
+      message.success('裁判创建成功');
+      setCreateOpen(false);
+      createForm.resetFields();
+      setAccountInfo({ account: data.phone, password: data.password });
+      fetchList();
     } catch (err: any) {
-      message.error(err?.response?.data?.message || '生成邀请失败');
-    } finally { setInviteGenerating(false); }
-  };
-
-  const handleCopyLink = async (url: string) => {
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true); message.success('邀请链接已复制');
-      setTimeout(() => setCopied(false), 3000);
-    } catch { message.error('复制失败，请手动复制'); }
-  };
-
-  const handleDownloadQR = (qrcodeUrl: string) => {
-    if (!qrcodeUrl) { message.warning('暂无二维码图片'); return; }
-    const a = document.createElement('a');
-    a.href = qrcodeUrl;
-    a.download = `referee-invite-qrcode-${Date.now()}.png`;
-    a.target = '_blank';
-    a.click();
+      if (err?.response?.data?.message) {
+        message.error(err.response.data.message);
+      } else if (err?.errorFields) {
+        // 表单校验错误，不额外提示
+      } else {
+        message.error('创建失败');
+      }
+    } finally { setCreateLoading(false); }
   };
 
   const handleBindVenue = (record: RefereeItem) => { setBindTarget(record); setBindVenueId(record.venue_id || ''); setBindVenueOpen(true); };
@@ -191,32 +159,6 @@ export default function RefereeList() {
     )},
   ];
 
-  const inviteColumns: ColumnsType<InviteItem> = [
-    {
-      title: '二维码', dataIndex: 'qrcode_url', key: 'qrcode_url', width: 80, render: (url: string, record: InviteItem) => (
-        url && record.status === 'active' ? (
-          <img src={url} alt="邀请二维码" style={{ width: 48, height: 48, borderRadius: 4, cursor: 'pointer' }}
-            onClick={() => { setInviteResult({ token: record.token, invite_url: record.invite_url, qrcode_url: url, expires_at: record.expires_at }); setInviteModalOpen(true); }} />
-        ) : <span style={{ color: '#ccc', fontSize: 12 }}>-</span>
-      ),
-    },
-    { title: '邀请链接', dataIndex: 'invite_url', key: 'invite_url', width: 240, render: (url: string) => (
-      <Space>
-        <span style={{ fontSize: 12, color: '#666', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block' }}>{url}</span>
-        <Button type="link" size="small" icon={<CopyOutlined />} onClick={() => handleCopyLink(url)}>复制</Button>
-      </Space>
-    )},
-    { title: '状态', dataIndex: 'status', key: 'status', width: 100, render: (s: string) => {
-      if (s === 'active') return <Tag color="processing">有效</Tag>;
-      if (s === 'used') return <Tag color="default">已使用</Tag>;
-      if (s === 'expired') return <Tag color="error">已过期</Tag>;
-      return <Tag>{s}</Tag>;
-    }},
-    { title: '生成时间', dataIndex: 'created_at', key: 'created_at', width: 180, render: (v: string) => v ? new Date(v).toLocaleString('zh-CN') : '-' },
-    { title: '过期时间', dataIndex: 'expires_at', key: 'expires_at', width: 180, render: (v: string) => v ? new Date(v).toLocaleString('zh-CN') : '-' },
-    { title: '备注', dataIndex: 'note', key: 'note', width: 150, render: (v: string) => v || '-' },
-  ];
-
   return (
     <>
       <Card
@@ -224,17 +166,12 @@ export default function RefereeList() {
         extra={
           <Space>
             <Input placeholder="搜索裁判姓名" prefix={<SearchOutlined />} value={searchName} onChange={(e) => setSearchName(e.target.value)} onPressEnter={() => fetchList()} style={{ width: 200 }} allowClear />
-            <Button type="primary" icon={<PlusOutlined />} loading={inviteGenerating} onClick={handleGenerateInvite}>邀请裁判</Button>
-            <Button icon={<ReloadOutlined />} onClick={() => { fetchList(); fetchInviteList(); }}>刷新</Button>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>新建裁判</Button>
+            <Button icon={<ReloadOutlined />} onClick={() => fetchList()}>刷新</Button>
           </Space>
         }
       >
         <Table columns={columns} dataSource={list} rowKey="id" loading={loading} scroll={{ x: 1000 }} pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t: number) => `共 ${t} 名裁判` }} />
-
-        <div style={{ marginTop: 32 }}>
-          <h4 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 600 }}>邀请记录</h4>
-          <Table columns={inviteColumns} dataSource={inviteList} rowKey="id" loading={inviteLoading} scroll={{ x: 900 }} pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t: number) => `共 ${t} 条邀请记录` }} />
-        </div>
       </Card>
 
       <Modal title="裁判详情" open={detailOpen} onCancel={() => setDetailOpen(false)} footer={null} width={560}>
@@ -259,88 +196,27 @@ export default function RefereeList() {
         </div>
       </Modal>
 
-      {/* 邀请二维码弹窗 */}
+      {/* 新建裁判 Modal */}
       <Modal
-        title="裁判注册邀请"
-        open={inviteModalOpen}
-        onCancel={() => { setInviteModalOpen(false); setCopied(false); }}
-        footer={[
-          <Button key="copy" icon={<CopyOutlined />} onClick={() => inviteResult && handleCopyLink(inviteResult.invite_url)}>
-            {copied ? '已复制' : '复制链接'}
-          </Button>,
-          <Button key="download" icon={<DownloadOutlined />} type="primary" ghost onClick={() => inviteResult && handleDownloadQR(inviteResult.qrcode_url)}>
-            下载二维码
-          </Button>,
-          <Button key="close" type="primary" onClick={() => { setInviteModalOpen(false); setCopied(false); }}>
-            关闭
-          </Button>,
-        ]}
-        width={420}
+        title="新建裁判"
+        open={createOpen}
+        onOk={handleCreateReferee}
+        onCancel={() => { setCreateOpen(false); createForm.resetFields(); }}
+        confirmLoading={createLoading}
+        destroyOnClose
+        width={520}
       >
-        {inviteResult && (
-          <div style={{ textAlign: 'center', padding: '16px 0' }}>
-            {/* 二维码图片 */}
-            {inviteResult.qrcode_url ? (
-              <div style={{
-                display: 'inline-block',
-                padding: 12,
-                background: '#fff',
-                borderRadius: 8,
-                boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
-                marginBottom: 16,
-              }}>
-                <img
-                  src={inviteResult.qrcode_url}
-                  alt="裁判注册二维码"
-                  style={{ width: 200, height: 200, display: 'block' }}
-                />
-              </div>
-            ) : (
-              <div style={{
-                width: 200, height: 200,
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: '#f5f5f5',
-                borderRadius: 8,
-                marginBottom: 16,
-                flexDirection: 'column',
-              }}>
-                <QrcodeOutlined style={{ fontSize: 48, color: '#bbb' }} />
-                <span style={{ color: '#999', fontSize: 12, marginTop: 8 }}>二维码生成失败</span>
-              </div>
-            )}
-
-            {/* 提示文字 */}
-            <div style={{ color: '#666', fontSize: 14, marginBottom: 8 }}>
-              请裁判使用<strong style={{ color: '#07c160' }}>微信扫一扫</strong>识别二维码
-            </div>
-            <div style={{ color: '#999', fontSize: 12, marginBottom: 16 }}>
-              扫码后将引导裁判完成注册，自动关联到您的运营商
-            </div>
-
-            {/* 有效期 */}
-            <Tag color="orange" style={{ fontSize: 12, padding: '2px 12px', marginBottom: 12 }}>
-              有效期至 {inviteResult.expires_at ? new Date(inviteResult.expires_at).toLocaleString('zh-CN') : '-'}
-            </Tag>
-
-            {/* 链接区域 */}
-            <div style={{
-              background: '#fafafa',
-              border: '1px solid #f0f0f0',
-              borderRadius: 6,
-              padding: '8px 12px',
-              wordBreak: 'break-all',
-              fontSize: 11,
-              color: '#999',
-              textAlign: 'left',
-              lineHeight: 1.5,
-            }}>
-              <div style={{ color: '#666', fontWeight: 500, marginBottom: 2 }}>备用链接：</div>
-              {inviteResult.invite_url}
-            </div>
-          </div>
-        )}
+        <Form form={createForm} layout="vertical" style={{ marginTop: 16 }}>
+          <Form.Item label="说明" style={{ marginBottom: 16 }}>
+            <span style={{ color: '#888', fontSize: 13 }}>创建后系统将自动生成随机密码，请妥善保存并告知裁判。</span>
+          </Form.Item>
+          <Form.Item name="phone" label="手机号" rules={[{ required: true, message: '请输入手机号' }, { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号码' }]}>
+            <Input placeholder="请用手机号码注册" />
+          </Form.Item>
+          <Form.Item name="name" label="裁判姓名" rules={[{ required: true, message: '请输入裁判姓名' }]}>
+            <Input placeholder="请输入裁判姓名" />
+          </Form.Item>
+        </Form>
       </Modal>
 
       <AccountInfoModal open={!!accountInfo} account={accountInfo?.account || ''} password={accountInfo?.password || ''} role="referee" onClose={() => setAccountInfo(null)} />
