@@ -694,8 +694,8 @@ router.post('/match/start', authMiddleware, async (req: Request, res: Response) 
     // 从 paused_elapsed_ms 继续计时
     const adjustStart = now - (row.paused_elapsed_ms || 0);
     await executeOp(req,
-      `UPDATE race_queues SET status = 'racing', start_time_ms = $2, paused_elapsed_ms = 0 WHERE id = $1`,
-      [racerId, adjustStart]
+      `UPDATE race_queues SET status = 'racing', start_time_ms = $1, paused_elapsed_ms = 0 WHERE id = $2`,
+      [adjustStart, racerId]
     );
 
     await broadcastAfterUpdate(req);
@@ -720,8 +720,8 @@ router.post('/match/pause', authMiddleware, async (req: Request, res: Response) 
 
     const pausedMs = elapsed != null ? elapsed : 0;
     await executeOp(req,
-      `UPDATE race_queues SET status = 'paused', paused_elapsed_ms = $2 WHERE id = $1 AND status = 'racing'`,
-      [racerId, pausedMs]
+      `UPDATE race_queues SET status = 'paused', paused_elapsed_ms = $1 WHERE id = $2 AND status = 'racing'`,
+      [pausedMs, racerId]
     );
 
     return res.json({ code: 0, message: '已暂停', data: null });
@@ -752,8 +752,8 @@ router.post('/match/resume', authMiddleware, async (req: Request, res: Response)
 
     const adjustStart = Date.now() - (row.paused_elapsed_ms || 0);
     await executeOp(req,
-      `UPDATE race_queues SET status = 'racing', start_time_ms = $2, paused_elapsed_ms = 0 WHERE id = $1`,
-      [racerId, adjustStart]
+      `UPDATE race_queues SET status = 'racing', start_time_ms = $1, paused_elapsed_ms = 0 WHERE id = $2`,
+      [adjustStart, racerId]
     );
 
     await broadcastAfterUpdate(req);
@@ -798,10 +798,10 @@ router.post('/match/end', authMiddleware, async (req: Request, res: Response) =>
     const newRemaining = Math.max(0, row.remaining_races - 1);
 
     await executeOp(req,
-      `UPDATE race_queues SET status = 'finished', finish_time_ms = $2, finish_status = $3,
-       remaining_races = $4, start_time_ms = NULL, paused_elapsed_ms = 0
-       WHERE id = $1`,
-      [racerId, elapsed, finishStatus, newRemaining]
+      `UPDATE race_queues SET status = 'finished', finish_time_ms = $1, finish_status = $2,
+       remaining_races = $3, start_time_ms = NULL, paused_elapsed_ms = 0
+       WHERE id = $4`,
+      [elapsed, finishStatus, newRemaining, racerId]
     );
 
     // 同步写入 race_records（成绩记录）

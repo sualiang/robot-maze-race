@@ -166,22 +166,15 @@ function normalizeValue(v: any): any {
 }
 function expandParams(text: string, params: any[]): any[] {
   if (!params || params.length === 0) return [];
-  const counts: number[] = []; let m;
+  // 按 SQL 中 $digit 的出现顺序重排参数，每个 $digit 对应 params[digit-1]
+  const r: any[] = [];
   const re = /\$(\d+)/g;
+  let m;
   while ((m = re.exec(text)) !== null) {
     const idx = parseInt(m[1], 10) - 1;
-    counts[idx] = (counts[idx] || 0) + 1;
+    r.push(idx < params.length ? normalizeValue(params[idx]) : undefined);
   }
-  if (counts.length > 0) {
-    const r: any[] = [];
-    for (let i = 0; i < counts.length; i++) {
-      const c = counts[i] || 0;
-      const v = i < params.length ? normalizeValue(params[i]) : undefined;
-      for (let j = 0; j < c; j++) r.push(v);
-    }
-    return r;
-  }
-  return params.map(normalizeValue);
+  return r;
 }
 
 async function doQuery(pool: mysql.Pool, text: string, params?: any[]): Promise<any[]> {
