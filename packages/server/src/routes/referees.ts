@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { Pool as MysqlPool } from 'mysql2/promise';
 import { broadcastToScreen, validateActivationCode } from '../ws/handler';
 import { WebSocket } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
@@ -1425,6 +1426,14 @@ router.post('/attendance/check-out', authMiddleware, async (req: Request, res: R
  * 比赛专用直接签到 — 不依赖激活码/Redis
  * 裁判已登录 + venueId 匹配即可签到
  */
+function getOpPoolFromJwt(req: Request): MysqlPool | null {
+  const opId = (req.user as any)?.operatorId;
+  if (!opId) return null;
+  try {
+    return getOperatorPool('op_' + opId);
+  } catch { return null; }
+}
+
 router.post('/attendance/check-in-direct', authMiddleware, async (req: Request, res: Response) => {
   try {
     const { venueId } = req.body;
@@ -1435,15 +1444,15 @@ router.post('/attendance/check-in-direct', authMiddleware, async (req: Request, 
     const userId = req.user!.userId;
     if (!userId) return res.status(401).json({ code: 401, message: '未登录', data: null });
 
-    // 1. 查 referee（authMiddleware 放到了 user_id；referee-bind 放的是 referee.id）
-    let refRow = await queryOpOne<{ id: string; venue_id: string | null }>(req,
-      'SELECT id, venue_id FROM referees WHERE user_id = $1', [userId]
-    );
-    if (!refRow) {
-      refRow = await queryOpOne<{ id: string; venue_id: string | null }>(req,
-        'SELECT id, venue_id FROM referees WHERE id = $1', [userId]
-      );
-    }
+    // 裁判接口直接用 JWT operatorId 连接，不依赖 resolveOperatorDb
+    const pool = getOpPoolFromJwt(req);
+    if (!pool) return res.status(400).json({ code: 400, message: '未找到裁判记录', data: null });
+
+    // 1. 查 referee
+    const [refRows] = await pool.execute(
+      'SELECT id, venue_id FROM referees WHERE user_id = ? OR id = ?', [userId, userId]
+    ) as any[];
+    const refRow: { id: string; venue_id: string | null } | null = (refRows as any[])?.[0] || null;
     if (!refRow) {
       return res.status(400).json({ code: 400, message: '未找到裁判记录', data: null });
     }
@@ -1454,36 +1463,37 @@ router.post('/attendance/check-in-direct', authMiddleware, async (req: Request, 
     }
 
     // 3. 查 venue
-    const venue = await queryOpOne<{ id: string; name: string; address: string }>(req,
-      'SELECT id, name, COALESCE(address, \'\') as address FROM venues WHERE id = $1', [venueId]
-    );
+    const [venueRows] = await pool.execute(
+      'SELECT id, name, COALESCE(address, \'\') as address FROM venues WHERE id = ?', [venueId]
+    ) as any[];
+    const venue = (venueRows as any[])?.[0] || null;
     if (!venue) {
       return res.status(404).json({ code: 404, message: '场地不存在', data: null });
     }
 
     // 4. 查今日是否已签到且未签退
-    const existing = await queryOpOne<any>(req,
-      'SELECT id FROM attendance WHERE referee_id = $1 AND date(checkin_at) = CURDATE() AND checkout_at IS NULL LIMIT 1',
+    const [attRows] = await pool.execute(
+      'SELECT id FROM attendance WHERE referee_id = ? AND date(checkin_at) = CURDATE() AND checkout_at IS NULL LIMIT 1',
       [refRow.id]
-    );
-    if (existing) {
+    ) as any[];
+    if ((attRows as any[])?.[0]) {
       return res.status(400).json({ code: 400, message: '今日已签到，请先签退', data: null });
     }
 
     // 5. 写入签到记录
     const attendanceId = uuidv4();
-    await executeOp(req,
-      'INSERT INTO attendance (id, referee_id, user_id, venue_id, checkin_at) VALUES ($1, $2, $3, $4, NOW())',
+    await pool.execute(
+      'INSERT INTO attendance (id, referee_id, user_id, venue_id, checkin_at) VALUES (?, ?, ?, ?, NOW())',
       [attendanceId, refRow.id, userId, venue.id]
     );
-    await executeOp(req, 'UPDATE referees SET last_checkin_at = NOW() WHERE id = $1', [refRow.id]);
+    await pool.execute('UPDATE referees SET last_checkin_at = NOW() WHERE id = ?', [refRow.id]);
 
     // 6. 标记赛场已激活
     setVenueActive(true);
     cachedVenueStatus = 'open';
     cachedVenueName = venue.name;
     cachedVenueId = venue.id;
-    try { await executeOp(req, 'UPDATE venues SET status = \'open\' WHERE id = $1', [venue.id]); } catch (_) {}
+    try { await pool.execute('UPDATE venues SET status = \'open\' WHERE id = ?', [venue.id]); } catch (_) {}
 
     // 7. 广播
     broadcastToScreen({ type: 'activated', data: { venue_name: venue.name, venue_id: venue.id } });
@@ -1507,15 +1517,15 @@ router.post('/attendance/check-in-by-qr', authMiddleware, async (req: Request, r
     const userId = req.user!.userId;
     if (!userId) return res.status(401).json({ code: 401, message: '未登录', data: null });
 
+    // 裁判接口直接用 JWT operatorId 连接，不依赖 resolveOperatorDb
+    const pool = getOpPoolFromJwt(req);
+    if (!pool) return res.status(400).json({ code: 400, message: '未找到裁判记录，请先完成注册', data: null });
+
     // 1. 从 referees 表查真实 referee_id + 绑定的 venue_id
-    let refRow = await queryOpOne<{ id: string; venue_id: string | null }>(req,
-      'SELECT id, venue_id FROM referees WHERE user_id = $1', [userId]
-    );
-    if (!refRow) {
-      refRow = await queryOpOne<{ id: string; venue_id: string | null }>(req,
-        'SELECT id, venue_id FROM referees WHERE id = $1', [userId]
-      );
-    }
+    const [refRows] = await pool.execute(
+      'SELECT id, venue_id FROM referees WHERE user_id = ? OR id = ?', [userId, userId]
+    ) as any[];
+    const refRow: { id: string; venue_id: string | null } | null = (refRows as any[])?.[0] || null;
     if (!refRow) {
       return res.status(400).json({ code: 400, message: '未找到裁判记录，请先完成注册', data: null });
     }
@@ -1553,17 +1563,19 @@ router.post('/attendance/check-in-by-qr', authMiddleware, async (req: Request, r
 
     // 从 DB 查 venue 信息
     if (venueId) {
-      venue = await queryOpOne<{ id: string; name: string; address: string }>(req, 
-        'SELECT id, name, COALESCE(address, \'\') as address FROM venues WHERE id = $1',
+      const [vRows] = await pool.execute(
+        'SELECT id, name, COALESCE(address, \'\') as address FROM venues WHERE id = ?',
         [venueId]
-      );
+      ) as any[];
+      venue = (vRows as any[])?.[0] || null;
     }
 
     // 最终降级：取第一个场地
     if (!venue) {
-      venue = await queryOpOne<{ id: string; name: string; address: string }>(req, 
+      const [vRows] = await pool.execute(
         'SELECT id, name, COALESCE(address, \'\') as address FROM venues LIMIT 1'
-      );
+      ) as any[];
+      venue = (vRows as any[])?.[0] || null;
       if (venue) {
         usedFallback = true;
         console.log('[QR签到] 降级：使用第一个可用场地');
@@ -1580,26 +1592,24 @@ router.post('/attendance/check-in-by-qr', authMiddleware, async (req: Request, r
     }
 
     // 4. 查今日是否已签到且未签退
-    const existing = await queryOpOne<any>(req, 
-      `SELECT id FROM attendance
-       WHERE referee_id = $1 AND date(checkin_at) = CURDATE() AND checkout_at IS NULL
-       LIMIT 1`,
+    const [attRows] = await pool.execute(
+      'SELECT id FROM attendance WHERE referee_id = ? AND date(checkin_at) = CURDATE() AND checkout_at IS NULL LIMIT 1',
       [refRow.id]
-    );
-    if (existing) {
+    ) as any[];
+    if ((attRows as any[])?.[0]) {
       return res.status(400).json({ code: 400, message: '今日已签到，请先签退', data: null });
     }
 
     // 5. 写入 attendance 签到记录
     const attendanceId = uuidv4();
     const now = new Date().toLocaleString('zh-CN');
-    await executeOp(req, 
-      'INSERT INTO attendance (id, referee_id, user_id, venue_id, checkin_at) VALUES ($1, $2, $3, $4, NOW())',
+    await pool.execute(
+      'INSERT INTO attendance (id, referee_id, user_id, venue_id, checkin_at) VALUES (?, ?, ?, ?, NOW())',
       [attendanceId, refRow.id, userId, venue.id]
     );
 
     // 6. 更新 referees 表最后签到时间
-    await executeOp(req, 'UPDATE referees SET last_checkin_at = NOW() WHERE id = $1', [refRow.id]);
+    await pool.execute('UPDATE referees SET last_checkin_at = NOW() WHERE id = ?', [refRow.id]);
 
     // 7. 标记赛场已激活
     setVenueActive(true);
@@ -1608,9 +1618,9 @@ router.post('/attendance/check-in-by-qr', authMiddleware, async (req: Request, r
     cachedVenueId = venue.id;
 
     // 回写 venues 表
-    try { await executeOp(req, 'UPDATE venues SET status = \'open\' WHERE id = $1', [venue.id]); } catch (_) {}
+    try { await pool.execute('UPDATE venues SET status = \'open\' WHERE id = ?', [venue.id]); } catch (_) {}
 
-    // 8. 广播大屏激活（通过 WebSocket broadcast 而非旧的内存 ws 引用）
+    // 8. 广播大屏激活
     broadcastToScreen({
       type: 'activated',
       data: { venue_name: venue.name, venue_id: venue.id },
