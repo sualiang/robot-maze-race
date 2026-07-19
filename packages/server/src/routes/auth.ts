@@ -672,20 +672,28 @@ router.post('/login', async (req: Request, res: Response) => {
         `SELECT db_name FROM operators_registry WHERE db_name LIKE 'op_%'`,
         []
       );
+      console.log('[Login] operators_registry op_* count:', regRows?.length);
       for (const reg of regRows) {
         try {
           const pool = getOperatorPool(reg.db_name);
+          console.log('[Login] trying pool:', reg.db_name);
           const [rows] = await pool.execute(
             'SELECT r.id, r.phone, r.name, r.password, r.is_first_login, r.operator_id FROM referees r WHERE r.phone = ? LIMIT 1',
             [phone]
           ) as any[];
+          console.log('[Login] pool result rows:', (rows as any[])?.length);
           if ((rows as any[])?.[0]) {
             refereeInfo = { ...rows[0], operatorId: rows[0].operator_id, isFirstLogin: rows[0].is_first_login === 1 };
+            console.log('[Login] found referee in', reg.db_name, ':', refereeInfo.name);
             break;
           }
-        } catch { /* skip inaccessible dbs */ }
+        } catch (e: any) { 
+          console.log('[Login] pool error:', reg.db_name, e.message); 
+        }
       }
-    } catch { /* operators_registry table may not exist */ }
+    } catch (e: any) { 
+      console.log('[Login] operators_registry query error:', e.message); 
+    }
 
     if (refereeInfo) {
       // 裁判手机号+密码登录
