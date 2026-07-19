@@ -100,10 +100,10 @@
     <view class="spinner"></view>
   </view>
 
-  <!-- ===== 底部兜底：邀请助力 ===== -->
-  <view wx:if="{{!loading && !empty}}" class="invite-footer" bindtap="onInviteFriend">
+  <!-- ===== 底部兜底：邀请助力（已隐藏） ===== -->
+  <!-- view wx:if="{{!loading && !empty}}" class="invite-footer" bindtap="onInviteFriend">
     <text class="invite-icon">🎁</text>
     <text class="invite-text">不想付费？邀请好友助力免费拿 →</text>
-  </view>
+  </view -->
 
 </view>
