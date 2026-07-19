@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { Pool as MysqlPool } from 'mysql2/promise';
-import { broadcastToScreen, validateActivationCode } from '../ws/handler';
+import { broadcastToScreen, validateActivationCode, ACTIVATION_CODE_PREFIX } from '../ws/handler';
 import { getRedis } from '../config/redis';
 import { WebSocket } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
@@ -1409,8 +1409,25 @@ router.post('/attendance/check-out', authMiddleware, async (req: Request, res: R
       [refereeId]
     );
 
-    // 签退只是裁判个人下班，不影响赛场状态
-    // 赛场状态由比赛流程（开赛/结束）独立控制
+    // 签退时：清除 Redis active_venues，广播大屏失活
+    try {
+      const redis = await getRedis();
+      if (cachedVenueId) {
+        await redis.sRem('active_venues', cachedVenueId);
+        await redis.del('active_venue:' + cachedVenueId);
+      }
+      // 清除所有激活码
+      const keys = await redis.keys(ACTIVATION_CODE_PREFIX + '*');
+      if (keys.length > 0) await redis.del(keys);
+    } catch (_) { /* ignore */ }
+
+    // 广播大屏签退
+    setVenueActive(false);
+    cachedVenueStatus = 'closed';
+    cachedVenueName = '';
+    cachedVenueId = '';
+    broadcastToScreen({ type: 'deactivated' });
+    broadcastToScreen({ type: 'screen_data', data: getCurrentScreenData() });
 
     return res.json({ code: 0, message: '签退成功', data: { checkoutAt: now } });
   } catch (error: any) {

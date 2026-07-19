@@ -10,7 +10,7 @@ const clientRooms = new Map<WebSocket, string>();
 const screenClients = new Set<WebSocket>();
 const refereeClients = new Set<WebSocket>();
 
-const ACTIVATION_CODE_PREFIX = 'activation_code:';
+export const ACTIVATION_CODE_PREFIX = 'activation_code:';
 const ACTIVATION_CODE_TTL = 60; // 秒（Redis SETEX用）
 
 export async function validateActivationCode(code: string): Promise<{ valid: boolean; venueId?: string; venueName?: string }> {
