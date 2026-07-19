@@ -570,16 +570,7 @@ export default function ScreenDisplay() {
             }}>
               {formatTime(elapsed)}
             </div>
-            {/* 底部：最新成绩标签，替换掉原来的 🏁 比赛完成 */}
-            {highlightTime && (
-              <div style={{
-                fontSize: 16, marginTop: 12,
-                color: '#ffd700',
-                fontWeight: 600,
-              }}>
-                <ClockCircleOutlined /> 🏁 最新成绩
-              </div>
-            )}
+            {/* 不显示最新成绩标签，避免遮挡 */}
             {displayData.race_status === 'waiting' && displayData.current_racer && (
               <div style={{ fontSize: 18, color: '#fbbf24', marginTop: 8 }}>
                 ⏳ 等待开赛
