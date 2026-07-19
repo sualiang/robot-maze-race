@@ -1638,7 +1638,7 @@ router.post('/attendance/check-in-by-qr', authMiddleware, async (req: Request, r
 
     // 2. 确定签到场地（优先级：激活码 > body venueId > 裁判绑定的 venue_id）
     let venueId: string | null = null;
-    let venue: { id: string; name: string; address: string } | null = null;
+    let venue: { id: string; name: string; address: string; operator_id?: string } | null = null;
     let usedFallback = false;
 
     // 尝试验证激活码（Redis）
