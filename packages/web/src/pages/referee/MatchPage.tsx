@@ -18,25 +18,6 @@ interface Racer {
 
 type MatchStatus = 'idle' | 'running' | 'paused' | 'finished' | 'malfunctioned';
 
-function RaceTypeTag({ type }: { type?: string }) {
-  if (!type) return null;
-  const isFinal = type === 'final' || type === 'finals';
-  return (
-    <span style={{
-      display: 'inline-block',
-      padding: '2px 8px',
-      borderRadius: 4,
-      fontSize: 11,
-      fontWeight: 600,
-      background: isFinal ? 'linear-gradient(135deg, #ffd700, #ffaa00)' : 'linear-gradient(135deg, #1890ff, #096dd9)',
-      color: isFinal ? '#8b4513' : '#fff',
-      marginLeft: 6,
-    }}>
-      {isFinal ? '🏆 决赛' : '普通'}
-    </span>
-  );
-}
-
 function padZero(n: number): string { return n < 10 ? '0' + n : String(n); }
 
 function formatFullTime(ms: number): string {
@@ -354,7 +335,7 @@ export default function MatchPage() {
           <div className="referee-racer-info">
             <div className="referee-racer-avatar">{currentRacer.avatarUrl || '🤖'}</div>
             <div className="referee-racer-detail">
-              <div className="text-one-line">{currentRacer.nickname || currentRacer.name}<RaceTypeTag type={currentRacer.race_type} /></div>
+              <div className="text-one-line">{currentRacer.nickname || currentRacer.name}</div>
               <div className="referee-racer-remaining">剩<strong>{currentRacer.remainingRaces}</strong>次</div>
             </div>
           </div>
@@ -407,7 +388,7 @@ export default function MatchPage() {
           <div key={item.id} className="referee-card referee-queue-item" data-active={item.isCurrent} onClick={() => { if (!item.isCurrent && status === 'idle') selectRacer(item.id); }}>
             <div className="referee-queue-index" data-current={item.isCurrent}>{item.isCurrent ? '★' : index + 1}</div>
             <div className="referee-queue-avatar" data-current={item.isCurrent}>{item.avatarUrl || '🤖'}</div>
-            <div className="referee-queue-name"><span className="text-one-line">{item.nickname || item.name || '选手' + item.id}<RaceTypeTag type={item.race_type} /></span><span className="referee-queue-remaining">剩<strong>{item.remainingRaces ?? '?'}</strong>次</span></div>
+            <div className="referee-queue-name"><span className="text-one-line">{item.nickname || item.name || '选手' + item.id}</span><span className="referee-queue-remaining">剩<strong>{item.remainingRaces ?? '?'}</strong>次</span></div>
             {item.isCurrent && <div className="referee-queue-badge"><span className="referee-queue-dot">●</span><span>进行中</span></div>}
             {!item.isCurrent && status === 'idle' && checkedIn === true && <button className="referee-btn referee-btn-primary referee-btn-sm" style={{ marginLeft: 8, flexShrink: 0 }} onClick={(e) => { e.stopPropagation(); selectRacer(item.id); }}>上场</button>}
           </div>
