@@ -51,7 +51,7 @@ export default function MatchPage() {
   const [pageLoading, setPageLoading] = useState(true);
   const [wsConnected, setWsConnected] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  const [maxTimeout] = useState(60);
+  const [maxTimeout] = useState(300);
   const [checkedIn, setCheckedIn] = useState<boolean | null>(null);
   const [checkingStatus, setCheckingStatus] = useState(true);
   const { hasContext, loading: contextLoading } = useOperatorContext();
@@ -247,7 +247,7 @@ export default function MatchPage() {
       setElapsed(0);
       setPausedElapsed(0);
       setStatus('malfunctioned');
-      setErrorMsg('🤖 故障已登记，**' + racerName + '** 请重新开始');
+      setErrorMsg('故障已登记，**' + racerName + '** 请重新开始');
       loadQueue();
     }).catch(() => { setErrorMsg('网络异常，操作已本地缓存'); }).finally(() => setActionLoading(false));
   };
@@ -375,10 +375,10 @@ export default function MatchPage() {
           {status === 'running' && <div className="referee-btn-row"><button className="referee-btn referee-btn-danger" onClick={endRace}>⏹ 结束比赛</button></div>}
           {status === 'paused' && <div className="referee-btn-row"><button className="referee-btn referee-btn-success" onClick={startRace} disabled={actionLoading}>▶ 继续比赛</button><button className="referee-btn referee-btn-danger" onClick={endRace}>⏹ 结束比赛</button></div>}
         </div>
-        {status === 'running' && maxTimeout > 0 && <div className="referee-timeout-hint">⏰ 超时限制 {maxTimeout}秒 · 超时将自动记录</div>}
+        {status === 'running' && maxTimeout > 0 && <div className="referee-timeout-hint">⏰ 超时限制5分钟 · 超时将自动记录</div>}
       </div>
       {errorMsg && <div className="referee-error-msg" dangerouslySetInnerHTML={{ __html: errorMsg.replace(/\*\*(.+?)\*\*/g, '<strong style="color:#27ae60">$1</strong>') }} />}
-      {checkedIn === true && currentRacer && (status === 'running' || status === 'paused') && <div className="referee-card referee-card-compact" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16, padding: 16 }}><button className="referee-btn referee-btn-outline" onClick={handleMalfunction} disabled={actionLoading}>🤖 机器狗故障 · 保留次数重新排队</button><button className="referee-btn referee-btn-ghost referee-btn-sm" onClick={handleForfeit} disabled={actionLoading}>🚫 选手弃赛</button></div>}
+      {checkedIn === true && currentRacer && (status === 'running' || status === 'paused') && <div className="referee-card referee-card-compact" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16, padding: 16 }}><button className="referee-btn referee-btn-outline" onClick={handleMalfunction} disabled={actionLoading}>机器狗故障 · 保留次数重新排队</button><button className="referee-btn referee-btn-danger-outline" onClick={handleForfeit} disabled={actionLoading}>🚫 弃赛</button></div>}
       {checkedIn === true && currentRacer && status === 'finished' && <div className="referee-card referee-card-compact" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16, padding: 16 }}><button className="referee-btn referee-btn-outline" style={{ borderColor: '#e74c3c', color: '#e74c3c' }} onClick={handleInvalidate} disabled={actionLoading}>❌ 标记成绩无效</button></div>}
       {checkedIn === true && currentRacer && (status === 'called' || status === 'waiting') && <div className="referee-card referee-card-compact" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16, padding: 16 }}><button className="referee-btn referee-btn-ghost referee-btn-sm" onClick={handleSkip} disabled={actionLoading}>⏭ 跳过此选手</button></div>}
       {checkedIn === true && <><div className="referee-section">
