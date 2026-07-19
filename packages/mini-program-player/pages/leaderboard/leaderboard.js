@@ -33,6 +33,10 @@ Page({
     // 赛季配置（从 /rank/config 加载）
     config: { quarter: null, year: null },
 
+    // 临时：大屏实时排行榜
+    liveLeaderboard: [],
+    liveDate: '',
+
     // 我的排名
     myRanking: { rank: '-', region: '--', bestScore: '--', clubName: '--', totalRaces: 0, beatPercent: 0 },
 
@@ -57,10 +61,47 @@ Page({
     var userInfo = wx.getStorageSync('player_user');
     if (userInfo && userInfo.id) that.setData({ myUserId: userInfo.id });
     that._loadConfig().finally(function () { that.setData({ pageLoading: false }); });
+    that._fetchLiveLeaderboard();
   },
 
   onShow: function () {
     if (!this.data.pageLoading) this._refreshCurrentTab();
+    this._fetchLiveLeaderboard();
+  },
+
+  /**
+   * 拉取大屏实时排行榜（临时覆盖层）
+   */
+  _fetchLiveLeaderboard: function () {
+    var that = this;
+    request.silentGet('/player/leaderboard/live').then(function (data) {
+      var d = data.data || data;
+      var list = (d.leaderboard || []).map(function (item) {
+        return {
+          rank: item.rank,
+          nickname: item.nickname || '选手',
+          avatar_url: item.avatar_url || '',
+          finish_time_ms: item.finish_time_ms || 0,
+          displayTime: that._formatRaceTime(item.finish_time_ms),
+          status: item.status || 'finished'
+        };
+      });
+      that.setData({
+        liveLeaderboard: list,
+        liveDate: d.date || ''
+      });
+    }).catch(function () {
+      // 静默失败，保留旧数据
+    });
+  },
+
+  _formatRaceTime: function (ms) {
+    if (!ms || ms <= 0) return '--:--.--';
+    var totalSec = Math.floor(ms / 1000);
+    var min = Math.floor(totalSec / 60);
+    var sec = totalSec % 60;
+    var cs = Math.floor((ms % 1000) / 10);
+    return (min < 10 ? '0' + min : '' + min) + ':' + (sec < 10 ? '0' + sec : '' + sec) + '.' + (cs < 10 ? '0' + cs : '' + cs);
   },
 
   // ===== 加载赛季配置 =====

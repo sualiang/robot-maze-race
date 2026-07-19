@@ -114,6 +114,77 @@ router.get('/packages', authMiddleware, async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /player/leaderboard/live
+ * 大屏实时排行榜数据（小程序排行Tab用）
+ * 从 operator 库 race_queues 查询，与大屏完全一致
+ */
+router.get('/leaderboard/live', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+
+    // 获取用户最近签到的 venue_id
+    const checkin = await queryOpOne<{ venue_id: string }>(req,
+      `SELECT venue_id FROM checkins WHERE user_id = $1 AND status = 'queued'
+       ORDER BY created_at DESC LIMIT 1`,
+      [userId]
+    );
+
+    if (!checkin?.venue_id) {
+      return res.json({ code: 0, data: { leaderboard: [], venueName: '', date: '' } });
+    }
+
+    const venueId = checkin.venue_id;
+
+    // 查 venue 名称
+    const venue = await queryOpOne<{ name: string }>(req,
+      `SELECT name FROM venues WHERE id = $1`,
+      [venueId]
+    );
+
+    // 排行榜 top 10 —— 与大屏 pushCurrentScreenData 完全一致
+    const leaderRows = await queryOp<any>(req,
+      `SELECT rq.* FROM race_queues rq WHERE rq.venue_id = $1 AND rq.status = 'finished' AND rq.finish_status != 'invalid' ORDER BY rq.finish_time_ms ASC LIMIT 10`,
+      [venueId]
+    );
+
+    // 查 users（从 common 库）
+    const allUserIds = leaderRows.map((r: any) => r.user_id).filter(Boolean);
+    const userMap = new Map<string, { nickname: string; avatar_url: string }>();
+    if (allUserIds.length > 0) {
+      const placeholders = allUserIds.map((_: any, i: number) => '$' + (i + 1)).join(',');
+      const userRows = await query<any[]>(
+        `SELECT id, nickname, avatar_url FROM users WHERE id IN (${placeholders})`,
+        allUserIds
+      );
+      for (const u of (userRows || [])) {
+        userMap.set(u.id, { nickname: u.nickname, avatar_url: u.avatar_url });
+      }
+    }
+
+    const now = new Date();
+    const dateStr = now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日';
+
+    res.json({
+      code: 0,
+      data: {
+        leaderboard: leaderRows.map((r: any, i: number) => ({
+          rank: i + 1,
+          nickname: (userMap.get(r.user_id)?.nickname || '选手'),
+          avatar_url: userMap.get(r.user_id)?.avatar_url || '',
+          finish_time_ms: r.finish_time_ms || 0,
+          status: r.finish_status || 'finished',
+        })),
+        venueName: venue?.name || '',
+        date: dateStr,
+      }
+    });
+  } catch (e: any) {
+    console.error('[Player] leaderboard/live error:', e.message);
+    res.json({ code: 0, data: { leaderboard: [], venueName: '', date: '' } });
+  }
+});
+
 // 排行榜
 router.get('/leaderboard', (req: Request, res: Response) => {
   res.json({
