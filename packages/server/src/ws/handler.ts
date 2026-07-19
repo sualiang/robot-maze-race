@@ -234,5 +234,5 @@ export function broadcastToScreen(data: any) {
       refereeCount++;
     }
   });
-  console.log(`[WS] 已广播 ${isRaw ? data.event : 'screen_data'} 给 ${screenCount} 个大屏 + ${refereeCount} 个裁判客户端`);
+  console.log(`[WS] 已广播 ${isRaw ? (data.event || data.type) : 'screen_data'} 给 ${screenCount} 个大屏 + ${refereeCount} 个裁判客户端`);
 }
