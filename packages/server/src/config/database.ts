@@ -107,10 +107,18 @@ export async function resolveOperatorDbForUserId(userId: string): Promise<string
     if (!opReg.db_name) continue;
     try {
       const pool = getOperatorPool(opReg.db_name);
-      const [rows] = await pool.execute(
-        `SELECT id FROM users WHERE id = ? LIMIT 1`,
+      // 优先查 referees 表（裁判的 user_id 不在 op_* 库的 users 表里）
+      let [rows] = await pool.execute(
+        `SELECT id FROM referees WHERE user_id = ? LIMIT 1`,
         [userId]
       );
+      if (!rows || (Array.isArray(rows) && rows.length === 0)) {
+        // 回退：查 users 表
+        [rows] = await pool.execute(
+          `SELECT id FROM users WHERE id = ? LIMIT 1`,
+          [userId]
+        );
+      }
       if (rows && (Array.isArray(rows) ? rows.length > 0 : true)) {
         userIdDbCache.set(userId, { dbName: opReg.db_name, ts: Date.now() });
         return opReg.db_name;
@@ -128,10 +136,25 @@ export async function resolveOperatorDb(req: Request): Promise<string | null> {
     || (req.merchantAdmin as any)?.operatorId;
   if (jwtOperatorId) {
     const pool = getCommonPool();
-    const [rows] = await pool.query<any[]>(
-      `SELECT db_name FROM operators_registry WHERE operator_id = ?`, [jwtOperatorId]
-    );
-    return (rows && rows.length > 0 && rows[0].db_name) ? rows[0].db_name : null;
+    try {
+      const [rows] = await pool.query<any[]>(
+        `SELECT db_name FROM operators_registry WHERE operator_id = ?`, [jwtOperatorId]
+      );
+      if (rows && rows.length > 0 && rows[0].db_name) {
+        return rows[0].db_name;
+      }
+    } catch {
+      // operators_registry 可能不存在，回退到约定命名
+    }
+    // fallback: 直接用 op_{operatorId} 约定命名
+    const guessName = 'op_' + jwtOperatorId;
+    try {
+      const opPool = getOperatorPool(guessName);
+      await opPool.execute('SELECT 1');
+      return guessName;
+    } catch {
+      return null;
+    }
   }
   // 回退：从 Redis 获取
   const userId = req.user?.userId;
