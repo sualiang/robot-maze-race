@@ -405,18 +405,7 @@ export default function ScreenDisplay() {
           }} />
         </div>
       )}
-      {/* 断网提示 */}
-      {!connected && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0,
-          background: 'rgba(255, 59, 48, 0.9)', color: '#fff',
-          padding: '8px 24px', textAlign: 'center', zIndex: 1000,
-          fontSize: 18, fontWeight: 600,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-        }}>
-          <WifiOfflined style={{ fontSize: 22 }} /> 网络连接已断开，正在重新连接...
-        </div>
-      )}
+      {/* 静默重连，不显示断网横幅 */}
 
       {/* 顶栏 */}
       <div style={{
