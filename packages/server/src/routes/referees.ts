@@ -1399,34 +1399,8 @@ router.post('/attendance/check-out', authMiddleware, async (req: Request, res: R
       [refereeId]
     );
 
-    // 赛场标记为未激活
-    setVenueActive(false);
-    cachedVenueStatus = 'closed';
-
-    // 回写 venues 表
-    try { await pool.execute('UPDATE venues SET status = ? LIMIT 1', ['closed']); } catch (_) {}
-
-    // 清空排队队列和当前选手
-    try {
-      await pool.execute(
-        'UPDATE race_queues SET status = ?, start_time_ms = NULL, paused_elapsed_ms = 0, finish_time_ms = NULL, finish_status = NULL, fault_reason = NULL WHERE venue_id = ? AND status NOT IN (?,?,?)',
-        ['waiting', cachedVenueId, 'finished', 'forfeit', 'invalid']
-      );
-    } catch (_) {}
-
-    // 广播赛场关闭通知到大屏（含清空后的队列和选手信息）
-    broadcastToScreen({
-      event: 'venue_closed',
-      data: {
-        closedAt: now,
-        queue: [],
-        currentRacer: null,
-        race_status: 'inactive',
-      },
-    });
-    // 同时推送最新 screen_data（venue_status = inactive, queue 为空）
-    const closedScreenData = getCurrentScreenData();
-    broadcastToScreen({ type: 'screen_data', data: closedScreenData });
+    // 签退只是裁判个人下班，不影响赛场状态
+    // 赛场状态由比赛流程（开赛/结束）独立控制
 
     return res.json({ code: 0, message: '签退成功', data: { checkoutAt: now } });
   } catch (error: any) {
