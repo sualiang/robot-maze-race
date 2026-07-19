@@ -1793,29 +1793,16 @@ router.get('/scan-login-status', async (req: Request, res: Response) => {
 
 /**
  * POST /api/v1/auth/referee-bind
- * 扫码登录 — 手机号绑定 & 运营商选择
- * Body: { state, phone, operator_id? }
- * - state: 扫码时生成的 scan_{uuid}
- * - phone: 用户输入的手机号
+ * 裁判手机号登录（无需扫码 / 无需鉴权）
+ * Body: { phone, operator_id? }
+ * - phone: 裁判手机号
  * - operator_id: 多运营商时选择的 operator_id（可选）
  */
 router.post('/referee-bind', async (req: Request, res: Response) => {
   try {
-    const { state, phone, operator_id } = req.body;
-    if (!state || typeof state !== 'string') {
-      return res.status(400).json({ code: 400, message: '缺少 state 参数', data: null });
-    }
+    const { phone, operator_id } = req.body;
     if (!phone || typeof phone !== 'string') {
       return res.status(400).json({ code: 400, message: '缺少 phone 参数', data: null });
-    }
-
-    // 验证 state 对应的 Redis key 存在且有效
-    const redis = await getRedis();
-    const key = `scan_login:${state}`;
-    const openid = await redis.get(key);
-
-    if (!openid) {
-      return res.status(400).json({ code: 400, message: '扫码已过期，请重新扫码', data: null });
     }
 
     // 用手机号在所有运营商库里查匹配的裁判
@@ -1856,8 +1843,12 @@ router.post('/referee-bind', async (req: Request, res: Response) => {
       }
     }
 
-    // 删除 Redis key，生成 token
-    await redis.del(key);
+    // 在公共库 users 表按 phone 查 openid
+    const userRow = await queryOne<any>(
+      'SELECT id, openid FROM users WHERE phone = ? LIMIT 1',
+      [phone]
+    );
+    const openid = userRow?.openid || '';
 
     const payload = {
       userId: selected.refereeId,
