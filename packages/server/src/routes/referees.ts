@@ -1433,11 +1433,27 @@ router.post('/attendance/check-out', authMiddleware, async (req: Request, res: R
  * 裁判已登录 + venueId 匹配即可签到
  */
 function getOpPoolFromJwt(req: Request): MysqlPool | null {
-  const opId = (req.user as any)?.operatorId;
-  if (!opId) return null;
+  const jwt = req.user as any;
+  const opId = jwt?.operatorId;
+  if (opId) {
+    try { return getOperatorPool('op_' + opId); } catch { /* fall through */ }
+  }
+  // 降级：referee-bind 旧 token 可能不带 operatorId，根据 userId 从 referees 查 operator_id
+  const userId = jwt?.userId;
+  if (!userId) return null;
+  // 遍历所有已知 op_* 库（从 common 库 operators_registry 拿列表）
   try {
-    return getOperatorPool('op_' + opId);
-  } catch { return null; }
+    const common = getCommonPool();
+    const [regRows] = (await common.query('SELECT db_name FROM operators_registry WHERE db_name IS NOT NULL')) as any[];
+    for (const reg of (regRows as any[] || [])) {
+      try {
+        const pool = getOperatorPool(reg.db_name);
+        const [rows] = await pool.execute('SELECT id, operator_id FROM referees WHERE user_id = ? OR id = ? LIMIT 1', [userId, userId]) as any[];
+        if ((rows as any[])?.[0]) return pool;
+      } catch { /* skip unreachable DB */ }
+    }
+  } catch { /* operators_registry 可能不存在 */ }
+  return null;
 }
 
 router.post('/attendance/check-in-direct', authMiddleware, async (req: Request, res: Response) => {
