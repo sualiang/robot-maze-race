@@ -671,31 +671,6 @@ export default function ScreenDisplay() {
                 <div style={{ flex: 1, textAlign: 'left', paddingLeft: 20 }}>选手</div>
                 <div style={{ width: 120, textAlign: 'left' }}>用时</div>
               </div>
-              {/* 比赛刚结束：在排行榜顶部高亮显示最新成绩 */}
-              {highlightTime && (
-                <div style={{
-                  display: 'flex', padding: '12px 8px', marginBottom: 6,
-                  borderBottom: '1px solid rgba(255,215,0,0.3)',
-                  alignItems: 'center',
-                  background: 'linear-gradient(90deg, rgba(255,215,0,0.2), rgba(255,215,0,0.05))',
-                  borderRadius: 8,
-                  border: '1px solid rgba(255,215,0,0.4)',
-                  animation: 'highlightPulse 1.5s ease-in-out infinite',
-                }}>
-                  <div style={{ width: 50, fontSize: 22, fontWeight: 700, color: '#ffd700' }}>
-                    🏆
-                  </div>
-                  <div style={{ flex: 1, fontSize: 17, fontWeight: 700, color: '#ffd700', textAlign: 'center' }}>
-                    最新成绩
-                  </div>
-                  <div style={{
-                    width: 120, textAlign: 'right', fontSize: 16, fontWeight: 700,
-                    fontFamily: 'monospace', color: '#ffd700',
-                  }}>
-                    {formatTime(elapsed)}
-                  </div>
-                </div>
-              )}
               {displayData.leaderboard.slice(0, 10).map((entry, i) => {
                 const rankColors: Record<number, string> = {
                   1: '#ffd700', 2: '#c0c0c0', 3: '#cd7f32',
