@@ -439,8 +439,8 @@ router.post('/notify', async (req: Request, res: Response) => {
       if (!existingPmt || (Array.isArray(existingPmt) && existingPmt.length === 0)) {
         try {
           await opPool.execute(
-            `INSERT INTO payments (id, order_id, operator_id, user_id, transaction_id, amount_cents, status, pay_time, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, 'paid', NOW(), NOW())`,
+            `INSERT INTO payments (id, order_id, operator_id, user_id, transaction_id, amount_cents, channel, status, pay_time, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, 'wechat_pay', 'paid', NOW(), NOW())`,
             [uuidv4(), order.id, order.operator_id || '', order.user_id || '',
              (transaction.transaction_id || '').slice(0, 128), order.amount]
           );
@@ -603,12 +603,18 @@ router.get('/query/:orderId', authMiddleware, async (req: Request, res: Response
             [wxOrder.transaction_id, order.id]
           );
           // 兜底也写 payments（幂等，INSERT IGNORE 防重）
+          const [orderDetail] = await queryOp<any[]>(req,
+            `SELECT operator_id, user_id FROM orders WHERE id = ?`, [order.id]
+          );
           const txnId = (wxOrder.transaction_id || '').slice(0, 128);
           try {
             await executeOp(req,
-              `INSERT IGNORE INTO payments (id, order_id, transaction_id, amount_cents, channel, status, paid_at, created_at)
-               VALUES (?, ?, ?, ?, 'wechat_pay', 'success', NOW(), NOW())`,
-              [uuidv4(), order.id, txnId, order.amount]
+              `INSERT IGNORE INTO payments (id, order_id, operator_id, user_id, transaction_id, amount_cents, channel, status, pay_time, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, 'wechat_pay', 'success', NOW(), NOW())`,
+              [uuidv4(), order.id,
+               orderDetail?.[0]?.operator_id || '',
+               orderDetail?.[0]?.user_id || '',
+               txnId, order.amount]
             );
           } catch (e: any) {
             console.error('[WxPay] 兜底 payments INSERT 失败:', e.message);
@@ -845,8 +851,8 @@ router.post('/mock-pay-success', authMiddleware, async (req: Request, res: Respo
     // 模拟支付也写入 payments 表
     try {
       await executeOp(req,
-        `INSERT IGNORE INTO payments (id, order_id, transaction_id, amount_cents, channel, status, paid_at, created_at)
-         SELECT ?, ?, ?, amount_cents, 'wechat_pay', 'success', NOW(), NOW() FROM orders WHERE id = ?`,
+        `INSERT IGNORE INTO payments (id, order_id, operator_id, user_id, transaction_id, amount_cents, channel, status, pay_time, created_at)
+         SELECT ?, ?, operator_id, user_id, ?, amount_cents, 'wechat_pay', 'success', NOW(), NOW() FROM orders WHERE id = ?`,
         [uuidv4(), order_id, mockTxnId, order_id]
       );
     } catch (e: any) {

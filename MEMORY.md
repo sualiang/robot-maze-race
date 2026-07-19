@@ -178,6 +178,19 @@ _SASDT V3.6.3 生效，三岗位平级架构 + 资源分层分配_
 - 密钥90天轮换一次
 - 误操作立即上报，绝不隐瞒或自行修复
 
+### 微信平台配置速查
+| 项目 | AppID | 类型 |
+|------|-------|------|
+| 小程序 | `wx619c9f373868ab63` | Mini Program |
+| 微信支付商户 | `1113756136` | MCH ID |
+| 服务号（安博天智） | `wx22a4891531ce5fe7` | 公众号 (MP) |
+
+环境变量（`.env`）：
+- `WECHAT_APP_ID` / `WECHAT_APP_SECRET` = 小程序
+- `WECHAT_MP_APP_ID` / `WECHAT_MP_APP_SECRET` = 服务号（二维码、菜单等用）
+- `WECHAT_PAY_MCH_ID` / `WECHAT_PAY_API_V3_KEY` / `WECHAT_PAY_MERCHANT_SERIAL_NO` = 支付
+- ⚠️ 之前服务号 AppID 硬编码 `wx38bbdf0eb0d39e85` 是小C测试号，已废弃
+
 ---
 
 ## 📝 小C执行SOP（需要小C写代码时）
