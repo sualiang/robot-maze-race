@@ -1324,11 +1324,7 @@ router.post('/attendance/check-in-by-qr', authMiddleware, async (req: Request, r
       return res.status(400).json({ code: 400, message: '缺少激活码', data: null });
     }
 
-<<<<<<< Updated upstream
     // 1. 验证激活码（Redis，进程重启不丢）
-=======
-    // 1. 验证激活码
->>>>>>> Stashed changes
     const validation = await validateActivationCode(activationCode);
     if (!validation.valid) {
       return res.status(400).json({ code: 400, message: '激活码无效或已过期，请刷新大屏二维码', data: null });
