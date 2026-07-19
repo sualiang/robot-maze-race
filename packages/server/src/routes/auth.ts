@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { compareSync, hashSync } from '../config/bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config';
-import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../config/database';
+import { query, queryOne, execute, queryOp, queryOpOne, executeOp, getOperatorPool } from '../config/database';
 import { queryCommonOne } from '../db/router';
 import { authMiddleware, optionalAuth, AuthPayload } from '../middleware/auth';
 import { getAccessToken } from '../services/wechat-token';
@@ -1643,10 +1643,64 @@ router.get('/mp-oauth/subscribe-status', authMiddleware, async (req: Request, re
 });
 
 /**
+ * 跨所有运营商库查询裁判表（按手机号），不依赖 operator 上下文
+ */
+async function queryAllOperatorReferees(phone: string): Promise<Array<{
+  refereeId: string;
+  refereeName: string;
+  operatorId: string;
+  operatorName: string;
+  dbName: string;
+}>> {
+  const { query: commonQuery } = await import('../config/database');
+  // 从公共库获取所有运营商注册信息
+  const registryList = await commonQuery<any>(
+    `SELECT operator_id, operator_name, db_name FROM operators_registry WHERE db_name IS NOT NULL`
+  );
+  if (!registryList || registryList.length === 0) return [];
+
+  const results: Array<{
+    refereeId: string;
+    refereeName: string;
+    operatorId: string;
+    operatorName: string;
+    dbName: string;
+  }> = [];
+
+  for (const reg of registryList) {
+    try {
+      const pool = getOperatorPool(reg.db_name);
+      const [rows] = await pool.query<any[]>(
+        'SELECT r.id AS refereeId, r.name AS refereeName FROM referees r WHERE r.phone = ? LIMIT 1',
+        [phone]
+      );
+      if (rows && rows.length > 0) {
+        results.push({
+          refereeId: rows[0].refereeId,
+          refereeName: rows[0].refereeName,
+          operatorId: reg.operator_id,
+          operatorName: reg.operator_name,
+          dbName: reg.db_name,
+        });
+      }
+    } catch {
+      // 跳过连接失败的库
+    }
+  }
+  return results;
+}
+
+/**
  * GET /api/v1/auth/scan-login-status
- * 扫码登录状态轮询接口
- * 前端扫码后每隔 1.5s 轮询，等待 OAuth 回调写入 Redis
- * @param state - 扫码时前端生成的随机 state
+ * 扫码登录状态轮询接口 — 扫码后手机号验证流程
+ * @param state - 扫码时前端生成的随机 state（scan_{uuid}）
+ * @param phone - 可选，用户填写的手机号（第二次+轮询时传入）
+ *
+ * 响应 status:
+ * - pending: 尚未扫码
+ * - need_phone: 已扫码但不清楚是哪个裁判 → 需要输入手机号
+ * - need_select: 手机号匹配到多个运营商裁判 → 需要用户选择
+ * - success: 直接登录成功（匹配到唯一的裁判记录）
  */
 router.get('/scan-login-status', async (req: Request, res: Response) => {
   try {
@@ -1663,31 +1717,153 @@ router.get('/scan-login-status', async (req: Request, res: Response) => {
       return res.json({ code: 0, message: 'pending', data: { status: 'pending' } });
     }
 
-    // 删除 Redis key（一次性有效）
-    await redis.del(key);
-
-    // 用 openid 走 wx-mp-login 逻辑完成登录
-    // 先检查该 openid 是否有裁判身份
-    const referee = await queryOpOne<{ id: string; name: string }>(req,
-      `SELECT r.id, r.name FROM referees r
-       INNER JOIN users u ON r.user_id = u.id
-       WHERE u.openid = $1 LIMIT 1`,
+    // 已扫码 → 检查 openid 对应用户的手机号
+    // 从公共库 users 表查手机号
+    const user = await queryOne<any>(
+      'SELECT id, phone FROM users WHERE openid = ? LIMIT 1',
       [openid]
     );
 
-    if (!referee) {
+    if (!user || !user.phone) {
+      // 没手机号 → 需要用户输入
       return res.json({
         code: 0,
-        message: 'not_registered',
-        data: { status: 'not_registered', openid },
+        message: 'need_phone',
+        data: { status: 'need_phone', openid, state },
       });
     }
 
-    // 生成 JWT token（复用 wx-mp-login 逻辑）
+    // 用手机号在所有运营商库的 referees 表里查匹配
+    const matches = await queryAllOperatorReferees(user.phone);
+
+    if (matches.length === 0) {
+      // 手机号没匹配到任何裁判
+      return res.json({
+        code: 0,
+        message: 'not_registered',
+        data: { status: 'not_registered' },
+      });
+    }
+
+    if (matches.length === 1) {
+      // 唯一匹配 → 直接登录
+      const m = matches[0];
+      await redis.del(key);
+
+      const payload = {
+        userId: m.refereeId,
+        openid,
+        role: 'referee' as const,
+        operatorId: m.operatorId,
+      };
+      const token = jwt.sign(payload, config.jwt.secret, { expiresIn: config.jwt.expiresIn as any });
+
+      return res.json({
+        code: 0,
+        message: '登录成功',
+        data: {
+          status: 'success',
+          token,
+          user: { id: m.refereeId, name: m.refereeName, openid, operatorId: m.operatorId, operatorName: m.operatorName },
+        },
+      });
+    }
+
+    // 多个匹配 → 让用户选择运营商
+    return res.json({
+      code: 0,
+      message: 'need_select',
+      data: {
+        status: 'need_select',
+        openid,
+        state,
+        operators: matches.map(m => ({
+          refereeId: m.refereeId,
+          refereeName: m.refereeName,
+          operatorId: m.operatorId,
+          operatorName: m.operatorName,
+        })),
+      },
+    });
+  } catch (error: any) {
+    console.error('[Auth] scan-login-status error:', error.message);
+    return res.status(500).json({ code: 500, message: '查询失败', data: null });
+  }
+});
+
+/**
+ * POST /api/v1/auth/referee-bind
+ * 扫码登录 — 手机号绑定 & 运营商选择
+ * Body: { state, phone, operator_id? }
+ * - state: 扫码时生成的 scan_{uuid}
+ * - phone: 用户输入的手机号
+ * - operator_id: 多运营商时选择的 operator_id（可选）
+ */
+router.post('/referee-bind', async (req: Request, res: Response) => {
+  try {
+    const { state, phone, operator_id } = req.body;
+    if (!state || typeof state !== 'string') {
+      return res.status(400).json({ code: 400, message: '缺少 state 参数', data: null });
+    }
+    if (!phone || typeof phone !== 'string') {
+      return res.status(400).json({ code: 400, message: '缺少 phone 参数', data: null });
+    }
+
+    // 验证 state 对应的 Redis key 存在且有效
+    const redis = await getRedis();
+    const key = `scan_login:${state}`;
+    const openid = await redis.get(key);
+
+    if (!openid) {
+      return res.status(400).json({ code: 400, message: '扫码已过期，请重新扫码', data: null });
+    }
+
+    // 用手机号在所有运营商库里查匹配的裁判
+    const matches = await queryAllOperatorReferees(phone);
+
+    if (matches.length === 0) {
+      return res.json({
+        code: 0,
+        message: 'not_registered',
+        data: { status: 'not_registered' },
+      });
+    }
+
+    // 选择逻辑：如果传了 operator_id，按 operator_id 筛选
+    let selected = matches[0];
+    if (matches.length > 1) {
+      if (operator_id) {
+        const found = matches.find(m => m.operatorId === operator_id);
+        if (!found) {
+          return res.status(400).json({ code: 400, message: '选择的运营商不匹配', data: null });
+        }
+        selected = found;
+      } else {
+        // 多个匹配但未选择 → 返回列表让用户选
+        return res.json({
+          code: 0,
+          message: 'need_select',
+          data: {
+            status: 'need_select',
+            operators: matches.map(m => ({
+              refereeId: m.refereeId,
+              refereeName: m.refereeName,
+              operatorId: m.operatorId,
+              operatorName: m.operatorName,
+            })),
+          },
+        });
+      }
+    }
+
+    // 删除 Redis key，生成 token
+    await redis.del(key);
+
     const payload = {
-      userId: referee.id,
+      userId: selected.refereeId,
       openid,
       role: 'referee' as const,
+      operatorId: selected.operatorId,
     };
     const token = jwt.sign(payload, config.jwt.secret, { expiresIn: config.jwt.expiresIn as any });
 
@@ -1697,12 +1873,18 @@ router.get('/scan-login-status', async (req: Request, res: Response) => {
       data: {
         status: 'success',
         token,
-        user: { id: referee.id, name: referee.name, openid },
+        user: {
+          id: selected.refereeId,
+          name: selected.refereeName,
+          openid,
+          operatorId: selected.operatorId,
+          operatorName: selected.operatorName,
+        },
       },
     });
   } catch (error: any) {
-    console.error('[Auth] scan-login-status error:', error.message);
-    return res.status(500).json({ code: 500, message: '查询失败', data: null });
+    console.error('[Auth] referee-bind error:', error.message);
+    return res.status(500).json({ code: 500, message: '绑定失败', data: null });
   }
 });
 
