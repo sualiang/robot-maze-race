@@ -297,78 +297,50 @@ export default function OperatorDashboard() {
 
   return (
     <div>
-      {/* 板块一：核心指标 — 行1: GMV + 订单（stats-fast）*/}
-      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={24} sm={12} lg={6}>
-          <Card loading={loadingStats}>
-            <Statistic
-              title={
-                <Space size={4}>
-                  <span>全平台营收</span>
-                  <Button type="link" size="small" icon={<ReloadOutlined />}
-                    onClick={fetchStats} loading={loadingStats}
-                    style={{ padding: 0, fontSize: 12 }} />
-                </Space>
-              }
-              value={stats.total_revenue / 100} precision={2}
-              prefix={<DollarOutlined />} suffix="元" />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card loading={loadingStats}>
-            <Statistic
-              title={
-                <Space size={4}>
-                  <span>全平台订单</span>
-                  <Button type="link" size="small" icon={<ReloadOutlined />}
-                    onClick={fetchStats} loading={loadingStats}
-                    style={{ padding: 0, fontSize: 12 }} />
-                </Space>
-              }
-              value={stats.total_orders}
-              prefix={<WalletOutlined />} suffix="笔" />
-          </Card>
-        </Col>
-      </Row>
+      {/* 板块一：核心指标 — 行1: 平台GMV + 订单（stats-fast）*/}
+      <Card
+        size="small"
+        title={<span style={{ fontSize: 14 }}>平台GMV</span>}
+        extra={<Button size="small" icon={<ReloadOutlined />} onClick={fetchStats} loading={loadingStats}>刷新</Button>}
+        style={{ marginBottom: 16 }}
+      >
+        <Row gutter={[16, 16]}>
+          <Col xs={24} sm={12}>
+            <Statistic title="全平台营收" value={stats.total_revenue / 100} precision={2}
+              prefix={<DollarOutlined />} suffix="元" loading={loadingStats} />
+          </Col>
+          <Col xs={24} sm={12}>
+            <Statistic title="全平台订单" value={stats.total_orders}
+              prefix={<WalletOutlined />} suffix="笔" loading={loadingStats} />
+          </Col>
+        </Row>
+      </Card>
       {/* 行2: 平台收入 + 预估待审核提现（stats-slow）*/}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col xs={24} sm={12} lg={6}>
-          <Card loading={loadingSlow}>
-            <Statistic
-              title={
-                <Space size={4}>
-                  <span>平台收入</span>
-                  <Button type="link" size="small" icon={<ReloadOutlined />}
-                    onClick={fetchSlowStats} loading={loadingSlow && !slowLoaded}
-                    style={{ padding: 0, fontSize: 12 }} />
-                </Space>
-              }
+      <Card
+        size="small"
+        title={<span style={{ fontSize: 14 }}>平台收入</span>}
+        extra={<Button size="small" icon={<ReloadOutlined />} onClick={fetchSlowStats} loading={loadingSlow}>刷新</Button>}
+        style={{ marginBottom: 24 }}
+      >
+        <Row gutter={[16, 16]}>
+          <Col xs={24} sm={12}>
+            <Statistic title="平台收入"
               value={slowLoaded ? (stats.platform_profit / 100).toFixed(2) : '--'}
               suffix={slowLoaded ? '元' : undefined}
               prefix={slowLoaded ? <BankOutlined /> : undefined}
               valueStyle={slowLoaded ? { color: '#52c41a' } : undefined}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card loading={loadingSlow}>
-            <Statistic
-              title={
-                <Space size={4}>
-                  <span>预估待审核提现</span>
-                  <Button type="link" size="small" icon={<ReloadOutlined />}
-                    onClick={fetchSlowStats} loading={loadingSlow && !slowLoaded}
-                    style={{ padding: 0, fontSize: 12 }} />
-                </Space>
-              }
+              loading={loadingSlow} />
+          </Col>
+          <Col xs={24} sm={12}>
+            <Statistic title="预估待审核提现"
               value={slowLoaded ? (stats.pending_withdraw / 100).toFixed(2) : '--'}
               suffix={slowLoaded ? '元' : undefined}
               prefix={slowLoaded ? <DollarOutlined /> : undefined}
               valueStyle={slowLoaded ? { color: '#faad14' } : undefined}
-            />
-          </Card>
-        </Col>
-      </Row>
+              loading={loadingSlow} />
+          </Col>
+        </Row>
+      </Card>
 
       {/* 板块二+三+四: Tabs */}
       <Card>
