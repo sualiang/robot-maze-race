@@ -671,8 +671,8 @@ router.get('/match/queue', authMiddleware, async (req: Request, res: Response) =
 
     const currentRow = await refQueryOpOne<RacerRow>(req,
       `SELECT rq.* FROM race_queues rq
-       WHERE rq.venue_id = $1 AND rq.status IN ('racing','paused','malfunction')
-       ORDER BY rq.created_at DESC LIMIT 1`,
+       WHERE rq.venue_id = $1 AND rq.status IN ('called','racing','paused','malfunction') AND rq.status != 'waiting'
+       ORDER BY FIELD(rq.status, 'racing','paused','malfunction','called'), rq.created_at DESC LIMIT 1`,
       [vid]
     );
 
