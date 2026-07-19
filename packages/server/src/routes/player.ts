@@ -485,14 +485,14 @@ router.get('/queue/current', authMiddleware, rateLimiter(10, 60), async (req: Re
     // 2) lastRaceResult: 用户最近一次 completed 比赛成绩
     let lastRaceResult: any = null;
     const lastResultRow = await queryOpOne<any>(req,
-      `SELECT id, score, rank, total_racers, created_at
+      `SELECT id, score_ms, \`rank\`, created_at
        FROM race_results
        WHERE user_id = $1 AND status = 'completed'
        ORDER BY created_at DESC LIMIT 1`,
       [userId]
     );
     if (lastResultRow) {
-      const s = lastResultRow.score ?? 0;
+      const s = lastResultRow.score_ms ?? 0;
       let scoreText = '--';
       if (typeof s === 'number') {
         if (s < 60) scoreText = s.toFixed(1) + 's';
@@ -502,7 +502,7 @@ router.get('/queue/current', authMiddleware, rateLimiter(10, 60), async (req: Re
         score: s,
         scoreText,
         rank: lastResultRow.rank ?? 0,
-        totalRacers: lastResultRow.total_racers ?? 0,
+        totalRacers: 0,
       };
     }
 
