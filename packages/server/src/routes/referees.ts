@@ -1896,6 +1896,7 @@ async function broadcastAfterUpdate(req: Request) {
           `SELECT id, nickname, avatar_url FROM users WHERE id IN (${placeholders})`,
           allUserIds
         );
+        console.log('[Broadcast] user query: ids=' + JSON.stringify(allUserIds) + ' rows=' + (userRows?.length || 0));
         for (const u of (userRows || [])) {
           broadcastUserMap.set(u.id, { nickname: u.nickname, avatar_url: u.avatar_url });
         }
