@@ -1343,15 +1343,22 @@ router.post('/attendance/check-in', authMiddleware, async (req: Request, res: Re
     // 标记赛场已激活
     setVenueActive(true);
     cachedVenueStatus = 'open';
+    cachedVenueName = venueName;
+    cachedVenueId = finalVenueId;
 
     // 回写 venues 表，确保 REST API 也返回正确状态
     try { await refExecuteOp(req, 'UPDATE venues SET status = \'open\' LIMIT 1'); } catch (_) {}
 
-    // 广播赛场重新开放到大屏，大屏恢复全新状态
-    broadcastToScreen({
-      event: 'venue_reopen',
-      data: { reopenedAt: now },
-    });
+    // 写 Redis active_venues（大屏重连自动恢复）
+    try {
+      const redis = await getRedis();
+      await redis.sAdd('active_venues', finalVenueId);
+      await redis.hSet('active_venue:' + finalVenueId, 'name', venueName);
+      await redis.hSet('active_venue:' + finalVenueId, 'activatedAt', String(Date.now()));
+    } catch (_) {}
+
+    // 广播大屏激活
+    broadcastToScreen({ type: 'activated', data: { venue_name: venueName, venue_id: finalVenueId } });
 
     // 再推送一次当前 screen_data，让大屏直接显示比赛界面
     const screenData = getCurrentScreenData();
