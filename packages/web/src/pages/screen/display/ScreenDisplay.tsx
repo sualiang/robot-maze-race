@@ -75,16 +75,19 @@ export default function ScreenDisplay() {
       setReconnecting(false);
       ws.send(JSON.stringify({ type: 'subscribe', channel: 'screen' }));
 
-      // 仅首次连接生成激活码，重连不生成
-      if (!reconnectingRef.current) {
-        const code = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
-        setActivationCode(code);
-        ws.send(JSON.stringify({
-          type: 'screen_login',
-          activation_code: code,
-          venueId: venueId || undefined,
-        }));
+      // 从 localStorage 获取或生成激活码（永久复用，不重复生成）
+      const CODE_KEY = 'screen_activation_code_' + venueId;
+      let code = localStorage.getItem(CODE_KEY);
+      if (!code) {
+        code = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
+        localStorage.setItem(CODE_KEY, code);
       }
+      setActivationCode(code);
+      ws.send(JSON.stringify({
+        type: 'screen_login',
+        activation_code: code,
+        venueId: venueId || undefined,
+      }));
 
       // 请求一次当前数据（防止签到后打开大屏没有初始数据）
       ws.send(JSON.stringify({ type: 'get_screen_data' }));
