@@ -449,7 +449,7 @@ Page({
   doCheckin: function (code) {
     var that = this;
     wx.showLoading({ title: '处理中...' });
-    request.post('/checkin', { code: code }).then(function () {
+    request.post('/player/checkin', { code: code }).then(function () {
       wx.hideLoading();
       that.fetchAll();
     }).catch(function (err) {
