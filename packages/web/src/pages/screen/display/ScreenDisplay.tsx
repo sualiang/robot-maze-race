@@ -660,12 +660,10 @@ export default function ScreenDisplay() {
           borderRadius: 16, padding: 24,
           border: '1px solid rgba(255,255,255,0.08)',
         }}>
-          <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <TrophyOutlined style={{ color: '#ffd700' }} /> 本场实时排行榜
-            </span>
+          <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <TrophyOutlined style={{ color: '#ffd700' }} /> 本场实时排行榜
             <span style={{ fontSize: 14, fontWeight: 400, color: 'rgba(255,255,255,0.5)' }}>
-              {new Date().toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })}
+              （{new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })}）
             </span>
           </div>
           {displayData.leaderboard.length > 0 ? (
