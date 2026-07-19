@@ -1374,7 +1374,10 @@ router.post('/attendance/check-out', authMiddleware, async (req: Request, res: R
 
     // 直接用 JWT operatorId 连 op_* 库
     const pool = getOpPoolFromJwt(req);
-    if (!pool) return res.status(401).json({ code: 401, message: '未找到裁判记录', data: null });
+    if (!pool) {
+      console.error('[check-out] getOpPoolFromJwt returned null, userId=', userId, 'operatorId=', (req.user as any)?.operatorId);
+      return res.status(401).json({ code: 401, message: '未找到裁判记录', data: null });
+    }
 
     // 从 referees 表查真实 referee_id
     const [refRows] = await pool.execute(
