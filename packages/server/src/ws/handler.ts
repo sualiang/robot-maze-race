@@ -212,8 +212,8 @@ export function setupWebSocket(server: Server) {
 
 /** 向所有大屏客户端 + 所有裁判端客户端广播消息 */
 export function broadcastToScreen(data: any) {
-  // 已经是 type=screen_data 格式或 event 格式都直接透传
-  const isRaw = data.event || data.type === 'screen_data';
+  // 已经是 type=xxx 或 event 格式都直接透传
+  const isRaw = !!(data.event || data.type);
   // 注入 venue_status 防止大屏端丢失导致回退到 mock 的 inactive
   if (!isRaw && data.venue_status === undefined) {
     data.venue_status = 'open';
