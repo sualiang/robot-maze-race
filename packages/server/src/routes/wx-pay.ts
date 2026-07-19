@@ -457,30 +457,6 @@ router.post('/notify', async (req: Request, res: Response) => {
         console.log('[WxPay] payments 已存在（幂等跳过）:', outTradeNo);
       }
 
-      // 记录支付流水到 payment_transactions 表（扩展流水表）—— 幂等：先查后插
-      const [existingTxn] = await opPool.execute(
-        `SELECT id FROM payment_transactions WHERE order_id = ? LIMIT 1`,
-        [order.id]
-      );
-      if (!existingTxn || (Array.isArray(existingTxn) && existingTxn.length === 0)) {
-        try {
-          await opPool.execute(
-            `INSERT INTO payment_transactions (id, order_id, user_id, amount, transaction_id, payment_method, status, created_at)
-             VALUES (?, ?, ?, ?, ?, 'wechat_pay', 'success', NOW())`,
-            [uuidv4(), order.id, order.user_id || '', order.amount,
-             (transaction.transaction_id || '').slice(0, 64)]
-          );
-        } catch (txnErr: any) {
-          console.error('[WxPay] payment_transactions INSERT 失败! outTradeNo:', outTradeNo, 'orderId:', order.id,
-            'txn_id:', transaction.transaction_id, 'err:', txnErr.message);
-          if (!txnErr.message?.includes('Duplicate') && !txnErr.message?.includes('duplicate')) {
-            throw txnErr;
-          }
-        }
-      } else {
-        console.log('[WxPay] payment_transactions 已存在（幂等跳过）:', outTradeNo);
-      }
-
       // P0-14: 幂等创建结算记录（运营商库）
       try {
         const [stlRows] = await opPool.execute(
@@ -804,11 +780,7 @@ router.post('/notify-refund', async (req: Request, res: Response) => {
            WHERE order_no = ? AND status = 'refunding'`,
           [refundResult.out_trade_no]
         );
-        await refOpPool.execute(
-          `UPDATE payment_transactions SET status = 'refunded', refund_id = ?, updated_at = NOW()
-           WHERE transaction_id = ?`,
-          [refundResult.refund_id, refundResult.transaction_id]
-        );
+
       } else {
         console.error('[WxPay] notify-refund 未找到订单:', refundResult.out_trade_no);
       }

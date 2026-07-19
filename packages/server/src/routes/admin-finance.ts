@@ -604,7 +604,7 @@ router.get('/payment-records', authMiddleware, checkPermission('admin:finance'),
       allRows = await queryOp<any>(req, pageSql, [opId, ...params, pageSize, offset]);
     } else {
       // 超管：跨库聚合
-      const opRegs = await query<any>('SELECT db_name, operator_id, name FROM operators_registry WHERE db_name IS NOT NULL', []);
+      const opRegs = await query<any>('SELECT db_name, operator_id, operator_name FROM operators_registry WHERE db_name IS NOT NULL', []);
       const opNameMap = new Map<string, string>();
       for (const reg of opRegs) opNameMap.set(reg.operator_id, reg.name);
 

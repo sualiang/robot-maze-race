@@ -1213,17 +1213,6 @@ router.post('/order/:id/confirm-payment', authMiddleware, async (req: Request, r
     const changes = (updateResult as any)?.affectedRows || 0;
 
     if (changes > 0) {
-      // 3a. 🔴 财务：写入运营商库 payment_transactions
-      try {
-        await pool.execute(
-          `INSERT INTO payment_transactions (id, order_id, user_id, amount, transaction_id, payment_method, status, created_at)
-           VALUES (?, ?, ?, ?, '', 'wechat_pay', 'success', NOW())`,
-          [uuidv4(), id, order.user_id, order.amount_cents || 0]
-        );
-      } catch (ptErr: any) {
-        console.warn('[Player] confirm-payment payment_transactions:', ptErr.message?.substring(0, 100));
-      }
-
       // 3b. 🔴 财务：幂等写入运营商库 settlements
       try {
         const [stlRows] = await pool.execute(

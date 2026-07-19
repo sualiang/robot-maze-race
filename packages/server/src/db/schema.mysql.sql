@@ -179,20 +179,6 @@ CREATE TABLE IF NOT EXISTS payments (
 CREATE INDEX IF NOT EXISTS idx_payments_order ON payments(order_id);
 CREATE INDEX IF NOT EXISTS idx_payments_transaction ON payments(transaction_id);
 
--- ==================== 支付事务表 ====================
-CREATE TABLE IF NOT EXISTS payment_transactions (
-  id VARCHAR(36) PRIMARY KEY,
-  order_id VARCHAR(36) NOT NULL,
-  user_id VARCHAR(36) NOT NULL,
-  amount INT NOT NULL,
-  transaction_id VARCHAR(64),
-  payment_method VARCHAR(32) DEFAULT 'wechat_pay',
-  status VARCHAR(16) DEFAULT 'pending',
-  refund_id VARCHAR(64),
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
 -- ==================== 签到记录表 ====================
 CREATE TABLE IF NOT EXISTS checkins (
   id VARCHAR(36) PRIMARY KEY,

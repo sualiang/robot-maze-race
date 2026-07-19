@@ -12,7 +12,7 @@
  *   queryOp / queryOpOne / executeOp
  *   通过 req 中的 operator context 解析 db_name
  *   表: venues, referees, race_packages, race_package_coupons, orders,
- *       payments, payment_transactions, checkins, race_results, attendance,
+ *       payments, checkins, race_results, attendance,
  *       settlements, marketing_config, operator_members, operator_sessions,
  *       races, race_records, race_attendance, ticket_redemptions,
  *       merchant_coupons, user_coupons, merchants, entry_deductions,
