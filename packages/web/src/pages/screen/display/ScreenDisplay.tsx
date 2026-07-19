@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Empty, Tag } from 'antd';
 import { TrophyOutlined, ClockCircleOutlined, UserOutlined, WifiOutlined, WifiOutlined as WifiOfflined } from '@ant-design/icons';
 
@@ -32,9 +33,13 @@ interface ScreenData {
 }
 
 export default function ScreenDisplay() {
+  const [searchParams] = useSearchParams();
+  const venueId = searchParams.get('venueId') || '';
+
   // 激活状态跟踪：不再依赖 sessionStorage，由 WS screen_data 的 venue_status 决定
   const [isActivated, setIsActivated] = useState(false);
   const [venueName, setVenueName] = useState('');
+  const [activationCode, setActivationCode] = useState('');
 
   const [data, setData] = useState<ScreenData | null>(null);
   const [elapsed, setElapsed] = useState(0);
@@ -68,6 +73,16 @@ export default function ScreenDisplay() {
       setConnected(true);
       setReconnecting(false);
       ws.send(JSON.stringify({ type: 'subscribe', channel: 'screen' }));
+
+      // 生成激活码并通过 WS 发给后端（无激活状态时显示给裁判扫码）
+      const code = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
+      setActivationCode(code);
+      ws.send(JSON.stringify({
+        type: 'screen_login',
+        activation_code: code,
+        venueId: venueId || undefined,
+      }));
+
       // 请求一次当前数据（防止签到后打开大屏没有初始数据）
       ws.send(JSON.stringify({ type: 'get_screen_data' }));
       // 心跳保活：每 15 秒发一次 ping，防止 nginx/防火墙断开空闲连接
@@ -358,11 +373,25 @@ export default function ScreenDisplay() {
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           gap: 24,
         }}>
-          <img src="/logo-operator.png" alt="铁甲快狗" style={{ width: 480, height: 'auto', maxWidth: '80vw' }} />
-          <div style={{ fontSize: 32, fontWeight: 700, color: '#fff' }}>赛场未激活</div>
-          <div style={{ fontSize: 18, color: 'rgba(255,255,255,0.5)', letterSpacing: 1 }}>
-            等待裁判签到激活…
-          </div>
+          {activationCode ? (
+            <>
+              <div style={{ fontSize: 56, marginBottom: 8 }}>🐕</div>
+              <div style={{
+                fontSize: 72, fontFamily: 'monospace', fontWeight: 800,
+                letterSpacing: 16, color: '#ff6b35', paddingLeft: 16,
+              }}>{activationCode}</div>
+              <div style={{ fontSize: 18, color: 'rgba(255,255,255,0.5)', letterSpacing: 1 }}>
+                裁判输入上方激活码激活大屏
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 32, fontWeight: 700, color: '#fff' }}>赛场未激活</div>
+              <div style={{ fontSize: 18, color: 'rgba(255,255,255,0.5)', letterSpacing: 1 }}>
+                等待裁判签到激活…
+              </div>
+            </>
+          )}
           {connected && (
             <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.3)' }}>
               已连接，等待裁判扫码
