@@ -625,16 +625,6 @@ export default function ScreenDisplay() {
                     ) : (
                       <div style={{ fontSize: 12, color: '#666', marginBottom: 0 }}>&nbsp;</div>
                     )}
-                    {q.avatar_url && (
-                      <div style={{
-                        width: 36, height: 36, borderRadius: '50%',
-                        overflow: 'hidden',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        flexShrink: 0,
-                      }}>
-                        {renderAvatar(q.avatar_url, 36)}
-                      </div>
-                    )}
                     <div style={{ fontSize: 17, fontWeight: 600, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', wordBreak: 'break-all' }}>{q.nickname}</div>
                   </div>
                 ))}
@@ -703,13 +693,8 @@ export default function ScreenDisplay() {
                     }}>
                       {entry.rank <= 3 ? ['🥇', '🥈', '🥉'][entry.rank - 1] : entry.rank}
                     </div>
-                    <div style={{ flex: 1, fontSize: 17, fontWeight: entry.rank <= 3 ? 600 : 400, display: 'flex', alignItems: 'center', gap: 10, paddingLeft: 20, overflow: 'hidden' }}>
-                      {entry.avatar_url && (
-                        <span style={{ width: 32, height: 32, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          {renderAvatar(entry.avatar_url, 32)}
-                        </span>
-                      )}
-                      <span className="text-one-line" style={{ maxWidth: 'calc(100% - 42px)' }}>{entry.nickname}</span>
+                    <div style={{ flex: 1, fontSize: 17, fontWeight: entry.rank <= 3 ? 600 : 400, paddingLeft: 20, overflow: 'hidden' }}>
+                      <span className="text-one-line">{entry.nickname}</span>
                     </div>
                     <div style={{
                       width: 120, fontSize: 16, textAlign: 'right',
