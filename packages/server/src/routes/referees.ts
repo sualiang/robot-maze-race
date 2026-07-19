@@ -1241,7 +1241,7 @@ router.get('/attendance/status', authMiddleware, async (req: Request, res: Respo
     console.log('[DEBUG attendance/status] userId=' + userId + ' operatorId=' + ((req.user as any)?.operatorId || 'NONE') + ' role=' + ((req.user as any)?.role || 'NONE'));
     // 从 referees 表查真实 referee_id
     const ref = await refQueryOpOne<{ id: string; phone: string }>(req, 
-      'SELECT id, phone FROM referees WHERE user_id = $1', [userId]
+      'SELECT id, phone FROM referees WHERE id = $1', [userId]
     );
     if (!ref) return res.status(401).json({ code: 401, message: '未找到裁判记录', data: null });
     const refereeId = ref.id;
