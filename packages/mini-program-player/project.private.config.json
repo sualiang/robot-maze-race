@@ -6,11 +6,18 @@
     "miniprogram": {
       "list": [
         {
+          "name": "北仑银泰城赛场",
+          "pathName": "pages/index/index",
+          "query": "operator_id=91510a78-09bb-4462-a803-a430981941b1&venue_id=3a24c858-2f5b-4b9f-a567-8646603dedab",
+          "scene": null,
+          "launchMode": "default"
+        },
+        {
           "name": "北京大悦城赛场",
           "pathName": "pages/index/index",
           "query": "operator_id=ebf89164-90a0-4941-bcbd-69273e8b0216&venue_id=39a8dc9f-7f71-4163-b322-0ca83bd524b9",
-          "scene": null,
-          "launchMode": "default"
+          "launchMode": "default",
+          "scene": null
         }
       ]
     }

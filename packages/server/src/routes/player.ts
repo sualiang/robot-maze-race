@@ -358,6 +358,19 @@ router.post('/checkin', authMiddleware, async (req: Request, res: Response) => {
       [checkinId, userId, venueId, queueNumber, (req.user as any)?.operatorId || '']
     );
 
+    // 同时写入 race_queues，让裁判端和大屏能看到排队
+    const raceQueueId = uuidv4();
+    try {
+      await executeOp(req,
+        `INSERT INTO race_queues (id, user_id, venue_id, queue_number, status, remaining_races, checkin_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'waiting', 1, ?, NOW(), NOW())`,
+        [raceQueueId, userId, venueId, queueNumber, checkinId]
+      );
+    } catch (e: any) {
+      console.error('[签到] race_queues 写入失败:', e?.message || e);
+      // 不阻断签到流程
+    }
+
     // 成长值发放：从已购且还有剩余次数的参赛包中，按包扣减
     // 找到最新一个有 remaining_times > 0 的订单，扣减一次，发放 growth_value / race_count
     await grantGrowthOnCheckin(req, userId, checkinId);
