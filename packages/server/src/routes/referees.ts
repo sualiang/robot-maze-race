@@ -1567,8 +1567,8 @@ router.post('/attendance/check-in-direct', authMiddleware, async (req: Request, 
     // 6.5 写入 Redis active_venues（大屏重连时自动恢复激活状态）
     try {
       const redis = await getRedis();
-      await redis.sadd('active_venues', venue.id);
-      await redis.hset('active_venue:' + venue.id, 'name', venue.name, 'activatedAt', String(Date.now()));
+      await redis.sAdd('active_venues', venue.id);
+      await redis.hSet('active_venue:' + venue.id, 'name', venue.name, 'activatedAt', String(Date.now()));
     } catch (_) { /* Redis 不可用时不影响主流程 */ }
 
     // 7. 广播
@@ -1788,9 +1788,9 @@ export function setVenueActive(active: boolean) {
       try {
         const redis = await getRedis();
         if (active) {
-          await redis.sadd('active_venues', cachedVenueId);
+          await redis.sAdd('active_venues', cachedVenueId);
         } else {
-          await redis.srem('active_venues', cachedVenueId);
+          await redis.sRem('active_venues', cachedVenueId);
           await redis.del('active_venue:' + cachedVenueId);
         }
       } catch (_) { /* Redis 不可用不影响主流程 */ }
