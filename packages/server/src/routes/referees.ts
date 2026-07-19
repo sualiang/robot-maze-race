@@ -651,7 +651,7 @@ router.get('/match/queue', authMiddleware, async (req: Request, res: Response) =
     const venueId = (req as any).venueId || (req.query as any).venueId;
     if (!venueId) {
       const ref = await refQueryOpOne<{ venue_id: string }>(req,
-        'SELECT venue_id FROM referees WHERE user_id = $1 LIMIT 1',
+        'SELECT venue_id FROM referees WHERE id = $1 LIMIT 1',
         [req.user!.userId]
       );
       if (!ref?.venue_id) {
