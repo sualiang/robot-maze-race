@@ -291,15 +291,21 @@ router.get('/', authMiddleware, async (req: Request, res: Response<ApiResponse<P
       return res.json({ code: 0, message: 'ok', data: { list, total, page, pageSize } });
     }
 
-    // ---- operator 路径（原有逻辑） ----
+    // ---- operator 路径（直接用 JWT operatorId 连 op_* 库，不依赖 resolveOperatorDb） ----
 
-    const countResult = await queryOpOne<{ count: string }>(req,
-      `SELECT COUNT(*) as count FROM referees r ${whereClause}`,
+    const opPool = getOpPoolFromJwt(req);
+    if (!opPool) {
+      return res.json({ code: 0, message: 'ok', data: { list: [], total: 0, page, pageSize } });
+    }
+
+    const mysqlWhere = whereClause.replace(/\$(\d+)/g, '?');
+    const [countRows] = await opPool.execute(
+      `SELECT COUNT(*) as count FROM referees r ${mysqlWhere}`,
       params
-    );
-    const total = parseInt(countResult?.count || '0', 10);
+    ) as any[];
+    const total = parseInt((countRows as any[])?.[0]?.count || '0', 10);
 
-    const rows = await queryOp<any>(req,
+    const [rows] = await opPool.execute(
       `SELECT r.id, r.user_id, r.venue_id, r.status,
               r.name,
               r.phone, r.id_number, r.cert_image,
@@ -308,11 +314,11 @@ router.get('/', authMiddleware, async (req: Request, res: Response<ApiResponse<P
               v.name as venue_name
        FROM referees r
        LEFT JOIN venues v ON r.venue_id = v.id
-       ${whereClause}
+       ${mysqlWhere}
        ORDER BY r.created_at DESC
-       LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
-      [...params, pageSize, offset]
-    );
+       LIMIT ${pageSize} OFFSET ${offset}`,
+      params
+    ) as any[];
 
     const userIds = [...new Set(rows.map((r: any) => r.user_id).filter(Boolean))];
     const opIds = [...new Set(rows.map((r: any) => r.operator_id).filter(Boolean))];
