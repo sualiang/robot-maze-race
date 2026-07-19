@@ -1898,6 +1898,7 @@ async function broadcastAfterUpdate(req: Request) {
 
     const raceStatus = currentRow?.status === 'racing' ? 'racing'
       : currentRow?.status === 'paused' ? 'paused'
+      : lastFinished ? 'finished'
       : queueRows.length > 0 ? 'waiting' : 'idle';
 
     const lastResult = lastFinished?.finish_time_ms != null ? {
