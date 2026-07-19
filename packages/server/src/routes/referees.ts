@@ -1372,16 +1372,21 @@ router.post('/attendance/check-out', authMiddleware, async (req: Request, res: R
     const userId = req.user!.userId;
     if (!userId) return res.status(401).json({ code: 401, message: '未登录', data: null });
 
+    // 直接用 JWT operatorId 连 op_* 库
+    const pool = getOpPoolFromJwt(req);
+    if (!pool) return res.status(401).json({ code: 401, message: '未找到裁判记录', data: null });
+
     // 从 referees 表查真实 referee_id
-    const ref = await queryOpOne<{ id: string }>(req, 
-      'SELECT id FROM referees WHERE user_id = $1', [userId]
-    );
+    const [refRows] = await pool.execute(
+      'SELECT id FROM referees WHERE user_id = ? OR id = ? LIMIT 1', [userId, userId]
+    ) as any[];
+    const ref = (refRows as any[])?.[0];
     if (!ref) return res.status(401).json({ code: 401, message: '未找到裁判记录', data: null });
     const refereeId = ref.id;
 
     const now = new Date().toLocaleString('zh-CN');
-    await executeOp(req, 
-      `UPDATE attendance SET checkout_at = NOW() WHERE referee_id = $1 AND date(checkin_at) = CURDATE() AND checkout_at IS NULL`,
+    await pool.execute(
+      'UPDATE attendance SET checkout_at = NOW() WHERE referee_id = ? AND date(checkin_at) = CURDATE() AND checkout_at IS NULL',
       [refereeId]
     );
 
@@ -1390,15 +1395,13 @@ router.post('/attendance/check-out', authMiddleware, async (req: Request, res: R
     cachedVenueStatus = 'closed';
 
     // 回写 venues 表
-    try { await executeOp(req, 'UPDATE venues SET status = \'closed\' LIMIT 1'); } catch (_) {}
+    try { await pool.execute('UPDATE venues SET status = ? LIMIT 1', ['closed']); } catch (_) {}
 
-    // 清空排队队列和当前选手，重置所有比赛状态（新玩家需重新扫码排队）
+    // 清空排队队列和当前选手
     try {
-      await executeOp(req,
-        `UPDATE race_queues SET status = 'waiting', start_time_ms = NULL, paused_elapsed_ms = 0,
-         finish_time_ms = NULL, finish_status = NULL, fault_reason = NULL
-         WHERE venue_id = $1 AND status NOT IN ('finished','forfeit','invalid')`,
-        [cachedVenueId]
+      await pool.execute(
+        'UPDATE race_queues SET status = ?, start_time_ms = NULL, paused_elapsed_ms = 0, finish_time_ms = NULL, finish_status = NULL, fault_reason = NULL WHERE venue_id = ? AND status NOT IN (?,?,?)',
+        ['waiting', cachedVenueId, 'finished', 'forfeit', 'invalid']
       );
     } catch (_) {}
 
