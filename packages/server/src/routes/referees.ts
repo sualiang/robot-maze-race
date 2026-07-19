@@ -1475,6 +1475,29 @@ async function refExecuteOp(req: Request, sql: string, params?: any[]): Promise<
 async function getOpPoolFromJwt(req: Request): Promise<MysqlPool | null> {
   const jwt = req.user as any;
   const opId = jwt?.operatorId;
+
+  // 裁判 JWT 里没有 operatorId，通过 referees.user_id 查找运营商
+  if (!opId && jwt?.role === 'referee' && jwt?.userId) {
+    try {
+      const ref = await queryOne<{ operator_id: string }>(
+        'SELECT operator_id FROM referees WHERE user_id = $1',
+        [jwt.userId]
+      );
+      if (ref?.operator_id) {
+        const regRow = await queryOne<{ db_name: string }>(
+          'SELECT db_name FROM operators_registry WHERE operator_id = $1',
+          [ref.operator_id]
+        );
+        if (regRow?.db_name) {
+          return getOperatorPool(regRow.db_name);
+        }
+        // operators_registry 里没有，fallback
+        try { return getOperatorPool('op_' + ref.operator_id); } catch { return null; }
+      }
+    } catch { /* fall through */ }
+    return null;
+  }
+
   if (!opId) return null;
 
   // 1) 查询 operators_registry 获取真正的 db_name
