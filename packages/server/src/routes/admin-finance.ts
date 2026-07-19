@@ -621,7 +621,7 @@ router.get('/payment-records', authMiddleware, checkPermission('admin:finance'),
           allDbRows.push(...(dbRows as any[]));
         } catch { /* skip */ }
       }
-      allDbRows.sort((a, b) => (b.pay_time || '').localeCompare(a.pay_time || ''));
+      allDbRows.sort((a, b) => new Date(b.pay_time || 0).getTime() - new Date(a.pay_time || 0).getTime());
       total = allDbRows.length;
       allRows = allDbRows.slice(offset, offset + pageSize);
       // 补充 operator_name
