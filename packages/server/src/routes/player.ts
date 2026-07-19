@@ -153,7 +153,7 @@ router.get('/leaderboard/live', authMiddleware, async (req: Request, res: Respon
     const userMap = new Map<string, { nickname: string; avatar_url: string }>();
     if (allUserIds.length > 0) {
       const placeholders = allUserIds.map((_: any, i: number) => '$' + (i + 1)).join(',');
-      const userRows = await query<any[]>(
+      const userRows = await query<{ id: string; nickname: string; avatar_url: string }>(
         `SELECT id, nickname, avatar_url FROM users WHERE id IN (${placeholders})`,
         allUserIds
       );
