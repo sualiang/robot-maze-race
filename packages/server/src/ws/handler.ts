@@ -113,9 +113,8 @@ function handleMessage(ws: WebSocket, msg: any) {
       (async () => {
         try {
           const redis = await getRedis();
-          await redis.setEx(
+          await redis.set(
             ACTIVATION_CODE_PREFIX + code,
-            ACTIVATION_CODE_TTL,
             JSON.stringify({ venueId, venueName, createdAt: Date.now() })
           );
           console.log('[ActivationCode] Stored in Redis:', code.substring(0, 8) + '...');
