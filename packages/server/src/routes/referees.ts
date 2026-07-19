@@ -26,6 +26,7 @@ const router = Router();
  * @body name - 裁判姓名
  * @body phone - 裁判手机号（必填，用于登录）
  * @body venue_id - 绑定的赛场 ID（可选）
+ * @body operator_id - admin 创建时必填，指定目标运营商 ID（operator 角色忽略此参数）
  * @returns 创建的裁判信息 + 初始密码
  */
 router.post('/create-by-operator', authMiddleware, async (req: Request, res: Response) => {
@@ -35,18 +36,36 @@ router.post('/create-by-operator', authMiddleware, async (req: Request, res: Res
       return res.status(403).json({ code: 403, message: '仅管理员或运营商可创建裁判', data: null });
     }
 
-    const { name, phone, venue_id } = req.body;
+    const { name, phone, venue_id, operator_id } = req.body;
 
     if (!name || !phone) {
       return res.status(400).json({ code: 400, message: '请填写裁判姓名和手机号', data: null });
     }
 
-    // 检查手机号是否已被注册为裁判
-    const existingReferee = await queryOpOne<{ id: string }>(req, 
-      'SELECT id FROM referees WHERE phone = $1',
+    // 解析目标运营商 ID
+    const targetOperatorId = req.user?.operatorId || operator_id;
+    if (!targetOperatorId) {
+      return res.status(400).json({ code: 400, message: 'admin 创建裁判需指定 operator_id', data: null });
+    }
+
+    // 校验 operator_id 对应的运营商库存在
+    const opRegistry = await queryOne<{ db_name: string; operator_name: string }>(
+      'SELECT db_name, operator_name FROM operators_registry WHERE operator_id = $1',
+      [targetOperatorId]
+    );
+    if (!opRegistry || !opRegistry.db_name) {
+      return res.status(400).json({ code: 400, message: '指定的运营商不存在或无独立数据库', data: null });
+    }
+
+    const { getOperatorPool } = await import('../config/database');
+    const opPool = getOperatorPool(opRegistry.db_name);
+
+    // 检查手机号是否已被注册为裁判（在运营商隔离库）
+    const [existingRows] = await opPool.execute(
+      'SELECT id FROM referees WHERE phone = ?',
       [phone]
     );
-    if (existingReferee) {
+    if ((existingRows as any[])?.length > 0) {
       return res.status(400).json({ code: 400, message: '该手机号已被注册为裁判', data: null });
     }
 
@@ -70,10 +89,10 @@ router.post('/create-by-operator', authMiddleware, async (req: Request, res: Res
     }
 
     const refereeId = uuidv4();
-    await executeOp(req, 
+    await opPool.execute(
       `INSERT INTO referees (id, user_id, phone, venue_id, name, operator_id)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [refereeId, userId, phone, venue_id || null, name, req.user?.operatorId || null]
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [refereeId, userId, phone, venue_id || null, name, targetOperatorId]
     );
 
     return res.json({
