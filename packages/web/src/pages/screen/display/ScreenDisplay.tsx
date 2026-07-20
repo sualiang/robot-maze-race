@@ -283,16 +283,7 @@ export default function ScreenDisplay() {
     return formatTime(ms);
   };
 
-  // 头像渲染：URL 用 img，纯 emoji/文字 用 span
-  const renderAvatar = (avatar: string | undefined, size: number = 40, defaultEmoji: string = '🤖') => {
-    if (!avatar) {
-      return <span style={{ fontSize: size * 0.8, lineHeight: 1 }}>{defaultEmoji}</span>;
-    }
-    if (avatar.startsWith('http://') || avatar.startsWith('https://') || avatar.startsWith('data:')) {
-      return <img src={avatar} alt="avatar" style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover' }} />;
-    }
-    return <span style={{ fontSize: size * 0.8, lineHeight: 1 }}>{avatar}</span>;
-  };
+
 
   // 默认场地数据（API 获取失败时的回退值）
   // 默认数据（当 WebSocket 返回 undefined 时的回退值）
@@ -508,50 +499,28 @@ export default function ScreenDisplay() {
                 marginBottom: 8,
               }}>
                 <span style={{ fontSize: 40, lineHeight: 1, marginRight: 4 }}>🏆</span>
-                {/* 从排行榜第一条取刚完成选手的头像和名字 */}
-                <div style={{
-                  width: 64, height: 64, borderRadius: '50%',
-                  flexShrink: 0,
-                  background: 'linear-gradient(135deg, #ffd700, #ffaa00)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  overflow: 'hidden',
-                  border: '2px solid rgba(255,215,0,0.5)',
-                  boxShadow: '0 0 20px rgba(255,215,0,0.5)',
-                }}>
-                  {renderAvatar(displayData.last_result?.racerAvatar, 64)}
-                </div>
+                {/* 选手名字 */}
                 <div className="text-one-line" style={{
                   fontSize: 36, fontWeight: 700, color: '#ffd700',
                   fontFamily: 'monospace',
                   textShadow: '0 0 20px rgba(255,215,0,0.5)',
-                  maxWidth: 280,
+                  maxWidth: 400,
                 }}>
                   {displayData.last_result?.racerName || ''}
                 </div>
               </div>
             ) : null}
-            {/* 选手头像 + 名字（已上场/竞速中显示） */}
+            {/* 选手名字（已上场/竞速中显示） */}
             {(isRacing || isOnArena) && displayData.current_racer && (
               <div style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
                 marginBottom: 6,
               }}>
-                <div style={{
-                  width: 64, height: 64, borderRadius: '50%',
-                  flexShrink: 0,
-                  background: 'linear-gradient(135deg, #ff6b35, #ff9a3c)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  overflow: 'hidden',
-                  border: '2px solid rgba(255,255,255,0.3)',
-                  boxShadow: '0 0 20px rgba(255,107,53,0.5)',
-                }}>
-                  {renderAvatar(displayData.current_racer.avatar_url, 64)}
-                </div>
                 <div className="text-one-line" style={{
                   fontSize: 42, fontWeight: 700,
                   color: '#ff6b35',
                   fontFamily: 'monospace',
-                  maxWidth: 240,
+                  maxWidth: 400,
                 }}>
                   {displayData.current_racer.nickname}
                 </div>
