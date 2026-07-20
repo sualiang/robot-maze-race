@@ -240,13 +240,6 @@ export default function PackageList() {
     { title: '参赛次数', dataIndex: 'race_count', key: 'race_count', width: 90 },
     { title: '有效期(天)', dataIndex: 'valid_days', key: 'valid_days', width: 100, render: (v: number) => `${v}天` },
     {
-      title: '抵扣金', key: 'freeDeduction', width: 100,
-      render: (_: unknown, record: PackageItem) => {
-        const cents = record.free_deduction_cents || 0;
-        return cents > 0 ? `${(cents / 100).toFixed(0)}元` : '-';
-      },
-    },
-    {
       title: '消费券包', key: 'couponReward', width: 150,
       render: (_: unknown, record: PackageItem) => {
         const min = record.coupon_reward_min || 0;
@@ -370,11 +363,6 @@ export default function PackageList() {
                 placeholder="例如设60" />
             </Form.Item>
           </Space>
-          <Form.Item name="free_deduction_cents" label="赠送参赛包抵扣金（元）"
-            rules={[{ pattern: /^\d+$/, message: '请输入非负整数' }]}>
-            <InputNumber min={0} precision={0} style={{ width: 200 }}
-              placeholder="0表示不赠送" addonAfter="元" />
-          </Form.Item>
           <Space size={16}>
             <Form.Item name="growth_value" label="成长值"
               rules={[{ pattern: /^\d+$/, message: '请输入非负整数' }]}>
