@@ -443,11 +443,11 @@ router.post('/points-shop/redeem', authMiddleware, async (req: Request, res: Res
       return;
     }
 
-    // 2. 验证核销码
+    // 2. 验证核销码（从所有运营商的核销码中匹配）
     const opId = (req.user as any)?.operatorId || '';
     const validCode = await queryOne<any>(
-      `SELECT redeem_code FROM physical_gift_redeem_codes WHERE operator_id = $1`,
-      [opId]
+      `SELECT redeem_code FROM physical_gift_redeem_codes WHERE redeem_code = $1`,
+      [redeemCode]
     );
     if (!validCode || validCode.redeem_code !== redeemCode) {
       res.json({ code: 400, message: '核销码无效', data: null });

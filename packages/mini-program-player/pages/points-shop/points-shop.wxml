@@ -128,6 +128,12 @@
         <text class="detail-points-icon">⭐</text>
         <text class="detail-points-text">需要 {{detailItem.needPoints}} 积分</text>
       </view>
+      <!-- 兑换提醒 -->
+      <view class="detail-reminder">
+        <text class="detail-reminder-title">⚠️ 兑换提醒</text>
+        <text class="detail-reminder-text">积分兑换礼品</text>
+        <text class="detail-reminder-text">请前往比赛现场的礼品兑换处兑换或咨询现场工作人员！</text>
+      </view>
       <button class="detail-redeem-btn" bindtap="onStartRedeem" disabled="{{userPoints < detailItem.needPoints}}">
         {{userPoints < detailItem.needPoints ? '积分不足' : '现场兑换'}}
       </button>

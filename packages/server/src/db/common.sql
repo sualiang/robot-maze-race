@@ -316,4 +316,14 @@ CREATE TABLE IF NOT EXISTS settlements (
 CREATE INDEX IF NOT EXISTS idx_settlements_status ON settlements(status);
 CREATE INDEX IF NOT EXISTS idx_settlements_operator ON settlements(operator_id);
 
+-- 积分商城实物核销码（每个运营商一条记录，UPSERT 更新）
+CREATE TABLE IF NOT EXISTS physical_gift_redeem_codes (
+  id VARCHAR(36) NOT NULL PRIMARY KEY,
+  operator_id VARCHAR(36) NOT NULL,
+  redeem_code VARCHAR(4) NOT NULL,
+  created_by VARCHAR(36),
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT unique_operator_redeem UNIQUE (operator_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 
