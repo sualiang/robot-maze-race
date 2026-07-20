@@ -167,7 +167,7 @@ Page({
     if (that.data.recordMonthFilter) {
       params.month = that.data.recordMonthFilter;
     }
-    request.silentGet('/points-shop/records', params).then(function (res) {
+    request.silentGet('/points-shop/history', params).then(function (res) {
       if (res) {
         that.setData({ records: res.records || res.data || [] });
       }
