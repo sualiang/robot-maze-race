@@ -157,9 +157,9 @@ export default function OperatorDashboard() {
 
   useEffect(() => {
     fetchStats();
+    fetchSlowStats();
     fetchTopOperators(1);
-    // cross-stats loaded on demand via button click
-  }, [fetchStats, fetchTopOperators]);
+  }, [fetchStats, fetchSlowStats, fetchTopOperators]);
 
   /* ── Open operator orders modal ── */
   const openOperatorOrders = async (op: TopOperator, page: number = 1) => {
@@ -306,7 +306,7 @@ export default function OperatorDashboard() {
       >
         <Row gutter={[16, 16]}>
           <Col xs={24} sm={12}>
-            <Statistic title="全平台营收" value={stats.total_revenue / 100} precision={2}
+            <Statistic title="平台GMV" value={stats.total_revenue / 100} precision={2}
               prefix={<DollarOutlined />} suffix="元" loading={loadingStats} />
           </Col>
           <Col xs={24} sm={12}>

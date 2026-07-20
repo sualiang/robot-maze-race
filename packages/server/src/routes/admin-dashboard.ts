@@ -24,7 +24,8 @@ async function queryAllOpDash<T = any>(
   for (const reg of opRegs) {
     try {
       const pool = getOperatorPool(reg.db_name);
-      const [regRows] = await pool.query<any[]>(sql, params);
+      const result = await pool.query(sql, params);
+      const regRows = result[0] as any[];
       allRows.push(...regRows);
     } catch { /* skip */ }
   }
@@ -47,7 +48,8 @@ async function queryAllOpDashOne<T = any>(
   for (const reg of opRegs) {
     try {
       const pool = getOperatorPool(reg.db_name);
-      const [rows] = await pool.query<any[]>(sql, params);
+      const result = await pool.query(sql, params);
+      const rows = result[0] as any[];
       if (!rows || rows.length === 0) continue;
       const row = rows[0];
       for (const k of Object.keys(row)) {
@@ -146,12 +148,10 @@ router.get('/stats-slow', authMiddleware, checkPermission('dashboard:read'), asy
 // ============================================================
 router.get('/revenue-breakdown', authMiddleware, checkPermission('dashboard:read'), async (req: Request, res: Response) => {
   try {
-    // Step 1: 从所有运营商库查 payments 聚合
-    const settlementRows = await queryAllOpDash<any>(req, 
+    // Step 1: 从所有运营商库查 payments 聚合（订单数+收入）
+    const paymentRows = await queryAllOpDash<any>(req, 
       `SELECT operator_id,
               SUM(amount_cents) as revenue,
-              0 as platform_profit,
-              SUM(amount_cents) as operator_profit,
               COUNT(id) as order_count
        FROM payments
        WHERE status = 'paid'
@@ -159,12 +159,23 @@ router.get('/revenue-breakdown', authMiddleware, checkPermission('dashboard:read
        ORDER BY revenue DESC`
     );
 
-    // Step 2: 从 common 库查 operators 名称
-    if (settlementRows.length === 0) {
+    if (paymentRows.length === 0) {
       return res.json({ code: 0, message: 'ok', data: { list: [] } });
     }
 
-    const opIds = [...new Set(settlementRows.map((r: any) => r.operator_id))];
+    const opIds = [...new Set(paymentRows.map((r: any) => r.operator_id))];
+
+    // Step 2: 从各运营商库查 settlements 聚合佣金
+    const commissionRows = await queryAllOpDash<any>(req,
+      `SELECT operator_id,
+              COALESCE(SUM(commission_cents), 0) as platform_profit
+       FROM settlements
+       WHERE status = 'settled'
+       GROUP BY operator_id`
+    );
+    const commissionMap = new Map(commissionRows.map((r: any) => [r.operator_id, parseInt(r.platform_profit, 10)]));
+
+    // Step 3: 从 common 库查 operators 名称
     const placeholders = opIds.map((_, i) => '$' + (i + 1)).join(',');
     const ops = await query<any>(
       `SELECT id, name FROM operators WHERE id IN (${placeholders})`,
@@ -172,14 +183,18 @@ router.get('/revenue-breakdown', authMiddleware, checkPermission('dashboard:read
     );
     const opMap = new Map(ops.map((o: any) => [o.id, o.name]));
 
-    const breakdown = settlementRows.map((r: any) => ({
-      operator_id: r.operator_id,
-      operator_name: opMap.get(r.operator_id) || '未知运营商',
-      revenue: parseInt(r.revenue, 10),
-      platform_profit: parseInt(r.platform_profit, 10),
-      operator_profit: parseInt(r.operator_profit, 10),
-      order_count: parseInt(r.order_count, 10),
-    }));
+    const breakdown = paymentRows.map((r: any) => {
+      const revenue = parseInt(r.revenue, 10);
+      const platformProfit = commissionMap.get(r.operator_id) || 0;
+      return {
+        operator_id: r.operator_id,
+        operator_name: opMap.get(r.operator_id) || '未知运营商',
+        revenue,
+        platform_profit: platformProfit,
+        operator_profit: Math.max(0, revenue - platformProfit),
+        order_count: parseInt(r.order_count, 10),
+      };
+    });
 
     return res.json({ code: 0, message: 'ok', data: { list: breakdown } });
   } catch (error: any) {
@@ -206,7 +221,7 @@ router.get('/revenue-by-region', authMiddleware, checkPermission('dashboard:read
     const lastMonthEnd = lastOfLastMonth.toISOString().slice(0, 10);
 
     // Step 1: operator 库查 payments 按 operator_id 聚合
-    const settlementsAgg = await queryAllOpDash<any>(req,
+    const paymentAgg = await queryAllOpDash<any>(req,
       `SELECT operator_id,
               COALESCE(SUM(CASE WHEN date(created_at) = ? THEN amount_cents ELSE 0 END), 0) as yesterday_revenue,
               COALESCE(SUM(CASE WHEN date(created_at) >= ? AND date(created_at) <= ? THEN amount_cents ELSE 0 END), 0) as last_month_revenue
@@ -217,7 +232,7 @@ router.get('/revenue-by-region', authMiddleware, checkPermission('dashboard:read
     );
 
     // Step 2: common 库查 operators 的 province
-    const opIds = [...new Set(settlementsAgg.map((r: any) => r.operator_id))];
+    const opIds = [...new Set(paymentAgg.map((r: any) => r.operator_id))];
     if (opIds.length === 0) {
       return res.json({ code: 0, message: 'ok', data: { list: [] } });
     }
@@ -230,7 +245,7 @@ router.get('/revenue-by-region', authMiddleware, checkPermission('dashboard:read
 
     // Step 3: 按 province 聚合
     const provinceMap = new Map<string, { province: string; yesterday_revenue: number; last_month_revenue: number }>();
-    for (const r of settlementsAgg) {
+    for (const r of paymentAgg) {
       const province = opProvinceMap.get(r.operator_id) || '未知';
       if (!provinceMap.has(province)) {
         provinceMap.set(province, { province, yesterday_revenue: 0, last_month_revenue: 0 });
@@ -478,7 +493,7 @@ router.get('/top-operators', authMiddleware, checkPermission('dashboard:list'), 
     const opMap = new Map(allOps.map((o: any) => [o.id, o]));
 
     // Step 2: operator 库查 payments 聚合（带日期筛选）
-    const settlementsAgg = await queryAllOpDash<any>(req,
+    const paymentAgg = await queryAllOpDash<any>(req,
       `SELECT operator_id,
               COALESCE(SUM(amount_cents), 0) as total_revenue,
               COUNT(id) as order_count
@@ -487,16 +502,25 @@ router.get('/top-operators', authMiddleware, checkPermission('dashboard:list'), 
        GROUP BY operator_id`,
       [dateStart, dateEnd]
     );
-    const revMap = new Map(settlementsAgg.map((r: any) => [r.operator_id, r]));
+    const revMap = new Map(paymentAgg.map((r: any) => [r.operator_id, r]));
 
-    // Step 3: 合并排序，取 top 100
+    // Step 3: operator 库查 settlements 聚合佣金（平台利润）
+    const commissionAgg = await queryAllOpDash<any>(req,
+      `SELECT operator_id,
+              COALESCE(SUM(commission_cents), 0) as platform_profit
+       FROM settlements
+       WHERE status = 'settled' AND date(settled_at) >= ? AND date(settled_at) <= ?
+       GROUP BY operator_id`,
+      [dateStart, dateEnd]
+    );
+    const commissionMap = new Map(commissionAgg.map((r: any) => [r.operator_id, parseInt(r.platform_profit, 10)]));
+
+    // Step 4: 合并排序，取 top 100
     const merged = allOps
       .map((op: any) => {
         const rev = revMap.get(op.id) || { total_revenue: 0, order_count: 0 };
         const revenue = parseInt(rev.total_revenue, 10);
-        // 平台利润: 用 profit_share_rate 计算（payments 表无 commission_cents）
-        const profitShareRate = parseFloat(op.profit_share_rate) || 0;
-        const platformProfit = Math.round(revenue * (1 - profitShareRate / 100));
+        const platformProfit = commissionMap.get(op.id) || 0;
         return {
           id: op.id,
           name: op.name,
@@ -504,7 +528,7 @@ router.get('/top-operators', authMiddleware, checkPermission('dashboard:list'), 
           email: op.email,
           company_name: op.company_name,
           status: op.status,
-          profit_share_rate: profitShareRate,
+          profit_share_rate: op.profit_share_rate,
           venue_count: op.venue_count,
           province: op.province,
           city: op.city,
@@ -578,9 +602,9 @@ router.get('/operator-orders/:operatorId', authMiddleware, checkPermission('dash
       dateEnd = `${year}-${monthStr}-${lastDay}`;
     }
 
-    // 查询订单
+    // 查询订单（统一从 payments 表读取）
     const countRow = await queryAllOpDashOne<{ count: string }>(req,
-      `SELECT COUNT(*) as count FROM orders
+      `SELECT COUNT(*) as count FROM payments
        WHERE operator_id = ? AND status = 'paid'
          AND DATE(paid_at) >= ? AND DATE(paid_at) <= ?`,
       [operatorId, dateStart, dateEnd]
@@ -588,14 +612,14 @@ router.get('/operator-orders/:operatorId', authMiddleware, checkPermission('dash
     const total = parseInt(countRow?.count || '0', 10);
 
     const rows = await queryAllOpDash<any>(req,
-      `SELECT o.id, o.order_no, o.amount_cents, o.points_deduction_cents,
-              o.paid_at, o.status,
+      `SELECT p.id, p.order_no, p.amount_cents, p.points_deduction_cents,
+              p.paid_at, p.status,
               rp.name as package_name
-       FROM orders o
-       LEFT JOIN race_packages rp ON o.package_id = rp.id
-       WHERE o.operator_id = ? AND o.status = 'paid'
-         AND DATE(o.paid_at) >= ? AND DATE(o.paid_at) <= ?
-       ORDER BY o.paid_at DESC
+       FROM payments p
+       LEFT JOIN race_packages rp ON p.package_id = rp.id
+       WHERE p.operator_id = ? AND p.status = 'paid'
+         AND DATE(p.paid_at) >= ? AND DATE(p.paid_at) <= ?
+       ORDER BY p.paid_at DESC
        LIMIT ${pageSize} OFFSET ${offset}`,
       [operatorId, dateStart, dateEnd]
     );
