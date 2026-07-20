@@ -86,6 +86,7 @@ export default function MarketingConfig() {
     setEditingItem(item);
     editForm.setFieldsValue({
       name: item.name,
+      itemType: item.itemType || 'physical_gift',
       description: item.description,
       image: item.image || '',
       needPoints: item.needPoints,
