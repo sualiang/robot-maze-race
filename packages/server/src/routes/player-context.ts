@@ -21,8 +21,32 @@ router.post('/player/context/set', authMiddleware, async (req: Request, res: Res
   }
 
   try {
-    await setOperatorContext(userId, operatorId, venueId);
-    res.json({ code: 0, message: '运营商上下文已设置', data: { operatorId, venueId, userId } });
+    let fullOperatorId = operatorId;
+    let fullVenueId = venueId;
+
+    // scene 扫码只传了 UUID 前缀（去连字符后前 14 位），需补齐完整 UUID
+    // 从全局 operators 表 LIKE 匹配
+    if (operatorId.length < 32) {
+      const matched = await queryOne<{ id: string }>(
+        `SELECT id FROM operators WHERE REPLACE(id, '-', '') LIKE $1 LIMIT 1`,
+        [operatorId + '%']
+      );
+      if (matched?.id) {
+        fullOperatorId = matched.id;
+        console.log('[PlayerContext] 补全 operatorId: ' + operatorId + ' → ' + fullOperatorId);
+      } else {
+        console.warn('[PlayerContext] 无法补全 operatorId 前缀: ' + operatorId);
+      }
+    }
+
+    // venueId 同理，但需要对应运营商库来匹配——先跳过，等 set 完 operatorId 后再尝试
+    if (fullVenueId && fullVenueId.length < 32) {
+      // 暂时用简单 LIKE（全局 fallback 不行，但 setOperatorContext 后再查就行了）
+      // 这里先不处理 venueId 前缀补全
+    }
+
+    await setOperatorContext(userId, fullOperatorId, fullVenueId);
+    res.json({ code: 0, message: '运营商上下文已设置', data: { operatorId: fullOperatorId, venueId: fullVenueId, userId } });
   } catch (e: any) {
     console.error('[PlayerContext] set error:', e?.message || e);
     res.status(500).json({ code: 500, message: '设置运营商上下文失败', data: null });
