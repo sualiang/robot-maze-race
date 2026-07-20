@@ -108,23 +108,25 @@ function handleMessage(ws: WebSocket, msg: any) {
 
     case 'get_screen_data': {
       // 客户端主动请求当前数据，从 DB 恢复排行榜
-      const data = getCurrentScreenData();
-      const venueId = data.venue_id || getCachedVenueId();
-      if (venueId) {
-        try {
-          const leaderboard = await fetchLeaderboardFromDb(venueId);
-          data.leaderboard = leaderboard.map((e: any) => ({
-            rank: e.rank,
-            nickname: e.name,
-            finish_time_ms: e.elapsed,
-            status: e.status,
-            avatar_url: e.avatar || undefined,
-          }));
-        } catch (e: any) {
-          console.error('[WS] get_screen_data leaderboard fetch error:', e.message);
+      (async () => {
+        const data = getCurrentScreenData();
+        const venueId = data.venue_id || getCachedVenueId();
+        if (venueId) {
+          try {
+            const leaderboard = await fetchLeaderboardFromDb(venueId);
+            data.leaderboard = leaderboard.map((e: any) => ({
+              rank: e.rank,
+              nickname: e.name,
+              finish_time_ms: e.elapsed,
+              status: e.status,
+              avatar_url: e.avatar || undefined,
+            }));
+          } catch (e: any) {
+            console.error('[WS] get_screen_data leaderboard fetch error:', e.message);
+          }
         }
-      }
-      ws.send(JSON.stringify({ type: 'screen_data', data }));
+        ws.send(JSON.stringify({ type: 'screen_data', data }));
+      })();
       break;
     }
 
