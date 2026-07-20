@@ -134,7 +134,14 @@ Page({
     }).then(function (res) {
       that.setData({ redeeming: false });
       if (res && res.code === 0) {
-        that.setData({ showDetail: false, detailItem: null, showRedeem: false, redeemCodeInput: '' });
+        var needPoints = (res.data && res.data.needPoints) || item.needPoints || 0;
+        that.setData({
+          showDetail: false,
+          detailItem: null,
+          showRedeem: false,
+          redeemCodeInput: '',
+          userPoints: Math.max(0, that.data.userPoints - needPoints)
+        });
         that.showToast('🎉 恭喜你，积分兑换成功！');
         that.fetchItems();
         that.fetchRecords();
