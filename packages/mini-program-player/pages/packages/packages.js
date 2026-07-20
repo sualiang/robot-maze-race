@@ -17,13 +17,6 @@ Page({
     pendingPackagePrice: 0,
     pendingPackageCount: 0,
 
-    // 积分抵扣
-    pointsBalance: 0,
-    pointsDeductionChecked: false,
-    pointsDeductionCents: 0,
-    pointsDeductionYuan: 0,
-    pointsDeductionInfo: null,
-
     // 扫码来源参数
     venueId: null
   },
@@ -35,16 +28,11 @@ Page({
       that.setData({ venueId: options.venue_id });
     }
 
-    // 并行拉取参赛包列表 + 用户信息 + 积分抵扣信息
+    // 并行拉取参赛包列表 + 用户信息
     that.fetchAllData();
-    that.fetchPointsDeductionInfo();
   },
 
   onShow: function () {
-    var app = getApp();
-    if (app.globalData.pointsDeductionChecked !== undefined) {
-      this.setData({ pointsDeductionChecked: app.globalData.pointsDeductionChecked });
-    }
   },
 
   onPullDownRefresh: function () {
@@ -165,7 +153,7 @@ Page({
 
     request.post('/player/orders', {
       packageId: packageId,
-      usePointsDeduction: that.data.pointsDeductionChecked
+      usePointsDeduction: false
     }).then(function (order) {
       wx.hideLoading();
 
@@ -259,41 +247,6 @@ Page({
    */
   onInviteFriend: function () {
     wx.navigateTo({ url: '/pages/help/help' });
-  },
-
-  /**
-   * 获取积分抵扣信息
-   */
-  fetchPointsDeductionInfo: function () {
-    var that = this;
-    request.get('/player/points-deduction-info').then(function (data) {
-      var d = data && data.data ? data.data : data;
-      if (!d) return;
-      var balance = d.pointsBalance || 0;
-      var maxYuan = d.maxDeductionYuan || 0;
-      var maxPoints = Math.min(balance, d.maxDeductiblePoints || 0);
-      var maxCents = Math.min(d.maxDeductionCents || 0, Math.floor(balance * 100 / (d.deductionRate || 100)));
-      that.setData({
-        pointsBalance: balance,
-        pointsDeductionInfo: {
-          balance: balance,
-          maxYuan: maxYuan,
-          maxPoints: maxPoints,
-          rate: d.deductionRate || 100
-        },
-        pointsDeductionCents: maxCents,
-        pointsDeductionYuan: (maxCents / 100).toFixed(2)
-      });
-    }).catch(function () {});
-  },
-
-  /**
-   * 切换积分抵扣勾选
-   */
-  onTogglePointsDeduction: function (e) {
-    var checked = e.detail.value;
-    this.setData({ pointsDeductionChecked: checked });
-    getApp().globalData.pointsDeductionChecked = checked;
   },
 
   /**

@@ -10,21 +10,6 @@
     <text wx:else class="banner-text">当前剩余 <text class="banner-count">{{remainCount}}</text> 次</text>
   </view>
 
-  <!-- ===== 积分抵扣开关 ===== -->
-  <view wx:if="{{!loading && !empty && pointsBalance > 0}}" class="points-deduction-bar">
-    <view class="deduction-info">
-      <text class="deduction-label">积分抵扣</text>
-      <text class="deduction-detail">
-        当前 <text class="deduction-hl">{{pointsBalance}}</text> 积分，最多可抵扣 ¥{{pointsDeductionYuan}}
-      </text>
-    </view>
-    <switch
-      checked="{{pointsDeductionChecked}}"
-      bindchange="onTogglePointsDeduction"
-      color="#07c160"
-    />
-  </view>
-
   <!-- ===== 参赛包列表 ===== -->
   <view wx:if="{{!loading && !empty}}" class="package-list">
     <view
