@@ -352,7 +352,6 @@ export default function MatchPage() {
         {status === 'running' && maxTimeout > 0 && <div className="referee-progress-bar"><div className="referee-progress-fill" style={{ width: timeoutPercent + '%' }} data-danger={isTimeoutDanger} /></div>}
         {currentRacer && (
           <div className="referee-racer-info">
-            <div className="referee-racer-avatar">🤖</div>
             <div className="referee-racer-detail">
               <div className="text-one-line">{currentRacer.nickname || currentRacer.name}</div>
               <div className="referee-racer-remaining">剩<strong>{currentRacer.remainingRaces}</strong>次</div>
@@ -406,7 +405,6 @@ export default function MatchPage() {
         {queue.map((item, index) => (
           <div key={item.id} className="referee-card referee-queue-item" data-active={item.isCurrent} onClick={() => { if (!item.isCurrent && status === 'idle') selectRacer(item.id); }}>
             <div className="referee-queue-index" data-current={item.isCurrent}>{item.isCurrent ? '★' : index + 1}</div>
-            <div className="referee-queue-avatar" data-current={item.isCurrent}>🤖</div>
             <div className="referee-queue-name"><span className="text-one-line">{item.nickname || item.name || '选手' + item.id}</span><span className="referee-queue-remaining">剩<strong>{item.remainingRaces ?? '?'}</strong>次</span></div>
             {item.isCurrent && <div className="referee-queue-badge"><span className="referee-queue-dot">●</span><span>进行中</span></div>}
             {!item.isCurrent && status === 'idle' && checkedIn === true && <button className="referee-btn referee-btn-primary referee-btn-sm" style={{ marginLeft: 8, flexShrink: 0 }} onClick={(e) => { e.stopPropagation(); selectRacer(item.id); }}>上场</button>}
