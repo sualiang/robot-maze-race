@@ -329,31 +329,18 @@ async function grantGrowthOnCheckin(req: Request, userId: string, checkinId: str
     const perCheckinPoints = Math.floor((order.point_value || 0) / raceCount);
 
     if (perCheckinGrowth > 0 || perCheckinPoints > 0) {
-      const season = await queryOne<{ id: string }>(
-        `SELECT id FROM seasons WHERE status = 1 ORDER BY created_at DESC LIMIT 1`
-      );
-      if (season) {
-        const existing = await queryOne<{ id: string; exp: number; points: number }>(
-          `SELECT id, exp, points FROM season_user_info WHERE user_id = $1 AND season_id = $2`,
-          [userId, season.id]
+      if (perCheckinGrowth > 0) {
+        await execute(
+          `UPDATE users SET exp = COALESCE(exp, 0) + $1, updated_at = NOW() WHERE id = $2`,
+          [perCheckinGrowth, userId]
         );
-        if (existing) {
-          await execute(
-            `UPDATE season_user_info SET exp = exp + $1, points = points + $2, updated_at = NOW() WHERE id = $3`,
-            [perCheckinGrowth, perCheckinPoints, existing.id]
-          );
-        } else {
-          await query(
-            `INSERT INTO season_user_info (id, user_id, season_id, level, exp, points)
-             VALUES ($1, $2, $3, 1, $4, $5)`,
-            [uuidv4(), userId, season.id, perCheckinGrowth, perCheckinPoints]
-          );
-        }
       }
-      await execute(
-        `UPDATE users SET exp = COALESCE(exp, 0) + $1, points = COALESCE(points, 0) + $2, updated_at = NOW() WHERE id = $3`,
-        [perCheckinGrowth, perCheckinPoints, userId]
-      );
+      if (perCheckinPoints > 0) {
+        await execute(
+          `UPDATE users SET points = COALESCE(points, 0) + $1, updated_at = NOW() WHERE id = $2`,
+          [perCheckinPoints, userId]
+        );
+      }
     }
     await executeOp(req,
       `UPDATE orders SET remaining_times = remaining_times - 1, updated_at = NOW() WHERE id = $1 AND remaining_times > 0`,
