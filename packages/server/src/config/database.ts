@@ -190,6 +190,7 @@ function normalizeValue(v: any): any {
 export function expandParams(text: string, params: any[]): any[] {
   if (!params || params.length === 0) return [];
   // 按 SQL 中 $digit 的出现顺序重排参数，每个 $digit 对应 params[digit-1]
+  // 如果 SQL 中没有 $digit 占位符（比如原生 ? 占位符），直接返回原始 params
   const r: any[] = [];
   const re = /\$(\d+)/g;
   let m;
@@ -197,7 +198,7 @@ export function expandParams(text: string, params: any[]): any[] {
     const idx = parseInt(m[1], 10) - 1;
     r.push(idx < params.length ? normalizeValue(params[idx]) : undefined);
   }
-  return r;
+  return r.length > 0 ? r : params;
 }
 
 async function doQuery(pool: mysql.Pool, text: string, params?: any[]): Promise<any[]> {
