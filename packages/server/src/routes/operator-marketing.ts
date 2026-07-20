@@ -314,7 +314,7 @@ router.post('/init-templates', authMiddleware, operatorOnly, async (req: Request
 
     // 默认营销配置
     const defaultMktConfigs = [
-      { key: 'home_announcement', value: '' },
+      { key: 'home_announcement', value: '🏆 迷宫竞速火热进行中！快来挑战你的极限速度～' },
       { key: 'help_enabled', value: 'true' },
       { key: 'help_required_count', value: '3' },
       { key: 'help_reward_count', value: '1' },
