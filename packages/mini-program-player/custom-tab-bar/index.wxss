@@ -3,7 +3,7 @@
   bottom: 0;
   left: 0;
   right: 0;
-  height: 100rpx;
+  height: 120rpx;
   padding-bottom: env(safe-area-inset-bottom);
   display: flex;
   background: #1a1a2e;
@@ -21,13 +21,13 @@
 }
 
 .tab-icon {
-  width: 40rpx;
-  height: 40rpx;
-  margin-bottom: 4rpx;
+  width: 44rpx;
+  height: 44rpx;
+  margin-bottom: 6rpx;
 }
 
 .tab-text {
-  font-size: 22rpx;
+  font-size: 30rpx;
   color: #666680;
   line-height: 1;
 }
