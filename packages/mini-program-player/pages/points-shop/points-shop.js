@@ -146,10 +146,13 @@ Page({
         that.fetchItems();
         that.fetchRecords();
       } else {
-        that.showToast(res && res.message || '核销失败');
+        var errMsg = (res && res.message) || '核销失败';
+        console.error('[PointsShop] redeem failed:', res);
+        that.showToast(errMsg);
       }
-    }).catch(function () {
+    }).catch(function (err) {
       that.setData({ redeeming: false });
+      console.error('[PointsShop] redeem catch:', err);
       that.showToast('核销失败，请重试');
     });
   },
