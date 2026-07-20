@@ -1,12 +1,8 @@
 import { Router, Request, Response } from 'express';
-import { Pool as MysqlPool } from 'mysql2/promise';
-import { broadcastToScreen, validateActivationCode, ACTIVATION_CODE_PREFIX } from '../ws/handler';
-import { getRedis } from '../config/redis';
+import { broadcastToScreen, validateActivationCode } from '../ws/handler';
 import { WebSocket } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
-import { hashSync } from '../config/bcrypt';
-import { query, queryOne, execute, getOperatorPool, expandParams, executeOp } from '../config/database';
-import { getConfigInt } from '../config/utils';
+import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import {
   ApiResponse,
@@ -15,6 +11,7 @@ import {
   CreateRefereeParams,
   UpdateRefereeParams,
 } from '@robot-race/shared';
+import { getConfigInt } from '../config/utils';
 
 const router = Router();
 
@@ -30,8 +27,7 @@ const router = Router();
  * @body name - 裁判姓名
  * @body phone - 裁判手机号（必填，用于登录）
  * @body venue_id - 绑定的赛场 ID（可选）
- * @body operator_id - admin 创建时必填，指定目标运营商 ID（operator 角色忽略此参数）
- * @returns 创建的裁判信息 + 系统生成的登录密码
+ * @returns 创建的裁判信息 + 初始密码
  */
 router.post('/create-by-operator', authMiddleware, async (req: Request, res: Response) => {
   try {
@@ -40,39 +36,18 @@ router.post('/create-by-operator', authMiddleware, async (req: Request, res: Res
       return res.status(403).json({ code: 403, message: '仅管理员或运营商可创建裁判', data: null });
     }
 
-    const { name, phone, venue_id, operator_id } = req.body;
+    const { name, phone, venue_id } = req.body;
 
     if (!name || !phone) {
       return res.status(400).json({ code: 400, message: '请填写裁判姓名和手机号', data: null });
     }
 
-    // 随机生成 8 位数字密码
-    const generatedPassword = Math.floor(10000000 + Math.random() * 90000000).toString();
-
-    // 解析目标运营商 ID
-    const targetOperatorId = operator_id || req.user?.operatorId;
-    if (!targetOperatorId) {
-      return res.status(400).json({ code: 400, message: 'admin 创建裁判需指定 operator_id', data: null });
-    }
-
-    // 校验 operator_id 对应的运营商库存在
-    const opRegistry = await queryOne<{ db_name: string; operator_name: string }>(
-      'SELECT db_name, operator_name FROM operators_registry WHERE operator_id = $1',
-      [targetOperatorId]
-    );
-    if (!opRegistry || !opRegistry.db_name) {
-      return res.status(400).json({ code: 400, message: '指定的运营商不存在或无独立数据库', data: null });
-    }
-
-
-    const opPool = getOperatorPool(opRegistry.db_name);
-
-    // 检查手机号是否已被注册为裁判（在运营商隔离库）
-    const [existingRows] = await opPool.execute(
-      'SELECT id FROM referees WHERE phone = ?',
+    // 检查手机号是否已被注册为裁判
+    const existingReferee = await queryOpOne<{ id: string }>(req, 
+      'SELECT id FROM referees WHERE phone = $1',
       [phone]
     );
-    if ((existingRows as any[])?.length > 0) {
+    if (existingReferee) {
       return res.status(400).json({ code: 400, message: '该手机号已被注册为裁判', data: null });
     }
 
@@ -83,7 +58,7 @@ router.post('/create-by-operator', authMiddleware, async (req: Request, res: Res
     );
 
     let userId: string;
-    // 创建 users 记录（裁判支持手机号+密码登录）
+    // 创建 users 记录（裁判仅微信OAuth登录，无需密码）
     if (!existingUser) {
       userId = uuidv4();
       await execute(
@@ -96,11 +71,10 @@ router.post('/create-by-operator', authMiddleware, async (req: Request, res: Res
     }
 
     const refereeId = uuidv4();
-    const hashedPwd = hashSync(generatedPassword, 10);
-    await opPool.execute(
-      `INSERT INTO referees (id, user_id, phone, password, is_first_login, venue_id, name, operator_id)
-       VALUES (?, ?, ?, ?, 1, ?, ?, ?)`,
-      [refereeId, userId, phone, hashedPwd, venue_id || null, name, targetOperatorId]
+    await executeOp(req, 
+      `INSERT INTO referees (id, user_id, phone, venue_id, name, operator_id)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [refereeId, userId, phone, venue_id || null, name, req.user?.operatorId || null]
     );
 
     return res.json({
@@ -111,7 +85,6 @@ router.post('/create-by-operator', authMiddleware, async (req: Request, res: Res
         user_id: userId,
         name,
         phone,
-        password: generatedPassword,  // 明文返回给运营商展示
         venue_id: venue_id || null,
       },
     });
@@ -144,7 +117,6 @@ router.get('/', authMiddleware, async (req: Request, res: Response<ApiResponse<P
     const {
       venue_id,
       status,
-      operator_id,
       page: pageStr = '1',
       pageSize: pageSizeStr = '20',
     } = req.query;
@@ -152,7 +124,6 @@ router.get('/', authMiddleware, async (req: Request, res: Response<ApiResponse<P
     const page = Math.max(1, parseInt(pageStr as string, 10) || 1);
     const pageSize = Math.min(100, Math.max(1, parseInt(pageSizeStr as string, 10) || 20));
     const offset = (page - 1) * pageSize;
-    const role = req.user!.role;
 
     const conditions: string[] = [];
     const params: any[] = [];
@@ -179,141 +150,47 @@ router.get('/', authMiddleware, async (req: Request, res: Response<ApiResponse<P
         params.push('rejected');
         paramIdx++;
       }
+      // 不支持其他 status 值，忽略
     }
 
-    // operator: 只看自己的运营商 + venue 过滤
-    if (role === 'operator') {
-      const owneOpId = (req.user as any)?.operatorId
-        || (await queryOne<{ operator_id: string }>(
-          'SELECT operator_id FROM operator_members WHERE id = $1',
-          [req.user!.userId]
-        ))?.operator_id
-        || req.user!.userId;
-
-      const operatorVenues = await refQueryOp<{ id: string }>(req,
+    // operator 可看自己管理的赛场下的裁判 + 未绑定赛场的裁判（自己创建的）
+    if (req.user!.role === 'operator') {
+      // 统一获取运营商ID：先查 operator_members 表再回退
+      const roleMember = await queryOne<{ operator_id: string }>(
+          'SELECT operator_id FROM operator_members WHERE id = ?',
+        [req.user!.userId]
+      );
+      const opUserId = roleMember?.operator_id || 
+        (req.user as any).operatorId || 
+        req.user!.userId;
+      const operatorVenues = await queryOp<{ id: string }>(req, 
         'SELECT id FROM venues WHERE operator_id = $1',
-        [owneOpId]
+        [opUserId]
       );
       const venueIds = operatorVenues.map((v) => v.id);
       if (venueIds.length > 0) {
-        const ph = venueIds.map((_, i) => `$${paramIdx + i}`).join(', ');
-        conditions.push(`(r.venue_id IN (${ph}) OR r.venue_id IS NULL)`);
+        const placeholders = venueIds.map((_, i) => `$${paramIdx + i}`).join(', ');
+        // 自己赛场的裁判 OR 未绑定的裁判
+        conditions.push(`(r.venue_id IN (${placeholders}) OR r.venue_id IS NULL)`);
         params.push(...venueIds);
         paramIdx += venueIds.length;
       } else {
+        // 没有赛场，只看未绑定的裁判
         conditions.push('r.venue_id IS NULL');
       }
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    // admin: 遍历所有运营商库汇总（或按 ?operator_id 指定单个）
-    // operator: 走 resolveOperatorDb 单库查询
-    const isAdmin = role === 'admin';
-
-    if (isAdmin) {
-      // 收集所有目标运营商库的 db_name
-      let targetDbNames: string[] = [];
-      if (operator_id && (operator_id as string) !== '') {
-        const opReg = await queryOne<{ db_name: string }>(
-          'SELECT db_name FROM operators_registry WHERE operator_id = $1',
-          [operator_id as string]
-        );
-        if (opReg?.db_name) targetDbNames = [opReg.db_name];
-      } else {
-        const allRegs = await query<{ db_name: string }>(
-          'SELECT db_name FROM operators_registry WHERE db_name IS NOT NULL'
-        );
-        targetDbNames = allRegs.map((r: any) => r.db_name).filter(Boolean);
-      }
-
-      if (targetDbNames.length === 0) {
-        return res.json({ code: 0, message: 'ok', data: { list: [], total: 0, page, pageSize } });
-      }
-
-      // 从每个运营商库拉 referees
-      type RawRow = any;
-      const allRows: RawRow[] = [];
-      for (const dbName of targetDbNames) {
-        try {
-          const pool = getOperatorPool(dbName);
-          const [countRows] = await pool.execute(
-            `SELECT COUNT(*) as count FROM referees r ${whereClause.replace(/\$(\d+)/g, '?')}`,
-            params
-          ) as any[];
-          if (((countRows as any[])?.[0]?.count || 0) > 0) {
-            const [rows] = await pool.execute(
-              `SELECT r.id, r.user_id, r.venue_id, r.status,
-                      r.name, r.phone, r.id_number, r.cert_image,
-                      r.last_checkin_at, r.created_at, r.updated_at,
-                      r.apply_remark, r.review_remark, r.reviewed_at, r.operator_id,
-                      v.name as venue_name
-               FROM referees r
-               LEFT JOIN venues v ON r.venue_id = v.id
-               ${whereClause.replace(/\$(\d+)/g, '?')}
-               ORDER BY r.created_at DESC`,
-              params
-            ) as any[];
-            allRows.push(...(rows || []));
-          }
-        } catch { /* skip unreachable DB */ }
-      }
-
-      // JS 层排序 + 分页
-      allRows.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      const total = allRows.length;
-      const paged = allRows.slice(offset, offset + pageSize);
-
-      // 组装用户/运营商名称
-      const userIds = [...new Set(paged.map((r: any) => r.user_id).filter(Boolean))];
-      const opIds = [...new Set(paged.map((r: any) => r.operator_id).filter(Boolean))];
-      const userMap: Record<string, any> = {};
-      const opMap: Record<string, any> = {};
-
-      if (userIds.length > 0) {
-        try {
-          const users = await query<any>(
-            `SELECT id, nickname, avatar_url FROM users WHERE id IN (${userIds.map((_, i) => `$${i + 1}`).join(', ')})`,
-            userIds
-          );
-          users.forEach((u: any) => { userMap[u.id] = u; });
-        } catch { /* ignore */ }
-      }
-      if (opIds.length > 0) {
-        try {
-          const ops = await query<any>(
-            `SELECT id, name FROM operators WHERE id IN (${opIds.map((_, i) => `$${i + 1}`).join(', ')})`,
-            opIds
-          );
-          ops.forEach((o: any) => { opMap[o.id] = o; });
-        } catch { /* ignore */ }
-      }
-
-      const list: RefereeWithUser[] = paged.map((r: any) => ({
-        ...r,
-        nickname: userMap[r.user_id]?.nickname || null,
-        avatar_url: userMap[r.user_id]?.avatar_url || null,
-        operator_name: opMap[r.operator_id]?.name || null,
-      }));
-
-      return res.json({ code: 0, message: 'ok', data: { list, total, page, pageSize } });
-    }
-
-    // ---- operator 路径（直接用 JWT operatorId 连 op_* 库，不依赖 resolveOperatorDb） ----
-
-    const opPool = await getOpPoolFromJwt(req);
-    if (!opPool) {
-      return res.json({ code: 0, message: 'ok', data: { list: [], total: 0, page, pageSize } });
-    }
-
-    const mysqlWhere = whereClause.replace(/\$(\d+)/g, '?');
-    const [countRows] = await opPool.execute(
-      `SELECT COUNT(*) as count FROM referees r ${mysqlWhere}`,
+    // COUNT: only from operator DB (no cross-DB JOIN on users)
+    const countResult = await queryOpOne<{ count: string }>(req, 
+      `SELECT COUNT(*) as count FROM referees r ${whereClause}`,
       params
-    ) as any[];
-    const total = parseInt((countRows as any[])?.[0]?.count || '0', 10);
+    );
+    const total = parseInt(countResult?.count || '0', 10);
 
-    const [rows] = await opPool.execute(
+    // 1) 从运营商库查 referees + venues
+    const rows = await queryOp<any>(req, 
       `SELECT r.id, r.user_id, r.venue_id, r.status,
               r.name,
               r.phone, r.id_number, r.cert_image,
@@ -322,12 +199,13 @@ router.get('/', authMiddleware, async (req: Request, res: Response<ApiResponse<P
               v.name as venue_name
        FROM referees r
        LEFT JOIN venues v ON r.venue_id = v.id
-       ${mysqlWhere}
+       ${whereClause}
        ORDER BY r.created_at DESC
-       LIMIT ${pageSize} OFFSET ${offset}`,
-      params
-    ) as any[];
+       LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
+      [...params, pageSize, offset]
+    );
 
+    // 2) 收集 user_id 和 operator_id，批量查公共库的 users 和 operators
     const userIds = [...new Set(rows.map((r: any) => r.user_id).filter(Boolean))];
     const opIds = [...new Set(rows.map((r: any) => r.operator_id).filter(Boolean))];
     const userMap: Record<string, any> = {};
@@ -348,6 +226,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response<ApiResponse<P
       } catch { /* ignore if operators query fails */ }
     }
 
+    // 3) JS 层组装
     const list: RefereeWithUser[] = rows.map((r: any) => ({
       ...r,
       nickname: userMap[r.user_id]?.nickname || null,
@@ -355,7 +234,11 @@ router.get('/', authMiddleware, async (req: Request, res: Response<ApiResponse<P
       operator_name: opMap[r.operator_id]?.name || null,
     }));
 
-    return res.json({ code: 0, message: 'ok', data: { list, total, page, pageSize } });
+    return res.json({
+      code: 0,
+      message: 'ok',
+      data: { list, total, page, pageSize },
+    });
   } catch (error: any) {
     console.error('[Referees] list error:', error.message);
     return res.status(500).json({ code: 500, message: '获取裁判列表失败', data: null as any });
@@ -372,7 +255,7 @@ router.get('/my', authMiddleware, async (req: Request, res: Response<ApiResponse
   try {
     const userId = req.user!.userId;
 
-    const referee = await refQueryOpOne<RefereeWithUser>(req, 
+    const referee = await queryOpOne<RefereeWithUser>(req, 
       `SELECT r.id, r.user_id, r.venue_id, r.status,
               r.name,
               r.phone, r.id_number, r.cert_image,
@@ -410,7 +293,7 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response<ApiRespons
   try {
     const { id } = req.params;
 
-    const row = await refQueryOpOne<any>(req, 
+    const row = await queryOpOne<any>(req, 
       `SELECT r.id, r.user_id, r.venue_id, r.status,
               r.name,
               r.phone, r.id_number, r.cert_image,
@@ -488,7 +371,7 @@ router.put('/:id/bind-venue', authMiddleware, async (req: Request, res: Response
     }
 
     // 验证赛场存在
-    const venue = await refQueryOpOne<{ id: string }>(req, 
+    const venue = await queryOpOne<{ id: string }>(req, 
       'SELECT id FROM venues WHERE id = $1',
       [venue_id]
     );
@@ -496,11 +379,11 @@ router.put('/:id/bind-venue', authMiddleware, async (req: Request, res: Response
       return res.status(404).json({ code: 404, message: '赛场不存在', data: null as any });
     }
 
-    await refExecuteOp(req, 
+    await executeOp(req, 
       'UPDATE referees SET venue_id = $1, updated_at = NOW() WHERE id = $2',
       [venue_id, id]
     );
-    const referee = await refQueryOpOne<Referee>(req, 
+    const referee = await queryOpOne<Referee>(req, 
       'SELECT id, user_id, venue_id, phone, id_number, cert_image, id_card_front, id_card_back last_checkin_at, created_at, updated_at FROM referees WHERE id = $1',
       [id]
     );
@@ -532,11 +415,11 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response<ApiResp
     }
 
     // 先取 user_id 再删裁判，同时清理 users 表残留
-    const ref = await refQueryOpOne<{ user_id: string }>(req, 
+    const ref = await queryOpOne<{ user_id: string }>(req, 
       'SELECT user_id FROM referees WHERE id = $1', [id]
     );
 
-    const result = await refExecuteOp(req, 
+    const result = await executeOp(req, 
       'DELETE FROM referees WHERE id = $1',
       [id]
     );
@@ -582,7 +465,7 @@ router.patch('/:id/status', authMiddleware, async (req: Request, res: Response<A
     }
 
     // 获取裁判关联的 user_id
-    const referee = await refQueryOpOne<{ id: string; user_id: string }>(req, 
+    const referee = await queryOpOne<{ id: string; user_id: string }>(req, 
       'SELECT id, user_id FROM referees WHERE id = $1',
       [id]
     );
@@ -593,7 +476,7 @@ router.patch('/:id/status', authMiddleware, async (req: Request, res: Response<A
 
     // 更新裁判表
     console.log('[Referees] status change:', { id, status, user_id: referee.user_id });
-    await refExecuteOp(req, 'UPDATE referees SET status = $1 WHERE id = $2', [status, id]);
+    await executeOp(req, 'UPDATE referees SET status = $1 WHERE id = $2', [status, id]);
     console.log('[Referees] referees status updated');
 
     // 同步更新 users 表状态
@@ -651,8 +534,8 @@ router.get('/match/queue', authMiddleware, async (req: Request, res: Response) =
   try {
     const venueId = (req as any).venueId || (req.query as any).venueId;
     if (!venueId) {
-      const ref = await refQueryOpOne<{ venue_id: string }>(req,
-        'SELECT venue_id FROM referees WHERE id = $1 LIMIT 1',
+      const ref = await queryOpOne<{ venue_id: string }>(req,
+        'SELECT venue_id FROM referees WHERE user_id = $1 LIMIT 1',
         [req.user!.userId]
       );
       if (!ref?.venue_id) {
@@ -663,18 +546,17 @@ router.get('/match/queue', authMiddleware, async (req: Request, res: Response) =
     const vid = (req as any).venueId || venueId;
 
     // 分两段查询：race_queues 在运营商库，users 在 common 库，不能直接 JOIN
-    const queueRows = await refQueryOp<RacerRow>(req,
+    const queueRows = await queryOp<RacerRow>(req,
       `SELECT rq.* FROM race_queues rq
        WHERE rq.venue_id = $1 AND rq.status IN ('waiting','called','skipped')
        ORDER BY rq.queue_number ASC`,
       [vid]
     );
-    console.log('[Match] queueRows count=' + queueRows.length + ' firstUser_id=' + (queueRows[0]?.user_id || 'none'));
 
-    const currentRow = await refQueryOpOne<RacerRow>(req,
+    const currentRow = await queryOpOne<RacerRow>(req,
       `SELECT rq.* FROM race_queues rq
-       WHERE rq.venue_id = $1 AND rq.status IN ('called','racing','paused','malfunction') AND rq.status != 'waiting'
-       ORDER BY FIELD(rq.status, 'racing','paused','malfunction','called'), rq.created_at DESC LIMIT 1`,
+       WHERE rq.venue_id = $1 AND rq.status IN ('racing','paused','malfunction')
+       ORDER BY rq.created_at DESC LIMIT 1`,
       [vid]
     );
 
@@ -686,7 +568,7 @@ router.get('/match/queue', authMiddleware, async (req: Request, res: Response) =
     const userMap = new Map<string, { nickname: string; avatar_url: string }>();
     if (allUserIds.length > 0) {
       try {
-        const placeholders = allUserIds.map((_, i) => '$' + (i + 1)).join(',');
+        const placeholders = allUserIds.map(() => '?').join(',');
         const userRows: any[] = await query(
           `SELECT id, nickname, avatar_url FROM users WHERE id IN (${placeholders})`,
           allUserIds
@@ -694,7 +576,6 @@ router.get('/match/queue', authMiddleware, async (req: Request, res: Response) =
         for (const u of (userRows || [])) {
           userMap.set(u.id, { nickname: u.nickname, avatar_url: u.avatar_url });
         }
-        console.log('[Match] match/queue userMap: ids=' + JSON.stringify(allUserIds) + ' size=' + userMap.size);
       } catch (e: any) {
         console.warn('[Match] query users from common DB failed:', e.message);
       }
@@ -756,7 +637,7 @@ router.post('/match/select-racer', authMiddleware, async (req: Request, res: Res
 
     if (!racerId) {
       // 自动选第一个 waiting 的选手
-      const first = await refQueryOpOne<RacerRow>(req,
+      const first = await queryOpOne<RacerRow>(req,
         `SELECT id FROM race_queues WHERE status IN ('waiting','skipped') ORDER BY CASE WHEN status = 'skipped' THEN 0 ELSE 1 END, queue_number ASC LIMIT 1`, []
       );
       if (!first) {
@@ -768,14 +649,14 @@ router.post('/match/select-racer', authMiddleware, async (req: Request, res: Res
     const rid = racerId || (req.body as any).racerId;
 
     // 如果已有当前选手在比赛，先放回队列
-    await refExecuteOp(req,
+    await executeOp(req,
       `UPDATE race_queues SET status = 'waiting', start_time_ms = NULL, paused_elapsed_ms = 0
        WHERE status IN ('called','malfunction') AND id != $1`,
       [rid]
     );
 
     // 更新该选手状态为 called（$1 先出现，避免 expandParams 重排参数）
-    await refExecuteOp(req,
+    await executeOp(req,
       `UPDATE race_queues SET status = 'called', start_time_ms = NULL, paused_elapsed_ms = 0, finish_time_ms = NULL, referee_id = $1
        WHERE id = $2`,
       [req.user!.userId, rid]
@@ -803,7 +684,7 @@ router.post('/match/start', authMiddleware, async (req: Request, res: Response) 
       return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
     }
 
-    const row = await refQueryOpOne<RacerRow>(req,
+    const row = await queryOpOne<RacerRow>(req,
       `SELECT id, status, paused_elapsed_ms FROM race_queues WHERE id = $1`,
       [racerId]
     );
@@ -813,7 +694,7 @@ router.post('/match/start', authMiddleware, async (req: Request, res: Response) 
 
     // 从 paused_elapsed_ms 继续计时
     const adjustStart = now - (row.paused_elapsed_ms || 0);
-    await refExecuteOp(req,
+    await executeOp(req,
       `UPDATE race_queues SET status = 'racing', start_time_ms = $1, paused_elapsed_ms = 0 WHERE id = $2`,
       [adjustStart, racerId]
     );
@@ -839,7 +720,7 @@ router.post('/match/pause', authMiddleware, async (req: Request, res: Response) 
     }
 
     const pausedMs = elapsed != null ? elapsed : 0;
-    await refExecuteOp(req,
+    await executeOp(req,
       `UPDATE race_queues SET status = 'paused', paused_elapsed_ms = $1 WHERE id = $2 AND status = 'racing'`,
       [pausedMs, racerId]
     );
@@ -862,7 +743,7 @@ router.post('/match/resume', authMiddleware, async (req: Request, res: Response)
       return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
     }
 
-    const row = await refQueryOpOne<RacerRow>(req,
+    const row = await queryOpOne<RacerRow>(req,
       `SELECT paused_elapsed_ms FROM race_queues WHERE id = $1 AND status = 'paused'`,
       [racerId]
     );
@@ -871,7 +752,7 @@ router.post('/match/resume', authMiddleware, async (req: Request, res: Response)
     }
 
     const adjustStart = Date.now() - (row.paused_elapsed_ms || 0);
-    await refExecuteOp(req,
+    await executeOp(req,
       `UPDATE race_queues SET status = 'racing', start_time_ms = $1, paused_elapsed_ms = 0 WHERE id = $2`,
       [adjustStart, racerId]
     );
@@ -896,8 +777,8 @@ router.post('/match/end', authMiddleware, async (req: Request, res: Response) =>
       return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
     }
 
-    let row = await refQueryOpOne<any>(req,
-      `SELECT id, user_id, venue_id, remaining_races, checkin_id FROM race_queues
+    let row = await queryOpOne<RacerRow>(req,
+      `SELECT id, user_id, venue_id, remaining_races FROM race_queues
        WHERE id = $1`,
       [racerId]
     );
@@ -917,78 +798,66 @@ router.post('/match/end', authMiddleware, async (req: Request, res: Response) =>
     const finishStatus = raceStatus === 'timeout' ? 'timeout' : 'finished';
     const newRemaining = Math.max(0, row.remaining_races - 1);
 
-    await refExecuteOp(req,
+    await executeOp(req,
       `UPDATE race_queues SET status = 'finished', finish_time_ms = $1, finish_status = $2,
        remaining_races = $3, start_time_ms = NULL, paused_elapsed_ms = 0
        WHERE id = $4`,
       [elapsed, finishStatus, newRemaining, racerId]
     );
 
-    // 同步更新 checkins 表（签到排队表，标记已完成）
-    if (row.checkin_id) {
-      await refExecuteOp(req,
-        `UPDATE checkins SET status = 'completed', updated_at = NOW() WHERE id = $1 AND status = 'queued'`,
-        [row.checkin_id]
-      );
-    }
-
     // 同步写入 race_records（成绩记录）
     if (row.user_id && row.venue_id) {
-      await refExecuteOp(req,
-        `INSERT INTO race_records (id, race_id, player_id, score, duration_seconds, status, started_at, finished_at)
-         VALUES ($1, NULL, $2, $3, $4, $5, NOW() - INTERVAL $6/1000 SECOND, NOW())`,
-        [uuidv4(), row.user_id, elapsed, Math.round(elapsed / 1000), finishStatus, elapsed]
+      await executeOp(req,
+        `INSERT INTO race_records (id, race_id, player_id, score, duration_seconds, status, started_at, finished_at, operator_id)
+         VALUES ($1, NULL, $2, $3, $4, $5, NOW() - INTERVAL $6/1000 SECOND, NOW(), $7)`,
+        [uuidv4(), row.user_id, elapsed, Math.round(elapsed / 1000), finishStatus, elapsed, row.nickname]
       );
     }
 
     // 同步写入 race_results
     await writeRaceResult(req, row.user_id, row.venue_id, row.nickname, elapsed, finishStatus);
 
-    // 发放比赛积分（从 system_config 读 season_race_points）
-    if (finishStatus === 'finished') {
-      try {
-        const pointCfg = await queryOne<{ config_value: string }>(
-          `SELECT config_value FROM system_config WHERE config_key = 'season_race_points'`
+    // 发放比赛积分（从 system_config 读取 season_race_points）
+    try {
+      const pointValue = await getConfigInt('season_race_points', 0).catch(() => 0);
+      if (pointValue > 0) {
+        const operatorId = (req.user as any)?.operatorId || '';
+        // 1. 写入 points_transactions（运营商库）
+        await executeOp(req,
+          `INSERT INTO points_transactions (id, user_id, operator_id, points, type, remark)
+           VALUES ($1, $2, $3, $4, 'race_reward', '比赛积分奖励')`,
+          [uuidv4(), row.user_id, operatorId, pointValue]
         );
-        const pointValue = parseInt(pointCfg?.config_value || '0', 10) || 0;
-        if (pointValue > 0) {
-          // 写 points_transactions（运营商库）
-          await refExecuteOp(req,
-            `INSERT INTO points_transactions (id, user_id, operator_id, points, type, remark, created_at)
-             VALUES ($1, $2, $3, $4, 'race_reward', $5, NOW())`,
-            [uuidv4(), row.user_id, (req.user as any)?.operatorId || '', pointValue, `完成比赛获得${pointValue}积分`]
+        // 2. 更新 users 表全局积分
+        await execute(
+          `UPDATE users SET points = COALESCE(points, 0) + $1, updated_at = NOW() WHERE id = $2`,
+          [pointValue, row.user_id]
+        );
+        // 3. 更新赛季积分
+        const season = await queryOne<{ id: string }>(
+          `SELECT id FROM seasons WHERE status = 1 ORDER BY created_at DESC LIMIT 1`
+        );
+        if (season) {
+          const seasonUser = await queryOne<{ id: string }>(
+            `SELECT id FROM season_user_info WHERE user_id = $1 AND season_id = $2`,
+            [row.user_id, season.id]
           );
-          // 更新 users 表全局积分（common 库）
-          await execute(
-            `UPDATE users SET points = COALESCE(points, 0) + $1, updated_at = NOW() WHERE id = $2`,
-            [pointValue, row.user_id]
-          );
-          // 更新 season_user_info 赛季积分（common 库）
-          const season = await queryOne<{ id: string }>(
-            `SELECT id FROM seasons WHERE status = 1 ORDER BY created_at DESC LIMIT 1`
-          );
-          if (season) {
-            const existing = await queryOne<{ id: string }>(
-              `SELECT id FROM season_user_info WHERE user_id = $1 AND season_id = $2`,
-              [row.user_id, season.id]
+          if (seasonUser) {
+            await execute(
+              `UPDATE season_user_info SET points = points + $1, updated_at = NOW() WHERE id = $2`,
+              [pointValue, seasonUser.id]
             );
-            if (existing) {
-              await execute(
-                `UPDATE season_user_info SET points = COALESCE(points, 0) + $1, updated_at = NOW() WHERE id = $2`,
-                [pointValue, existing.id]
-              );
-            } else {
-              await execute(
-                `INSERT INTO season_user_info (id, user_id, season_id, level, exp, points)
-                 VALUES ($1, $2, $3, 1, 0, $4)`,
-                [uuidv4(), row.user_id, season.id, pointValue]
-              );
-            }
+          } else {
+            await execute(
+              `INSERT INTO season_user_info (id, user_id, season_id, level, exp, points)
+               VALUES ($1, $2, $3, 1, 0, $4)`,
+              [uuidv4(), row.user_id, season.id, pointValue]
+            );
           }
         }
-      } catch (err: any) {
-        console.error('[比赛积分] 发放失败:', err?.message || err);
       }
+    } catch (pointErr: any) {
+      console.error('[比赛积分] 发放失败:', pointErr?.message || pointErr);
     }
 
     await broadcastAfterUpdate(req);
@@ -1015,7 +884,7 @@ router.post('/match/re-enter', authMiddleware, async (req: Request, res: Respons
       return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
     }
 
-    await refExecuteOp(req,
+    await executeOp(req,
       `UPDATE race_queues SET status = 'waiting', start_time_ms = NULL, paused_elapsed_ms = 0,
        finish_time_ms = NULL, finish_status = NULL
        WHERE id = $1`,
@@ -1042,7 +911,7 @@ router.post('/match/call-next', authMiddleware, async (req: Request, res: Respon
       return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
     }
 
-    const row = await refQueryOpOne<RacerRow>(req,
+    const row = await queryOpOne<RacerRow>(req,
       `SELECT id, venue_id, remaining_races FROM race_queues WHERE id = $1`,
       [racerId]
     );
@@ -1052,12 +921,12 @@ router.post('/match/call-next', authMiddleware, async (req: Request, res: Respon
 
     if (row.remaining_races > 0) {
       // 获取当前最大排队号 + 1
-      const maxQ = await refQueryOpOne<{ max_q: number }>(req,
+      const maxQ = await queryOpOne<{ max_q: number }>(req,
         `SELECT COALESCE(MAX(queue_number), 0) as max_q FROM race_queues WHERE venue_id = $1`,
         [row.venue_id]
       );
       const nextQ = (maxQ?.max_q ?? 0) + 1;
-      await refExecuteOp(req,
+      await executeOp(req,
         `UPDATE race_queues SET status = 'waiting', queue_number = $2, start_time_ms = NULL,
          paused_elapsed_ms = 0, finish_time_ms = NULL, finish_status = NULL
          WHERE id = $1`,
@@ -1086,7 +955,7 @@ router.post('/match/malfunction', authMiddleware, async (req: Request, res: Resp
       return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
     }
 
-    const row = await refQueryOpOne<RacerRow>(req,
+    const row = await queryOpOne<RacerRow>(req,
       `SELECT id, user_id FROM race_queues
        WHERE id = $1`,
       [racerId]
@@ -1100,7 +969,7 @@ router.post('/match/malfunction', authMiddleware, async (req: Request, res: Resp
     }
     if (row) { row.nickname = malfunctionUserInfo.nickname || ''; row.avatar_url = malfunctionUserInfo.avatar_url || ''; }
 
-    await refExecuteOp(req,
+    await executeOp(req,
       `UPDATE race_queues SET status = 'malfunction', start_time_ms = NULL,
        paused_elapsed_ms = 0, fault_reason = '机器狗故障'
        WHERE id = $1`,
@@ -1135,7 +1004,7 @@ router.post('/match/forfeit', authMiddleware, async (req: Request, res: Response
       return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
     }
 
-    let row = await refQueryOpOne<RacerRow>(req,
+    let row = await queryOpOne<RacerRow>(req,
       `SELECT id, user_id, venue_id, remaining_races FROM race_queues
        WHERE id = $1`,
       [racerId]
@@ -1155,12 +1024,12 @@ router.post('/match/forfeit', authMiddleware, async (req: Request, res: Response
     if (newRemaining > 0) {
       // 放回队首
       // 先把当前所有 waiting 选手的 queue_number + 1 腾出位置
-      await refExecuteOp(req,
+      await executeOp(req,
         `UPDATE race_queues SET queue_number = queue_number + 1
          WHERE venue_id = $1 AND status = 'waiting' AND id != $2`,
         [row.venue_id, racerId]
       );
-      await refExecuteOp(req,
+      await executeOp(req,
         `UPDATE race_queues SET status = 'waiting', queue_number = 1, remaining_races = $2,
          start_time_ms = NULL, paused_elapsed_ms = 0, finish_time_ms = NULL, finish_status = 'forfeit'
          WHERE id = $1`,
@@ -1168,7 +1037,7 @@ router.post('/match/forfeit', authMiddleware, async (req: Request, res: Response
       );
     } else {
       // 次数用尽，标记为 forfeit
-      await refExecuteOp(req,
+      await executeOp(req,
         `UPDATE race_queues SET status = 'forfeit', remaining_races = 0, finish_status = 'forfeit'
          WHERE id = $1`,
         [racerId]
@@ -1201,7 +1070,7 @@ router.post('/match/invalidate', authMiddleware, async (req: Request, res: Respo
       return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
     }
 
-    let row = await refQueryOpOne<RacerRow>(req,
+    let row = await queryOpOne<RacerRow>(req,
       `SELECT id, user_id, finish_time_ms, finish_status FROM race_queues
        WHERE id = $1`,
       [racerId]
@@ -1215,14 +1084,14 @@ router.post('/match/invalidate', authMiddleware, async (req: Request, res: Respo
       row.nickname = ui.nickname || '';
     } catch { /* ignore */ }
 
-    await refExecuteOp(req,
+    await executeOp(req,
       `UPDATE race_queues SET finish_status = 'invalid', fault_reason = '成绩无效'
        WHERE id = $1`,
       [racerId]
     );
 
     // 同步标记 race_records 为 invalid
-    await refExecuteOp(req,
+    await executeOp(req,
       `UPDATE race_records SET status = 'invalid' WHERE player_id = $1 AND status = 'finished' ORDER BY created_at DESC LIMIT 1`,
       [row.nickname]
     );
@@ -1253,7 +1122,7 @@ router.post('/match/skip', authMiddleware, async (req: Request, res: Response) =
       return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
     }
 
-    const row = await refQueryOpOne<RacerRow>(req,
+    const row = await queryOpOne<RacerRow>(req,
       `SELECT id, venue_id FROM race_queues WHERE id = $1`,
       [racerId]
     );
@@ -1262,7 +1131,7 @@ router.post('/match/skip', authMiddleware, async (req: Request, res: Response) =
     }
 
     // 保持原 queue_number，仅更新状态为 skipped
-    await refExecuteOp(req,
+    await executeOp(req,
       `UPDATE race_queues SET status = 'skipped' WHERE id = $1`,
       [racerId]
     );
@@ -1296,16 +1165,15 @@ interface AttendanceRecord {
 router.get('/attendance/status', authMiddleware, async (req: Request, res: Response<ApiResponse<any>>) => {
   try {
     const userId = req.user!.userId;
-    console.log('[DEBUG attendance/status] userId=' + userId + ' operatorId=' + ((req.user as any)?.operatorId || 'NONE') + ' role=' + ((req.user as any)?.role || 'NONE'));
     // 从 referees 表查真实 referee_id
-    const ref = await refQueryOpOne<{ id: string; phone: string }>(req, 
-      'SELECT id, phone FROM referees WHERE id = $1', [userId]
+    const ref = await queryOpOne<{ id: string; phone: string }>(req, 
+      'SELECT id, phone FROM referees WHERE user_id = $1', [userId]
     );
     if (!ref) return res.status(401).json({ code: 401, message: '未找到裁判记录', data: null });
     const refereeId = ref.id;
 
     // 查询今日签到
-    const todayCheckin = await refQueryOpOne<any>(req, 
+    const todayCheckin = await queryOpOne<any>(req, 
       `SELECT id, checkin_at, checkout_at, venue_id FROM attendance
        WHERE referee_id = $1 AND date(checkin_at) = CURDATE() ORDER BY checkin_at DESC LIMIT 1`,
       [refereeId]
@@ -1315,7 +1183,7 @@ router.get('/attendance/status', authMiddleware, async (req: Request, res: Respo
     let venueName = '';
     let venueAddress = '';
     if (todayCheckin?.venue_id) {
-      const venueRow = await refQueryOpOne<{ name: string; address: string }>(req, 
+      const venueRow = await queryOpOne<{ name: string; address: string }>(req, 
         'SELECT name, address FROM venues WHERE id = $1',
         [todayCheckin.venue_id]
       );
@@ -1362,7 +1230,7 @@ router.post('/attendance/check-in', authMiddleware, async (req: Request, res: Re
     }
 
     // 从 referees 表查找真实 referee_id
-    const refRow = await refQueryOpOne<{ id: string; phone: string }>(req, 
+    const refRow = await queryOpOne<{ id: string; phone: string }>(req, 
       'SELECT id, phone FROM referees WHERE user_id = $1', [userId]
     );
     if (!refRow) {
@@ -1372,60 +1240,52 @@ router.post('/attendance/check-in', authMiddleware, async (req: Request, res: Re
     const phone = refRow.phone || req.user!.openid?.replace('mock_openid_', '') || '13800138000';
 
     // 检查今日是否已签到
-    const existing = await refQueryOpOne<any>(req, 
+    const existing = await queryOpOne<any>(req, 
       `SELECT id, checkout_at FROM attendance
        WHERE referee_id = $1 AND date(checkin_at) = CURDATE()`,
       [refereeId]
     );
 
     if (existing && !existing.checkout_at) {
-      return res.json({ code: 200, message: '今日已签到，请勿重复签到', data: null });
+      return res.status(400).json({ code: 400, message: '今日已签到，请勿重复签到', data: null });
     }
 
     // 执行签到记录插入
     const id = uuidv4();
     const now = new Date().toLocaleString('zh-CN');
-    await refExecuteOp(req, 
+    await executeOp(req, 
       'INSERT INTO attendance (id, referee_id, venue_id, checkin_at) VALUES ($1, $2, $3, NOW())',
       [id, refereeId, finalVenueId]
     );
 
+    // 标记赛场已激活
+    setVenueActive(true);
+    cachedVenueStatus = 'open';
+
+    // 回写 venues 表，确保 REST API 也返回正确状态
+    try { await executeOp(req, 'UPDATE venues SET status = \'open\' LIMIT 1'); } catch (_) {}
+
+    // 广播赛场重新开放到大屏，大屏恢复全新状态
+    broadcastToScreen({
+      event: 'venue_reopen',
+      data: { reopenedAt: now },
+    });
+
+    // 再推送一次当前 screen_data，让大屏直接显示比赛界面
+    const screenData = getCurrentScreenData();
+    broadcastToScreen({ type: 'screen_data', data: screenData });
+
     // 从数据库获取真实的赛场信息
     let venueName = finalVenueId;
     let venueAddress = '';
-    const venueRow = await refQueryOpOne<{ name: string; address: string; operator_id: string }>(req, 
-      'SELECT name, address, operator_id FROM venues WHERE id = $1',
+    const venueRow = await queryOpOne<{ name: string; address: string }>(req, 
+      'SELECT name, address FROM venues WHERE id = $1',
       [finalVenueId]
     );
     if (venueRow) {
       venueName = venueRow.name;
       venueAddress = venueRow.address || '';
-      cachedOperatorId = venueRow.operator_id || '';
     }
-
-    // 标记赛场已激活
-    setVenueActive(true);
-    cachedVenueStatus = 'open';
-    cachedVenueName = venueName;
-    cachedVenueId = finalVenueId;
-
-    // 回写 venues 表，确保 REST API 也返回正确状态
-    try { await refExecuteOp(req, 'UPDATE venues SET status = \'open\' LIMIT 1'); } catch (_) {}
-
-    // 写 Redis active_venues（大屏重连自动恢复）
-    try {
-      const redis = await getRedis();
-      await redis.sAdd('active_venues', finalVenueId);
-      await redis.hSet('active_venue:' + finalVenueId, 'name', venueName);
-      await redis.hSet('active_venue:' + finalVenueId, 'activatedAt', String(Date.now()));
-    } catch (_) {}
-
-    // 广播大屏激活
-    broadcastToScreen({ type: 'activated', data: { venue_name: venueName, venue_id: finalVenueId } });
-
-    // 再推送一次当前 screen_data，让大屏直接显示比赛界面
-    const screenData = getCurrentScreenData();
-    broadcastToScreen({ type: 'screen_data', data: screenData });
 
     return res.json({
       code: 0,
@@ -1446,46 +1306,49 @@ router.post('/attendance/check-out', authMiddleware, async (req: Request, res: R
     const userId = req.user!.userId;
     if (!userId) return res.status(401).json({ code: 401, message: '未登录', data: null });
 
-    // 直接用 JWT operatorId 连 op_* 库
-    const pool = await getOpPoolFromJwt(req);
-    if (!pool) {
-      console.error('[check-out] getOpPoolFromJwt returned null, userId=', userId, 'operatorId=', (req.user as any)?.operatorId);
-      return res.status(401).json({ code: 401, message: '未找到裁判记录', data: null });
-    }
-
     // 从 referees 表查真实 referee_id
-    const [refRows] = await pool.execute(
-      'SELECT id FROM referees WHERE user_id = ? OR id = ? LIMIT 1', [userId, userId]
-    ) as any[];
-    const ref = (refRows as any[])?.[0];
+    const ref = await queryOpOne<{ id: string }>(req, 
+      'SELECT id FROM referees WHERE user_id = $1', [userId]
+    );
     if (!ref) return res.status(401).json({ code: 401, message: '未找到裁判记录', data: null });
     const refereeId = ref.id;
 
     const now = new Date().toLocaleString('zh-CN');
-    await pool.execute(
-      'UPDATE attendance SET checkout_at = NOW() WHERE referee_id = ? AND date(checkin_at) = CURDATE() AND checkout_at IS NULL',
+    await executeOp(req, 
+      `UPDATE attendance SET checkout_at = NOW() WHERE referee_id = $1 AND date(checkin_at) = CURDATE() AND checkout_at IS NULL`,
       [refereeId]
     );
 
-    // 签退时：清除 Redis active_venues，广播大屏失活
-    try {
-      const redis = await getRedis();
-      if (cachedVenueId) {
-        await redis.sRem('active_venues', cachedVenueId);
-        await redis.del('active_venue:' + cachedVenueId);
-      }
-      // 清除所有激活码
-      const keys = await redis.keys(ACTIVATION_CODE_PREFIX + '*');
-      if (keys.length > 0) await redis.del(keys);
-    } catch (_) { /* ignore */ }
-
-    // 广播大屏签退
+    // 赛场标记为未激活
     setVenueActive(false);
     cachedVenueStatus = 'closed';
-    cachedVenueName = '';
-    cachedVenueId = '';
-    broadcastToScreen({ type: 'deactivated' });
-    broadcastToScreen({ type: 'screen_data', data: getCurrentScreenData() });
+
+    // 回写 venues 表
+    try { await executeOp(req, 'UPDATE venues SET status = \'closed\' LIMIT 1'); } catch (_) {}
+
+    // 清空排队队列和当前选手，重置所有比赛状态（新玩家需重新扫码排队）
+    try {
+      await executeOp(req,
+        `UPDATE race_queues SET status = 'waiting', start_time_ms = NULL, paused_elapsed_ms = 0,
+         finish_time_ms = NULL, finish_status = NULL, fault_reason = NULL
+         WHERE venue_id = $1 AND status NOT IN ('finished','forfeit','invalid')`,
+        [cachedVenueId]
+      );
+    } catch (_) {}
+
+    // 广播赛场关闭通知到大屏（含清空后的队列和选手信息）
+    broadcastToScreen({
+      event: 'venue_closed',
+      data: {
+        closedAt: now,
+        queue: [],
+        currentRacer: null,
+        race_status: 'inactive',
+      },
+    });
+    // 同时推送最新 screen_data（venue_status = inactive, queue 为空）
+    const closedScreenData = getCurrentScreenData();
+    broadcastToScreen({ type: 'screen_data', data: closedScreenData });
 
     return res.json({ code: 0, message: '签退成功', data: { checkoutAt: now } });
   } catch (error: any) {
@@ -1498,298 +1361,90 @@ router.post('/attendance/check-out', authMiddleware, async (req: Request, res: R
  * POST /attendance/check-in-by-qr
  * 裁判扫大屏二维码签到 + 激活大屏
  */
-/**
- * POST /attendance/check-in-direct
- * 比赛专用直接签到 — 不依赖激活码/Redis
- * 裁判已登录 + venueId 匹配即可签到
- */
-// ==================== op 库查询包装（从 JWT 取 operatorId 连库） ====================
-
-async function refQueryOp<T>(req: Request, sql: string, params?: any[]): Promise<T[]> {
-  const pool = await getOpPoolFromJwt(req);
-  if (!pool) return [];
-  const expanded = params ? expandParams(sql, params) : [];
-  sql = sql.replace(/\$(\d+)/g, '?');
-  const [rows] = await pool.execute(sql, expanded) as any[];
-  return rows as T[];
-}
-
-async function refQueryOpOne<T>(req: Request, sql: string, params?: any[]): Promise<T | null> {
-  const pool = await getOpPoolFromJwt(req);
-  if (!pool) return null;
-  const expanded = params ? expandParams(sql, params) : [];
-  sql = sql.replace(/\$(\d+)/g, '?');
-  const [rows] = await pool.execute(sql, expanded) as any[];
-  return (rows as any[])?.length > 0 ? rows[0] as T : null;
-}
-
-async function refExecuteOp(req: Request, sql: string, params?: any[]): Promise<{ changes: number; lastInsertRowid: number | bigint }> {
-  const pool = await getOpPoolFromJwt(req);
-  if (!pool) return { changes: 0, lastInsertRowid: 0 };
-  const expanded = params ? expandParams(sql, params) : [];
-  sql = sql.replace(/\$(\d+)/g, '?');
-  const [result] = await pool.execute(sql, expanded) as any;
-  return { changes: result.affectedRows ?? 0, lastInsertRowid: result.insertId ?? 0 };
-}
-
-// ==================== 从 JWT 获取 op 库连接池 ====================
-
-async function getOpPoolFromJwt(req: Request): Promise<MysqlPool | null> {
-  const jwt = req.user as any;
-  let opId = jwt?.operatorId;
-  // fallback: 从 Redis operator_context 读取（JWT 没有 operatorId 时）
-  if (!opId) {
-    try {
-      const redis = await getRedis();
-      // JWT userId 可能是 referee.id 或 users.id，两者都试
-      let ctxData = await redis.get(`operator_context:${jwt.userId}`);
-      // 如果当前 userId 是 referee.id，再试 users.id（查 common 库）
-      if (!ctxData) {
-        try {
-          const userRow = await queryOne<{ id: string }>('SELECT id FROM users WHERE id = $1', [jwt.userId]);
-          if (!userRow) {
-            // 不是 users.id，可能是 referee.id → 查 referees 表获取 user_id
-            const refRow = await queryOne<{ user_id: string }>(
-              'SELECT r.user_id FROM referees r WHERE r.id = $1', [jwt.userId]
-            );
-            if (refRow?.user_id) {
-              ctxData = await redis.get(`operator_context:${refRow.user_id}`);
-            }
-          }
-        } catch { /* ignore */ }
-      }
-      if (ctxData) {
-        const ctx = JSON.parse(ctxData);
-        if (ctx.operatorId) opId = ctx.operatorId;
-      }
-    } catch { /* ignore redis errors */ }
-  }
-  if (!opId) return null;
-
-  // 1) 查询 operators_registry 获取真正的 db_name
-  try {
-    const regRow = await queryOne<{ db_name: string }>(
-      'SELECT db_name FROM operators_registry WHERE operator_id = $1',
-      [opId]
-    );
-    if (regRow?.db_name) {
-      return getOperatorPool(regRow.db_name);
-    }
-  } catch { /* fall through if registry unavailable */ }
-
-  // 2) fallback: 直接用 op_{operatorId}
-  try { return getOperatorPool('op_' + opId); } catch { return null; }
-}
-
-router.post('/attendance/check-in-direct', authMiddleware, async (req: Request, res: Response) => {
-  try {
-    const { venueId } = req.body;
-    if (!venueId) {
-      return res.status(400).json({ code: 400, message: '缺少 venueId', data: null });
-    }
-
-    const userId = req.user!.userId;
-    if (!userId) return res.status(401).json({ code: 401, message: '未登录', data: null });
-
-    // 裁判接口直接用 JWT operatorId 连接，不依赖 resolveOperatorDb
-    const pool = await getOpPoolFromJwt(req);
-    if (!pool) return res.status(400).json({ code: 400, message: '未找到裁判记录', data: null });
-
-    // 1. 查 referee
-    const [refRows] = await pool.execute(
-      'SELECT id, venue_id FROM referees WHERE user_id = ? OR id = ?', [userId, userId]
-    ) as any[];
-    const refRow: { id: string; venue_id: string | null } | null = (refRows as any[])?.[0] || null;
-    if (!refRow) {
-      return res.status(400).json({ code: 400, message: '未找到裁判记录', data: null });
-    }
-
-    // 2. 验证 venueId 与裁判绑定一致
-    if (refRow.venue_id && refRow.venue_id !== venueId) {
-      return res.status(403).json({ code: 403, message: '场地不匹配', data: null });
-    }
-
-    // 3. 查 venue
-    const [venueRows] = await pool.execute(
-      'SELECT id, name, COALESCE(address, \'\') as address FROM venues WHERE id = ?', [venueId]
-    ) as any[];
-    const venue = (venueRows as any[])?.[0] || null;
-    if (!venue) {
-      return res.status(404).json({ code: 404, message: '场地不存在', data: null });
-    }
-
-    // 4. 查今日是否已签到且未签退
-    const [attRows] = await pool.execute(
-      'SELECT id FROM attendance WHERE referee_id = ? AND date(checkin_at) = CURDATE() AND checkout_at IS NULL LIMIT 1',
-      [refRow.id]
-    ) as any[];
-    if ((attRows as any[])?.[0]) {
-      return res.json({ code: 200, message: '今日已签到，请先签退', data: null });
-    }
-
-    // 5. 写入签到记录
-    const attendanceId = uuidv4();
-    await pool.execute(
-      'INSERT INTO attendance (id, referee_id, user_id, venue_id, checkin_at) VALUES (?, ?, ?, ?, NOW())',
-      [attendanceId, refRow.id, userId, venue.id]
-    );
-    await pool.execute('UPDATE referees SET last_checkin_at = NOW() WHERE id = ?', [refRow.id]);
-
-    // 6. 标记赛场已激活
-    setVenueActive(true);
-    cachedVenueStatus = 'open';
-    cachedVenueName = venue.name;
-    cachedVenueId = venue.id;
-    try { await pool.execute('UPDATE venues SET status = \'open\' WHERE id = ?', [venue.id]); } catch (_) {}
-
-    // 6.5 写入 Redis active_venues（大屏重连时自动恢复激活状态）
-    try {
-      const redis = await getRedis();
-      await redis.sAdd('active_venues', venue.id);
-      await redis.hSet('active_venue:' + venue.id, 'name', venue.name);
-      await redis.hSet('active_venue:' + venue.id, 'activatedAt', String(Date.now()));
-    } catch (_) { /* Redis 不可用时不影响主流程 */ }
-
-    // 7. 广播
-    broadcastToScreen({ type: 'activated', data: { venue_name: venue.name, venue_id: venue.id } });
-    broadcastToScreen({ type: 'screen_data', data: getCurrentScreenData() });
-
-    return res.json({
-      code: 0,
-      message: '签到成功',
-      data: { attendanceId, venueId: venue.id, venueName: venue.name },
-    });
-  } catch (error: any) {
-    console.error('[Direct签到] 失败:', error.message);
-    return res.status(500).json({ code: 500, message: '签到失败', data: null });
-  }
-});
-
 router.post('/attendance/check-in-by-qr', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const { activationCode, venueId: bodyVenueId } = req.body;
+    const { activationCode } = req.body;
+    if (!activationCode) {
+      return res.status(400).json({ code: 400, message: '缺少激活码', data: null });
+    }
+
+    // 1. 验证激活码
+    const validation = await validateActivationCode(activationCode);
+    if (!validation.valid) {
+      return res.status(400).json({ code: 400, message: '激活码无效或已过期，请刷新大屏二维码', data: null });
+    }
 
     const userId = req.user!.userId;
     if (!userId) return res.status(401).json({ code: 401, message: '未登录', data: null });
 
-    // 裁判接口直接用 JWT operatorId 连接，不依赖 resolveOperatorDb
-    const pool = await getOpPoolFromJwt(req);
-    if (!pool) {
-      console.log('[QR签到] getOpPoolFromJwt 返回 null, userId=' + userId + ', operatorId=' + (req.user as any)?.operatorId);
-      return res.status(400).json({ code: 400, message: '未找到裁判记录，请先完成注册', data: null });
-    }
-
-    // 1. 从 referees 表查真实 referee_id + 绑定的 venue_id
-    const [refRows] = await pool.execute(
-      'SELECT id, venue_id FROM referees WHERE user_id = ? OR id = ?', [userId, userId]
-    ) as any[];
-    const refRow: { id: string; venue_id: string | null } | null = (refRows as any[])?.[0] || null;
+    // 2. 从 referees 表查真实 referee_id
+    const refRow = await queryOpOne<{ id: string; venue_id: string | null }>(req, 
+      'SELECT id, venue_id FROM referees WHERE user_id = $1', [userId]
+    );
     if (!refRow) {
-      console.log('[QR签到] referees 表未查到 userId=' + userId);
       return res.status(400).json({ code: 400, message: '未找到裁判记录，请先完成注册', data: null });
     }
 
-    // 2. 确定签到场地（优先级：激活码 > body venueId > 裁判绑定的 venue_id）
-    let venueId: string | null = null;
-    let venue: { id: string; name: string; address: string; operator_id?: string } | null = null;
-    let usedFallback = false;
-
-    // 尝试验证激活码（Redis）
-    if (activationCode) {
-      try {
-        const validation = await validateActivationCode(activationCode);
-        if (validation.valid && validation.venueId) {
-          venueId = validation.venueId;
-        }
-      } catch (e: any) {
-        console.warn('[QR签到] Redis 激活码验证异常:', e.message);
-      }
+    // 3. 取激活码绑定的场地（如果大屏传了 venueId 则用它，否则取第一个）
+    let venue: { id: string; name: string; address: string } | null = null;
+    if (validation.venueId) {
+      venue = await queryOpOne<{ id: string; name: string; address: string }>(req, 
+        'SELECT id, name, COALESCE(address, \'\') as address FROM venues WHERE id = $1',
+        [validation.venueId]
+      );
     }
-
-    // 降级1: body 直接传 venueId
-    if (!venueId && bodyVenueId) {
-      venueId = bodyVenueId;
-      usedFallback = true;
-      console.log('[QR签到] 降级：使用 body venueId');
-    }
-
-    // 降级2: 用裁判绑定的 venue_id
-    if (!venueId && refRow.venue_id) {
-      venueId = refRow.venue_id;
-      usedFallback = true;
-      console.log('[QR签到] 降级：使用裁判绑定 venue_id');
-    }
-
-    // 从 DB 查 venue 信息
-    if (venueId) {
-      const [vRows] = await pool.execute(
-        'SELECT id, name, COALESCE(address, \'\') as address, operator_id FROM venues WHERE id = ?',
-        [venueId]
-      ) as any[];
-      venue = (vRows as any[])?.[0] || null;
-    }
-
-    // 最终降级：取第一个场地
     if (!venue) {
-      const [vRows] = await pool.execute(
+      venue = await queryOpOne<{ id: string; name: string; address: string }>(req, 
         'SELECT id, name, COALESCE(address, \'\') as address FROM venues LIMIT 1'
-      ) as any[];
-      venue = (vRows as any[])?.[0] || null;
-      if (venue) {
-        usedFallback = true;
-        console.log('[QR签到] 降级：使用第一个可用场地');
-      }
+      );
     }
-
     if (!venue) {
-      console.log('[QR签到] 无可用赛场, usedFallback=' + usedFallback + ', refRow.venue_id=' + (refRow.venue_id || 'null'));
       return res.status(500).json({ code: 500, message: '没有可用赛场', data: null });
     }
 
-    console.log('[QR签到] 最终 venue=' + venue.id + ' (' + venue.name + '), usedFallback=' + usedFallback + ', refRow.venue_id=' + (refRow.venue_id || 'null'));
-
-    // 验证裁判是否已绑定该赛场（降级时跳过严格校验）
-    if (!usedFallback && refRow.venue_id && refRow.venue_id !== venue.id) {
-      console.log('[QR签到] 场地不匹配: ref.venue_id=' + refRow.venue_id + ' vs venue.id=' + venue.id);
+    // 3.5 验证裁判是否已绑定该赛场
+    if (refRow.venue_id && refRow.venue_id !== venue.id) {
       return res.status(403).json({ code: 403, message: '抱歉，您并没有绑定本赛场', data: null });
     }
 
     // 4. 查今日是否已签到且未签退
-    const [attRows] = await pool.execute(
-      'SELECT id FROM attendance WHERE referee_id = ? AND date(checkin_at) = CURDATE() AND checkout_at IS NULL LIMIT 1',
+    const existing = await queryOpOne<any>(req, 
+      `SELECT id FROM attendance
+       WHERE referee_id = $1 AND date(checkin_at) = CURDATE() AND checkout_at IS NULL
+       LIMIT 1`,
       [refRow.id]
-    ) as any[];
-    if ((attRows as any[])?.[0]) {
-      console.log('[QR签到] 今日已签到, refRow.id=' + refRow.id);
-      return res.json({ code: 200, message: '今日已签到，请先签退', data: null });
+    );
+    if (existing) {
+      return res.status(400).json({ code: 400, message: '今日已签到，请先签退', data: null });
     }
 
     // 5. 写入 attendance 签到记录
     const attendanceId = uuidv4();
     const now = new Date().toLocaleString('zh-CN');
-    await pool.execute(
-      'INSERT INTO attendance (id, referee_id, user_id, venue_id, checkin_at) VALUES (?, ?, ?, ?, NOW())',
+    await executeOp(req, 
+      'INSERT INTO attendance (id, referee_id, user_id, venue_id, checkin_at) VALUES ($1, $2, $3, $4, NOW())',
       [attendanceId, refRow.id, userId, venue.id]
     );
 
     // 6. 更新 referees 表最后签到时间
-    await pool.execute('UPDATE referees SET last_checkin_at = NOW() WHERE id = ?', [refRow.id]);
+    await executeOp(req, 'UPDATE referees SET last_checkin_at = NOW() WHERE id = $1', [refRow.id]);
 
     // 7. 标记赛场已激活
     setVenueActive(true);
     cachedVenueStatus = 'open';
     cachedVenueName = venue.name;
     cachedVenueId = venue.id;
-    cachedOperatorId = venue.operator_id || '';
 
     // 回写 venues 表
-    try { await pool.execute('UPDATE venues SET status = \'open\' WHERE id = ?', [venue.id]); } catch (_) {}
+    try { await executeOp(req, 'UPDATE venues SET status = \'open\' WHERE id = $1', [venue.id]); } catch (_) {}
 
-    // 8. 广播大屏激活
-    broadcastToScreen({
-      type: 'activated',
-      data: { venue_name: venue.name, venue_id: venue.id },
-    });
+    // 8. 通知大屏激活
+    if (validation.ws && validation.ws.readyState === WebSocket.OPEN) {
+      validation.ws.send(JSON.stringify({
+        type: 'activated',
+        data: { venue_name: venue.name, venue_id: venue.id },
+      }));
+    }
 
     // 9. 广播 screen_data 更新
     const screenData = getCurrentScreenData();
@@ -1822,7 +1477,7 @@ router.get('/attendance/records', authMiddleware, async (req: Request, res: Resp
 
     const { date } = req.query;
     // 从 referees 表查真实 referee_id
-    const ref = await refQueryOpOne<{ id: string }>(req, 'SELECT id FROM referees WHERE user_id = $1', [userId]);
+    const ref = await queryOpOne<{ id: string }>(req, 'SELECT id FROM referees WHERE user_id = $1', [userId]);
     if (!ref) return res.json({ code: 0, message: 'ok', data: [] });
     const refereeId = ref.id;
 
@@ -1844,7 +1499,7 @@ router.get('/attendance/records', authMiddleware, async (req: Request, res: Resp
       sql += ' LIMIT 5';
     }
 
-    const records = await refQueryOp<any>(req, sql, params);
+    const records = await query<any>(sql, params);
 
     return res.json({ code: 0, message: 'ok', data: records });
   } catch (error: any) {
@@ -1859,24 +1514,10 @@ router.get('/attendance/records', authMiddleware, async (req: Request, res: Resp
 
 let cachedVenueName = '机器狗迷宫赛场';
 let cachedVenueId = '';
-let cachedOperatorId = '';
 let cachedVenueStatus = 'inactive';
 
 export function setVenueActive(active: boolean) {
-  // 同步到 Redis，让大屏重连时能自动恢复
-  if (cachedVenueId) {
-    (async () => {
-      try {
-        const redis = await getRedis();
-        if (active) {
-          await redis.sAdd('active_venues', cachedVenueId);
-        } else {
-          await redis.sRem('active_venues', cachedVenueId);
-          await redis.del('active_venue:' + cachedVenueId);
-        }
-      } catch (_) { /* Redis 不可用不影响主流程 */ }
-    })();
-  }
+  // venActive 由签到/签退控制
 }
 
 export async function initVenueCache(): Promise<void> { return; }
@@ -1901,119 +1542,6 @@ export function getCurrentScreenData() {
   };
 }
 
-/** 给 handler.ts 调用的版本——不依赖 req，直接从 DB 查并推送给指定 ws */
-export async function pushCurrentScreenData(ws: WebSocket) {
-  if (!cachedVenueId) {
-    ws.send(JSON.stringify({ type: 'screen_data', data: getCurrentScreenData() }));
-    return;
-  }
-  try {
-    const venueId = cachedVenueId;
-
-    // 直接连 op 库（通过 cachedOperatorId 获取）
-    let pool: MysqlPool | null = null;
-    let opId = cachedOperatorId;
-
-    // 如果 cachedOperatorId 为空但有 venueId，从 common 库 venues 表查 operator_id
-    if (!opId) {
-      const venueOp = await queryOne<{ operator_id: string }>(
-        'SELECT operator_id FROM venues WHERE id = $1',
-        [venueId]
-      );
-      if (venueOp?.operator_id) {
-        opId = venueOp.operator_id;
-      }
-    }
-
-    if (opId) {
-      // 先查 operators_registry 获取真正的 db_name
-      const regRow = await queryOne<{ db_name: string }>(
-        'SELECT db_name FROM operators_registry WHERE operator_id = $1',
-        [opId]
-      );
-      const dbName = regRow?.db_name || ('op_' + opId);
-      pool = getOperatorPool(dbName);
-    }
-    if (!pool) {
-      ws.send(JSON.stringify({ type: 'screen_data', data: getCurrentScreenData() }));
-      return;
-    }
-
-    const runSql = async (sql: string, p: any[]) => {
-      const [rows] = await pool!.execute(sql, p) as any[];
-      return rows;
-    };
-
-    const queueRows: any[] = await runSql(
-      `SELECT rq.* FROM race_queues rq WHERE rq.venue_id=? AND rq.status IN ('waiting','called','skipped') ORDER BY rq.queue_number ASC`,
-      [venueId]
-    );
-    const currentRow: any = (await runSql(
-      `SELECT rq.* FROM race_queues rq WHERE rq.venue_id=? AND rq.status IN ('racing','paused','called') ORDER BY rq.created_at DESC LIMIT 1`,
-      [venueId]
-    ))[0] || null;
-    const lastFinished: any = (await runSql(
-      `SELECT rq.* FROM race_queues rq WHERE rq.venue_id=? AND rq.status='finished' AND rq.finish_status!='invalid' ORDER BY rq.updated_at DESC LIMIT 1`,
-      [venueId]
-    ))[0] || null;
-
-    // 排行榜 top 10 —— 按 finish_time_ms 升序，与 broadcastAfterUpdate 对齐
-    const leaderRows: any[] = await runSql(
-      `SELECT rq.* FROM race_queues rq WHERE rq.venue_id=? AND rq.status='finished' AND rq.finish_status != 'invalid' ORDER BY rq.finish_time_ms ASC LIMIT 10`,
-      [venueId]
-    );
-
-    // 收集所有 user_id
-    const allUserIds: string[] = [];
-    for (const r of queueRows) if (r.user_id) allUserIds.push(r.user_id);
-    if (currentRow?.user_id) allUserIds.push(currentRow.user_id);
-    if (lastFinished?.user_id) allUserIds.push(lastFinished.user_id);
-    for (const r of leaderRows) if (r.user_id) allUserIds.push(r.user_id);
-
-    // 查 common 库 user info
-    const userMap = new Map<string, { nickname: string; avatar_url: string }>();
-    if (allUserIds.length > 0) {
-      const placeholders = allUserIds.map((_, i) => '$' + (i + 1)).join(',');
-      const userRows: any[] = await query(
-        `SELECT id, nickname, avatar_url FROM users WHERE id IN (${placeholders})`,
-        allUserIds
-      );
-      for (const u of (userRows || [])) {
-        userMap.set(u.id, { nickname: u.nickname, avatar_url: u.avatar_url });
-      }
-      console.log('[Broadcast] user query: ids=' + JSON.stringify(allUserIds) + ' rows=' + (userRows?.length || 0));
-    }
-
-    const attachUser = (row: any) => {
-      if (!row?.user_id) return row;
-      const u = userMap.get(row.user_id);
-      return { ...row, nickname: u?.nickname || '', avatar_url: u?.avatar_url || '' };
-    };
-
-    const currentUser = currentRow?.user_id ? userMap.get(currentRow.user_id) : null;
-
-    const screenData = {
-      race_status: currentRow ? (currentRow.status === 'racing' ? 'racing' : currentRow.status === 'paused' ? 'paused' : 'idle') : (lastFinished ? 'finished' : 'idle'),
-      venue_status: cachedVenueStatus,
-      current_racer: currentRow ? attachUser(currentRow) : null,
-      elapsed_ms: currentRow?.start_time ? Date.now() - new Date(currentRow.start_time).getTime() : (currentRow?.elapsed_ms ?? 0),
-      start_time: currentRow?.start_time || null,
-      next_racer: queueRows.length > 0 ? attachUser(queueRows[0]) : null,
-      queue: queueRows.map(attachUser),
-      venue_name: cachedVenueName,
-      venue_id: cachedVenueId,
-      leaderboard: leaderRows.map((r, i) => ({ rank: i + 1, ...attachUser(r) })),
-      last_result: lastFinished ? attachUser(lastFinished) : undefined,
-      timestamp: new Date().toLocaleString('zh-CN'),
-    };
-
-    ws.send(JSON.stringify({ type: 'screen_data', data: screenData }));
-  } catch (e: any) {
-    console.error('[pushCurrentScreenData] error:', e.message);
-    ws.send(JSON.stringify({ type: 'screen_data', data: getCurrentScreenData() }));
-  }
-}
-
 /** 从 DB 查询当前状态并广播 screen_data 到大屏 */
 async function broadcastAfterUpdate(req: Request) {
   if (!cachedVenueId) return;
@@ -2022,28 +1550,28 @@ async function broadcastAfterUpdate(req: Request) {
     const venueId = cachedVenueId;
 
     // 分两段查询：race_queues 在运营商库，users 在 common 库
-    const queueRows = await refQueryOp<RacerRow>(req,
+    const queueRows = await queryOp<RacerRow>(req,
       `SELECT rq.* FROM race_queues rq
        WHERE rq.venue_id = $1 AND rq.status IN ('waiting','called','skipped')
        ORDER BY rq.queue_number ASC`,
       [venueId]
     );
 
-    const currentRow = await refQueryOpOne<RacerRow>(req,
+    const currentRow = await queryOpOne<RacerRow>(req,
       `SELECT rq.* FROM race_queues rq
        WHERE rq.venue_id = $1 AND rq.status IN ('racing','paused')
        ORDER BY rq.created_at DESC LIMIT 1`,
       [venueId]
     );
 
-    const lastFinished = await refQueryOpOne<RacerRow>(req,
+    const lastFinished = await queryOpOne<RacerRow>(req,
       `SELECT rq.* FROM race_queues rq
        WHERE rq.venue_id = $1 AND rq.status = 'finished' AND rq.finish_status != 'invalid'
        ORDER BY rq.updated_at DESC LIMIT 1`,
       [venueId]
     );
 
-    const leaderboardRows = await refQueryOp<RacerRow>(req,
+    const leaderboardRows = await queryOp<RacerRow>(req,
       `SELECT rq.* FROM race_queues rq
        WHERE rq.venue_id = $1 AND rq.status = 'finished' AND rq.finish_status != 'invalid'
        ORDER BY rq.finish_time_ms ASC LIMIT 10`,
@@ -2060,12 +1588,11 @@ async function broadcastAfterUpdate(req: Request) {
     const broadcastUserMap = new Map<string, { nickname: string; avatar_url: string }>();
     if (allUserIds.length > 0) {
       try {
-        const placeholders = allUserIds.map((_, i) => '$' + (i + 1)).join(',');
+        const placeholders = allUserIds.map(() => '?').join(',');
         const userRows: any[] = await query(
           `SELECT id, nickname, avatar_url FROM users WHERE id IN (${placeholders})`,
           allUserIds
         );
-        console.log('[Broadcast] user query: ids=' + JSON.stringify(allUserIds) + ' rows=' + (userRows?.length || 0));
         for (const u of (userRows || [])) {
           broadcastUserMap.set(u.id, { nickname: u.nickname, avatar_url: u.avatar_url });
         }
@@ -2092,7 +1619,6 @@ async function broadcastAfterUpdate(req: Request) {
 
     const raceStatus = currentRow?.status === 'racing' ? 'racing'
       : currentRow?.status === 'paused' ? 'paused'
-      : lastFinished ? 'finished'
       : queueRows.length > 0 ? 'waiting' : 'idle';
 
     const lastResult = lastFinished?.finish_time_ms != null ? {
@@ -2112,9 +1638,9 @@ async function broadcastAfterUpdate(req: Request) {
       venue_id: cachedVenueId,
       leaderboard: leaderboardRows.map((r, i) => ({
         rank: i + 1,
-        nickname: r.nickname || '选手',
-        avatar_url: r.avatar_url || undefined,
-        finish_time_ms: r.finish_time_ms || 0,
+        name: r.nickname || '选手',
+        avatar: r.avatar_url || undefined,
+        elapsed: r.finish_time_ms || 0,
         status: r.finish_status || 'finished',
       })),
       last_result: lastResult,
@@ -2128,12 +1654,12 @@ async function broadcastAfterUpdate(req: Request) {
 /** 写入比赛成绩 */
 async function writeRaceResult(req: Request, userId: string, venueId: string, nickname: string | undefined, elapsed: number, status: string) {
   try {
-    const existing = await refQueryOpOne<{ id: string }>(req,
+    const existing = await queryOpOne<{ id: string }>(req,
       `SELECT id FROM race_results WHERE user_id = $1 AND created_at > NOW() - INTERVAL 10 SECOND`,
       [userId]
     );
     if (!existing) {
-      await refExecuteOp(req,
+      await executeOp(req,
         `INSERT INTO race_results (id, checkin_id, user_id, venue_id, referee_id, score_ms, status, race_type, finished_at)
          VALUES ($1, NULL, $2, $3, $4, $5, 'completed', 1, NOW())`,
         [uuidv4(), userId, venueId, req.user!.userId, elapsed]
@@ -2156,11 +1682,11 @@ router.patch('/:id/profile', authMiddleware, async (req: Request, res: Response)
     if (!name || !phone) return res.status(400).json({ code: 400, message: '请填写姓名和手机号', data: null });
     if (!/^\d{11}$/.test(phone)) return res.status(400).json({ code: 400, message: '手机号格式不正确', data: null });
 
-    const referee = await refQueryOpOne<{ id: string; user_id: string }>(req, 
+    const referee = await queryOpOne<{ id: string; user_id: string }>(req, 
       'SELECT id, user_id FROM referees WHERE id = $1', [id]);
     if (!referee) return res.status(404).json({ code: 404, message: '裁判记录不存在', data: null });
 
-    await refExecuteOp(req, 'UPDATE referees SET name = $1, phone = $2, updated_at = NOW() WHERE id = $3', [name, phone, id]);
+    await executeOp(req, 'UPDATE referees SET name = $1, phone = $2, updated_at = NOW() WHERE id = $3', [name, phone, id]);
     if (referee.user_id) {
       await execute('UPDATE users SET nickname = $1, phone = $2, updated_at = NOW() WHERE id = $3', [name, phone, referee.user_id]);
     }
@@ -2184,7 +1710,7 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response<ApiRespo
     const { id } = req.params;
     const { venue_id, name, phone } = req.body;
 
-    const existing = await refQueryOpOne<{ id: string }>(req, 
+    const existing = await queryOpOne<{ id: string }>(req, 
       'SELECT id FROM referees WHERE id = $1',
       [id]
     );
@@ -2216,7 +1742,7 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response<ApiRespo
     fields.push('updated_at = NOW()');
     values.push(id);
 
-    await refQueryOp(req, 
+    await queryOp(req, 
       `UPDATE referees SET ${fields.join(', ')} WHERE id = $${paramIdx}`,
       values
     );
@@ -2225,130 +1751,6 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response<ApiRespo
   } catch (error: any) {
     console.error('[Referees] update error:', error.message);
     return res.status(500).json({ code: 500, message: '更新裁判信息失败', data: null });
-  }
-});
-
-
-/**
- * POST /api/v1/referees/register
- * 裁判注册（运营商后台专用）
- * @header Authorization: Bearer <operator_token>
- * @body phone - 手机号（必填，11位）
- * @body name - 姓名（必填）
- * @returns 裁判信息 + 系统生成的登录密码
- */
-router.post('/register', authMiddleware, async (req: Request, res: Response) => {
-  try {
-    const { phone, name } = req.body;
-    const operatorId = (req.user as any)?.operatorId;
-
-    if (!operatorId) {
-      return res.status(400).json({ code: 400, message: '缺少运营商ID', data: null });
-    }
-    if (!phone || !name) {
-      return res.status(400).json({ code: 400, message: '请填写手机号和姓名', data: null });
-    }
-    if (!/^1[3-9]\d{9}$/.test(phone)) {
-      return res.status(400).json({ code: 400, message: '手机号格式不正确', data: null });
-    }
-
-    // 查找运营商库
-    const opRegistry = await queryOne<{ db_name: string; operator_name: string }>(
-      'SELECT db_name, operator_name FROM operators_registry WHERE operator_id = $1',
-      [operatorId]
-    );
-    if (!opRegistry || !opRegistry.db_name) {
-      return res.status(400).json({ code: 400, message: '指定的运营商不存在', data: null });
-    }
-
-    const opPool = getOperatorPool(opRegistry.db_name);
-
-    // 检查手机号是否已被注册（当前运营商库）
-    const [existingRefs] = await opPool.execute(
-      'SELECT id FROM referees WHERE phone = ?',
-      [phone]
-    );
-    if ((existingRefs as any[])?.length > 0) {
-      return res.status(400).json({ code: 400, message: '该手机号已被注册为裁判', data: null });
-    }
-
-    // 随机生成 8 位数字密码
-    const generatedPassword = Math.floor(10000000 + Math.random() * 90000000).toString();
-
-    // 创建/更新 users 记录
-    let userId: string;
-    const existingUser = await queryOne<{ id: string }>(
-      'SELECT id FROM users WHERE phone = $1',
-      [phone]
-    );
-    if (!existingUser) {
-      userId = uuidv4();
-      await execute(
-        `INSERT INTO users (id, openid, nickname, phone, role)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [userId, 'ref_' + phone, name, phone, 'referee']
-      );
-    } else {
-      userId = existingUser.id;
-      await execute(
-        `UPDATE users SET nickname = $1, role = $2, updated_at = NOW() WHERE id = $3`,
-        [name, 'referee', userId]
-      );
-    }
-
-    const refereeId = uuidv4();
-    const hashedPwd = hashSync(generatedPassword, 10);
-    await opPool.execute(
-      `INSERT INTO referees (id, user_id, phone, password, is_first_login, name, operator_id)
-       VALUES (?, ?, ?, ?, 1, ?, ?)`,
-      [refereeId, userId, phone, hashedPwd, name, operatorId]
-    );
-
-    return res.status(201).json({
-      code: 0,
-      message: '裁判注册成功',
-      data: {
-        id: refereeId,
-        user_id: userId,
-        name,
-        phone,
-        password: generatedPassword,
-        operator_id: operatorId,
-      },
-    });
-  } catch (error: any) {
-    console.error('[Referees] register error:', error.message);
-    return res.status(500).json({ code: 500, message: '注册失败: ' + error.message, data: null });
-  }
-});
-
-/**
- * POST /api/v1/referees/:refereeId/reset-password
- * 重置裁判密码为默认密码 Admin@123
- */
-router.post('/:refereeId/reset-password', authMiddleware, async (req: Request, res: Response) => {
-  try {
-    const { refereeId } = req.params;
-
-    const referee = await refQueryOpOne<{ id: string }>(req,
-      'SELECT id FROM referees WHERE id = $1',
-      [refereeId]
-    );
-    if (!referee) {
-      return res.status(404).json({ code: 404, message: '裁判不存在', data: null });
-    }
-
-    const defaultPassword = 'Admin@123';
-    const hashed = hashSync(defaultPassword);
-    await refExecuteOp(req,
-      'UPDATE referees SET password = $1 WHERE id = $2',
-      [hashed, refereeId]
-    );
-
-    return res.json({ code: 0, message: '密码已重置为默认密码' });
-  } catch (error: any) {
-    console.error('[Referees] reset-password error:', error.message);
-    return res.status(500).json({ code: 500, message: '密码重置失败', data: null });
   }
 });
 

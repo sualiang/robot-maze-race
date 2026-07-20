@@ -1,30 +1,24 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { IncomingMessage } from 'http';
 import { Server } from 'http';
-import { getCurrentScreenData, pushCurrentScreenData } from '../routes/referees';
-import { getRedis } from '../config/redis';
+import { getCurrentScreenData } from '../routes/referees';
+import { setTempToken, getTempToken, listTempTokensWithData, deleteTempToken } from '../utils/temp-token';
 
 // 存储所有连接的客户端，按房间分组
 const rooms = new Map<string, Set<WebSocket>>();
 const clientRooms = new Map<WebSocket, string>();
 const screenClients = new Set<WebSocket>();
-const screenActivationCodes = new Map<WebSocket, string>(); // ws → activation_code，用于断线时清理
 const refereeClients = new Set<WebSocket>();
 
-export const ACTIVATION_CODE_PREFIX = 'activation_code:';
+// 激活码关联的 WebSocket（用于激活后回推通知）
+// Redis 存 data，内存存 ws 引用（ws 不能序列化）
+const activationCodeWs = new Map<string, WebSocket>();
 
-export async function validateActivationCode(code: string): Promise<{ valid: boolean; venueId?: string; venueName?: string }> {
-  if (!code) return { valid: false };
-  try {
-    const redis = await getRedis();
-    const data = await redis.get(ACTIVATION_CODE_PREFIX + code);
-    if (!data) return { valid: false };
-    const entry = JSON.parse(data);
-    return { valid: true, venueId: entry.venueId, venueName: entry.venueName };
-  } catch (e: any) {
-    console.error('[ActivationCode] Redis read error:', e.message);
-    return { valid: false };
-  }
+export async function validateActivationCode(code: string): Promise<{ valid: boolean; ws?: WebSocket; venueId?: string; venueName?: string }> {
+  const data = await getTempToken<{ venueId?: string; venueName?: string }>('activation_code', code);
+  if (!data) return { valid: false };
+  const ws = activationCodeWs.get(code);
+  return { valid: true, ws, venueId: data.venueId, venueName: data.venueName };
 }
 
 function handleConnection(ws: WebSocket, req: IncomingMessage) {
@@ -45,21 +39,6 @@ function handleConnection(ws: WebSocket, req: IncomingMessage) {
     if (screenData) {
       ws.send(JSON.stringify({ type: 'screen_data', data: screenData }));
     }
-    // 检查是否有已激活的赛场，自动恢复（大屏断线重连）
-    (async () => {
-      try {
-        const redis = await getRedis();
-        const activeIds = await redis.sMembers('active_venues');
-        if (activeIds.length > 0) {
-          const vid = activeIds[0]; // 取第一个激活的赛场
-          const info = await redis.hGetAll('active_venue:' + vid);
-          if (info && info.name) {
-            // 大屏重连自动恢复：跳过激活码阶段，直接进入比赛画面
-            ws.send(JSON.stringify({ type: 'activated', data: { venue_name: info.name, venue_id: vid } }));
-          }
-        }
-      } catch (_) { /* ignore */ }
-    })();
   }
 
   // 裁判客户端单独跟踪（用于推送 venue 状态变更）
@@ -68,25 +47,16 @@ function handleConnection(ws: WebSocket, req: IncomingMessage) {
   }
 }
 
-function handleClose(ws: WebSocket) {
-  // 大屏断线时清理激活码，防止重连后找不到
-  if (screenClients.has(ws)) {
-    const code = screenActivationCodes.get(ws);
-    if (code) {
-      (async () => {
-        try {
-          const redis = await getRedis();
-          await redis.del(ACTIVATION_CODE_PREFIX + code);
-          console.log('[ActivationCode] Cleaned up on disconnect:', code.substring(0, 8) + '...');
-        } catch (e: any) {
-          console.error('[ActivationCode] Cleanup error:', e.message);
-        }
-      })();
-    }
-    screenActivationCodes.delete(ws);
-  }
+async function handleClose(ws: WebSocket) {
   screenClients.delete(ws);
   refereeClients.delete(ws);
+  // 清理该 ws 对应的激活码映射（Redis + 内存）
+  for (const [code, storedWs] of activationCodeWs.entries()) {
+    if (storedWs === ws) {
+      activationCodeWs.delete(code);
+      deleteTempToken('activation_code', code).catch(() => {});
+    }
+  }
   const room = clientRooms.get(ws);
   if (room) {
     const clients = rooms.get(room);
@@ -125,53 +95,38 @@ function handleMessage(ws: WebSocket, msg: any) {
       rooms.get(newRoom)!.add(ws);
       clientRooms.set(ws, newRoom);
       ws.send(JSON.stringify({ event: 'subscribed', data: { room: newRoom } }));
-      // 推送当前完整数据（含 queue、nickname、avatar）
-      pushCurrentScreenData(ws);
       break;
 
     case 'get_screen_data': {
-      // 推送包含 DB 数据的 screen_data
-      pushCurrentScreenData(ws);
+      // 客户端主动请求当前数据
+      const data = getCurrentScreenData();
+      ws.send(JSON.stringify({ type: 'screen_data', data }));
       break;
     }
 
     case 'screen_login': {
-      // 大屏生成激活码后存 Redis（含 venueId 关联），不设 TTL，断线时主动清理
+      // 大屏生成激活码后注册到 Redis + 内存 ws 引用
       const code = msg.activation_code;
       if (!code || typeof code !== 'string') break;
       const venueId = msg.venueId || undefined;
       const venueName = msg.venueName || undefined;
-      (async () => {
-        try {
-          const redis = await getRedis();
-          await redis.set(
-            ACTIVATION_CODE_PREFIX + code,
-            JSON.stringify({ venueId, venueName, createdAt: Date.now() })
-          );
-          screenActivationCodes.set(ws, code);
-          console.log('[ActivationCode] Stored in Redis:', code.substring(0, 8) + '...');
-          // 不在此处发送 activated —— 激活由 check-in-by-qr 的 broadcastToScreen 触发
-        } catch (e: any) {
-          console.error('[ActivationCode] Redis write error:', e.message);
-        }
-      })();
+      setTempToken('activation_code', code, { venueId, venueName }, 60).catch((err) =>
+        console.error('[WS] setTempToken error:', err.message),
+      );
+      activationCodeWs.set(code, ws);
       ws.send(JSON.stringify({ type: 'login_ack', message: '等待裁判扫码' }));
       break;
     }
 
     case 'get_activation_code': {
-      // 查询有效激活码列表（从 Redis 读取）
-      (async () => {
-        try {
-          const redis = await getRedis();
-          const keys = await redis.keys(ACTIVATION_CODE_PREFIX + '*');
-          const codes = keys.map(k => k.replace(ACTIVATION_CODE_PREFIX, ''));
-          ws.send(JSON.stringify({ type: 'activation_codes', codes }));
-        } catch (e: any) {
-          console.error('[ActivationCode] Redis keys error:', e.message);
-          ws.send(JSON.stringify({ type: 'activation_codes', codes: [] }));
-        }
-      })();
+      // 查询有效激活码列表
+      listTempTokensWithData('activation_code').then((codeData) => {
+        const codes: string[] = [];
+        codeData.forEach((_data, c) => codes.push(c));
+        ws.send(JSON.stringify({ type: 'activation_codes', codes }));
+      }).catch(() => {
+        ws.send(JSON.stringify({ type: 'activation_codes', codes: [] }));
+      });
       break;
     }
 
@@ -210,7 +165,7 @@ function setupWSS(wss: WebSocketServer) {
       }
     });
     ws.on('close', (code, reason) => { console.log(`[WS] 关闭: code=${code} reason=${reason?.toString() || ''}`); handleClose(ws); });
-    ws.on('error', (err) => { console.error('[WS] 连接错误:', err.message); handleClose(ws); });
+    ws.on('error', (err) => console.error('[WS] 连接错误:', err.message));
   });
 }
 
@@ -245,8 +200,8 @@ export function setupWebSocket(server: Server) {
 
 /** 向所有大屏客户端 + 所有裁判端客户端广播消息 */
 export function broadcastToScreen(data: any) {
-  // 已经是 type=xxx 或 event 格式都直接透传
-  const isRaw = !!(data.event || data.type);
+  // 已经是 type=screen_data 格式或 event 格式都直接透传
+  const isRaw = data.event || data.type === 'screen_data';
   // 注入 venue_status 防止大屏端丢失导致回退到 mock 的 inactive
   if (!isRaw && data.venue_status === undefined) {
     data.venue_status = 'open';
@@ -267,5 +222,5 @@ export function broadcastToScreen(data: any) {
       refereeCount++;
     }
   });
-  console.log(`[WS] 已广播 ${isRaw ? (data.event || data.type) : 'screen_data'} 给 ${screenCount} 个大屏 + ${refereeCount} 个裁判客户端`);
+  console.log(`[WS] 已广播 ${isRaw ? data.event : 'screen_data'} 给 ${screenCount} 个大屏 + ${refereeCount} 个裁判客户端`);
 }
