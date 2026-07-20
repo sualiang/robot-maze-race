@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Card, Form, Switch, InputNumber, Button, Space, Input,
+  Card, Form, Switch, InputNumber, Button, Space, Input, Select,
   Divider, message, Spin, Alert, Typography, Modal, Tabs, Table, Tag,
 } from 'antd';
 import {
@@ -458,9 +458,9 @@ export default function MarketingConfig() {
             <Input maxLength={30} />
           </Form.Item>
           <Form.Item name="itemType" label="商品类型" rules={[{ required: true, message: '请选择类型' }]}>
-            <select style={{ width: '100%', height: 32, borderRadius: 6, border: '1px solid #d9d9d9', padding: '0 11px' }}>
-              <option value="physical_gift">实物礼品</option>
-            </select>
+            <Select placeholder="请选择商品类型">
+              <Select.Option value="physical_gift">实物礼品</Select.Option>
+            </Select>
           </Form.Item>
           <Form.Item name="itemId" label="备注">
             <Input placeholder="实物礼品描述信息" />
