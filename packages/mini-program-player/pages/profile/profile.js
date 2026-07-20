@@ -36,6 +36,9 @@ Page({
   },
 
   onShow: function () {
+    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
+      this.getTabBar().setData({ selected: 3 });
+    }
     var token = wx.getStorageSync('player_token');
     if (!token) {
       app.globalData.isLoggedIn = false;

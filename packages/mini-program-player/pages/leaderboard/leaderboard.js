@@ -65,6 +65,9 @@ Page({
   },
 
   onShow: function () {
+    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
+      this.getTabBar().setData({ selected: 2 });
+    }
     if (!this.data.pageLoading) this._refreshCurrentTab();
     this._fetchLiveLeaderboard();
   },
