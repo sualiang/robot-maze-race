@@ -682,21 +682,11 @@ router.get('/me/profile-check', authMiddleware, async (req: Request, res: Respon
       console.error('[profile-check] 查询消费券失败:', (couponErr as Error)?.message);
     }
 
-    // 查询积分余额（按运营商隔离，从 operator DB 的 points_transactions SUM）
+    // 查询积分余额（从 users 表统一读取）
     let pointsBalance = 0;
     try {
-      const opId = (req.user as any)?.operatorId || '';
-      let pointsSql: string;
-      let pointsParams: any[];
-      if (opId) {
-        pointsSql = `SELECT COALESCE(SUM(points), 0) as balance FROM points_transactions WHERE user_id = $1 AND operator_id = $2`;
-        pointsParams = [userId, opId];
-      } else {
-        pointsSql = `SELECT COALESCE(SUM(points), 0) as balance FROM points_transactions WHERE user_id = $1`;
-        pointsParams = [userId];
-      }
-      const pointsRow = await queryOpOne<{ balance: string }>(req, pointsSql, pointsParams);
-      pointsBalance = parseInt(pointsRow?.balance || '0', 10);
+      const pointsRow = await queryOne<{ points: number }>(`SELECT COALESCE(points, 0) as points FROM users WHERE id = $1`, [userId]);
+      pointsBalance = pointsRow?.points || 0;
     } catch (pointsErr) {
       // 静默失败
     }
