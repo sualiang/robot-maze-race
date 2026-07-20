@@ -489,6 +489,11 @@ async function runSqlFile(pool: mysql.Pool, filePath: string): Promise<void> {
   for (const stmt of stmts) {
     try { await pool.execute(stmt); }
     catch (e: any) {
+      // 忽略表/索引已存在的错误（幂等重放）
+      const code = e.errno || e.code;
+      if (code === 1050 || code === 1061 || code === 'ER_TABLE_EXISTS_ERROR' || code === 'ER_DUP_KEYNAME' || e.message?.includes('already exists')) {
+        continue;
+      }
       const short = stmt.substring(0, 80).replace(/\s+/g, ' ');
       console.error(`[DB] SQL error in ${path.basename(filePath)} at "${short}...":`, e.message?.substring(0, 150));
     }
