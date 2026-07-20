@@ -162,6 +162,11 @@
   background: linear-gradient(135deg, #6366F1, #8B5CF6);
 }
 
+.race-cta-btn.race-cta-pending {
+  background: #667085;
+  pointer-events: none;
+}
+
 .race-cta-text {
   font-size: 32rpx;
   font-weight: 600;
