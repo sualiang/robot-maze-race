@@ -537,8 +537,9 @@
 .redeem-submit-btn {
   width: 360rpx;
   height: 88rpx;
-  line-height: 88rpx;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: linear-gradient(135deg, #e94560, #ff6b81);
   color: #fff;
   font-size: 32rpx;

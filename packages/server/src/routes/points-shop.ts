@@ -479,7 +479,16 @@ router.post('/points-shop/redeem', authMiddleware, async (req: Request, res: Res
       );
     }
 
-    // 6. 扣积分
+    // 6. 扣积分（更新 users.points）
+    const deductResult = await execute(
+      `UPDATE users SET points = points - $1 WHERE id = $2 AND points >= $1`,
+      [needPoints, userId]
+    );
+    if (deductResult.changes === 0) {
+      res.json({ code: 400, message: '积分不足', data: null });
+      return;
+    }
+    // 写入积分明细
     await executeOp(req,
       `INSERT INTO points_transactions (id, user_id, operator_id, points, type, remark, created_at)
        VALUES ($1, $2, $3, $4, 'point_shop_redeem', $5, NOW())`,
