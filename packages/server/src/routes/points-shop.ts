@@ -24,7 +24,7 @@ router.get('/points-shop/items', authMiddleware, async (req: Request, res: Respo
   try {
     const userId = req.user!.userId;
     const items = await queryOp<any>(req, 
-      `SELECT id, item_type, item_id, name, description, image, need_points, stock, exchange_limit,
+      `SELECT id, item_type, item_id, name, description, image, need_points, face_value, stock, exchange_limit,
               sort_weight, status, created_at
        FROM point_shop
        WHERE status = 1
@@ -48,6 +48,7 @@ router.get('/points-shop/items', authMiddleware, async (req: Request, res: Respo
           description: item.description,
           image: item.image ? (item.image.startsWith('/uploads/') ? `${process.env.SITE_URL || 'https://dog.amberrobot.com.cn'}${item.image}` : item.image) : '',
           needPoints: item.need_points,
+          faceValue: item.face_value || 0,
           exchangeLimit: item.exchange_limit || 0,
           sortWeight: item.sort_weight || 0,
           status: item.status,
@@ -103,7 +104,7 @@ router.get('/points-shop/items/all', authMiddleware, operatorOnly, async (req: R
  */
 router.post('/points-shop/items', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
-    const { name, itemType, itemId, description, needPoints, sortWeight, stock, image } = req.body;
+    const { name, itemType, itemId, description, needPoints, faceValue, sortWeight, stock, image } = req.body;
     if (!name || !itemType || !needPoints) {
       return res.status(400).json({ code: 400, message: 'name, itemType, needPoints 不能为空', data: null });
     }
@@ -113,9 +114,9 @@ router.post('/points-shop/items', authMiddleware, operatorOnly, async (req: Requ
     }
     const id = uuidv4();
     await executeOp(req, 
-      `INSERT INTO point_shop (id, item_type, item_id, name, description, need_points, sort_weight, stock, image)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [id, itemType, itemId || '', name, description || '', needPoints, sortWeight || 0, stock ?? 0, image || '']
+      `INSERT INTO point_shop (id, item_type, item_id, name, description, need_points, face_value, sort_weight, stock, image)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [id, itemType, itemId || '', name, description || '', needPoints, faceValue || 0, sortWeight || 0, stock ?? 0, image || '']
     );
     res.status(201).json({ code: 0, message: '商品已创建', data: { id } });
   } catch (error: any) {
@@ -131,7 +132,7 @@ router.post('/points-shop/items', authMiddleware, operatorOnly, async (req: Requ
 router.put('/points-shop/items/:id', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, itemType, itemId, description, needPoints, sortWeight, status, stock, image } = req.body;
+    const { name, itemType, itemId, description, needPoints, faceValue, sortWeight, status, stock, image } = req.body;
 
     const updates: string[] = [];
     const params: any[] = [];
@@ -147,6 +148,7 @@ router.put('/points-shop/items/:id', authMiddleware, operatorOnly, async (req: R
     if (itemId !== undefined) { updates.push(`item_id = $${idx++}`); params.push(String(itemId)); }
     if (description !== undefined) { updates.push(`description = $${idx++}`); params.push(description); }
     if (needPoints !== undefined) { updates.push(`need_points = $${idx++}`); params.push(needPoints); }
+    if (faceValue !== undefined) { updates.push(`face_value = $${idx++}`); params.push(faceValue); }
     if (sortWeight !== undefined) { updates.push(`sort_weight = $${idx++}`); params.push(sortWeight); }
     if (status !== undefined) { updates.push(`status = $${idx++}`); params.push(status); }
     if (stock !== undefined) { updates.push(`stock = $${idx++}`); params.push(stock); }

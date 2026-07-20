@@ -90,6 +90,7 @@ export default function MarketingConfig() {
       description: item.description,
       image: item.image || '',
       needPoints: item.needPoints,
+      faceValue: item.faceValue || 0,
       sortWeight: item.sortWeight,
       status: item.status,
       stock: item.stock || 0,
@@ -485,6 +486,9 @@ export default function MarketingConfig() {
           </Form.Item>
           <Form.Item name="needPoints" label="所需积分" rules={[{ required: true, message: '请输入积分' }]}>
             <InputNumber min={1} max={999999} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="faceValue" label="商品面额（元）">
+            <InputNumber min={0} max={999999} precision={2} prefix="¥" style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="stock" label="库存数量" rules={[{ required: true, message: '请输入库存数量' }]}>
             <InputNumber min={1} max={999999} style={{ width: '100%' }} />

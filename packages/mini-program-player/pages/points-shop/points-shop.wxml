@@ -18,6 +18,7 @@
       <text class="section-subtitle">可用于抵扣参赛报名费</text>
     </view>
     <view class="item-grid">
+      <!-- 参赛抵扣金区块 -->
       <view
         wx:for="{{entryItems}}"
         wx:key="id"
@@ -28,6 +29,7 @@
         <image wx:if="{{item.image}}" class="card-image" src="{{item.image}}" mode="aspectFill" />
         <view class="card-value">{{item.name}}</view>
         <view class="card-desc" wx:if="{{item.description}}">{{item.description}}</view>
+        <view class="face-value" wx:if="{{item.faceValue > 0}}">💰 价值 ¥{{item.faceValue}}</view>
         <view class="card-footer">
           <view class="card-points">
             <text class="card-points-icon">⭐</text>
@@ -41,7 +43,7 @@
     </view>
   </view>
 
-  <!-- 商家消费券分区 -->
+  <!-- 商家消费券/实物礼品区块 -->
   <view class="section" wx:if="{{couponItems.length > 0}}">
     <view class="section-title">
       <text>🎟️ 商家消费券</text>
@@ -58,6 +60,7 @@
         <image wx:if="{{item.image}}" class="card-image" src="{{item.image}}" mode="aspectFill" />
         <view class="card-value">{{item.name}}</view>
         <view class="card-desc" wx:if="{{item.description}}">{{item.description}}</view>
+        <view class="face-value" wx:if="{{item.faceValue > 0}}">💰 价值 ¥{{item.faceValue}}</view>
         <view class="card-footer">
           <view class="card-points">
             <text class="card-points-icon">⭐</text>
