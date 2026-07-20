@@ -164,9 +164,37 @@ export default function ScreenDisplay() {
               }
             }, 50);
           } else if (screenData.race_status === 'finished') {
-            console.log('[大屏WS] 比赛结束, 固定 elapsed_ms:', screenData.elapsed_ms, 'current elapsed:', elapsedRef.current);
-            // 已完成：固定显示 elapsed_ms（用 ref 获取最新的 elapsed，防止闭包过期）
-            setElapsed(screenData.elapsed_ms || elapsedRef.current || 0);
+            console.log('[大屏WS] 比赛结束, backend elapsed_ms:', screenData.elapsed_ms, 'client elapsed:', elapsedRef.current);
+            // 优先用客户端自己计时的值，兜底用后端 elapsed_ms（如果后端为 0 则忽略）
+            const finalElapsed = elapsedRef.current > 0 ? elapsedRef.current : (screenData.elapsed_ms || 0);
+            setElapsed(finalElapsed);
+            
+            // 自动判断进榜：如果成绩有效且能进前 10，插入榜单
+            if (finalElapsed > 0 && screenData.last_result?.racerName) {
+              const currentLeaderboard = screenData.leaderboard || [];
+              const newEntry: LeaderboardEntry = {
+                rank: 0, // 后面重新排
+                nickname: screenData.last_result.racerName,
+                finish_time_ms: finalElapsed,
+                status: 'finished',
+              };
+              // 判断是否进前 10（榜单不足 10 人，或者比第 10 名快）
+              let canEnter = currentLeaderboard.length < 10;
+              if (!canEnter && currentLeaderboard.length >= 10) {
+                const tenthTime = currentLeaderboard[9]?.finish_time_ms;
+                if (tenthTime && finalElapsed < tenthTime) {
+                  canEnter = true;
+                }
+              }
+              if (canEnter) {
+                const newBoard = [...currentLeaderboard, newEntry]
+                  .filter(e => e.finish_time_ms > 0)
+                  .sort((a, b) => a.finish_time_ms - b.finish_time_ms)
+                  .slice(0, 20)
+                  .map((e, i) => ({ ...e, rank: i + 1 }));
+                setData(prev => prev ? { ...prev, leaderboard: newBoard } : prev);
+              }
+            }
           } else if (screenData.race_status === 'idle' || screenData.race_status === 'waiting') {
             // 闲置：固定显示 elapsed_ms
             setElapsed(screenData.elapsed_ms || 0);
