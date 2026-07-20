@@ -135,15 +135,7 @@ export async function resolveOperatorDbForUserId(userId: string): Promise<string
  * 用于未登录用户调用的公开展示接口（如 /packages）
  */
 async function resolveFirstOperatorDb(): Promise<string | null> {
-  const common = getCommonPool();
-  try {
-    const [rows] = await common.query<any[]>(
-      `SELECT db_name FROM operators_registry WHERE db_name IS NOT NULL ORDER BY id LIMIT 1`
-    );
-    if (rows && rows.length > 0 && rows[0].db_name) {
-      return rows[0].db_name;
-    }
-  } catch { /* ignore */ }
+  // 未登录用户直接返回主库，避免查到运营商标配库表为空
   return 'robot_maze_race';
 }
 
