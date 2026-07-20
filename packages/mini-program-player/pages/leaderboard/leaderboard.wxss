@@ -8,7 +8,7 @@
 .page-leaderboard {
   min-height: 100vh;
   background: #0F172A;
-  padding: 0 32rpx 140rpx;
+  padding: 0 32rpx 0;
 }
 
 .loading-mask {

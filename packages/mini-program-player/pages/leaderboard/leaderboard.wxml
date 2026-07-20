@@ -39,7 +39,7 @@
   </view>
 
   <!-- ===== 原排行榜内容（蒙层遮盖） ===== -->
-  <view class="lb-original-mask">
+  <view class="lb-original-mask" style="display:none;">
 
   <!-- 加载遮罩 -->
   <view wx:if="{{pageLoading}}" class="loading-mask">
