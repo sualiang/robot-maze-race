@@ -26,7 +26,8 @@ Page({
     lastRaceResult: null, // 最近一次比赛成绩
     showResultCard: false,
     resultCardTimer: null,
-
+    canCheckin: true,  // 成绩卡片显示期间禁止签到，防竞态
+   
     // 赛季最佳成绩
     seasonBest: null,
     hasSeasonBest: false,
@@ -208,10 +209,11 @@ Page({
       if (prevStatus !== 'idle' && newStatus === 'idle' && lastResult) {
         updateData.lastRaceResult = lastResult;
         updateData.showResultCard = true;
+        updateData.canCheckin = false;  // 锁定签到，防竞态
         // 3-5秒后自动消失
         if (that.data.resultCardTimer) clearTimeout(that.data.resultCardTimer);
         var timer = setTimeout(function () {
-          that.setData({ showResultCard: false });
+          that.setData({ showResultCard: false, canCheckin: true });
         }, 4000);
         that.data.resultCardTimer = timer;
       }
@@ -400,6 +402,12 @@ Page({
 
     if (!this.data.isLoggedIn) {
       this.promptLogin();
+      return;
+    }
+
+    // 成绩卡片显示期间禁止签到，防竞态
+    if (!this.data.canCheckin) {
+      wx.showToast({ title: '正在结算成绩，请稍候...', icon: 'none' });
       return;
     }
 
