@@ -135,7 +135,7 @@ Page({
       that.setData({ redeeming: false });
       if (res && res.code === 0) {
         that.setData({ showDetail: false, detailItem: null, showRedeem: false, redeemCodeInput: '' });
-        that.showToast('兑换成功！');
+        that.showToast('🎉 恭喜你，积分兑换成功！');
         that.fetchItems();
       } else {
         that.showToast(res && res.message || '核销失败');
@@ -169,7 +169,8 @@ Page({
     }
     request.silentGet('/points-shop/history', params).then(function (res) {
       if (res) {
-        that.setData({ records: res.records || res.data || [] });
+        var d = res.data || res;
+        that.setData({ records: d.list || d.records || [] });
       }
     }).catch(function () {
       that.setData({ records: [] });
