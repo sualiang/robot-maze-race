@@ -588,8 +588,8 @@ router.get('/query/:orderId', authMiddleware, async (req: Request, res: Response
           const txnId = (wxOrder.transaction_id || '').slice(0, 128);
           try {
             await executeOp(req,
-              "INSERT IGNORE INTO payments (id, order_id, operator_id, user_id, transaction_id, amount_cents, channel, status, pay_time, created_at)
-               VALUES ($1, $2, $3, $4, $5, $6, 'wechat_pay', 'success', NOW(), NOW())",
+              `INSERT IGNORE INTO payments (id, order_id, operator_id, user_id, transaction_id, amount_cents, channel, status, pay_time, created_at)
+               VALUES ($1, $2, $3, $4, $5, $6, 'wechat_pay', 'success', NOW(), NOW())`,
               [uuidv4(), order.id,
                orderDetail?.[0]?.operator_id || '',
                orderDetail?.[0]?.user_id || '',
@@ -601,8 +601,8 @@ router.get('/query/:orderId', authMiddleware, async (req: Request, res: Response
           // 兜底也写 settlements（幂等）
           try {
             await executeOp(req,
-              "INSERT IGNORE INTO settlements (id, order_id, amount_cents, commission_cents, operator_id, status, created_at)
-               VALUES ($1, $2, $3, 0, $4, 'pending', NOW())",
+              `INSERT IGNORE INTO settlements (id, order_id, amount_cents, commission_cents, operator_id, status, created_at)
+               VALUES ($1, $2, $3, 0, $4, 'pending', NOW())`,
               [uuidv4(), order.id, order.amount, orderDetail?.[0]?.operator_id || '']
             );
           } catch (e: any) {
