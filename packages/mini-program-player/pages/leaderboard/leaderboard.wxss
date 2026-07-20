@@ -622,8 +622,7 @@
   position: relative;
   z-index: 10;
   background: #0F172A;
-  padding: 24rpx 32rpx 40rpx;
-  min-height: 60vh;
+  padding: 24rpx 32rpx 24rpx;
 }
 
 .lb-live-header {
