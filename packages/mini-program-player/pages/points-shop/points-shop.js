@@ -142,18 +142,18 @@ Page({
           redeemCodeInput: '',
           userPoints: Math.max(0, that.data.userPoints - needPoints)
         });
-        that.showToast('🎉 恭喜你，积分兑换成功！');
+        wx.showToast({ title: '🎉 恭喜你，积分兑换成功！', icon: 'success', duration: 2500 });
         that.fetchItems();
         that.fetchRecords();
       } else {
         var errMsg = (res && res.message) || '核销失败';
         console.error('[PointsShop] redeem failed:', res);
-        that.showToast(errMsg);
+        wx.showToast({ title: errMsg, icon: 'none', duration: 2500 });
       }
     }).catch(function (err) {
       that.setData({ redeeming: false });
       console.error('[PointsShop] redeem catch:', err);
-      that.showToast('核销失败，请重试');
+      wx.showToast({ title: '核销失败，请重试', icon: 'none', duration: 2500 });
     });
   },
 
