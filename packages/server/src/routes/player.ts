@@ -328,7 +328,7 @@ async function grantGrowthOnCheckin(req: Request, userId: string, checkinId: str
     const perCheckinGrowth = Math.floor((order.growth_value || 0) / raceCount);
     const perCheckinPoints = Math.floor((order.point_value || 0) / raceCount);
 
-    if (perCheckinGrowth > 0) {
+    if (perCheckinGrowth > 0 || perCheckinPoints > 0) {
       const season = await queryOne<{ id: string }>(
         `SELECT id FROM seasons WHERE status = 1 ORDER BY created_at DESC LIMIT 1`
       );
