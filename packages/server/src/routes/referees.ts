@@ -827,7 +827,7 @@ router.post('/match/end', authMiddleware, async (req: Request, res: Response) =>
 
     // 发放比赛积分（从 system_config 读取 season_race_points）
     try {
-      const pointValue = await getConfigInt('season_race_points', 0).catch(() => 0);
+      const pointValue = await getConfigInt('cfg_season_race_points', 0).catch(() => 0);
       if (pointValue > 0) {
         const operatorId = (req.user as any)?.operatorId || '';
         // 1. 写入 points_transactions（运营商库）
