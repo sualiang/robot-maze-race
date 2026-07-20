@@ -22,8 +22,8 @@ page {
 }
 
 .logo {
-  width: 140rpx;
-  height: 140rpx;
+  width: 200rpx;
+  height: 200rpx;
   border-radius: 32rpx;
   margin-bottom: 24rpx;
 }

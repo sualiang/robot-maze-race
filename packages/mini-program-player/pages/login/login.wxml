@@ -7,7 +7,7 @@
     <text class="subtitle">手机号快捷登录，开启竞速之旅</text>
   </view>
 
-  <!-- 手机号快捷登录按钮 -->
+  <!-- 快捷登录按钮 -->
   <view class="login-area">
     <button
       class="login-btn"
@@ -15,8 +15,7 @@
       disabled="{{loading}}"
       bindtap="onLogin"
     >
-      <text class="login-btn-icon">📱</text>
-      <text>{{loading ? '登录中...' : '手机号快捷登录'}}</text>
+      <text>{{loading ? '登录中...' : '快捷登录'}}</text>
     </button>
 
     <!-- 取消/返回 -->
