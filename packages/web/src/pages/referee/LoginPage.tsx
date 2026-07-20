@@ -14,7 +14,7 @@ export default function LoginPage() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
-  const [mode, setMode] = useState<'code' | 'password'>('code'); // 默认验证码登录
+  const [mode, setMode] = useState<'code' | 'password'>('password'); // 默认密码登录
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [sendLoading, setSendLoading] = useState(false);
