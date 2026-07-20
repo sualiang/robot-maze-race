@@ -110,7 +110,7 @@ function handleMessage(ws: WebSocket, msg: any) {
       if (!code || typeof code !== 'string') break;
       const venueId = msg.venueId || undefined;
       const venueName = msg.venueName || undefined;
-      setTempToken('activation_code', code, { venueId, venueName }, 60).catch((err) =>
+      setTempToken('activation_code', code, { venueId, venueName }, 300).catch((err) =>
         console.error('[WS] setTempToken error:', err.message),
       );
       activationCodeWs.set(code, ws);
