@@ -123,9 +123,9 @@ router.get('/leaderboard/live', authMiddleware, async (req: Request, res: Respon
   try {
     const userId = req.user!.userId;
 
-    // 获取用户最近签到的 venue_id
+    // 获取用户最近签到记录（不限状态，包含 completed 等）
     const checkin = await queryOpOne<{ venue_id: string }>(req,
-      `SELECT venue_id FROM checkins WHERE user_id = $1 AND status = 'queued'
+      `SELECT venue_id FROM checkins WHERE user_id = $1
        ORDER BY created_at DESC LIMIT 1`,
       [userId]
     );
