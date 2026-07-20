@@ -694,10 +694,16 @@ router.get('/me/profile-check', authMiddleware, async (req: Request, res: Respon
     let pointsBalance = 0;
     try {
       const opId = (req.user as any)?.operatorId || '';
-      const pointsRow = await queryOpOne<{ balance: string }>(req,
-        `SELECT COALESCE(SUM(points), 0) as balance FROM points_transactions WHERE user_id = $1 AND operator_id = $2`,
-        [userId, opId]
-      );
+      let pointsSql: string;
+      let pointsParams: any[];
+      if (opId) {
+        pointsSql = `SELECT COALESCE(SUM(points), 0) as balance FROM points_transactions WHERE user_id = $1 AND operator_id = $2`;
+        pointsParams = [userId, opId];
+      } else {
+        pointsSql = `SELECT COALESCE(SUM(points), 0) as balance FROM points_transactions WHERE user_id = $1`;
+        pointsParams = [userId];
+      }
+      const pointsRow = await queryOpOne<{ balance: string }>(req, pointsSql, pointsParams);
       pointsBalance = parseInt(pointsRow?.balance || '0', 10);
     } catch (pointsErr) {
       // 静默失败
