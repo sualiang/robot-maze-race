@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../config/database';
-import { authMiddleware } from '../middleware/auth';
+import { authMiddleware, optionalAuth } from '../middleware/auth';
 import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();
@@ -20,9 +20,9 @@ function operatorOnly(req: Request, res: Response, next: Function): void {
  * GET /api/v1/points-shop/items
  * 列出积分商城可兑换商品（玩家端，仅上架商品）
  */
-router.get('/points-shop/items', authMiddleware, async (req: Request, res: Response) => {
+router.get('/points-shop/items', optionalAuth, async (req: Request, res: Response) => {
   try {
-    const userId = req.user!.userId;
+    const userId = req.user?.userId;
     const items = await queryOp<any>(req, 
       `SELECT id, item_type, item_id, name, description, image, need_points, face_value, stock, exchange_limit,
               sort_weight, status, created_at
@@ -31,11 +31,11 @@ router.get('/points-shop/items', authMiddleware, async (req: Request, res: Respo
        ORDER BY sort_weight ASC, created_at ASC`
     );
 
-    // 同时查询用户积分余额
-    const userPoints = await queryOne<{ points: number }>(
+    // 同时查询用户积分余额（未登录返回 0）
+    const userPoints = userId ? await queryOne<{ points: number }>(
       `SELECT COALESCE(points, 0) as points FROM users WHERE id = $1`,
       [userId]
-    );
+    ) : null;
 
     res.json({
       code: 0,

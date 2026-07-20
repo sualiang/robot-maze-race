@@ -9,39 +9,6 @@ page {
   box-sizing: border-box;
 }
 
-/* ===== 头像区 ===== */
-.avatar-area,
-button.avatar-area {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin: 0 0 48rpx;
-  padding: 0;
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  line-height: 1;
-}
-
-button.avatar-area::after {
-  border: none;
-}
-
-.avatar-circle {
-  width: 160rpx;
-  height: 160rpx;
-  border-radius: 50%;
-  background-color: #1e293b;
-  border: 3rpx solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.3);
-}
-
-.avatar-hint {
-  font-size: 24rpx;
-  color: #475569;
-  margin-top: 16rpx;
-}
-
 /* ===== 表单卡片 ===== */
 .form-card {
   margin: 0 24rpx;

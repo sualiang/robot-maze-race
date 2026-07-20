@@ -1,11 +1,5 @@
-<!-- pages/register/register.wxml — 新用户注册（头像+昵称+手机号） -->
+<!-- pages/register/register.wxml — 新用户注册（昵称+手机号） -->
 <view class="page">
-
-  <!-- 头像 — 顶部居中圆形 -->
-  <button class="avatar-area" bindtap="onChooseAvatar">
-    <image class="avatar-circle" src="{{avatar || '/assets/images/logo-avatar.png'}}" mode="aspectFill" />
-    <text class="avatar-hint">点击设置头像</text>
-  </button>
 
   <!-- 表单卡片 -->
   <view class="form-card">

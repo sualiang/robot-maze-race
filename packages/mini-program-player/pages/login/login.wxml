@@ -1,22 +1,27 @@
-<!-- pages/login/login.wxml — 微信登录 -->
+<!-- pages/login/login.wxml — 手机号快捷登录 -->
 <view class="page">
   <!-- Logo + 标题 -->
   <view class="header">
     <image class="logo" src="/assets/images/logo-avatar.png" mode="aspectFit" />
     <text class="title">迷宫竞速</text>
-    <text class="subtitle">微信授权登录，开启竞速之旅</text>
+    <text class="subtitle">手机号快捷登录，开启竞速之旅</text>
   </view>
 
-  <!-- 微信登录按钮 -->
+  <!-- 手机号快捷登录按钮 -->
   <view class="login-area">
     <button
-      class="weui-btn weui-btn_primary"
+      class="login-btn"
       loading="{{loading}}"
       disabled="{{loading}}"
       bindtap="onLogin"
     >
-      <image class="weui-btn_icon" src="/assets/images/wechat-icon.svg" mode="aspectFit" />
-      <text>{{loading ? '登录中...' : '微信登录'}}</text>
+      <text class="login-btn-icon">📱</text>
+      <text>{{loading ? '登录中...' : '手机号快捷登录'}}</text>
     </button>
+
+    <!-- 取消/返回 -->
+    <view class="login-cancel" bindtap="onCancel">
+      <text>暂不登录，先看看</text>
+    </view>
   </view>
 </view>

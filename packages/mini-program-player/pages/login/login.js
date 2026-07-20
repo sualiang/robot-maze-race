@@ -1,4 +1,4 @@
-// pages/login/login.js — 微信登录（wx.login → /auth/mp-login）
+// pages/login/login.js — 手机号快捷登录（wx.login → /auth/mp-login）
 var request = require('../../utils/request');
 var storage = require('../../utils/storage');
 
@@ -34,7 +34,7 @@ Page({
       success: function (loginRes) {
         if (!loginRes.code) {
           that.setData({ loading: false });
-          wx.showToast({ title: '微信登录失败', icon: 'none' });
+          wx.showToast({ title: '登录失败', icon: 'none' });
           return;
         }
 
@@ -73,8 +73,13 @@ Page({
       },
       fail: function () {
         that.setData({ loading: false });
-        wx.showToast({ title: '微信登录失败', icon: 'none' });
+        wx.showToast({ title: '登录失败', icon: 'none' });
       }
     });
+  },
+
+  // 取消登录，返回首页逛逛
+  onCancel: function () {
+    wx.switchTab({ url: '/pages/index/index' });
   }
 });
