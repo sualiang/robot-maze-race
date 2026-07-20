@@ -195,7 +195,7 @@ export default function MatchPage() {
   const selectRacer = async (racerId: string) => {
     const racer = queue.find((r) => r.id === racerId); if (!racer) return;
     setActionLoading(true);
-    try { await api.post('/referees/match/select-racer', { racerId }); loadQueue(); setCurrentRacer(racer); setStatus('idle'); setElapsed(0); setPausedElapsed(0); setErrorMsg('已叫号: ' + (racer.nickname || racer.name)); setTimeout(() => setErrorMsg(''), 2000); }
+    try { await api.post('/referees/match/select-racer', { racerId }); setCurrentRacer(racer); setStatus('idle'); setElapsed(0); setPausedElapsed(0); setErrorMsg('已叫号: ' + (racer.nickname || racer.name)); setTimeout(() => setErrorMsg(''), 2000); loadQueue(true); }
     catch {} finally { setActionLoading(false); }
   };
 
