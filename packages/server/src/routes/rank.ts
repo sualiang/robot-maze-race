@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { query, queryOne, getOperatorPool } from '../config/database';
+import { query, queryOne, queryOp, queryOpOne, getOperatorPool } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 
 const router = Router();
@@ -194,8 +194,8 @@ router.get('/threshold', authMiddleware, async (req: Request, res: Response) => 
     const cfg = await getSeasonConfig(prefix);
     const threshold = cfg.threshold;
 
-    // 玩家最佳成绩 (越小越好)
-    const myResult = await queryOne<{ best_score: number }>(
+    // 玩家最佳成绩 (越小越好) — 从运营商库查 race_results
+    const myResult = await queryOpOne<{ best_score: number }>(req,
       `SELECT MIN(score_ms) as best_score
        FROM race_results
        WHERE user_id = $1 AND status = 'completed' AND score_ms IS NOT NULL AND score_ms > 0`,
@@ -234,17 +234,31 @@ router.get('/qualified-list', authMiddleware, async (req: Request, res: Response
   try {
     const cfg = await getSeasonConfig(prefix);
 
-    const rows = await query<any>(
-      `SELECT u.id as user_id, u.nickname, u.avatar_url, MIN(rr.score_ms) as best_score
-       FROM race_results rr
-       JOIN users u ON rr.user_id = u.id
-       WHERE rr.status = 'completed' AND rr.score_ms IS NOT NULL AND rr.score_ms > 0
-         AND rr.score_ms <= $1
-       GROUP BY rr.user_id
+    // 从运营商库查 race_results（不能直接 JOIN users，users 在 common 库）
+    const opRows = await queryOp<any[]>(req,
+      `SELECT user_id, MIN(score_ms) as best_score
+       FROM race_results
+       WHERE status = 'completed' AND score_ms IS NOT NULL AND score_ms > 0
+         AND score_ms <= $1
+       GROUP BY user_id
        ORDER BY best_score ASC
        LIMIT 100`,
       [cfg.threshold]
     );
+
+    // 再去 common 库查用户信息
+    const userIds = (opRows || []).map((r: any) => r.user_id).filter(Boolean);
+    const userMap = new Map<string, { nickname: string; avatar_url: string }>();
+    if (userIds.length > 0) {
+      const placeholders = userIds.map(() => '?').join(',');
+      const userRows: any[] = await query(
+        `SELECT id, nickname, avatar_url FROM users WHERE id IN (${placeholders})`,
+        userIds
+      );
+      for (const u of (userRows || [])) userMap.set(u.id, { nickname: u.nickname, avatar_url: u.avatar_url });
+    }
+
+    const rows = (opRows || []).map((r: any) => ({ ...r, ...(userMap.get(r.user_id) || {}) }));
 
     const list = (rows || []).map((r: any, i: number) => ({
       rank: i + 1,
