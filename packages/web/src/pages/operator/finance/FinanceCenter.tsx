@@ -226,7 +226,7 @@ export default function FinanceCenter() {
         : <span style={{ color: '#999' }}>未使用</span>,
     },
     {
-      title: '支付时间', dataIndex: 'paidAt', key: 'paidAt', width: 160,
+      title: '支付时间', dataIndex: 'paidAt', key: 'paidAt', width: 180,
       render: (v: string) => v || '-',
     },
   ];

@@ -225,7 +225,7 @@ router.get('/revenue-details', authMiddleware, operatorOnly, async (req: Request
     const result = await Promise.all((dailyRows || []).map(async (day: any) => {
       const orderRows = await queryOp<any>(req,
         `SELECT o.id, o.order_no, o.amount_cents, o.discount_cents,
-                o.points_deduction_cents, DATE_FORMAT(o.paid_at, '%Y-%m-%d') as paid_at, o.package_id
+                o.points_deduction_cents, DATE_FORMAT(o.paid_at, '%Y-%m-%d %H:%i:%s') as paid_at, o.package_id
          FROM orders o
          WHERE o.operator_id = $1
            AND DATE_FORMAT(o.paid_at, '%Y-%m-%d') = $2
@@ -270,7 +270,7 @@ router.get('/export', authMiddleware, operatorOnly, async (req: Request, res: Re
     const operatorId = req.user!.operatorId;
     const rows = await queryOp<any>(req,
       `SELECT DATE_FORMAT(o.created_at, '%Y-%m-%d') as created_at, o.order_no, o.amount_cents, o.discount_cents,
-              o.points_deduction_cents, o.status, DATE_FORMAT(o.paid_at, '%Y-%m-%d') as paid_at
+              o.points_deduction_cents, o.status, DATE_FORMAT(o.paid_at, '%Y-%m-%d %H:%i:%s') as paid_at
        FROM orders o
        WHERE o.operator_id = $1
        ORDER BY o.created_at DESC`,
