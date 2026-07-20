@@ -24,7 +24,7 @@ router.get('/points-shop/items', authMiddleware, async (req: Request, res: Respo
   try {
     const userId = req.user!.userId;
     const items = await queryOp<any>(req, 
-      `SELECT id, item_type, item_id, name, description, need_points, stock, exchange_limit,
+      `SELECT id, item_type, item_id, name, description, image, need_points, stock, exchange_limit,
               sort_weight, status, created_at
        FROM point_shop
        WHERE status = 1
@@ -46,7 +46,7 @@ router.get('/points-shop/items', authMiddleware, async (req: Request, res: Respo
           itemId: item.item_id,
           name: item.name,
           description: item.description,
-          image: item.image || '',
+          image: item.image ? (item.image.startsWith('/uploads/') ? `${process.env.SITE_URL || 'https://dog.amberrobot.com.cn'}${item.image}` : item.image) : '',
           needPoints: item.need_points,
           exchangeLimit: item.exchange_limit || 0,
           sortWeight: item.sort_weight || 0,
