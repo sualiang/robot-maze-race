@@ -25,12 +25,6 @@ Component({
         text: '我的',
         iconPath: '/assets/tabbar/profile.png',
         selectedIconPath: '/assets/tabbar/profile-active.png'
-      },
-      {
-        pagePath: '/pages/points-shop/points-shop',
-        text: '积分商城',
-        iconPath: '/assets/tabbar/shop.png',
-        selectedIconPath: '/assets/tabbar/shop-active.png'
       }
     ]
   },

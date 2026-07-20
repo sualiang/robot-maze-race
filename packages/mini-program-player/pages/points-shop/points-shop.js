@@ -20,9 +20,6 @@ Page({
   },
 
   onShow: function () {
-    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setData({ selected: 4 });
-    }
     // 从兑换页返回时刷新积分
     this.fetchItems();
   },
