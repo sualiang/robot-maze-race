@@ -272,6 +272,8 @@
 .records-list {
   flex: 1;
   padding: 16rpx 32rpx;
+  overflow-y: auto;
+  max-height: 60vh;
 }
 .records-item {
   display: flex;
