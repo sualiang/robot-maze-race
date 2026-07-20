@@ -464,6 +464,7 @@ router.get('/:id/qrcode', authMiddleware, async (req: Request, res: Response) =>
       return res.status(404).json({ code: 404, message: '赛场不存在', data: null });
     }
 
+    console.log('[Venues qrcode] operatorId=' + operatorId + ', venueId=' + venue.id + ', userId=' + userId);
     const { imageBase64, contentType } = await createVenueMiniCode(operatorId, venue.id);
 
     return res.json({

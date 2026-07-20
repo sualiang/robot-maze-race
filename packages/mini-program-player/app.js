@@ -60,6 +60,8 @@ App({
   _parseContextParams: function (options) {
     if (!options) return;
 
+    console.log('[App] _parseContextParams 入参:', JSON.stringify(options));
+
     var operatorId = null;
     var venueId = null;
 
