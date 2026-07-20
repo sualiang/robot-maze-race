@@ -799,7 +799,7 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     // 检查是否是裁判手机号（遍历 op_* 库 referees 表）
-    let refereeInfo: { id: string; phone: string; name: string; operatorId: string; password: string; isFirstLogin: boolean } | null = null;
+    let refereeInfo: { id: string; phone: string; name: string; operatorId: string; password: string; isFirstLogin: boolean; userId?: string } | null = null;
     try {
       const regRows = await query<{ db_name: string }>(
         `SELECT db_name FROM operators_registry WHERE db_name LIKE 'op_%'`,
@@ -811,12 +811,12 @@ router.post('/login', async (req: Request, res: Response) => {
           const pool = getOperatorPool(reg.db_name);
           console.log('[Login] trying pool:', reg.db_name);
           const [rows] = await pool.execute(
-            'SELECT r.id, r.phone, r.name, r.password, r.is_first_login, r.operator_id FROM referees r WHERE r.phone = ? LIMIT 1',
+            'SELECT r.id, r.phone, r.name, r.password, r.is_first_login, r.operator_id, r.user_id FROM referees r WHERE r.phone = ? LIMIT 1',
             [phone]
           ) as any[];
           console.log('[Login] pool result rows:', (rows as any[])?.length);
           if ((rows as any[])?.[0]) {
-            refereeInfo = { ...rows[0], operatorId: rows[0].operator_id, isFirstLogin: rows[0].is_first_login === 1 };
+            refereeInfo = { ...rows[0], operatorId: rows[0].operator_id, isFirstLogin: rows[0].is_first_login === 1, userId: rows[0].user_id };
             console.log('[Login] found referee in', reg.db_name, ':', refereeInfo.name);
             break;
           }
@@ -835,7 +835,7 @@ router.post('/login', async (req: Request, res: Response) => {
         return res.status(401).json({ code: 401, message: '手机号或密码错误', data: null });
       }
       const payload: AuthPayload = {
-        userId: refereeInfo.id,
+        userId: refereeInfo.userId || refereeInfo.id,
         openid: 'ref_sms_' + refereeInfo.id,
         role: 'referee',
         operatorId: refereeInfo.operatorId,
