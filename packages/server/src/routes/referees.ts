@@ -5,7 +5,7 @@ import { getRedis } from '../config/redis';
 import { WebSocket } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
 import { hashSync } from '../config/bcrypt';
-import { query, queryOne, execute, getOperatorPool } from '../config/database';
+import { query, queryOne, execute, getOperatorPool, expandParams } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import {
   ApiResponse,
@@ -1460,24 +1460,27 @@ router.post('/attendance/check-out', authMiddleware, async (req: Request, res: R
 async function refQueryOp<T>(req: Request, sql: string, params?: any[]): Promise<T[]> {
   const pool = await getOpPoolFromJwt(req);
   if (!pool) return [];
+  const expanded = params ? expandParams(sql, params) : [];
   sql = sql.replace(/\$(\d+)/g, '?');
-  const [rows] = await pool.execute(sql, params || []) as any[];
+  const [rows] = await pool.execute(sql, expanded) as any[];
   return rows as T[];
 }
 
 async function refQueryOpOne<T>(req: Request, sql: string, params?: any[]): Promise<T | null> {
   const pool = await getOpPoolFromJwt(req);
   if (!pool) return null;
+  const expanded = params ? expandParams(sql, params) : [];
   sql = sql.replace(/\$(\d+)/g, '?');
-  const [rows] = await pool.execute(sql, params || []) as any[];
+  const [rows] = await pool.execute(sql, expanded) as any[];
   return (rows as any[])?.length > 0 ? rows[0] as T : null;
 }
 
 async function refExecuteOp(req: Request, sql: string, params?: any[]): Promise<{ changes: number; lastInsertRowid: number | bigint }> {
   const pool = await getOpPoolFromJwt(req);
   if (!pool) return { changes: 0, lastInsertRowid: 0 };
+  const expanded = params ? expandParams(sql, params) : [];
   sql = sql.replace(/\$(\d+)/g, '?');
-  const [result] = await pool.execute(sql, params || []) as any;
+  const [result] = await pool.execute(sql, expanded) as any;
   return { changes: result.affectedRows ?? 0, lastInsertRowid: result.insertId ?? 0 };
 }
 

@@ -187,7 +187,7 @@ function normalizeValue(v: any): any {
     return v.replace('T', ' ').replace(/\.\d{1,3}Z?$/, '').substring(0, 19);
   return v;
 }
-function expandParams(text: string, params: any[]): any[] {
+export function expandParams(text: string, params: any[]): any[] {
   if (!params || params.length === 0) return [];
   // 按 SQL 中 $digit 的出现顺序重排参数，每个 $digit 对应 params[digit-1]
   const r: any[] = [];
