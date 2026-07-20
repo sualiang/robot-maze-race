@@ -454,7 +454,7 @@ router.get('/orders', authMiddleware, checkPermission('finance:read'), async (re
       for (const reg of opRegs) {
         try {
           const pool = getOperatorPool(reg.db_name);
-          const [regRows] = await pool.query<any[]>('SELECT o.*, ? as _op_id FROM orders o ORDER BY o.created_at DESC', [reg.operator_id]);
+          const [regRows] = await pool.query('SELECT o.*, ? as _op_id FROM orders o ORDER BY o.created_at DESC', [reg.operator_id]) as any[];
           allRows.push(...regRows);
         } catch { /* skip unavailable operator dbs */ }
       }

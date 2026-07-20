@@ -227,7 +227,7 @@ export default function FinanceCenter() {
     },
     {
       title: '支付时间', dataIndex: 'paidAt', key: 'paidAt', width: 160,
-      render: (v: string) => v ? (typeof v === 'string' ? v.split('T')[0] : v) : '-',
+      render: (v: string) => v || '-',
     },
   ];
 

@@ -1,3 +1,10 @@
+#!/bin/bash
+set -e
+cd /Users/longshe/.openclaw/workspace/projects/robot-maze-race
+
+echo "=== Fix 1a: MatchPage.tsx check-in state persistence ==="
+# write the fixed file
+cat > packages/web/src/pages/referee/MatchPage.tsx << 'ENDOFFILE'
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../utils/api';
@@ -70,13 +77,11 @@ export default function MatchPage() {
     loadQueue();
     checkAttendanceStatus();
     connectWebSocket();
-    // 定期检查签到状态（兼容签到页签到后不刷新页面的场景）
     const checkinPoll = setInterval(() => { checkAttendanceStatus(); }, 2000);
     return () => { destroyedRef.current = true; clearTimer(); clearInterval(checkinPoll); if (wsRef.current) { wsRef.current.onclose = null; wsRef.current.onerror = null; wsRef.current.onmessage = null; wsRef.current.onopen = null; wsRef.current.close(); wsRef.current = null; } if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 监听签到状态变化：true→false 时（离线签退/轮询检测到签退），清除排队和计时
   useEffect(() => {
     const wasIn = prevCheckedInRef.current;
     prevCheckedInRef.current = checkedIn;
@@ -92,8 +97,6 @@ export default function MatchPage() {
   }, [checkedIn]);
 
   const connectWebSocket = useCallback(() => {
-    // 通过 Vite proxy 连接，避免直连后端端口
-    // 直接连后端 WebSocket
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
     const wsUrl = import.meta.env.VITE_REFEREE_WS_URL || `${protocol}://${window.location.host}/ws/referee`;
     if (wsRef.current) wsRef.current.close();
@@ -118,7 +121,7 @@ export default function MatchPage() {
             case 'venue_reopen':
               setCheckedIn(true);
               sessionStorage.setItem('referee_checkin_status', JSON.stringify({ checkedIn: true, at: Date.now() }));
-              setErrorMsg('✅ 赛场已激活');
+              setErrorMsg('赛场已激活');
               setTimeout(() => setErrorMsg(''), 2000);
               loadQueue();
               break;
@@ -170,7 +173,6 @@ export default function MatchPage() {
       }
     } catch (e) {
       console.warn('[checkin] api error', e);
-      // 接口异常时不覆盖缓存状态
       if (!cached) setCheckedIn(false);
     } finally {
       setCheckingStatus(false);
@@ -183,7 +185,7 @@ export default function MatchPage() {
       await api.post('/referees/attendance/check-in', { venueId: 'default_venue_001' });
       setCheckedIn(true);
       sessionStorage.setItem('referee_checkin_status', JSON.stringify({ checkedIn: true, at: Date.now() }));
-      setErrorMsg('✅ 签到成功，赛场已激活');
+      setErrorMsg('签到成功，赛场已激活');
       setTimeout(() => setErrorMsg(''), 2000);
       loadQueue();
     } catch {
@@ -220,7 +222,7 @@ export default function MatchPage() {
     catch {} finally { setActionLoading(false); }
   };
 
-  const pauseRace = async () => { if (status !== 'running') return; clearTimer(); setStatus('paused'); setPausedElapsed(elapsed); try { await api.post('/referees/match/pause', { racerId: currentRacer?.id, elapsed }); loadQueue(); } catch {}; setErrorMsg('⏸ 已暂停'); setTimeout(() => setErrorMsg(''), 1500); };
+  const pauseRace = async () => { if (status !== 'running') return; clearTimer(); setStatus('paused'); setPausedElapsed(elapsed); try { await api.post('/referees/match/pause', { racerId: currentRacer?.id, elapsed }); loadQueue(); } catch {}; setErrorMsg(' 已暂停'); setTimeout(() => setErrorMsg(''), 1500); };
 
   const endRace = async () => {
     if (status !== 'running' && status !== 'paused') return; clearTimer();
@@ -228,7 +230,7 @@ export default function MatchPage() {
     setActionLoading(true);
     try {
       await api.post('/referees/match/end', { racerId: currentRacer?.id, finishTimeMs: finalTime, status: raceStatus });
-      setErrorMsg(isTimeout ? '⏰ 超时！' + formatFullTime(finalTime) : '🏁 ' + formatFullTime(finalTime));
+      setErrorMsg(isTimeout ? ' 超时！' + formatFullTime(finalTime) : ' ' + formatFullTime(finalTime));
       setTimeout(() => setErrorMsg(''), 2500);
       setStatus('finished');
       setPausedElapsed(0);
@@ -246,12 +248,11 @@ export default function MatchPage() {
   const handleTimeout = async () => {
     const ri = currentRacer?.id; if (!ri) return;
     const racerName = currentRacer?.nickname || currentRacer?.name || '选手';
-    // 超时 → 跳过此选手（排到下一位后面）
     try {
       await api.post('/referees/match/end', { racerId: ri, finishTimeMs: maxTimeout * 1000, status: 'timeout' });
       await api.post('/referees/match/skip', { racerId: ri });
     } catch {}
-    setErrorMsg('⏰ ' + racerName + ' 超时，已自动跳过');
+    setErrorMsg(' ' + racerName + ' 超时，已自动跳过');
     setTimeout(() => setErrorMsg(''), 2500);
     setStatus('finished');
     loadQueue();
@@ -260,7 +261,7 @@ export default function MatchPage() {
   const handleMalfunction = () => {
     if (!currentRacer) return; clearTimer();
     const racerName = currentRacer.nickname || currentRacer.name; const ce = elapsed; const ri = currentRacer.id;
-    if (!window.confirm(racerName + ' 的机器狗发生故障？\n\n• 选手保留参赛次数\n• 计时归零重新开始\n• 当前计时作废')) { if (!destroyedRef.current) { setStatus('running'); startTimerInternal(ce, Date.now()); } return; }
+    if (!window.confirm(racerName + ' 的机器狗发生故障？\n\n 选手保留参赛次数\n 计时归零重新开始\n 当前计时作废')) { if (!destroyedRef.current) { setStatus('running'); startTimerInternal(ce, Date.now()); } return; }
     setActionLoading(true);
     api.post('/referees/match/malfunction', { racerId: ri }).then(() => {
       setElapsed(0);
@@ -284,7 +285,7 @@ export default function MatchPage() {
     const racerName = currentRacer.nickname || currentRacer.name; const ri = currentRacer.id;
     if (!window.confirm('确认将 ' + racerName + ' 本次成绩标记为无效？\n\n该操作不可撤销。')) return;
     setActionLoading(true);
-    api.post('/referees/match/invalidate', { racerId: ri }).then(() => { setErrorMsg('❌ ' + racerName + ' 成绩已标记无效'); loadQueue(); }).catch(() => { setErrorMsg('网络异常，操作失败'); }).finally(() => setActionLoading(false));
+    api.post('/referees/match/invalidate', { racerId: ri }).then(() => { setErrorMsg(' ' + racerName + ' 成绩已标记无效'); loadQueue(); }).catch(() => { setErrorMsg('网络异常，操作失败'); }).finally(() => setActionLoading(false));
   };
 
   const handleSkip = () => {
@@ -292,7 +293,7 @@ export default function MatchPage() {
     const racerName = currentRacer.nickname || currentRacer.name; const ri = currentRacer.id;
     if (!window.confirm('确认跳过 ' + racerName + '？\n\n该选手将排到下一位后面。')) return;
     setActionLoading(true);
-    api.post('/referees/match/skip', { racerId: ri }).then(() => { setErrorMsg('⏭ ' + racerName + ' 已跳过'); resetMatch(); loadQueue(); }).catch(() => { setErrorMsg('网络异常，操作失败'); }).finally(() => setActionLoading(false));
+    api.post('/referees/match/skip', { racerId: ri }).then(() => { setErrorMsg(' ' + racerName + ' 已跳过'); resetMatch(); loadQueue(); }).catch(() => { setErrorMsg('网络异常，操作失败'); }).finally(() => setActionLoading(false));
   };
 
   const resetMatch = () => { clearTimer(); setStatus('idle'); setElapsed(0); setPausedElapsed(0); setCurrentRacer(null); setActionLoading(false); };
@@ -301,7 +302,6 @@ export default function MatchPage() {
 
   if (pageLoading || checkingStatus || contextLoading) return <div className="referee-loading-mask"><div className="referee-loading-spinner">加载中...</div></div>;
 
-  // 无运营商上下文：引导线下扫码
   if (!hasContext) {
     return (
       <div className="referee-page">
@@ -310,7 +310,7 @@ export default function MatchPage() {
         </div>
         <NoContextBanner />
         <div className="referee-card" style={{ marginBottom: 16, padding: 24, textAlign: 'center' }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>🏁</div>
+          <div style={{ fontSize: 48, marginBottom: 16 }}></div>
           <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ref-text)', marginBottom: 8 }}>请联系运营商绑定赛场</div>
           <div style={{ fontSize: 14, color: 'var(--ref-text-dim)', lineHeight: 1.6 }}>
             请前往线下赛场扫描官方小程序码<br />由运营商后台为您分配赛场后即可使用
@@ -330,7 +330,7 @@ export default function MatchPage() {
               }}
               style={{ fontSize: 13, padding: '8px 20px' }}
             >
-              🔄 已经联系绑定，强制清除缓存
+              已经联系绑定，强制清除缓存
             </button>
           </div>
         </div>
@@ -340,10 +340,9 @@ export default function MatchPage() {
 
   return (
     <div className="referee-page">
-      {/* WS 连接状态 - 页面最顶部 */}
       <div className="referee-ws-badge">
         <div className="referee-ws-dot" style={{ background: wsConnected && checkedIn !== true ? '#e74c3c' : undefined }} data-connected={wsConnected} />
-        <span>{wsConnected ? (checkedIn === true ? '赛场已激活 · 大屏已连接' : '离线未签到 ↴ 请去签到页签到') : '离线模式'}</span>
+        <span>{wsConnected ? (checkedIn === true ? '赛场已激活 · 大屏已连接' : '离线未签到  请去签到页签到') : '离线模式'}</span>
       </div>
       <div className="referee-card referee-timer-card" style={{ textAlign: 'center', padding: '24px 20px', marginBottom: 16 }}>
         <div className="referee-timer-display" data-running={status === 'running'} data-danger={isTimeoutDanger}>
@@ -352,7 +351,7 @@ export default function MatchPage() {
         {status === 'running' && maxTimeout > 0 && <div className="referee-progress-bar"><div className="referee-progress-fill" style={{ width: timeoutPercent + '%' }} data-danger={isTimeoutDanger} /></div>}
         {currentRacer && (
           <div className="referee-racer-info">
-            <div className="referee-racer-avatar">{currentRacer.avatarUrl ? <img src={currentRacer.avatarUrl} alt="" style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover' }} /> : '🤖'}</div>
+            <div className="referee-racer-avatar">{currentRacer.avatarUrl ? <img src={currentRacer.avatarUrl} alt="" style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover' }} /> : ''}</div>
             <div className="referee-racer-detail">
               <div className="text-one-line">{currentRacer.nickname || currentRacer.name}</div>
               <div className="referee-racer-remaining">剩<strong>{currentRacer.remainingRaces}</strong>次</div>
@@ -361,12 +360,12 @@ export default function MatchPage() {
         )}
         <div className="referee-status-tag">
           {status === 'idle' && <span className="referee-tag referee-tag-info">准备就绪</span>}
-          {status === 'running' && <span className="referee-tag referee-tag-success">▶ 进行中</span>}
-          {status === 'paused' && <span className="referee-tag referee-tag-warning">⏸ 已暂停</span>}
-          {status === 'finished' && <span className="referee-tag referee-tag-danger">🏁 比赛结束</span>}
+          {status === 'running' && <span className="referee-tag referee-tag-success"> 进行中</span>}
+          {status === 'paused' && <span className="referee-tag referee-tag-warning"> 已暂停</span>}
+          {status === 'finished' && <span className="referee-tag referee-tag-danger"> 比赛结束</span>}
         </div>
         <div className="referee-actions">
-          {checkedIn !== true && <div className="referee-card" style={{ textAlign: 'center', padding: '24px', marginTop: 8 }}><div style={{ fontSize: 20, fontWeight: 700, color: 'var(--ref-text-dim)', marginBottom: 8 }}>📍 请先签到激活赛场</div><div style={{ fontSize: 14, color: 'var(--ref-text-dim)', lineHeight: 1.6 }}>请前往「签到页」完成签到后，方可进行比赛操作</div></div>}
+          {checkedIn !== true && <div className="referee-card" style={{ textAlign: 'center', padding: '24px', marginTop: 8 }}><div style={{ fontSize: 20, fontWeight: 700, color: 'var(--ref-text-dim)', marginBottom: 8 }}> 请先签到激活赛场</div><div style={{ fontSize: 14, color: 'var(--ref-text-dim)', lineHeight: 1.6 }}>请前往「签到页」完成签到后，方可进行比赛操作</div></div>}
           {checkedIn === true && status === 'finished' && (
             <div className="referee-btn-row" style={{ flexDirection: 'column', gap: 8 }}>
               <button className="referee-btn referee-btn-primary referee-btn-lg" onClick={async () => {
@@ -374,7 +373,7 @@ export default function MatchPage() {
                   try { await api.post('/referees/match/call-next', { racerId: currentRacer.id }); } catch {}
                 }
                 setStatus('idle'); setCurrentRacer(null); setElapsed(0); loadQueue(true);
-              }}>👋 完成，呼叫下一位</button>
+              }}> 完成，呼叫下一位</button>
               <button className="referee-btn referee-btn-ghost referee-btn-sm" disabled={actionLoading || (currentRacer?.remainingRaces ?? 0) <= 0} style={{ opacity: (currentRacer?.remainingRaces ?? 0) <= 0 ? 0.25 : 0.4, fontSize: 12, padding: '6px 12px', margin: '0 auto' }} onClick={async () => {
                 if (!currentRacer) return;
                 setActionLoading(true);
@@ -386,29 +385,29 @@ export default function MatchPage() {
                   setTimeout(() => setErrorMsg(''), 2000);
                 } catch { setErrorMsg('操作失败'); }
                 setActionLoading(false);
-              }}>🔄 再玩一次</button>
+              }}> 再玩一次</button>
             </div>
           )}
-          {status === 'idle' && currentRacer && <button className="referee-btn referee-btn-success referee-btn-lg" onClick={startRace} disabled={actionLoading}>▶ 开始比赛</button>}
-          {status === 'malfunctioned' && currentRacer && <button className="referee-btn referee-btn-success referee-btn-lg" onClick={startRace} disabled={actionLoading}>▶ 重新比赛</button>}
-          {status === 'running' && <div className="referee-btn-row"><button className="referee-btn referee-btn-danger" onClick={endRace}>⏹ 结束比赛</button></div>}
-          {status === 'paused' && <div className="referee-btn-row"><button className="referee-btn referee-btn-success" onClick={startRace} disabled={actionLoading}>▶ 继续比赛</button><button className="referee-btn referee-btn-danger" onClick={endRace}>⏹ 结束比赛</button></div>}
+          {status === 'idle' && currentRacer && <button className="referee-btn referee-btn-success referee-btn-lg" onClick={startRace} disabled={actionLoading}> 开始比赛</button>}
+          {status === 'malfunctioned' && currentRacer && <button className="referee-btn referee-btn-success referee-btn-lg" onClick={startRace} disabled={actionLoading}> 重新比赛</button>}
+          {status === 'running' && <div className="referee-btn-row"><button className="referee-btn referee-btn-danger" onClick={endRace}> 结束比赛</button></div>}
+          {status === 'paused' && <div className="referee-btn-row"><button className="referee-btn referee-btn-success" onClick={startRace} disabled={actionLoading}> 继续比赛</button><button className="referee-btn referee-btn-danger" onClick={endRace}> 结束比赛</button></div>}
         </div>
-        {status === 'running' && maxTimeout > 0 && <div className="referee-timeout-hint">⏰ 超时限制5分钟 · 超时将自动记录</div>}
+        {status === 'running' && maxTimeout > 0 && <div className="referee-timeout-hint"> 超时限制5分钟 · 超时将自动记录</div>}
       </div>
       {errorMsg && <div className="referee-error-msg" dangerouslySetInnerHTML={{ __html: errorMsg.replace(/\*\*(.+?)\*\*/g, '<strong style="color:#27ae60">$1</strong>') }} />}
-      {checkedIn === true && currentRacer && (status === 'running' || status === 'paused') && <div className="referee-card referee-card-compact" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16, padding: 16 }}><button className="referee-btn referee-btn-outline" onClick={handleMalfunction} disabled={actionLoading}>机器狗故障 · 保留次数重新排队</button><button className="referee-btn referee-btn-danger-outline" onClick={handleForfeit} disabled={actionLoading}>🚫 弃赛</button></div>}
-      {checkedIn === true && currentRacer && status === 'finished' && <div className="referee-card referee-card-compact" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16, padding: 16 }}><button className="referee-btn referee-btn-outline" style={{ borderColor: '#e74c3c', color: '#e74c3c' }} onClick={handleInvalidate} disabled={actionLoading}>❌ 标记成绩无效</button></div>}
-      {checkedIn === true && currentRacer && (status === 'called' || status === 'waiting') && <div className="referee-card referee-card-compact" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16, padding: 16 }}><button className="referee-btn referee-btn-ghost referee-btn-sm" onClick={handleSkip} disabled={actionLoading}>⏭ 跳过此选手</button></div>}
+      {checkedIn === true && currentRacer && (status === 'running' || status === 'paused') && <div className="referee-card referee-card-compact" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16, padding: 16 }}><button className="referee-btn referee-btn-outline" onClick={handleMalfunction} disabled={actionLoading}>机器狗故障 · 保留次数重新排队</button><button className="referee-btn referee-btn-danger-outline" onClick={handleForfeit} disabled={actionLoading}> 弃赛</button></div>}
+      {checkedIn === true && currentRacer && status === 'finished' && <div className="referee-card referee-card-compact" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16, padding: 16 }}><button className="referee-btn referee-btn-outline" style={{ borderColor: '#e74c3c', color: '#e74c3c' }} onClick={handleInvalidate} disabled={actionLoading}> 标记成绩无效</button></div>}
+      {checkedIn === true && currentRacer && (status === 'called' || status === 'waiting') && <div className="referee-card referee-card-compact" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16, padding: 16 }}><button className="referee-btn referee-btn-ghost referee-btn-sm" onClick={handleSkip} disabled={actionLoading}> 跳过此选手</button></div>}
       {checkedIn === true && <><div className="referee-section">
-        <div className="referee-section-header"><span>📋 排队列表</span><span className="referee-section-count">{queue.length} 人</span></div>
-        {queue.length === 0 && <div className="referee-empty"><span className="referee-empty-icon">📭</span><span className="referee-empty-text">暂无排队选手</span></div>}
+        <div className="referee-section-header"><span> 排队列表</span><span className="referee-section-count">{queue.length} 人</span></div>
+        {queue.length === 0 && <div className="referee-empty"><span className="referee-empty-icon"></span><span className="referee-empty-text">暂无排队选手</span></div>}
         {queue.map((item, index) => (
           <div key={item.id} className="referee-card referee-queue-item" data-active={item.isCurrent} onClick={() => { if (!item.isCurrent && status === 'idle') selectRacer(item.id); }}>
-            <div className="referee-queue-index" data-current={item.isCurrent}>{item.isCurrent ? '★' : index + 1}</div>
-            <div className="referee-queue-avatar" data-current={item.isCurrent}>{item.avatarUrl ? <img src={item.avatarUrl} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} /> : '🤖'}</div>
+            <div className="referee-queue-index" data-current={item.isCurrent}>{item.isCurrent ? '' : index + 1}</div>
+            <div className="referee-queue-avatar" data-current={item.isCurrent}>{item.avatarUrl ? <img src={item.avatarUrl} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} /> : ''}</div>
             <div className="referee-queue-name"><span className="text-one-line">{item.nickname || item.name || '选手' + item.id}</span><span className="referee-queue-remaining">剩<strong>{item.remainingRaces ?? '?'}</strong>次</span></div>
-            {item.isCurrent && <div className="referee-queue-badge"><span className="referee-queue-dot">●</span><span>进行中</span></div>}
+            {item.isCurrent && <div className="referee-queue-badge"><span className="referee-queue-dot"></span><span>进行中</span></div>}
             {!item.isCurrent && status === 'idle' && checkedIn === true && <button className="referee-btn referee-btn-primary referee-btn-sm" style={{ marginLeft: 8, flexShrink: 0 }} onClick={(e) => { e.stopPropagation(); selectRacer(item.id); }}>上场</button>}
           </div>
         ))}
@@ -416,3 +415,48 @@ export default function MatchPage() {
     </div>
   );
 }
+ENDOFFILE
+echo "Fix 1a done"
+
+echo "=== Fix 1b: Backend referees.ts ==="
+python3 << 'PYEOF'
+with open('packages/server/src/routes/referees.ts', 'r') as f:
+    content = f.read()
+
+# Fix: check-in-by-qr "今日已签到" response: res.status(400) → res.json
+old = "return res.status(400).json({ code: 400, message: '今日已签到，请先签退', data: null });"
+new = "return res.json({ code: 200, message: '今日已签到，请先签退', data: null });"
+count = content.count(old)
+if count > 0:
+    content = content.replace(old, new)
+    with open('packages/server/src/routes/referees.ts', 'w') as f:
+        f.write(content)
+    print(f"Fix 1b applied ({count} occurrence(s))")
+else:
+    print("Fix 1b: old pattern not found")
+PYEOF
+
+echo "=== Fix 5: FinanceCenter.tsx paidAt ==="
+python3 << 'PYEOF'
+with open('packages/web/src/pages/operator/finance/FinanceCenter.tsx', 'r') as f:
+    content = f.read()
+
+old = "render: (v: string) => v ? (typeof v === 'string' ? v.split('T')[0] : v) : '-',"
+new = "render: (v: string) => v || '-',"
+if old in content:
+    content = content.replace(old, new)
+    with open('packages/web/src/pages/operator/finance/FinanceCenter.tsx', 'w') as f:
+        f.write(content)
+    print("Fix 5 applied")
+else:
+    print("Fix 5: pattern not found, showing context around split:")
+    lines = content.split('\n')
+    for i, line in enumerate(lines):
+        if 'split' in line:
+            start = max(0, i-2)
+            end = min(len(lines), i+3)
+            for j in range(start, end):
+                print(f"  {j+1}: {lines[j]}")
+PYEOF
+
+echo "=== All fixes applied ==="
