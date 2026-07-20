@@ -80,10 +80,11 @@ Page({
     request.silentGet('/player/leaderboard/live').then(function (data) {
       var d = data.data || data;
       var list = (d.leaderboard || []).map(function (item) {
+        var av = item.avatar_url || '';
         return {
           rank: item.rank,
           nickname: item.nickname || '选手',
-          avatar_url: item.avatar_url || '',
+          avatar_url: av.indexOf('http://tmp') === 0 ? '' : av,
           finish_time_ms: item.finish_time_ms || 0,
           displayTime: that._formatRaceTime(item.finish_time_ms),
           status: item.status || 'finished'
@@ -162,9 +163,13 @@ Page({
     ]).then(function (results) {
       var t = results[0] || {};
       var q = results[1] || {};
+      var qList = (q.list || []).slice(0, 10).map(function (it) {
+        if ((it.avatarUrl || '').indexOf('http://tmp') === 0) it.avatarUrl = '';
+        return it;
+      });
       that.setData({
         threshold: t,
-        qualifiedList: (q.list || []).slice(0, 10),
+        qualifiedList: qList,
         listLoading: false
       });
     }).catch(function () {
@@ -229,8 +234,13 @@ Page({
         if ((item.avatarUrl || '').indexOf('http://tmp') === 0) item.avatarUrl = '';
         return item;
       });
+      var promoted = (res && res.promoted) || [];
+      promoted = promoted.map(function (it) {
+        if ((it.avatarUrl || '').indexOf('http://tmp') === 0) it.avatarUrl = '';
+        return it;
+      });
       that.setData({
-        finalResult: { list: list, promoted: (res && res.promoted) || [], quota: (res && res.quota) || 0 },
+        finalResult: { list: list, promoted: promoted, quota: (res && res.quota) || 0 },
         listLoading: false
       });
     }).catch(function () {
