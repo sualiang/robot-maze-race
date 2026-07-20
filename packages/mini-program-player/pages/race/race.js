@@ -48,6 +48,7 @@ Page({
   },
 
   onLoad: function () {
+    wx.showModal({ title: 'Debug Race', content: JSON.stringify({venueId: this.data.venueId, venueName: this.data.venueName}) });
     this.checkLogin();
   },
 

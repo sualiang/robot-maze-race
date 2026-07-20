@@ -61,6 +61,7 @@ App({
     if (!options) return;
 
     console.log('[App] _parseContextParams 入参:', JSON.stringify(options));
+    wx.showModal({ title: 'Debug Scene', content: JSON.stringify({scene: options.scene, query: options.query, queryScene: options.query && options.query.scene, referrerInfo: options.referrerInfo}) });
 
     var operatorId = null;
     var venueId = null;
