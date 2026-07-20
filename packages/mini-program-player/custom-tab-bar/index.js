@@ -16,7 +16,7 @@ Component({
       },
       {
         pagePath: '/pages/leaderboard/leaderboard',
-        text: '排行',
+        text: '榜单',
         iconPath: '/assets/tabbar/leaderboard.png',
         selectedIconPath: '/assets/tabbar/leaderboard-active.png'
       },
