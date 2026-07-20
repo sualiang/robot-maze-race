@@ -1,7 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { IncomingMessage } from 'http';
 import { Server } from 'http';
-import { getCurrentScreenData } from '../routes/referees';
+import { getCurrentScreenData, broadcastAfterUpdate, getCachedVenueId } from '../routes/referees';
 import { setTempToken, getTempToken, listTempTokensWithData, deleteTempToken } from '../utils/temp-token';
 
 // 存储所有连接的客户端，按房间分组
@@ -38,6 +38,15 @@ function handleConnection(ws: WebSocket, req: IncomingMessage) {
     const screenData = getCurrentScreenData ? getCurrentScreenData() : null;
     if (screenData) {
       ws.send(JSON.stringify({ type: 'screen_data', data: screenData }));
+    }
+    // 异步触发 broadcastAfterUpdate 拉取 DB 中的排行榜/排队数据推送
+    const venueId = getCachedVenueId();
+    if (venueId) {
+      setImmediate(() => {
+        broadcastAfterUpdate({} as any).catch((e: any) =>
+          console.error('[WS] initial broadcastAfterUpdate failed:', e.message)
+        );
+      });
     }
   }
 

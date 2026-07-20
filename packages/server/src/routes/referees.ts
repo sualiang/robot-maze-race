@@ -1522,6 +1522,10 @@ router.get('/attendance/records', authMiddleware, async (req: Request, res: Resp
 
 let cachedVenueName = '机器狗迷宫赛场';
 let cachedVenueId = '';
+
+export function getCachedVenueId(): string {
+  return cachedVenueId;
+}
 let cachedVenueStatus = 'inactive';
 
 export function setVenueActive(active: boolean) {
@@ -1533,6 +1537,7 @@ export async function initVenueCache(): Promise<void> { return; }
 /** 获取当前大屏数据（从 DB 异步查询） */
 export function getCurrentScreenData() {
   // 由 WebSocket handler 调用，返回基础结构；具体值由 broadcastAfterUpdate 推送
+  // 注意：leaderboard 这里只是空占位，实际数据由大屏重连时通过 get_screen_data 消息异步拉取
   console.log('[WS] getCurrentScreenData: venueStatus=' + cachedVenueStatus + ' venueId=' + cachedVenueId);
   return {
     race_status: 'inactive',
@@ -1550,8 +1555,51 @@ export function getCurrentScreenData() {
   };
 }
 
+/** 从 DB 查询 leaderboard 并填充到 screen_data（用于大屏重连恢复） */
+async function fetchLeaderboardFromDb(venueId: string): Promise<any[]> {
+  try {
+    const { queryOp, query } = require('../config/database');
+    const [rows] = await Promise.all([
+      queryOp(
+        `SELECT rq.* FROM race_queues rq
+         WHERE rq.venue_id = $1 AND rq.status = 'finished' AND rq.finish_status != 'invalid'
+         ORDER BY rq.finish_time_ms ASC LIMIT 10`,
+        [venueId]
+      ),
+    ]);
+
+    const leaderboardRows: any[] = rows;
+    if (!leaderboardRows?.length) return [];
+
+    // 批量查 users
+    const allUserIds = leaderboardRows.map((r: any) => r.user_id).filter(Boolean);
+    const userMap = new Map<string, { nickname: string; avatar_url: string }>();
+    if (allUserIds.length > 0) {
+      const placeholders = allUserIds.map(() => '?').join(',');
+      const userRows: any[] = await query(
+        `SELECT id, nickname, avatar_url FROM users WHERE id IN (${placeholders})`,
+        allUserIds
+      );
+      for (const u of (userRows || [])) {
+        userMap.set(u.id, { nickname: u.nickname, avatar_url: u.avatar_url });
+      }
+    }
+
+    return leaderboardRows.map((r: any, i: number) => ({
+      rank: i + 1,
+      name: userMap.get(r.user_id)?.nickname || '选手',
+      avatar: userMap.get(r.user_id)?.avatar_url || undefined,
+      elapsed: r.finish_time_ms || 0,
+      status: r.finish_status || 'finished',
+    }));
+  } catch (e: any) {
+    console.error('[Match] fetchLeaderboardFromDb error:', e.message);
+    return [];
+  }
+}
+
 /** 从 DB 查询当前状态并广播 screen_data 到大屏 */
-async function broadcastAfterUpdate(req: Request) {
+export async function broadcastAfterUpdate(req: Request) {
   if (!cachedVenueId) return;
 
   try {
