@@ -206,6 +206,7 @@ Page({
       list = list.map(function (item) {
         item.isMe = (item.userId || item.user_id || '') === myId;
         item.displayScore = fmt(item.bestScore || item.best_score || item.score);
+        if ((item.avatarUrl || '').indexOf('http://tmp') === 0) item.avatarUrl = '';
         return item;
       });
       that.setData({ entries: list, hasMore: list.length >= 50, listLoading: false });
@@ -225,6 +226,7 @@ Page({
       list = list.map(function (item) {
         item.isMe = (item.userId || item.user_id || '') === myId;
         item.displayScore = fmt(item.bestScore || item.best_score || item.score);
+        if ((item.avatarUrl || '').indexOf('http://tmp') === 0) item.avatarUrl = '';
         return item;
       });
       that.setData({
