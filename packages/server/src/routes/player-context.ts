@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { getOperatorContext, setOperatorContext } from '../middleware/operator-context';
-import { queryOne, queryOp, queryOpOne, executeOp } from '../config/database';
+import { queryOne, queryOp, queryOpOne, executeOp, getOperatorPool, doQueryOne } from '../config/database';
 
 const router = Router();
 
@@ -39,10 +39,28 @@ router.post('/player/context/set', authMiddleware, async (req: Request, res: Res
       }
     }
 
-    // venueId 同理，但需要对应运营商库来匹配——先跳过，等 set 完 operatorId 后再尝试
-    if (fullVenueId && fullVenueId.length < 32) {
-      // 暂时用简单 LIKE（全局 fallback 不行，但 setOperatorContext 后再查就行了）
-      // 这里先不处理 venueId 前缀补全
+    // venueId 同理，需要对应运营商库来匹配
+    if (fullVenueId && fullVenueId.length < 32 && fullOperatorId) {
+      try {
+        // 从 operators_registry 查该运营商的 db_name
+        const registry = await queryOne<{ db_name: string }>(
+          `SELECT db_name FROM operators_registry WHERE operator_id = $1 AND db_name IS NOT NULL LIMIT 1`,
+          [fullOperatorId]
+        );
+        if (registry?.db_name) {
+          const matched = await doQueryOne(
+            getOperatorPool(registry.db_name),
+            `SELECT id FROM venues WHERE REPLACE(id, '-', '') LIKE ? LIMIT 1`,
+            [fullVenueId + '%']
+          );
+          if (matched?.id) {
+            console.log('[PlayerContext] 补全 venueId: ' + fullVenueId + ' → ' + matched.id);
+            fullVenueId = matched.id;
+          }
+        }
+      } catch (e: any) {
+        console.warn('[PlayerContext] 无法补全 venueId 前缀: ' + fullVenueId, e?.message || e);
+      }
     }
 
     await setOperatorContext(userId, fullOperatorId, fullVenueId);

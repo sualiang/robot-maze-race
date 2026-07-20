@@ -226,7 +226,7 @@ async function doQuery(pool: mysql.Pool, text: string, params?: any[]): Promise<
   return (rows || []);
 }
 
-async function doQueryOne(pool: mysql.Pool, text: string, params?: any[]): Promise<any | null> {
+export async function doQueryOne(pool: mysql.Pool, text: string, params?: any[]): Promise<any | null> {
   const rows = await doQuery(pool, text, params);
   return rows.length > 0 ? rows[0] : null;
 }
