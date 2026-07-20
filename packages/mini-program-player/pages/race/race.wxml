@@ -120,18 +120,11 @@
         </view>
 
         <!-- ============================================================ -->
-        <!-- 状态2: 有次数 → 立即参赛（成绩卡片显示时隐藏，防竞态冲突） -->
+        <!-- 状态2: 有次数 → 立即参赛 -->
         <!-- ============================================================ -->
-        <view wx:if="{{remainCount > 0 && !showResultCard}}" class="race-cta-wrap">
+        <view wx:if="{{remainCount > 0}}" class="race-cta-wrap">
           <view class="race-cta-btn" bindtap="onRaceNow">
             <text class="race-cta-text">立即参赛（剩余 {{remainCount}} 次）</text>
-          </view>
-        </view>
-
-        <!-- 成绩卡片显示中，暂不可参赛 -->
-        <view wx:if="{{remainCount > 0 && showResultCard}}" class="race-cta-wrap">
-          <view class="race-cta-btn race-cta-pending">
-            <text class="race-cta-text">成绩确认中，请稍候...</text>
           </view>
         </view>
 
