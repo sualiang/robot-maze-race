@@ -5,7 +5,8 @@ import { getRedis } from '../config/redis';
 import { WebSocket } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
 import { hashSync } from '../config/bcrypt';
-import { query, queryOne, execute, getOperatorPool, expandParams } from '../config/database';
+import { query, queryOne, execute, getOperatorPool, expandParams, executeOp } from '../config/database';
+import { getConfigInt } from '../config/utils';
 import { authMiddleware } from '../middleware/auth';
 import {
   ApiResponse,
@@ -942,6 +943,53 @@ router.post('/match/end', authMiddleware, async (req: Request, res: Response) =>
 
     // 同步写入 race_results
     await writeRaceResult(req, row.user_id, row.venue_id, row.nickname, elapsed, finishStatus);
+
+    // 发放比赛积分（从 system_config 读 season_race_points）
+    if (finishStatus === 'finished') {
+      try {
+        const pointCfg = await queryOne<{ config_value: string }>(
+          `SELECT config_value FROM system_config WHERE config_key = 'season_race_points'`
+        );
+        const pointValue = parseInt(pointCfg?.config_value || '0', 10) || 0;
+        if (pointValue > 0) {
+          // 写 points_transactions（运营商库）
+          await refExecuteOp(req,
+            `INSERT INTO points_transactions (id, user_id, operator_id, points, type, remark, created_at)
+             VALUES ($1, $2, $3, $4, 'race_reward', $5, NOW())`,
+            [uuidv4(), row.user_id, (req.user as any)?.operatorId || '', pointValue, `完成比赛获得${pointValue}积分`]
+          );
+          // 更新 users 表全局积分（common 库）
+          await execute(
+            `UPDATE users SET points = COALESCE(points, 0) + $1, updated_at = NOW() WHERE id = $2`,
+            [pointValue, row.user_id]
+          );
+          // 更新 season_user_info 赛季积分（common 库）
+          const season = await queryOne<{ id: string }>(
+            `SELECT id FROM seasons WHERE status = 1 ORDER BY created_at DESC LIMIT 1`
+          );
+          if (season) {
+            const existing = await queryOne<{ id: string }>(
+              `SELECT id FROM season_user_info WHERE user_id = $1 AND season_id = $2`,
+              [row.user_id, season.id]
+            );
+            if (existing) {
+              await execute(
+                `UPDATE season_user_info SET points = COALESCE(points, 0) + $1, updated_at = NOW() WHERE id = $2`,
+                [pointValue, existing.id]
+              );
+            } else {
+              await execute(
+                `INSERT INTO season_user_info (id, user_id, season_id, level, exp, points)
+                 VALUES ($1, $2, $3, 1, 0, $4)`,
+                [uuidv4(), row.user_id, season.id, pointValue]
+              );
+            }
+          }
+        }
+      } catch (err: any) {
+        console.error('[比赛积分] 发放失败:', err?.message || err);
+      }
+    }
 
     await broadcastAfterUpdate(req);
 
