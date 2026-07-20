@@ -1556,7 +1556,7 @@ export function getCurrentScreenData() {
 }
 
 /** 从 DB 查询 leaderboard 并填充到 screen_data（用于大屏重连恢复） */
-async function fetchLeaderboardFromDb(venueId: string): Promise<any[]> {
+export async function fetchLeaderboardFromDb(venueId: string): Promise<any[]> {
   try {
     const { queryOp, query } = require('../config/database');
     const [rows] = await Promise.all([
