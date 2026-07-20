@@ -805,6 +805,14 @@ router.post('/match/end', authMiddleware, async (req: Request, res: Response) =>
       [elapsed, finishStatus, newRemaining, racerId]
     );
 
+    // 同步更新 checkins 状态为 completed（防止下次扫码被"已签到"挡住）
+    await executeOp(req,
+      `UPDATE checkins SET status = 'completed', updated_at = NOW()
+       WHERE user_id = $1 AND venue_id = $2 AND status NOT IN ('completed', 'cancelled')
+       ORDER BY created_at DESC LIMIT 1`,
+      [row.user_id, row.venue_id]
+    );
+
     // 同步写入 race_records（成绩记录）
     if (row.user_id && row.venue_id) {
       await executeOp(req,
