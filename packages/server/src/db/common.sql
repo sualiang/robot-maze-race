@@ -3,6 +3,23 @@
 -- 数据库: robot_maze_race_common
 -- ============================================
 
+-- ==================== 辅助: 安全创建索引 (MySQL 8.0 不支持 CREATE INDEX IF NOT EXISTS) ====================
+DROP PROCEDURE IF EXISTS create_index_if_not_exists;
+DELIMITER $$
+CREATE PROCEDURE create_index_if_not_exists(IN idx_name VARCHAR(128), IN tbl_name VARCHAR(128), IN columns_def TEXT)
+BEGIN
+  DECLARE idx_exists INT DEFAULT 0;
+  SELECT COUNT(*) INTO idx_exists FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = tbl_name AND INDEX_NAME = idx_name;
+  IF idx_exists = 0 THEN
+    SET @_sql = CONCAT('CREATE INDEX ', idx_name, ' ON ', tbl_name, ' (', columns_def, ')');
+    PREPARE stmt FROM @_sql;
+    EXECUTE stmt;
+    DEALLOCATE PREPARE stmt;
+  END IF;
+END$$
+DELIMITER ;
+
 -- ==================== 用户表 ====================
 CREATE TABLE IF NOT EXISTS users (
   id VARCHAR(36) PRIMARY KEY,
@@ -29,9 +46,9 @@ CREATE TABLE IF NOT EXISTS users (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX IF NOT EXISTS idx_users_openid ON users(openid);
-CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
-CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
+CALL create_index_if_not_exists('idx_users_openid', 'users', 'openid');
+CALL create_index_if_not_exists('idx_users_role', 'users', 'role');
+CALL create_index_if_not_exists('idx_users_phone', 'users', 'phone');
 
 -- ==================== 运营商注册表 ====================
 CREATE TABLE IF NOT EXISTS operators_registry (
@@ -41,7 +58,7 @@ CREATE TABLE IF NOT EXISTS operators_registry (
   operator_name VARCHAR(128) NOT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX IF NOT EXISTS idx_operators_registry_operator_id ON operators_registry(operator_id);
+CALL create_index_if_not_exists('idx_operators_registry_operator_id', 'operators_registry', 'operator_id');
 
 -- ==================== 运营商表 ====================
 CREATE TABLE IF NOT EXISTS operators (
@@ -74,11 +91,19 @@ CREATE TABLE IF NOT EXISTS admin_roles (
   id VARCHAR(36) PRIMARY KEY,
   name VARCHAR(64) NOT NULL UNIQUE,
   label VARCHAR(64) NOT NULL,
-  permissions TEXT NOT NULL DEFAULT '[]',
+  permissions TEXT NOT NULL,
   scope VARCHAR(32) NOT NULL DEFAULT 'admin',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- admin_roles 的 permissions 默认值用触发器方式设置 (TEXT 列不能有 DEFAULT)
+DROP TRIGGER IF EXISTS trg_admin_roles_permissions_default;
+DELIMITER $$
+CREATE TRIGGER trg_admin_roles_permissions_default BEFORE INSERT ON admin_roles
+FOR EACH ROW SET NEW.permissions = IFNULL(NEW.permissions, '[]');
+$$
+DELIMITER ;
 
 -- ==================== 后台管理员账号表 ====================
 CREATE TABLE IF NOT EXISTS admin_users (
@@ -95,9 +120,9 @@ CREATE TABLE IF NOT EXISTS admin_users (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX IF NOT EXISTS idx_admin_users_username ON admin_users(username);
-CREATE INDEX IF NOT EXISTS idx_admin_users_role ON admin_users(role_id);
-CREATE INDEX IF NOT EXISTS idx_admin_users_operator ON admin_users(operator_id);
+CALL create_index_if_not_exists('idx_admin_users_username', 'admin_users', 'username');
+CALL create_index_if_not_exists('idx_admin_users_role', 'admin_users', 'role_id');
+CALL create_index_if_not_exists('idx_admin_users_operator', 'admin_users', 'operator_id');
 
 -- ==================== 系统配置表 ====================
 CREATE TABLE IF NOT EXISTS system_config (
@@ -125,7 +150,7 @@ CREATE TABLE IF NOT EXISTS idempotency_keys (
   response TEXT NOT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX IF NOT EXISTS idx_idempotency_keys_key ON idempotency_keys(`key`);
+CALL create_index_if_not_exists('idx_idempotency_keys_key', 'idempotency_keys', '`key`');
 
 -- ==================== 客户端日志表 ====================
 CREATE TABLE IF NOT EXISTS client_logs (
@@ -142,7 +167,7 @@ CREATE TABLE IF NOT EXISTS client_logs (
 CREATE TABLE IF NOT EXISTS seasons (
   id VARCHAR(36) PRIMARY KEY,
   name VARCHAR(128) NOT NULL,
-  description TEXT DEFAULT '',
+  description TEXT,
   start_time DATETIME,
   end_time DATETIME,
   status INT NOT NULL DEFAULT 0,
@@ -163,8 +188,8 @@ CREATE TABLE IF NOT EXISTS season_user_info (
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE(user_id, season_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX IF NOT EXISTS idx_season_user_info_user ON season_user_info(user_id);
-CREATE INDEX IF NOT EXISTS idx_season_user_info_season ON season_user_info(season_id);
+CALL create_index_if_not_exists('idx_season_user_info_user', 'season_user_info', 'user_id');
+CALL create_index_if_not_exists('idx_season_user_info_season', 'season_user_info', 'season_id');
 
 -- ==================== 战斗力表 ====================
 CREATE TABLE IF NOT EXISTS combat_power (
@@ -185,7 +210,7 @@ CREATE TABLE IF NOT EXISTS combat_power (
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE(user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX IF NOT EXISTS idx_combat_power_user ON combat_power(user_id);
+CALL create_index_if_not_exists('idx_combat_power_user', 'combat_power', 'user_id');
 
 -- ==================== 积分交易记录表（已移入 operator.sql，每运营商独立） ====================
 -- points_transactions 表已从 common DB 移除，改为每运营商独立数据库
@@ -206,9 +231,9 @@ CREATE TABLE IF NOT EXISTS helps (
   expires_at DATETIME,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX IF NOT EXISTS idx_helps_initiator ON helps(initiator_id);
-CREATE INDEX IF NOT EXISTS idx_helps_helper ON helps(helper_id);
-CREATE INDEX IF NOT EXISTS idx_helps_status ON helps(status);
+CALL create_index_if_not_exists('idx_helps_initiator', 'helps', 'initiator_id');
+CALL create_index_if_not_exists('idx_helps_helper', 'helps', 'helper_id');
+CALL create_index_if_not_exists('idx_helps_status', 'helps', 'status');
 
 -- ==================== 帮助助力记录表 ====================
 CREATE TABLE IF NOT EXISTS help_helpers (
@@ -218,16 +243,16 @@ CREATE TABLE IF NOT EXISTS help_helpers (
   device_id VARCHAR(128),
   helped_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX IF NOT EXISTS idx_help_helpers_help ON help_helpers(help_id);
-CREATE INDEX IF NOT EXISTS idx_help_helpers_user ON help_helpers(user_id);
+CALL create_index_if_not_exists('idx_help_helpers_help', 'help_helpers', 'help_id');
+CALL create_index_if_not_exists('idx_help_helpers_user', 'help_helpers', 'user_id');
 
 -- ==================== 任务模板表 ====================
 CREATE TABLE IF NOT EXISTS tasks (
   id VARCHAR(36) PRIMARY KEY,
   name VARCHAR(128) NOT NULL,
-  description TEXT DEFAULT '',
+  description TEXT,
   task_type VARCHAR(32) NOT NULL DEFAULT '',
-  target_value TEXT DEFAULT '',
+  target_value TEXT,
   reward_type VARCHAR(32) NOT NULL DEFAULT '',
   reward_value INT NOT NULL DEFAULT 0,
   status INT NOT NULL DEFAULT 1,
@@ -235,22 +260,22 @@ CREATE TABLE IF NOT EXISTS tasks (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+CALL create_index_if_not_exists('idx_tasks_status', 'tasks', 'status');
 
 -- ==================== 用户任务进度表 ====================
 CREATE TABLE IF NOT EXISTS user_tasks (
   id VARCHAR(36) PRIMARY KEY,
   user_id VARCHAR(36) NOT NULL,
   task_id VARCHAR(36) NOT NULL,
-  progress_value TEXT DEFAULT '',
+  progress_value TEXT,
   status INT NOT NULL DEFAULT 0,
   rewarded_at DATETIME,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE(user_id, task_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX IF NOT EXISTS idx_user_tasks_user ON user_tasks(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_tasks_status ON user_tasks(status);
+CALL create_index_if_not_exists('idx_user_tasks_user', 'user_tasks', 'user_id');
+CALL create_index_if_not_exists('idx_user_tasks_status', 'user_tasks', 'status');
 
 -- ==================== 通知发送日志表 ====================
 CREATE TABLE IF NOT EXISTS notification_logs (
@@ -264,9 +289,9 @@ CREATE TABLE IF NOT EXISTS notification_logs (
   error_msg TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX IF NOT EXISTS idx_notification_logs_scene ON notification_logs(scene);
-CREATE INDEX IF NOT EXISTS idx_notification_logs_user ON notification_logs(user_id);
-CREATE INDEX IF NOT EXISTS idx_notification_logs_created ON notification_logs(created_at);
+CALL create_index_if_not_exists('idx_notification_logs_scene', 'notification_logs', 'scene');
+CALL create_index_if_not_exists('idx_notification_logs_user', 'notification_logs', 'user_id');
+CALL create_index_if_not_exists('idx_notification_logs_created', 'notification_logs', 'created_at');
 
 -- ==================== 运营商成员表 ====================
 -- 放在公共库，因为登录时需要按手机号查找成员，无法提前知道运营商 DB
@@ -282,8 +307,8 @@ CREATE TABLE IF NOT EXISTS operator_members (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX IF NOT EXISTS idx_operator_members_operator ON operator_members(operator_id);
-CREATE INDEX IF NOT EXISTS idx_operator_members_phone ON operator_members(phone);
+CALL create_index_if_not_exists('idx_operator_members_operator', 'operator_members', 'operator_id');
+CALL create_index_if_not_exists('idx_operator_members_phone', 'operator_members', 'phone');
 
 -- ==================== 裁判邀请表 ====================
 CREATE TABLE IF NOT EXISTS referee_invites (
@@ -313,8 +338,8 @@ CREATE TABLE IF NOT EXISTS settlements (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX IF NOT EXISTS idx_settlements_status ON settlements(status);
-CREATE INDEX IF NOT EXISTS idx_settlements_operator ON settlements(operator_id);
+CALL create_index_if_not_exists('idx_settlements_status', 'settlements', 'status');
+CALL create_index_if_not_exists('idx_settlements_operator', 'settlements', 'operator_id');
 
 -- 积分商城实物核销码（每个运营商一条记录，UPSERT 更新）
 CREATE TABLE IF NOT EXISTS physical_gift_redeem_codes (

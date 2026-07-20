@@ -3,6 +3,23 @@
 -- 每个运营商独立数据库: robot_maze_race_{db_name}
 -- ============================================
 
+-- ==================== 辅助: 安全创建索引 (MySQL 8.0 不支持 CREATE INDEX IF NOT EXISTS) ====================
+DROP PROCEDURE IF EXISTS create_index_if_not_exists;
+DELIMITER $$
+CREATE PROCEDURE create_index_if_not_exists(IN idx_name VARCHAR(128), IN tbl_name VARCHAR(128), IN columns_def TEXT)
+BEGIN
+  DECLARE idx_exists INT DEFAULT 0;
+  SELECT COUNT(*) INTO idx_exists FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = tbl_name AND INDEX_NAME = idx_name;
+  IF idx_exists = 0 THEN
+    SET @_sql = CONCAT('CREATE INDEX ', idx_name, ' ON ', tbl_name, ' (', columns_def, ')');
+    PREPARE stmt FROM @_sql;
+    EXECUTE stmt;
+    DEALLOCATE PREPARE stmt;
+  END IF;
+END$$
+DELIMITER ;
+
 -- ==================== 赛场表 ====================
 CREATE TABLE IF NOT EXISTS venues (
   id VARCHAR(36) PRIMARY KEY,
@@ -26,7 +43,7 @@ CREATE TABLE IF NOT EXISTS venues (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX IF NOT EXISTS idx_venues_status ON venues(status);
+CALL create_index_if_not_exists('idx_venues_status', 'venues', 'status');
 
 -- ==================== 裁判表 ====================
 CREATE TABLE IF NOT EXISTS referees (
@@ -52,10 +69,10 @@ CREATE TABLE IF NOT EXISTS referees (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX IF NOT EXISTS idx_referees_user ON referees(user_id);
-CREATE INDEX IF NOT EXISTS idx_referees_venue ON referees(venue_id);
-CREATE INDEX IF NOT EXISTS idx_referees_cert ON referees(cert_status);
-CREATE INDEX IF NOT EXISTS idx_referees_status ON referees(status);
+CALL create_index_if_not_exists('idx_referees_user', 'referees', 'user_id');
+CALL create_index_if_not_exists('idx_referees_venue', 'referees', 'venue_id');
+CALL create_index_if_not_exists('idx_referees_cert', 'referees', 'cert_status');
+CALL create_index_if_not_exists('idx_referees_status', 'referees', 'status');
 
 -- ==================== 参赛包表 ====================
 CREATE TABLE IF NOT EXISTS race_packages (
@@ -82,7 +99,7 @@ CREATE TABLE IF NOT EXISTS race_packages (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX IF NOT EXISTS idx_race_packages_status ON race_packages(status);
+CALL create_index_if_not_exists('idx_race_packages_status', 'race_packages', 'status');
 
 -- ==================== 参赛包关联优惠券 ====================
 CREATE TABLE IF NOT EXISTS race_package_coupons (
@@ -95,8 +112,8 @@ CREATE TABLE IF NOT EXISTS race_package_coupons (
   coupon_name VARCHAR(128) DEFAULT '',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX IF NOT EXISTS idx_rpc_package_id ON race_package_coupons(package_id);
-CREATE INDEX IF NOT EXISTS idx_rpc_coupon_id ON race_package_coupons(coupon_id);
+CALL create_index_if_not_exists('idx_rpc_package_id', 'race_package_coupons', 'package_id');
+CALL create_index_if_not_exists('idx_rpc_coupon_id', 'race_package_coupons', 'coupon_id');
 
 -- ==================== 订单表 ====================
 CREATE TABLE IF NOT EXISTS orders (
@@ -122,9 +139,9 @@ CREATE TABLE IF NOT EXISTS orders (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id);
-CREATE INDEX IF NOT EXISTS idx_orders_no ON orders(order_no);
-CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+CALL create_index_if_not_exists('idx_orders_user', 'orders', 'user_id');
+CALL create_index_if_not_exists('idx_orders_no', 'orders', 'order_no');
+CALL create_index_if_not_exists('idx_orders_status', 'orders', 'status');
 
 -- ==================== 支付流水表 ====================
 CREATE TABLE IF NOT EXISTS payments (
@@ -142,8 +159,8 @@ CREATE TABLE IF NOT EXISTS payments (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX IF NOT EXISTS idx_payments_order ON payments(order_id);
-CREATE INDEX IF NOT EXISTS idx_payments_transaction ON payments(transaction_id);
+CALL create_index_if_not_exists('idx_payments_order', 'payments', 'order_id');
+CALL create_index_if_not_exists('idx_payments_transaction', 'payments', 'transaction_id');
 
 -- ==================== 签到记录表 ====================
 CREATE TABLE IF NOT EXISTS checkins (
@@ -159,10 +176,10 @@ CREATE TABLE IF NOT EXISTS checkins (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX IF NOT EXISTS idx_checkins_user ON checkins(user_id);
-CREATE INDEX IF NOT EXISTS idx_checkins_venue ON checkins(venue_id);
-CREATE INDEX IF NOT EXISTS idx_checkins_venue_queue ON checkins(venue_id, queue_number);
-CREATE INDEX IF NOT EXISTS idx_checkins_status ON checkins(status);
+CALL create_index_if_not_exists('idx_checkins_user', 'checkins', 'user_id');
+CALL create_index_if_not_exists('idx_checkins_venue', 'checkins', 'venue_id');
+CALL create_index_if_not_exists('idx_checkins_venue_queue', 'checkins', 'venue_id, queue_number');
+CALL create_index_if_not_exists('idx_checkins_status', 'checkins', 'status');
 
 -- ==================== 比赛成绩表 ====================
 CREATE TABLE IF NOT EXISTS race_results (
@@ -182,10 +199,10 @@ CREATE TABLE IF NOT EXISTS race_results (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX IF NOT EXISTS idx_race_results_user ON race_results(user_id);
-CREATE INDEX IF NOT EXISTS idx_race_results_venue ON race_results(venue_id);
-CREATE INDEX IF NOT EXISTS idx_race_results_score ON race_results(score_ms);
-CREATE INDEX IF NOT EXISTS idx_race_results_created ON race_results(created_at);
+CALL create_index_if_not_exists('idx_race_results_user', 'race_results', 'user_id');
+CALL create_index_if_not_exists('idx_race_results_venue', 'race_results', 'venue_id');
+CALL create_index_if_not_exists('idx_race_results_score', 'race_results', 'score_ms');
+CALL create_index_if_not_exists('idx_race_results_created', 'race_results', 'created_at');
 
 -- ==================== 考勤记录表 ====================
 CREATE TABLE IF NOT EXISTS attendance (
@@ -199,10 +216,10 @@ CREATE TABLE IF NOT EXISTS attendance (
   gps_lng DOUBLE,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX IF NOT EXISTS idx_attendance_referee ON attendance(referee_id);
-CREATE INDEX IF NOT EXISTS idx_attendance_venue ON attendance(venue_id);
-CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance(checkin_at);
-CREATE INDEX IF NOT EXISTS idx_attendance_user ON attendance(user_id);
+CALL create_index_if_not_exists('idx_attendance_referee', 'attendance', 'referee_id');
+CALL create_index_if_not_exists('idx_attendance_venue', 'attendance', 'venue_id');
+CALL create_index_if_not_exists('idx_attendance_date', 'attendance', 'checkin_at');
+CALL create_index_if_not_exists('idx_attendance_user', 'attendance', 'user_id');
 
 -- ==================== 结算记录表 ====================
 CREATE TABLE IF NOT EXISTS settlements (
@@ -217,7 +234,7 @@ CREATE TABLE IF NOT EXISTS settlements (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX IF NOT EXISTS idx_settlements_status ON settlements(status);
+CALL create_index_if_not_exists('idx_settlements_status', 'settlements', 'status');
 
 -- ==================== 营销配置表 ====================
 CREATE TABLE IF NOT EXISTS marketing_config (
@@ -318,7 +335,7 @@ CREATE TABLE IF NOT EXISTS merchant_coupons (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX IF NOT EXISTS idx_merchant_coupons_merchant ON merchant_coupons(merchant_id);
+CALL create_index_if_not_exists('idx_merchant_coupons_merchant', 'merchant_coupons', 'merchant_id');
 
 -- ==================== 用户优惠券表 ====================
 CREATE TABLE IF NOT EXISTS user_coupons (
@@ -341,8 +358,8 @@ CREATE TABLE IF NOT EXISTS user_coupons (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX IF NOT EXISTS idx_user_coupons_user ON user_coupons(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_coupons_status ON user_coupons(status);
+CALL create_index_if_not_exists('idx_user_coupons_user', 'user_coupons', 'user_id');
+CALL create_index_if_not_exists('idx_user_coupons_status', 'user_coupons', 'status');
 
 -- ==================== 商家表 ====================
 CREATE TABLE IF NOT EXISTS merchants (
@@ -366,7 +383,7 @@ CREATE TABLE IF NOT EXISTS merchants (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX IF NOT EXISTS idx_merchants_status ON merchants(status);
+CALL create_index_if_not_exists('idx_merchants_status', 'merchants', 'status');
 
 -- ==================== 商家子账号表 ====================
 CREATE TABLE IF NOT EXISTS merchant_admin (
@@ -382,8 +399,8 @@ CREATE TABLE IF NOT EXISTS merchant_admin (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX IF NOT EXISTS idx_merchant_admin_username ON merchant_admin(username);
-CREATE INDEX IF NOT EXISTS idx_merchant_admin_merchant ON merchant_admin(merchant_id);
+CALL create_index_if_not_exists('idx_merchant_admin_username', 'merchant_admin', 'username');
+CALL create_index_if_not_exists('idx_merchant_admin_merchant', 'merchant_admin', 'merchant_id');
 
 -- ==================== 商家邀请码表 ====================
 CREATE TABLE IF NOT EXISTS merchant_invite_codes (
@@ -395,8 +412,8 @@ CREATE TABLE IF NOT EXISTS merchant_invite_codes (
   used_at DATETIME,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX IF NOT EXISTS idx_merchant_invite_codes_code ON merchant_invite_codes(code);
-CREATE INDEX IF NOT EXISTS idx_merchant_invite_codes_merchant ON merchant_invite_codes(merchant_id);
+CALL create_index_if_not_exists('idx_merchant_invite_codes_code', 'merchant_invite_codes', 'code');
+CALL create_index_if_not_exists('idx_merchant_invite_codes_merchant', 'merchant_invite_codes', 'merchant_id');
 
 -- ==================== 参赛抵扣金表 ====================
 CREATE TABLE IF NOT EXISTS entry_deductions (
@@ -411,8 +428,8 @@ CREATE TABLE IF NOT EXISTS entry_deductions (
   used_at DATETIME,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX IF NOT EXISTS idx_entry_deductions_user ON entry_deductions(user_id);
-CREATE INDEX IF NOT EXISTS idx_entry_deductions_status ON entry_deductions(status);
+CALL create_index_if_not_exists('idx_entry_deductions_user', 'entry_deductions', 'user_id');
+CALL create_index_if_not_exists('idx_entry_deductions_status', 'entry_deductions', 'status');
 
 -- ==================== 积分商城表 ====================
 CREATE TABLE IF NOT EXISTS point_shop (
