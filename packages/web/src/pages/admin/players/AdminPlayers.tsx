@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Card, Table, Button, Space, Tabs, Input, Select, Tag, message,
+  Card, Table, Button, Space, Input, Select, Tag, message,
 } from 'antd';
 import { SearchOutlined, DownloadOutlined, ReloadOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
@@ -40,11 +40,9 @@ export default function AdminPlayers() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // 从 URL query 中还原初始状态
-  const initialTab = searchParams.get('scope') === 'direct' ? 'direct' : 'operator';
   const initialKeyword = searchParams.get('keyword') || '';
   const initialOperatorId = searchParams.get('operator_id') || '';
 
-  const [activeTab, setActiveTab] = useState<string>(initialTab);
   const [list, setList] = useState<PlayerItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState({
@@ -71,14 +69,13 @@ export default function AdminPlayers() {
     fetchOperators();
   }, [fetchOperators]);
 
-  // 获取玩家列表
+  // 获取玩家列表（所有玩家，不分直属/运营商）
   const fetchList = useCallback(async (page: number, pageSize: number) => {
     setLoading(true);
     try {
-      const scope = activeTab === 'direct' ? 'direct' : 'operator';
-      const params: Record<string, any> = { scope, page, pageSize };
+      const params: Record<string, any> = { page, pageSize };
       if (keyword) params.keyword = keyword;
-      if (activeTab === 'operator' && operatorId) params.operator_id = operatorId;
+      if (operatorId) params.operator_id = operatorId;
 
       const data: any = await api.get('/admin/players', { params });
       const resultList = data?.list ?? data ?? [];
@@ -100,28 +97,22 @@ export default function AdminPlayers() {
     } finally {
       setLoading(false);
     }
-  }, [activeTab, keyword, operatorId]);
+  }, [keyword, operatorId]);
 
   // 同步筛选条件到 URL query
   useEffect(() => {
     const params: Record<string, string> = {};
-    params.scope = activeTab;
     if (keyword) params.keyword = keyword;
-    if (activeTab === 'operator' && operatorId) params.operator_id = operatorId;
+    if (operatorId) params.operator_id = operatorId;
     if (pagination.current > 1) params.page = String(pagination.current);
     if (pagination.pageSize !== 20) params.pageSize = String(pagination.pageSize);
     setSearchParams(params, { replace: true });
-  }, [activeTab, keyword, operatorId, pagination.current, pagination.pageSize, setSearchParams]);
+  }, [keyword, operatorId, pagination.current, pagination.pageSize, setSearchParams]);
 
   useEffect(() => {
     fetchList(pagination.current, pagination.pageSize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, keyword, operatorId]);
-
-  const handleTabChange = (key: string) => {
-    setActiveTab(key);
-    setPagination(prev => ({ ...prev, current: 1 }));
-  };
+  }, [keyword, operatorId]);
 
   const handleSearch = (value: string) => {
     setKeyword(value);
@@ -130,10 +121,9 @@ export default function AdminPlayers() {
 
   const handleExportCsv = async () => {
     try {
-      const scope = activeTab === 'direct' ? 'direct' : 'operator';
-      const params = new URLSearchParams({ export: 'csv', scope });
+      const params = new URLSearchParams({ export: 'csv' });
       if (keyword) params.set('keyword', keyword);
-      if (activeTab === 'operator' && operatorId) params.set('operator_id', operatorId);
+      if (operatorId) params.set('operator_id', operatorId);
 
       const token = localStorage.getItem('token');
       const resp = await fetch(`/api/v1/admin/players?${params.toString()}`, {
@@ -145,7 +135,7 @@ export default function AdminPlayers() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `玩家数据-${activeTab === 'direct' ? '总部直属' : '运营商'}-${dayjs().format('YYYYMMDDHHmmss')}.csv`;
+      a.download = `玩家数据-${dayjs().format('YYYYMMDDHHmmss')}.csv`;
       a.click();
       window.URL.revokeObjectURL(url);
       message.success('导出成功');
@@ -186,7 +176,7 @@ export default function AdminPlayers() {
 
   return (
     <Card
-      title={<span>玩家管理 <span style={{ fontSize: 13, color: '#999', fontWeight: 'normal' }}>（超级管理员）</span></span>}
+      title={<span>玩家列表 <span style={{ fontSize: 13, color: '#999', fontWeight: 'normal' }}>（超级管理员）</span></span>}
       extra={
         <Space>
           <Button icon={<DownloadOutlined />} onClick={handleExportCsv}>导出 CSV</Button>
@@ -194,88 +184,41 @@ export default function AdminPlayers() {
         </Space>
       }
     >
-      <Tabs
-        activeKey={activeTab}
-        onChange={handleTabChange}
-        items={[
-          {
-            key: 'operator',
-            label: '运营商玩家',
-            children: (
-              <>
-                <Space style={{ marginBottom: 16 }} wrap>
-                  <Input.Search
-                    placeholder="搜索昵称/手机号"
-                    prefix={<SearchOutlined />}
-                    value={keyword}
-                    onChange={(e) => setKeyword(e.target.value)}
-                    onSearch={handleSearch}
-                    style={{ width: 240 }}
-                    allowClear
-                  />
-                  <Select
-                    placeholder="选择运营商"
-                    allowClear
-                    style={{ width: 200 }}
-                    value={operatorId || undefined}
-                    onChange={(val) => {
-                      setOperatorId(val || '');
-                      setPagination(prev => ({ ...prev, current: 1 }));
-                    }}
-                    options={operators.map(op => ({ value: op.id, label: op.name }))}
-                  />
-                </Space>
-                <Table
-                  columns={columns}
-                  dataSource={list}
-                  rowKey="id"
-                  loading={loading}
-                  scroll={{ x: 1100 }}
-                  pagination={{
-                    ...pagination,
-                    showSizeChanger: true,
-                    showTotal: (t: number) => `共 ${t} 名玩家`,
-                    onChange: (page, pageSize) => fetchList(page, pageSize),
-                  }}
-                />
-              </>
-            ),
-          },
-          {
-            key: 'direct',
-            label: '总部直属玩家',
-            children: (
-              <>
-                <Space style={{ marginBottom: 16 }}>
-                  <Input.Search
-                    placeholder="搜索昵称/手机号"
-                    prefix={<SearchOutlined />}
-                    value={keyword}
-                    onChange={(e) => setKeyword(e.target.value)}
-                    onSearch={handleSearch}
-                    style={{ width: 240 }}
-                    allowClear
-                  />
-                </Space>
-                <Table
-                  columns={columns}
-                  dataSource={list}
-                  rowKey="id"
-                  loading={loading}
-                  scroll={{ x: 1100 }}
-                  pagination={{
-                    ...pagination,
-                    showSizeChanger: true,
-                    showTotal: (t: number) => `共 ${t} 名玩家`,
-                    onChange: (page, pageSize) => fetchList(page, pageSize),
-                  }}
-                />
-              </>
-            ),
-          },
-        ]}
+      <Space style={{ marginBottom: 16 }} wrap>
+        <Input.Search
+          placeholder="搜索昵称/手机号"
+          prefix={<SearchOutlined />}
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+          onSearch={handleSearch}
+          style={{ width: 240 }}
+          allowClear
+        />
+        <Select
+          placeholder="选择运营商"
+          allowClear
+          style={{ width: 200 }}
+          value={operatorId || undefined}
+          onChange={(val) => {
+            setOperatorId(val || '');
+            setPagination(prev => ({ ...prev, current: 1 }));
+          }}
+          options={operators.map(op => ({ value: op.id, label: op.name }))}
+        />
+      </Space>
+      <Table
+        columns={columns}
+        dataSource={list}
+        rowKey="id"
+        loading={loading}
+        scroll={{ x: 1100 }}
+        pagination={{
+          ...pagination,
+          showSizeChanger: true,
+          showTotal: (t: number) => `共 ${t} 名玩家`,
+          onChange: (page, pageSize) => fetchList(page, pageSize),
+        }}
       />
     </Card>
   );
 }
-

@@ -42,20 +42,12 @@ router.get('/', authMiddleware, checkPermission('players:list'), async (req: Req
     const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
     const pageSize = Math.min(200, Math.max(1, parseInt(req.query.pageSize as string, 10) || 20));
     const offset = (page - 1) * pageSize;
-    const scope = req.query.scope as string | undefined;
     const keyword = req.query.keyword as string | undefined;
     const operatorId = req.query.operator_id as string | undefined;
     const exportCsv = req.query.export === 'csv';
 
     const conditions: string[] = [];
     const params: any[] = [];
-
-    // scope 筛选
-    if (scope === 'direct') {
-      conditions.push('u.subscribe_venue_id IS NULL');
-    } else if (scope === 'operator') {
-      conditions.push('u.subscribe_venue_id IS NOT NULL');
-    }
 
     // 关键字搜索（昵称或手机号）
     if (keyword && keyword.trim()) {
@@ -64,10 +56,16 @@ router.get('/', authMiddleware, checkPermission('players:list'), async (req: Req
       params.push(kw, kw);
     }
 
+    // 按运营商筛选（通过 subscribe_venue_id → venues.operator_id）
+    if (operatorId) {
+      conditions.push('v.operator_id = $' + (params.length + 1));
+      params.push(operatorId);
+    }
+
     const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
 
-    // 构建基础查询（不 JOIN 跨库表，venue_name/operator_name 返回 NULL）
-    const fromClause = `FROM users u`;
+    // 构建基础查询（JOIN venues 获取 operator_id 用于筛选 + venue_name 显示）
+    const fromClause = `FROM users u LEFT JOIN venues v ON u.subscribe_venue_id = v.id LEFT JOIN operators_registry op ON v.operator_id = op.operator_id`;
 
     // 计数
     const countResult = await queryOne<{ total: number }>(
@@ -76,12 +74,12 @@ router.get('/', authMiddleware, checkPermission('players:list'), async (req: Req
     );
     const total = countResult?.total || 0;
 
-    // 查询字段（不 JOIN 跨库表，venue_name/operator_name 置 NULL）
+    // 查询字段（通过 JOIN venues/operators_registry 获取真实场地名和运营商名）
     const selectFields = `u.id, u.nickname, u.phone, u.gender, u.age, u.avatar_url,
       u.subscribe_venue_id,
-      NULL AS subscribe_venue_name,
-      NULL AS operator_id,
-      NULL AS operator_name,
+      v.name AS subscribe_venue_name,
+      v.operator_id,
+      op.name AS operator_name,
       u.race_count, u.best_score_ms, u.created_at`;
 
     // CSV 导出

@@ -16,7 +16,7 @@ const allMenuItems: { key: string; icon: React.ReactNode; label: string; perms?:
   { key: '/operator/finance', icon: <DollarOutlined />, label: '财务中心', perms: ['finance:read'] },
   { key: '/operator/rbac', icon: <SafetyCertificateOutlined />, label: '角色与成员管理', perms: ['rbac:read'] },
   { key: '/operator/merchant', icon: <ShoppingOutlined />, label: '商家管理', perms: ['merchant:read'] },
-  { key: '/operator/players', icon: <UserSwitchOutlined />, label: '玩家管理', perms: ['players:read'] },
+  // { key: '/operator/players', icon: <UserSwitchOutlined />, label: '玩家管理', perms: ['players:read'] },
 
   { key: '/operator/profile', icon: <UserOutlined />, label: '个人中心' },
 ];
