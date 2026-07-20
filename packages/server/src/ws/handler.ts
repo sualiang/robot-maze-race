@@ -50,11 +50,11 @@ function handleConnection(ws: WebSocket, req: IncomingMessage) {
 async function handleClose(ws: WebSocket) {
   screenClients.delete(ws);
   refereeClients.delete(ws);
-  // 清理该 ws 对应的激活码映射（Redis + 内存）
+  // 清理内存 ws 映射，但保留 Redis 激活码（靠 TTL 自然过期）
+  // 大屏 WS 重连后会重新发 screen_login 注册新的
   for (const [code, storedWs] of activationCodeWs.entries()) {
     if (storedWs === ws) {
       activationCodeWs.delete(code);
-      deleteTempToken('activation_code', code).catch(() => {});
     }
   }
   const room = clientRooms.get(ws);
