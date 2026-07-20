@@ -137,6 +137,7 @@ Page({
         that.setData({ showDetail: false, detailItem: null, showRedeem: false, redeemCodeInput: '' });
         that.showToast('🎉 恭喜你，积分兑换成功！');
         that.fetchItems();
+        that.fetchRecords();
       } else {
         that.showToast(res && res.message || '核销失败');
       }
@@ -182,6 +183,6 @@ Page({
     this.setData({ toastMsg: msg });
     setTimeout(function () {
       that.setData({ toastMsg: '' });
-    }, 2000);
+    }, 3000);
   }
 });
