@@ -143,7 +143,7 @@ Page({
           redeemCodeInput: '',
           userPoints: Math.max(0, that.data.userPoints - needPoints)
         });
-        wx.showToast({ title: '🎉 恭喜你，积分兑换成功！', icon: 'success', duration: 2500 });
+        wx.showToast({ title: '兑换成功！', icon: 'success', duration: 3000 });
         that.fetchItems();
         that.fetchRecords();
       } else {
