@@ -144,16 +144,17 @@
   display: none;
   overflow: hidden;
 }
-.modal-show {
+.modal-show,
+.fullscreen-mask.modal-show {
+  display: block;
+}
+.modal.modal-show,
+.records-modal.modal-show {
   display: flex;
   flex-direction: column;
 }
 .modal-content {
   padding: 48rpx 32rpx 32rpx;
-  display: flex;
-  flex-direction: column;
-  gap: 16rpx;
-}
 .modal-title {
   font-size: 34rpx;
   font-weight: 700;
@@ -336,4 +337,181 @@
 .empty-desc {
   font-size: 26rpx;
   color: var(--color-text-light);
+}
+
+/* ========== 实物礼品详情浮层 ========== */
+.fullscreen-mask {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 200;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+.detail-panel {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--color-bg, #0f0f23);
+  z-index: 210;
+  display: flex;
+  flex-direction: column;
+  transform: translateY(100%);
+  transition: transform 0.35s ease-out;
+  overflow-y: auto;
+}
+.detail-panel.modal-show {
+  transform: translateY(0);
+}
+.detail-close {
+  position: absolute;
+  top: 24rpx; right: 24rpx;
+  width: 56rpx; height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36rpx;
+  color: #fff;
+  background: rgba(255,255,255,0.15);
+  border-radius: 50%;
+  z-index: 5;
+}
+.detail-image {
+  width: 100%;
+  height: 560rpx;
+  background: var(--color-card, #1a1a2e);
+}
+.detail-body {
+  padding: 48rpx 32rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+.detail-name {
+  font-size: 40rpx;
+  font-weight: 700;
+  color: var(--color-text, #fff);
+  margin-bottom: 16rpx;
+  text-align: center;
+}
+.detail-desc {
+  font-size: 28rpx;
+  color: var(--color-text-secondary, #aaa);
+  text-align: center;
+  margin-bottom: 32rpx;
+  line-height: 1.5;
+}
+.detail-points {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  margin-bottom: 48rpx;
+  padding: 16rpx 40rpx;
+  background: rgba(233, 69, 96, 0.12);
+  border-radius: 40rpx;
+}
+.detail-points-icon {
+  font-size: 32rpx;
+}
+.detail-points-text {
+  font-size: 32rpx;
+  color: #e94560;
+  font-weight: 600;
+}
+.detail-redeem-btn {
+  width: 400rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  text-align: center;
+  background: linear-gradient(135deg, #e94560, #ff6b81);
+  color: #fff;
+  font-size: 32rpx;
+  font-weight: 600;
+  border-radius: 44rpx;
+  border: none;
+}
+
+/* ========== 核销码输入浮层 ========== */
+.redeem-panel {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--color-bg, #0f0f23);
+  z-index: 220;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transform: scale(0.9);
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.25s ease-out;
+}
+.redeem-panel.modal-show {
+  transform: scale(1);
+  opacity: 1;
+  pointer-events: auto;
+}
+.redeem-close {
+  position: absolute;
+  top: 24rpx; right: 24rpx;
+  width: 56rpx; height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36rpx;
+  color: #fff;
+  background: rgba(255,255,255,0.15);
+  border-radius: 50%;
+}
+.redeem-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 48rpx;
+}
+.redeem-icon {
+  font-size: 80rpx;
+  margin-bottom: 24rpx;
+}
+.redeem-title {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: var(--color-text, #fff);
+  margin-bottom: 16rpx;
+}
+.redeem-hint {
+  font-size: 26rpx;
+  color: var(--color-text-secondary, #aaa);
+  text-align: center;
+  line-height: 1.5;
+  margin-bottom: 48rpx;
+}
+.redeem-input-row {
+  width: 360rpx;
+  margin-bottom: 40rpx;
+}
+.redeem-input {
+  width: 100%;
+  height: 80rpx;
+  border: 2rpx solid var(--color-border, #333);
+  border-radius: 12rpx;
+  background: var(--color-card, #1a1a2e);
+  color: var(--color-text, #fff);
+  font-size: 36rpx;
+  text-align: center;
+  letter-spacing: 16rpx;
+  padding: 0 16rpx;
+}
+.redeem-submit-btn {
+  width: 360rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  text-align: center;
+  background: linear-gradient(135deg, #e94560, #ff6b81);
+  color: #fff;
+  font-size: 32rpx;
+  font-weight: 600;
+  border-radius: 44rpx;
+  border: none;
 }

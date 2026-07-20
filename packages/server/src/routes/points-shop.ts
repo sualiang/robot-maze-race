@@ -413,4 +413,168 @@ router.get('/points-shop/history', authMiddleware, async (req: Request, res: Res
   }
 });
 
+/**
+ * POST /api/v1/points-shop/redeem
+ * 现场核销兑换（由工作人员输入核销码）
+ * @param body.itemId - 商品ID
+ * @param body.redeemCode - 4位核销码
+ */
+router.post('/points-shop/redeem', authMiddleware, async (req: Request, res: Response) => {
+  const userId = req.user!.userId;
+  const { itemId, redeemCode } = req.body;
+
+  if (!itemId || !redeemCode) {
+    res.json({ code: 400, message: '缺少商品ID或核销码', data: null });
+    return;
+  }
+
+  try {
+    // 1. 查询商品
+    const item = await queryOpOne<any>(req,
+      `SELECT * FROM point_shop WHERE id = $1 AND status = 1`,
+      [itemId]
+    );
+    if (!item) {
+      res.json({ code: 404, message: '商品不存在或已下架', data: null });
+      return;
+    }
+    if (item.item_type !== 'physical_gift') {
+      res.json({ code: 400, message: '仅实物礼品支持现场核销', data: null });
+      return;
+    }
+
+    // 2. 验证核销码
+    const opId = (req.user as any)?.operatorId || '';
+    const validCode = await queryOne<any>(
+      `SELECT redeem_code FROM physical_gift_redeem_codes WHERE operator_id = $1`,
+      [opId]
+    );
+    if (!validCode || validCode.redeem_code !== redeemCode) {
+      res.json({ code: 400, message: '核销码无效', data: null });
+      return;
+    }
+
+    // 3. 查用户积分
+    const needPoints = item.need_points;
+    const userPoints = await queryOne<{ points: number }>(
+      `SELECT COALESCE(points, 0) as points FROM users WHERE id = $1`,
+      [userId]
+    );
+    if (!userPoints || userPoints.points < needPoints) {
+      res.json({ code: 400, message: '积分不足', data: null });
+      return;
+    }
+
+    // 4. 库存检查
+    if (item.stock !== undefined && item.stock === 0) {
+      res.json({ code: 400, message: '库存不足', data: null });
+      return;
+    }
+
+    // 5. 原子扣库存
+    if (item.stock !== undefined) {
+      await executeOp(req,
+        `UPDATE point_shop SET stock = stock - 1 WHERE id = $1 AND stock > 0`,
+        [itemId]
+      );
+    }
+
+    // 6. 扣积分
+    await executeOp(req,
+      `INSERT INTO points_transactions (id, user_id, operator_id, points, type, remark, created_at)
+       VALUES ($1, $2, $3, $4, 'point_shop_redeem', $5, NOW())`,
+      [uuidv4(), userId, opId, -needPoints, `积分商城核销·${item.name}`]
+    );
+
+    // 7. 记录兑换日志
+    const exchangeId = uuidv4();
+    try {
+      await executeOp(req,
+        `CREATE TABLE IF NOT EXISTS points_exchange_log (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          item_id TEXT NOT NULL,
+          item_type TEXT NOT NULL,
+          item_name TEXT NOT NULL,
+          spent_points INTEGER NOT NULL,
+          created_at TEXT DEFAULT (NOW())
+        )`
+      );
+    } catch { /* ignore */ }
+    try {
+      await executeOp(req,
+        `INSERT INTO points_exchange_log (id, user_id, item_id, item_type, item_name, spent_points)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [exchangeId, userId, itemId, item.item_type, item.name, needPoints]
+      );
+    } catch { /* ignore */ }
+
+    console.log('[PointsShop] 核销成功:', userId, 'item:', item.name, 'redeemCode:', redeemCode);
+
+    res.json({
+      code: 0,
+      message: '核销成功',
+      data: { exchangeId, itemName: item.name, needPoints },
+    });
+  } catch (e: any) {
+    console.error('[PointsShop] redeem error:', e?.message || e);
+    res.json({ code: 500, message: '核销失败', data: null });
+  }
+});
+
+/**
+ * GET /api/v1/points-shop/redeem-code
+ * 运营商查看当前有效核销码
+ */
+router.get('/points-shop/redeem-code', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const opId = (req.user as any)?.operatorId || '';
+    if (!opId) {
+      res.json({ code: 400, message: '无法识别运营商', data: null });
+      return;
+    }
+    const row = await queryOne<any>(
+      `SELECT redeem_code, created_at FROM physical_gift_redeem_codes WHERE operator_id = $1`,
+      [opId]
+    );
+    res.json({ code: 0, data: row || null });
+  } catch (e: any) {
+    console.error('[PointsShop] get redeem code error:', e?.message || e);
+    res.json({ code: 500, message: '获取核销码失败', data: null });
+  }
+});
+
+/**
+ * POST /api/v1/points-shop/redeem-code
+ * 运营商创建新核销码（旧的自动失效）
+ */
+router.post('/points-shop/redeem-code', authMiddleware, operatorOnly, async (req: Request, res: Response) => {
+  try {
+    const opId = (req.user as any)?.operatorId || '';
+    if (!opId) {
+      res.json({ code: 400, message: '无法识别运营商', data: null });
+      return;
+    }
+
+    // 生成 4 位随机数字
+    const code = String(Math.floor(1000 + Math.random() * 9000));
+    const userId = req.user!.userId;
+
+    // UPSERT: 有则更新，无则插入
+    await execute(
+      `INSERT INTO physical_gift_redeem_codes (id, operator_id, redeem_code, created_by, created_at)
+       VALUES ($1, $2, $3, $4, NOW())
+       ON DUPLICATE KEY UPDATE redeem_code = $3, created_by = $4, created_at = NOW()`,
+      [uuidv4(), opId, code, userId]
+    );
+
+    console.log('[PointsShop] 创建核销码:', opId, 'code:', code);
+
+    res.json({ code: 0, data: { redeemCode: code } });
+  } catch (e: any) {
+    console.error('[PointsShop] create redeem code error:', e?.message || e);
+    res.json({ code: 500, message: '创建核销码失败', data: null });
+  }
+});
+
 export default router;

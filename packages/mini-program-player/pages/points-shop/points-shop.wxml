@@ -123,4 +123,37 @@
 
   <!-- toast -->
   <view class="toast {{toastMsg ? 'toast-show' : ''}}">{{toastMsg}}</view>
+
+  <!-- 实物礼品详情浮层 -->
+  <view class="fullscreen-mask {{showDetail ? 'modal-show' : ''}}" bindtap="onCloseDetail"></view>
+  <view class="detail-panel {{showDetail ? 'modal-show' : ''}}">
+    <view class="detail-close" bindtap="onCloseDetail">✕</view>
+    <image wx:if="{{detailItem && detailItem.image}}" class="detail-image" src="{{detailItem.image}}" mode="aspectFit" />
+    <view class="detail-body" wx:if="{{detailItem}}">
+      <text class="detail-name">{{detailItem.name}}</text>
+      <text class="detail-desc" wx:if="{{detailItem.description}}">{{detailItem.description}}</text>
+      <view class="detail-points">
+        <text class="detail-points-icon">⭐</text>
+        <text class="detail-points-text">需要 {{detailItem.needPoints}} 积分</text>
+      </view>
+      <button class="detail-redeem-btn" bindtap="onStartRedeem" disabled="{{userPoints < detailItem.needPoints}}">
+        {{userPoints < detailItem.needPoints ? '积分不足' : '现场兑换'}}
+      </button>
+    </view>
+  </view>
+
+  <!-- 核销码输入浮层 -->
+  <view class="fullscreen-mask {{showRedeem ? 'modal-show' : ''}}" bindtap="onCloseRedeem"></view>
+  <view class="redeem-panel {{showRedeem ? 'modal-show' : ''}}">
+    <view class="redeem-close" bindtap="onCloseRedeem">✕</view>
+    <view class="redeem-body">
+      <text class="redeem-icon">🎁</text>
+      <text class="redeem-title">积分礼品现场兑换</text>
+      <text class="redeem-hint">请到赛场礼品台或向现场工作人员申请兑换</text>
+      <view class="redeem-input-row">
+        <input class="redeem-input" type="number" maxlength="4" placeholder="请输入4位核销码" value="{{redeemCodeInput}}" bindinput="onRedeemCodeInput" focus="{{showRedeem}}" />
+      </view>
+      <button class="redeem-submit-btn" bindtap="onConfirmRedeem" loading="{{redeeming}}" disabled="{{redeemCodeInput.length !== 4 || redeeming}}">核销兑换</button>
+    </view>
+  </view>
 </view>

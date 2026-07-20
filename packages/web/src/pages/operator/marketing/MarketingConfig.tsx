@@ -5,7 +5,7 @@ import {
 } from 'antd';
 import {
   SaveOutlined, GiftOutlined, SettingOutlined, ThunderboltOutlined,
-  ShopOutlined, BellOutlined, DeleteOutlined, PlusOutlined, UploadOutlined,
+  ShopOutlined, BellOutlined, DeleteOutlined, PlusOutlined, UploadOutlined, KeyOutlined,
 } from '@ant-design/icons';
 import api from '../../../utils/api';
 
@@ -36,6 +36,8 @@ export default function MarketingConfig() {
   // 积分商城商品
   const [shopItems, setShopItems] = useState<any[]>([]);
   const [shopLoading, setShopLoading] = useState(false);
+  const [redeemCode, setRedeemCode] = useState<string | null>(null);
+  const [redeemCodeLoading, setRedeemCodeLoading] = useState(false);
   const [editingItem, setEditingItem] = useState<any | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editForm] = Form.useForm();
@@ -233,7 +235,30 @@ export default function MarketingConfig() {
 
     fetchAnnouncement();
     fetchShopItems();
+
+    fetchRedeemCode();
   }, []);
+
+  const fetchRedeemCode = async () => {
+    setRedeemCodeLoading(true);
+    try {
+      const data: any = await api.get('/points-shop/redeem-code');
+      if (data?.redeem_code) {
+        setRedeemCode(data.redeem_code);
+      }
+    } catch { /* ignore */ }
+    setRedeemCodeLoading(false);
+  };
+
+  const handleCreateRedeemCode = async () => {
+    try {
+      const data: any = await api.post('/points-shop/redeem-code');
+      if (data?.redeemCode) {
+        setRedeemCode(data.redeemCode);
+        message.success(`核销码已创建: ${data.redeemCode}`);
+      }
+    } catch { message.error('创建核销码失败'); }
+  };
 
   useEffect(() => {
     if (rangeLoading || Object.keys(ranges).length === 0) return;
@@ -413,13 +438,28 @@ export default function MarketingConfig() {
       children: (
         <>
           <Alert
-            message="管理积分商城可兑换的商品。目前支持：实物礼品。实物礼品的兑换需玩家到赛场现场领取。"
+            message="管理积分商城可兑换的商品。实物礼品需要线下核销。"
             type="info" showIcon style={{ marginBottom: 16 }}
           />
-          <div style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
             <Button type="primary" icon={<PlusOutlined />} onClick={handleAddItem}>
               新增商品
             </Button>
+            <Divider type="vertical" />
+            <Space>
+              <KeyOutlined />
+              <Text strong>现场核销码：</Text>
+              {redeemCodeLoading ? (
+                <Spin size="small" />
+              ) : redeemCode ? (
+                <Tag color="green" style={{ fontSize: 18, padding: '4px 16px', fontFamily: 'monospace' }}>{redeemCode}</Tag>
+              ) : (
+                <Tag color="default">未设置</Tag>
+              )}
+              <Button size="small" type="dashed" onClick={handleCreateRedeemCode}>
+                {redeemCode ? '重置新码' : '创建核销码'}
+              </Button>
+            </Space>
           </div>
           <Table
             dataSource={shopItems}
