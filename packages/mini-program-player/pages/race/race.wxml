@@ -92,12 +92,7 @@
         <text class="status-card-text">正在比赛中...</text>
       </view>
 
-      <!-- 比赛结束成绩卡片（从 racing 变 idle 时显示，3-5秒自动消失） -->
-      <view wx:if="{{showResultCard && lastRaceResult}}" class="result-card">
-        <text class="result-card-title">比赛结束</text>
-        <text class="result-card-score">{{lastRaceResult.scoreText}}</text>
-        <text class="result-card-rank">排名: 第{{lastRaceResult.rank}}名 / 共{{lastRaceResult.totalRacers}}人</text>
-      </view>
+      <!-- 比赛结束成绩卡片已移至页面底部浮层 -->
 
       <!-- ============================================================ -->
       <!-- idle: 赛季最佳成绩卡片 + CTA -->
@@ -203,5 +198,11 @@
 
   </block>
 
+  <!-- 比赛结束成绩卡片（浮层，固定底部盖住按钮） -->
+  <view wx:if="{{showResultCard && lastRaceResult}}" class="result-card">
+    <text class="result-card-title">比赛结束</text>
+    <text class="result-card-score">{{lastRaceResult.scoreText}}</text>
+    <text class="result-card-rank">排名: 第{{lastRaceResult.rank}}名 / 共{{lastRaceResult.totalRacers}}人</text>
+  </view>
 
 </view>
