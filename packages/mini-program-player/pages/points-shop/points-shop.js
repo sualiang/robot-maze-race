@@ -133,8 +133,9 @@ Page({
       redeemCode: code
     }).then(function (res) {
       that.setData({ redeeming: false });
-      if (res && res.code === 0) {
-        var needPoints = (res.data && res.data.needPoints) || item.needPoints || 0;
+      // request.js 在 code===0 时 resolve(body.data)，所以 res 已经有 exchangeId/itemName 表示成功
+      if (res && res.exchangeId) {
+        var needPoints = (res.needPoints) || item.needPoints || 0;
         that.setData({
           showDetail: false,
           detailItem: null,
