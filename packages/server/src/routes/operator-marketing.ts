@@ -34,7 +34,7 @@ router.get('/', authMiddleware, operatorOnly, async (req: Request, res: Response
       const operatorId = roleMember?.operator_id || 
         ((req.user as any).operatorId) || 
         req.user!.userId;
-      venue_id = 'operator_' + operatorId;
+      venue_id = operatorId;
     }
 
     const configs = await queryOp<{
