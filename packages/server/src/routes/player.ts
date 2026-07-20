@@ -314,7 +314,7 @@ router.post('/checkin/validate', authMiddleware, async (req: Request, res: Respo
 async function grantGrowthOnCheckin(req: Request, userId: string, checkinId: string): Promise<void> {
   try {
     const order = await queryOpOne<any>(req,
-      `SELECT o.id, o.remaining_times, o.remaining_growth, rp.race_count, rp.growth_value, rp.point_value
+      `SELECT o.id, o.remaining_times, o.remaining_growth, rp.race_count, rp.growth_value
        FROM orders o
        JOIN race_packages rp ON o.package_id = rp.id
        WHERE o.user_id = $1 AND o.status = 'paid' AND o.remaining_times > 0
@@ -326,21 +326,13 @@ async function grantGrowthOnCheckin(req: Request, userId: string, checkinId: str
 
     const raceCount = order.race_count || 1;
     const perCheckinGrowth = Math.floor((order.growth_value || 0) / raceCount);
-    const perCheckinPoints = Math.floor((order.point_value || 0) / raceCount);
 
-    if (perCheckinGrowth > 0 || perCheckinPoints > 0) {
-      if (perCheckinGrowth > 0) {
-        await execute(
-          `UPDATE users SET exp = COALESCE(exp, 0) + $1, updated_at = NOW() WHERE id = $2`,
-          [perCheckinGrowth, userId]
-        );
-      }
-      if (perCheckinPoints > 0) {
-        await execute(
-          `UPDATE users SET points = COALESCE(points, 0) + $1, updated_at = NOW() WHERE id = $2`,
-          [perCheckinPoints, userId]
-        );
-      }
+    // 积分改为购买时一次性发放（wx-pay.ts 支付回调），签到只发成长值
+    if (perCheckinGrowth > 0) {
+      await execute(
+        `UPDATE users SET exp = COALESCE(exp, 0) + $1, updated_at = NOW() WHERE id = $2`,
+        [perCheckinGrowth, userId]
+      );
     }
     await executeOp(req,
       `UPDATE orders SET remaining_times = remaining_times - 1, updated_at = NOW() WHERE id = $1 AND remaining_times > 0`,

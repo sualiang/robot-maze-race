@@ -495,23 +495,31 @@ router.post('/notify', async (req: Request, res: Response) => {
       // ===== 支付成功后执行 side effects =====
       try {
         const [orderDetailRowArr] = await opPool.execute(
-          `SELECT o.user_id, o.package_id, rp.race_count
+          `SELECT o.user_id, o.package_id, rp.race_count, rp.point_value
            FROM orders o JOIN race_packages rp ON o.package_id = rp.id
            WHERE o.id = ?`,
           [order.id]
         );
         const orderDetail = (Array.isArray(orderDetailRowArr) && orderDetailRowArr.length > 0 ? orderDetailRowArr[0] : null) as any;
         if (orderDetail) {
-          const { user_id: uid, race_count: rc } = orderDetail;
+          const { user_id: uid, race_count: rc, point_value: pointValue } = orderDetail;
 
-          // 更新用户参赛次数（抵扣卡赠送已废弃，改用积分抵扣）
-          // users 表在 robot_maze_race_common 公共库，不用 opPool
+          // 更新用户参赛次数
           if (rc > 0) {
             await execute(
               `UPDATE users SET race_count = COALESCE(race_count, 0) + ?, updated_at = NOW() WHERE id = ?`,
               [rc, uid]
             );
             console.log('[WxPay] 支付成功, 增加参赛次数:', rc);
+          }
+
+          // 购买时直接发放积分
+          if (pointValue > 0) {
+            await execute(
+              `UPDATE users SET points = COALESCE(points, 0) + ?, updated_at = NOW() WHERE id = ?`,
+              [pointValue, uid]
+            );
+            console.log('[WxPay] 支付成功, 发放积分:', pointValue);
           }
         }
       } catch (sideErr: any) {
