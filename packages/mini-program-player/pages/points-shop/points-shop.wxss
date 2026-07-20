@@ -155,6 +155,10 @@
 }
 .modal-content {
   padding: 48rpx 32rpx 32rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
 .modal-title {
   font-size: 34rpx;
   font-weight: 700;
