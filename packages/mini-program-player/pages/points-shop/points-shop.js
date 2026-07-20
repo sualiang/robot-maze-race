@@ -147,14 +147,12 @@ Page({
         that.fetchItems();
         that.fetchRecords();
       } else {
-        var errMsg = (res && res.message) || '核销失败';
-        console.error('[PointsShop] redeem failed:', res);
-        wx.showToast({ title: errMsg, icon: 'none', duration: 2500 });
+        wx.showToast({ title: '核销失败', icon: 'none', duration: 2500 });
       }
     }).catch(function (err) {
       that.setData({ redeeming: false });
-      console.error('[PointsShop] redeem catch:', err);
-      wx.showToast({ title: '核销失败，请重试', icon: 'none', duration: 2500 });
+      var errMsg = (err && err.message) || '核销失败，请重试';
+      wx.showToast({ title: errMsg, icon: 'none', duration: 2500 });
     });
   },
 
