@@ -138,13 +138,13 @@ async function resolveFirstOperatorDb(): Promise<string | null> {
   const common = getCommonPool();
   try {
     const [rows] = await common.query<any[]>(
-      `SELECT db_name FROM operators_registry WHERE db_name IS NOT NULL LIMIT 1`
+      `SELECT db_name FROM operators_registry WHERE db_name IS NOT NULL ORDER BY id LIMIT 1`
     );
     if (rows && rows.length > 0 && rows[0].db_name) {
       return rows[0].db_name;
     }
   } catch { /* ignore */ }
-  return null;
+  return 'robot_maze_race';
 }
 
 export async function resolveOperatorDb(req: Request): Promise<string | null> {
