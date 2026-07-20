@@ -266,7 +266,7 @@ export default function MarketingConfig() {
     setLoading(true);
     function applyDefaultValues() {
       return {
-        help_enabled: true,
+        help_enabled: false,
         help_required_count: ranges.help_required_count?.default ?? 3,
         help_reward_count: ranges.help_reward_count?.default ?? 1,
         welcome_deduction_cents: 500,
