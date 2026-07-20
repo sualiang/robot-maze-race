@@ -1152,15 +1152,8 @@ router.post('/orders', authMiddleware, async (req: Request, res: Response) => {
         const maxFromPoints = Math.min(Math.floor(points * 100 / rate), maxCents);
         deductionCents = Math.min(maxFromPoints, pkg.price_cents);
 
-        if (deductionCents > 0) {
-          const usedPoints = Math.ceil(deductionCents * rate / 100);
-          await executeOp(req,
-            `INSERT INTO points_transactions (id, user_id, points, type, operator_id, created_at)
-             VALUES ($1, $2, $3, 'order_deduction', $4, NOW())`,
-            ['PT_' + uuidv4().slice(0, 8), userId, -usedPoints, (req.user as any)?.operatorId || '']
-          );
-          console.log(`[订单] 用户${userId}使用${usedPoints}积分抵扣${deductionCents}分`);
-        }
+        // 积分不在此处扣除，移至 wx-pay.ts 支付回调成功后才扣
+        console.log(`[订单] 用户${userId}预计抵扣${deductionCents}分（支付成功后才扣）`);
       } catch (deductionErr: any) {
         console.error('[订单] 积分抵扣失败（不阻止下单）:', deductionErr?.message || deductionErr);
         deductionCents = 0;

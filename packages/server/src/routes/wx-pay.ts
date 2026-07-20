@@ -521,6 +521,27 @@ router.post('/notify', async (req: Request, res: Response) => {
             );
             console.log('[WxPay] 支付成功, 发放积分:', pointValue);
           }
+
+          // 积分抵扣扣减（支付成功后才实际扣除）
+          if ((order as any).points_deduction_cents > 0) {
+            const deductionCents = (order as any).points_deduction_cents;
+            try {
+              const [rateRow] = await opPool.execute(
+                `SELECT value FROM marketing_config WHERE \`key\` = 'points_deduction_rate'`
+              ) as any;
+              const rate = parseInt((Array.isArray(rateRow) && rateRow[0]?.value) || '100', 10);
+              const usedPoints = Math.ceil(deductionCents * rate / 100);
+              const opId = (order as any).operator_id || '';
+              await opPool.execute(
+                `INSERT INTO points_transactions (id, user_id, points, type, operator_id, created_at)
+                 VALUES (?, ?, ?, 'order_deduction', ?, NOW())`,
+                ['PT_' + require('uuid').v4().slice(0, 8), uid, -usedPoints, opId]
+              );
+              console.log('[WxPay] 积分抵扣扣减:', usedPoints, '分');
+            } catch (deductionErr: any) {
+              console.error('[WxPay] 积分抵扣扣减失败:', deductionErr.message?.substring(0, 200));
+            }
+          }
         }
       } catch (sideErr: any) {
         console.error('[WxPay] side effects error:', sideErr.message?.substring(0, 200));
