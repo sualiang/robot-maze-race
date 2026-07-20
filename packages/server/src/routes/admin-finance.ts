@@ -42,7 +42,8 @@ async function queryAllOperators<T = any>(
   for (const reg of opRegs) {
     try {
       const pool = getOperatorPool(reg.db_name);
-      const [regRows] = await pool.query<any[]>(sql, params);
+      const result = await pool.query(sql, params);
+      const regRows = result[0] as any[];
       allRows.push(...regRows);
     } catch { /* skip unavailable operator dbs */ }
   }
@@ -62,7 +63,8 @@ async function queryAllOperatorsOne<T = any>(
   for (const reg of opRegs) {
     try {
       const pool = getOperatorPool(reg.db_name);
-      const [rows] = await pool.query<any[]>(sql, params);
+      const result = await pool.query(sql, params);
+      const rows = result[0] as any[];
       if (rows && rows.length > 0) return rows[0] as T;
     } catch { /* skip */ }
   }

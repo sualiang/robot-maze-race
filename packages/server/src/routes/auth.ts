@@ -1849,10 +1849,11 @@ async function queryAllOperatorReferees(phone: string): Promise<Array<{
   for (const reg of registryList) {
     try {
       const pool = getOperatorPool(reg.db_name);
-      const [rows] = await pool.query<any[]>(
+      const result = await pool.query(
         'SELECT r.id AS refereeId, r.name AS refereeName FROM referees r WHERE r.phone = ? LIMIT 1',
         [phone]
       );
+      const rows = result[0] as any[];
       if (rows && rows.length > 0) {
         results.push({
           refereeId: rows[0].refereeId,

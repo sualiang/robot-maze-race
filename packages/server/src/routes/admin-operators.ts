@@ -91,7 +91,8 @@ router.get('/', authMiddleware, checkPermission('operators:list'), async (req: R
           if (!dbName) return { operator_id: op.id, count: 0 };
           try {
             const pool = getOperatorPool(dbName);
-            const [rows] = await pool.query<any[]>('SELECT COUNT(*) AS cnt FROM venues');
+            const result = await pool.query('SELECT COUNT(*) AS cnt FROM venues');
+            const rows = result[0] as any[];
             return { operator_id: op.id, count: Number(rows?.[0]?.cnt ?? 0) };
           } catch {
             return { operator_id: op.id, count: 0 };
@@ -143,7 +144,8 @@ router.get('/:id', authMiddleware, checkPermission('operators:read'), async (req
       );
       if (regRow?.db_name) {
         const pool = getOperatorPool(regRow.db_name);
-        const [rows] = await pool.query<any[]>('SELECT COUNT(*) AS cnt FROM venues');
+        const result = await pool.query('SELECT COUNT(*) AS cnt FROM venues');
+        const rows = result[0] as any[];
         (operator as any).venue_count = Number(rows?.[0]?.cnt ?? 0);
       } else {
         (operator as any).venue_count = 0;
