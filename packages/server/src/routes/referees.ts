@@ -1562,7 +1562,7 @@ export async function fetchLeaderboardFromDb(venueId: string): Promise<any[]> {
     const [rows] = await Promise.all([
       queryOp(
         `SELECT rq.* FROM race_queues rq
-         WHERE rq.venue_id = $1 AND rq.status = 'finished' AND rq.finish_status != 'invalid'
+         WHERE rq.venue_id = $1 AND rq.status = 'finished' AND rq.finish_status != 'invalid' AND DATE(rq.created_at) = CURDATE()
          ORDER BY rq.finish_time_ms ASC LIMIT 10`,
         [venueId]
       ),
