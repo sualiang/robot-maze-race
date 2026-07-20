@@ -33,7 +33,7 @@ Page({
         that.setData({
           userPoints: userPoints,
           entryItems: items.filter(function (i) { return i.itemType === 'entry_deduction'; }),
-          couponItems: items.filter(function (i) { return i.itemType === 'merchant_coupon'; })
+          couponItems: items.filter(function (i) { return i.itemType === 'merchant_coupon' || i.itemType === 'physical_gift'; })
         });
       }
     }).catch(function () {
