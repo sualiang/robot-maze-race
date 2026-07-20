@@ -144,7 +144,7 @@ router.get('/leaderboard/live', authMiddleware, async (req: Request, res: Respon
 
     // 排行榜 top 10 —— 与大屏 pushCurrentScreenData 完全一致
     const leaderRows = await queryOp<any>(req,
-      `SELECT rq.* FROM race_queues rq WHERE rq.venue_id = $1 AND rq.status = 'finished' AND rq.finish_status != 'invalid' ORDER BY rq.finish_time_ms ASC LIMIT 10`,
+      `SELECT rq.* FROM race_queues rq WHERE rq.venue_id = $1 AND rq.status = 'finished' AND rq.finish_status != 'invalid' ORDER BY rq.finish_time_ms ASC LIMIT 20`,
       [venueId]
     );
 
