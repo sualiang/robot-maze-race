@@ -70,8 +70,9 @@ App({
     }
 
     // 方式2: scene 解析（微信扫码进入）
-    if (!operatorId && options.scene) {
-      var scene = decodeURIComponent(options.scene);
+    // 小程序码用 wxacode.getUnlimited 生成的 scene 作为 query.scene 传递
+    if (!operatorId && (options.scene || (options.query && options.query.scene))) {
+      var scene = decodeURIComponent((options.query && options.query.scene) || options.scene);
 
       // 尝试 o{xx}v{yy} 格式 — 微信小程序码 scene
       if (scene.indexOf('o') === 0) {
