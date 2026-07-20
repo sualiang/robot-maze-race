@@ -130,6 +130,23 @@ export async function resolveOperatorDbForUserId(userId: string): Promise<string
   return null;
 }
 
+/**
+ * 兜底：返回第一个可用的 operator db 名称
+ * 用于未登录用户调用的公开展示接口（如 /packages）
+ */
+async function resolveFirstOperatorDb(): Promise<string | null> {
+  const common = getCommonPool();
+  try {
+    const [rows] = await common.query<any[]>(
+      `SELECT db_name FROM operators_registry WHERE db_name IS NOT NULL LIMIT 1`
+    );
+    if (rows && rows.length > 0 && rows[0].db_name) {
+      return rows[0].db_name;
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
 export async function resolveOperatorDb(req: Request): Promise<string | null> {
   // 优先从 JWT 获取 operatorId
   const jwtOperatorId = (req.user as any)?.operatorId
@@ -158,23 +175,27 @@ export async function resolveOperatorDb(req: Request): Promise<string | null> {
   }
   // 回退：从 Redis 获取
   const userId = req.user?.userId;
-  if (!userId) return null;
-  try {
-    const ctx = await getOperatorContext(userId);
-    const operatorId = ctx?.operator_id;
-    if (operatorId) {
-      const pool = getCommonPool();
-      const [rows] = await pool.query<any[]>(
-        `SELECT db_name FROM operators_registry WHERE operator_id = ?`, [operatorId]
-      );
-      if (rows && rows.length > 0 && rows[0].db_name) {
-        return rows[0].db_name;
+  if (userId) {
+    try {
+      const ctx = await getOperatorContext(userId);
+      const operatorId = ctx?.operator_id;
+      if (operatorId) {
+        const pool = getCommonPool();
+        const [rows] = await pool.query<any[]>(
+          `SELECT db_name FROM operators_registry WHERE operator_id = ?`, [operatorId]
+        );
+        if (rows && rows.length > 0 && rows[0].db_name) {
+          return rows[0].db_name;
+        }
       }
-    }
-  } catch { /* ignore Redis failure */ }
+    } catch { /* ignore Redis failure */ }
 
-  // 最终 fallback：遍历所有运营商库查找该用户所在的库
-  return resolveOperatorDbForUserId(userId);
+    // 最终 fallback：遍历所有运营商库查找该用户所在的库
+    return resolveOperatorDbForUserId(userId);
+  }
+
+  // 未登录用户：返回第一个可用的 operator db（用于公开展示接口如 /packages）
+  return resolveFirstOperatorDb();
 }
 
 // ==================== SQL 工具 ====================

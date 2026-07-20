@@ -27,16 +27,20 @@ Page({
   fetchItems: function () {
     var that = this;
     request.silentGet('/points-shop/items').then(function (res) {
+      console.log('[points-shop DEBUG] res type:', typeof res, 'truthy:', !!res);
+      console.log('[points-shop DEBUG] res:', JSON.stringify(res));
       if (res) {
         var items = res.items || [];
         var userPoints = res.userPoints || 0;
+        console.log('[points-shop DEBUG] items count:', items.length, 'userPoints:', userPoints);
         that.setData({
           userPoints: userPoints,
           entryItems: items.filter(function (i) { return i.itemType === 'entry_deduction'; }),
           couponItems: items.filter(function (i) { return i.itemType === 'merchant_coupon' || i.itemType === 'physical_gift'; })
         });
       }
-    }).catch(function () {
+    }).catch(function (e) {
+      console.log('[points-shop DEBUG] catch error:', e);
       that.showToast('加载失败，请下拉重试');
     });
   },

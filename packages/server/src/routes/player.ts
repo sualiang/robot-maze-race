@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { query, queryOne, execute, queryOp, queryOpOne, executeOp, executeOpByOrder, resolveOperatorDb, resolveOperatorDbForOrder } from '../config/database';
 import { getConfigInt } from '../config/utils';
-import { authMiddleware } from '../middleware/auth';
+import { authMiddleware, optionalAuth } from '../middleware/auth';
 import { getOperatorContext } from '../middleware/operator-context';
 
 import { autoAssignMerchantCoupons } from '../services/coupon-service';
@@ -50,7 +50,7 @@ function getTierInfo(priceCents: number) {
   return PACKAGE_TIERS[PACKAGE_TIERS.length - 1];
 }
 
-router.get('/packages', authMiddleware, async (req: Request, res: Response) => {
+router.get('/packages', optionalAuth, async (req: Request, res: Response) => {
   try {
     const rows = await queryOp<any>(req, 
       `SELECT * FROM race_packages
@@ -1442,7 +1442,7 @@ router.post('/order/:id/confirm-payment', authMiddleware, async (req: Request, r
  * GET /player/marketing/announcement
  * 查询首页公告（从运营商隔离库 marketing_config 表）
  */
-router.get('/marketing/announcement', authMiddleware, async (req: Request, res: Response) => {
+router.get('/marketing/announcement', optionalAuth, async (req: Request, res: Response) => {
   try {
     const row = await queryOpOne<{ value: string }>(req,
       `SELECT value FROM marketing_config WHERE \`key\` = 'home_announcement' ORDER BY updated_at DESC LIMIT 1`
