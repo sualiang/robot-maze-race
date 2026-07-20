@@ -50,16 +50,20 @@
   display: flex;
   flex-wrap: wrap;
   gap: 16rpx;
+  margin: 0 -8rpx;
 }
 .item-card {
-  width: calc(50% - 8rpx);
+  width: calc(50% - 16rpx);
+  flex-shrink: 0;
+  flex-grow: 0;
+  margin: 0 8rpx;
+  box-sizing: border-box;
   background: var(--color-bg-card);
   border-radius: 16rpx;
   padding: 24rpx;
   display: flex;
   flex-direction: column;
   gap: 8rpx;
-  box-sizing: border-box;
   overflow: hidden;
 }
 .card-image {

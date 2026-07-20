@@ -11,8 +11,8 @@
     </view>
   </view>
 
-  <!-- 参赛抵扣卡分区 -->
-  <view class="section" wx:if="{{entryItems.length > 0}}">
+  <!-- 所有商品（参赛抵扣卡 + 商家消费券/实物） -->
+  <view class="section" wx:if="{{entryItems.length > 0 || couponItems.length > 0}}">
     <view class="item-grid">
       <!-- 参赛抵扣金区块 -->
       <view
@@ -36,12 +36,7 @@
           </button>
         </view>
       </view>
-    </view>
-  </view>
-
-  <!-- 商家消费券/实物礼品区块 -->
-  <view class="section" wx:if="{{couponItems.length > 0}}">
-    <view class="item-grid">
+      <!-- 商家消费券/实物礼品区块 -->
       <view
         wx:for="{{couponItems}}"
         wx:key="id"

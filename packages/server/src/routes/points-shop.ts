@@ -386,7 +386,7 @@ router.get('/points-shop/history', authMiddleware, async (req: Request, res: Res
   const userId = req.user!.userId;
   try {
     const logs = await queryOp<any>(req, 
-      `SELECT id, item_id, item_type, item_name, spent_points, created_at
+      `SELECT id, item_id, item_type, item_name, spent_points, DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') as created_at
        FROM points_exchange_log
        WHERE user_id = $1
        ORDER BY created_at DESC
