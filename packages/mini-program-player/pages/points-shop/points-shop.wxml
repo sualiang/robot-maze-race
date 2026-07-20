@@ -13,10 +13,6 @@
 
   <!-- 参赛抵扣卡分区 -->
   <view class="section" wx:if="{{entryItems.length > 0}}">
-    <view class="section-title">
-      <text>🎫 参赛抵扣卡</text>
-      <text class="section-subtitle">可用于抵扣参赛报名费</text>
-    </view>
     <view class="item-grid">
       <!-- 参赛抵扣金区块 -->
       <view
@@ -45,10 +41,6 @@
 
   <!-- 商家消费券/实物礼品区块 -->
   <view class="section" wx:if="{{couponItems.length > 0}}">
-    <view class="section-title">
-      <text>🎟️ 商家消费券</text>
-      <text class="section-subtitle">可在合作商家消费时抵扣</text>
-    </view>
     <view class="item-grid">
       <view
         wx:for="{{couponItems}}"
