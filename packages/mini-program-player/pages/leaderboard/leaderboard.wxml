@@ -8,6 +8,10 @@
   <view class="lb-live-overlay">
     <view class="lb-live-header">
       <text class="lb-live-title">🏆 实时排行榜</text>
+      <view class="lb-live-tabs">
+        <text class="lb-live-tab {{liveTab === 'daily' ? 'lb-live-tab-active' : ''}}" bindtap="onLiveTabChange" data-tab="daily">日榜</text>
+        <text class="lb-live-tab {{liveTab === 'weekly' ? 'lb-live-tab-active' : ''}}" bindtap="onLiveTabChange" data-tab="weekly">周榜</text>
+      </view>
       <text class="lb-live-date">{{liveDate}}</text>
     </view>
 

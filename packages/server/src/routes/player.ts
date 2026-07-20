@@ -122,6 +122,7 @@ router.get('/packages', optionalAuth, async (req: Request, res: Response) => {
 router.get('/leaderboard/live', authMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId;
+    const period = (req.query.period as string) || 'daily';
 
     // 获取用户最近签到记录（不限状态，包含 completed 等）
     const checkin = await queryOpOne<{ venue_id: string }>(req,
@@ -142,9 +143,17 @@ router.get('/leaderboard/live', authMiddleware, async (req: Request, res: Respon
       [venueId]
     );
 
-    // 排行榜 top 10 —— 与大屏 pushCurrentScreenData 完全一致
+    // 时间过滤：日榜取今天，周榜取本周一至今
+    let timeFilter = '';
+    if (period === 'weekly') {
+      timeFilter = `AND rq.updated_at >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)`;
+    } else {
+      timeFilter = `AND rq.updated_at >= CURDATE()`;
+    }
+
+    // 排行榜 top 20
     const leaderRows = await queryOp<any>(req,
-      `SELECT rq.* FROM race_queues rq WHERE rq.venue_id = $1 AND rq.status = 'finished' AND rq.finish_status != 'invalid' ORDER BY rq.finish_time_ms ASC LIMIT 20`,
+      `SELECT rq.* FROM race_queues rq WHERE rq.venue_id = $1 AND rq.status = 'finished' AND rq.finish_status != 'invalid' ${timeFilter} ORDER BY rq.finish_time_ms ASC LIMIT 20`,
       [venueId]
     );
 

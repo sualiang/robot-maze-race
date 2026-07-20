@@ -36,6 +36,7 @@ Page({
     // 临时：大屏实时排行榜
     liveLeaderboard: [],
     liveDate: '',
+    liveTab: 'daily',
 
     // 我的排名
     myRanking: { rank: '-', region: '--', bestScore: '--', clubName: '--', totalRaces: 0, beatPercent: 0 },
@@ -73,11 +74,22 @@ Page({
   },
 
   /**
-   * 拉取大屏实时排行榜（临时覆盖层）
+   * 切换实时排行榜日榜/周榜
    */
-  _fetchLiveLeaderboard: function () {
+  onLiveTabChange: function (e) {
+    var tab = e.currentTarget.dataset.tab || 'daily';
+    this.setData({ liveTab: tab });
+    this._fetchLiveLeaderboard(tab);
+  },
+
+  /**
+   * 拉取大屏实时排行榜（日榜/周榜）
+   */
+  _fetchLiveLeaderboard: function (tab) {
     var that = this;
-    request.silentGet('/player/leaderboard/live').then(function (data) {
+    var period = tab || 'daily';
+    var url = '/player/leaderboard/live?period=' + period;
+    request.silentGet(url).then(function (data) {
       var d = data.data || data;
       var list = (d.leaderboard || []).map(function (item) {
         var av = item.avatar_url || '';
