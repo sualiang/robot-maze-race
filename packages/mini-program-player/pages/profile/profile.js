@@ -7,7 +7,6 @@ Page({
   data: {
     isLoggedIn: false,
     userInfo: {},
-    avatarSrc: '/assets/images/logo-avatar.png',
 
     seasonClosed: false,
     medalInfo: {
@@ -65,23 +64,16 @@ Page({
   loadData: function () {
     var that = this;
     var user = storage.getSync(storage.STORAGE_KEYS.USER, {});
-    var avatarUrl = user.avatar_url || user.avatarUrl || '';
-    var avatarSrc = (avatarUrl && avatarUrl.indexOf('http://tmp') !== 0) ? avatarUrl : '/assets/images/logo-avatar.png';
-    that.setData({ userInfo: user, avatarSrc: avatarSrc });
+    that.setData({ userInfo: user });
 
     request.silentGet('/player/me/profile-check').then(function (res) {
       if (res) {
         var d = res.code === 0 && res.data ? res.data : res;
-        if (d.avatarUrl && !d.avatar_url) {
-          d.avatar_url = d.avatarUrl;
-        }
         if (d.raceCount && !d.race_count) {
           d.race_count = d.raceCount;
         }
         var merged = Object.assign({}, that.data.userInfo, d);
-        var avUrl = merged.avatar_url || merged.avatarUrl || '';
-        var avSrc = (avUrl && avUrl.indexOf('http://tmp') !== 0) ? avUrl : '/assets/images/logo-avatar.png';
-        that.setData({ userInfo: merged, avatarSrc: avSrc });
+        that.setData({ userInfo: merged });
         storage.setSync(storage.STORAGE_KEYS.USER, merged);
 
         var balance = d.pointsBalance || 0;

@@ -10,13 +10,6 @@
   margin-bottom: 24rpx;
   background: transparent;
 }
-.user-avatar {
-  width: 100rpx;
-  height: 100rpx;
-  border-radius: 50%;
-  background: var(--color-bg-card, #1E293B);
-  flex-shrink: 0;
-}
 .user-info {
   margin-left: 24rpx;
   display: flex;
