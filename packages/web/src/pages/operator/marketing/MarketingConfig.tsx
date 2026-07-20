@@ -330,7 +330,7 @@ export default function MarketingConfig() {
         return <Tag>{map[t] || t}</Tag>;
       },
     },
-    { title: '面额', dataIndex: 'itemId', key: 'itemId', width: 80, render: (v: string) => v ? (parseFloat(v) / 100).toFixed(2) + '元' : '-' },
+    { title: '面额', dataIndex: 'faceValue', key: 'faceValue', width: 80, render: (v: number) => v ? `¥${v}` : '-' },
     { title: '积分', dataIndex: 'needPoints', key: 'needPoints', width: 80 },
     { title: '库存', dataIndex: 'stock', key: 'stock', width: 60 },
     { title: '排序', dataIndex: 'sortWeight', key: 'sortWeight', width: 60 },
