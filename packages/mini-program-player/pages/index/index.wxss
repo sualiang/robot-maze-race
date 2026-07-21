@@ -36,7 +36,7 @@
 
 /* ===== 页面容器 ===== */
 .container {
-  padding: 52rpx 32rpx 48rpx;
+  padding: 52rpx 0 48rpx;
   min-height: 100vh;
   background: #0F172A;
   box-sizing: border-box;
@@ -123,14 +123,10 @@
 .hero-banner-image {
   position: relative;
   width: 686rpx;
+  margin: 0 auto 24rpx;
   border-radius: 24rpx;
   overflow: hidden;
   background: #1E293B;
-  flex-shrink: 0;
-}
-
-.hero-banner-image {
-  margin-bottom: 24rpx;
 }
 
 .hero-banner-img {

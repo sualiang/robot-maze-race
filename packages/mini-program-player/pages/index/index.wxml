@@ -11,10 +11,8 @@
 <view style="height:{{navHeight}}px"></view>
 
 <view class="container">
-  <view style="display:flex;justify-content:center">
-    <view class="hero-banner-image">
-      <image class="hero-banner-img" src="/assets/images/home-banner.png" mode="widthFix" />
-    </view>
+  <view class="hero-banner-image">
+    <image class="hero-banner-img" src="/assets/images/home-banner.png" mode="widthFix" />
   </view>
 
   <!-- ============================================================ -->
