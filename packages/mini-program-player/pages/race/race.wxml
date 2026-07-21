@@ -1,4 +1,5 @@
 <!-- pages/race/race.wxml - 比赛页 V3 三状态重构 -->
+<nav-bar title="比赛" />
 <!-- 状态1: 无上下文 → 扫码引导 | 状态2: 有次数 → 立即参赛 | 状态3: 次数=0 → 购买参赛包 -->
 <view class="race-page">
 

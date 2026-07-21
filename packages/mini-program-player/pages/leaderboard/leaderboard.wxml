@@ -2,6 +2,7 @@
   pages/leaderboard/leaderboard.wxml - V4 全市季度赛/全省年度总决赛 四阶段
   临时改造：蒙层遮盖原排行榜，上方覆盖大屏实时排行榜
 -->
+<nav-bar title="排行榜" />
 <view class="page-leaderboard">
 
   <!-- ===== 临时：大屏实时排行榜覆盖层 ===== -->

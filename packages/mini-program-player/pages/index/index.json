@@ -1,6 +1,5 @@
 {
-  "usingComponents": {},
-  "navigationBarTitleText": "首页",
+  "usingComponents": { "nav-bar": "/components/nav-bar/index" },
   "enablePullDownRefresh": true,
   "backgroundColor": "#0f0f23"
 }

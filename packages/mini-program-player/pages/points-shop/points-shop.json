@@ -1,5 +1,4 @@
 {
-  "navigationBarTitleText": "积分商城",
-  "usingComponents": {},
+  "usingComponents": { "nav-bar": "/components/nav-bar/index" },
   "enablePullDownRefresh": false
 }

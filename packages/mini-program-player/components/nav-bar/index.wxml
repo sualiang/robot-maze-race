@@ -1,0 +1,10 @@
+<view class="nav-bar" style="padding-top:{{statusBarHeight}}px">
+  <view class="nav-inner">
+    <!-- 首页：logo -->
+    <image wx:if="{{showLogo}}" class="nav-logo" src="/assets/logo-header.png" mode="aspectFit" />
+    <!-- 其他页：标题文字 -->
+    <text wx:else class="nav-title">{{title}}</text>
+  </view>
+</view>
+<!-- 占位 -->
+<view style="height:{{navHeight}}px"></view>

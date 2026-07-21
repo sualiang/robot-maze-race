@@ -1,4 +1,5 @@
 <!-- pages/index/index.wxml - 首页 V2重构版 -->
+<nav-bar show-logo="{{true}}" />
 <!-- 模块1: 顶部导航栏 | 模块2: 主视觉Banner | 模块3: 参赛状态&福利总览卡 -->
 <!-- 模块4: 今日专属福利条 | 模块5: 参赛包推荐区 | 模块6: 赛季竞技入口卡片 -->
 <view class="container">

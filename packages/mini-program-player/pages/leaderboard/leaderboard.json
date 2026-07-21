@@ -1,5 +1,4 @@
 {
-  "navigationBarTitleText": "排行榜",
-  "usingComponents": {},
+  "usingComponents": { "nav-bar": "/components/nav-bar/index" },
   "enablePullDownRefresh": false
 }

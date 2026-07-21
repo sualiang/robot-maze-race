@@ -1,4 +1,5 @@
 <view class="page">
+  <nav-bar title="积分商城" />
   <!-- 顶部用户积分 + 兑换记录入口 -->
   <view class="user-points-bar">
     <view class="points-left">

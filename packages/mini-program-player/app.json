@@ -20,9 +20,8 @@
     "pages/race-history/race-history"
   ],
   "window": {
+    "navigationStyle": "custom",
     "backgroundTextStyle": "dark",
-    "navigationBarBackgroundColor": "#0f0f23",
-    "navigationBarTitleText": "铁甲快狗·迷宫竞速",
     "navigationBarTextStyle": "white",
     "backgroundColor": "#0f0f23",
     "backgroundColorTop": "#0f0f23",

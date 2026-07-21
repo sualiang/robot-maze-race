@@ -1,5 +1,5 @@
 {
-  "navigationBarTitleText": "比赛",
+  "usingComponents": { "nav-bar": "/components/nav-bar/index" },
   "enablePullDownRefresh": true,
   "backgroundColor": "#0f0f23",
   "backgroundTextStyle": "dark"
