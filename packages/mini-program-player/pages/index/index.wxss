@@ -43,7 +43,7 @@
 }
 
 /* ============================================================ */
-/* 自定义导航栏 - 首页顶部 fixed */
+/* 自定义导航栏 - 首页顶部 fixed，两行布局 */
 /* ============================================================ */
 .custom-nav {
   position: fixed;
@@ -53,30 +53,29 @@
   z-index: 999;
   background: #0F172A;
 }
-.custom-nav-inner {
-  position: relative;
+.custom-nav-top {
   display: flex;
   align-items: center;
-  justify-content: center;
-  height: 88rpx;
-  padding: 0 32rpx;
-}
-.custom-nav-logo {
-  position: relative;
-  z-index: 10;
-  width: 250rpx;
-  height: 66rpx;
-  display: block;
+  padding: 6rpx 32rpx 0;
 }
 .custom-nav-venue {
-  position: absolute;
-  left: 32rpx;
-  font-size: 24rpx;
+  font-size: 22rpx;
   color: #94A3B8;
-  max-width: 200rpx;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  max-width: 400rpx;
+}
+.custom-nav-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4rpx 32rpx 8rpx;
+}
+.custom-nav-logo {
+  width: 340rpx;
+  height: 90rpx;
+  display: block;
 }
 
 /* ============================================================ */

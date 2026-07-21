@@ -36,7 +36,7 @@ Page({
   onLoad: function () {
     var info = wx.getSystemInfoSync();
     var statusBarHeight = info.statusBarHeight || 20;
-    var navHeight = statusBarHeight + 44; // 44px ≈ 88rpx
+    var navHeight = statusBarHeight + 75; // 两行 nav：上22rpx+下40rpx ≈ 75px
     this.setData({ statusBarHeight: statusBarHeight, navHeight: navHeight });
     this.loadAllData();
   },
