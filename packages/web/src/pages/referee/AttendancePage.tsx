@@ -257,10 +257,10 @@ export default function AttendancePage() {
             maxWidth: 380, width: '90%', textAlign: 'center',
           }} onClick={(e) => e.stopPropagation()}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: '#e74c3c', marginBottom: 12 }}>清空排队队列</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: '#e74c3c', marginBottom: 12 }}>⚠️ 警告：清空排队队列</div>
             <div style={{ fontSize: 14, color: '#666', lineHeight: 1.8, textAlign: 'left', marginBottom: 24 }}>
-              <p style={{ margin: '0 0 12px' }}>清空排队队列会导致<strong style={{ color: '#e74c3c' }}>正在排队的玩家损失一次参赛次数</strong>。</p>
-              <p style={{ margin: '0 0 12px' }}>此功能仅建议在<strong>每天关闭赛场时</strong>执行一次，不要在比赛进行中使用，否则会导致玩家利益损失，引起客诉！</p>
+              <p style={{ margin: '0 0 12px' }}>清空排队队列将导致<strong style={{ color: '#e74c3c' }}>正在排队的选手损失一次参赛次数</strong>，引发玩家客诉！</p>
+              <p style={{ margin: '0 0 12px' }}>此操作<strong style={{ color: '#e74c3c' }}>仅限每天关闭赛场时执行一次</strong>。比赛进行中<strong>严禁操作</strong>，否则将造成选手体验重大事故！</p>
             </div>
             <div style={{ display: 'flex', gap: 12 }}>
               <button
