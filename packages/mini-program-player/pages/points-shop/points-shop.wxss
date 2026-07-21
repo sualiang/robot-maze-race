@@ -71,7 +71,6 @@
   border-radius: 20rpx;
   color: #fff;
   font-weight: 500;
-  background: rgba(233, 69, 96, 0.85);
 }
 
 /* 卡片信息 */

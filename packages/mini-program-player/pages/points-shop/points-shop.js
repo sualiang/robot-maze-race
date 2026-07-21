@@ -1,6 +1,18 @@
 // 积分商城
 var request = require('../../utils/request');
 
+// 商品类型 → 角标映射
+var TYPE_BADGE = {
+  entry_deduction: { text: '参赛抵扣', color: '#e94560' },
+  merchant_coupon: { text: '消费券', color: '#6c5ce7' },
+  platform_coupon: { text: '平台券', color: '#0984e3' },
+  physical_gift: { text: '实物礼品', color: '#e17055' }
+};
+
+function getBadge(itemType) {
+  return TYPE_BADGE[itemType] || { text: '商品', color: '#888' };
+}
+
 Page({
   data: {
     userPoints: 0,
@@ -35,10 +47,14 @@ Page({
     var that = this;
     request.silentGet('/points-shop/items').then(function (res) {
       if (res) {
-        var items = res.items || [];
-        var userPoints = res.userPoints || 0;
+        var items = (res.items || []).map(function (item) {
+          var badge = getBadge(item.itemType);
+          item._badgeText = badge.text;
+          item._badgeColor = badge.color;
+          return item;
+        });
         that.setData({
-          userPoints: userPoints,
+          userPoints: res.userPoints || 0,
           items: items
         });
       }

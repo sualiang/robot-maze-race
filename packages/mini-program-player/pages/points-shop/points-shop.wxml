@@ -23,7 +23,7 @@
       >
         <view class="card-image-area">
           <image wx:if="{{item.image}}" class="card-image" src="{{item.image}}" mode="aspectFill" />
-          <view class="card-type-badge">实物礼品</view>
+          <view class="card-type-badge" style="background:{{item._badgeColor}}">{{item._badgeText}}</view>
         </view>
         <view class="card-info">
           <text class="card-name">{{item.name}}</text>
