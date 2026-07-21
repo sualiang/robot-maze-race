@@ -345,9 +345,6 @@ export default function ScreenDisplay() {
     race_status: mergedData.race_status || 'idle',
   } as ScreenData;
 
-  const venueStatusLabel = displayData.venue_status === 'open' ? '运营中' :
-    displayData.venue_status === 'closed' ? '已关闭' : '维护中';
-
   // 闪烁动画 - 竞速中高亮
   const isRacing = displayData.current_racer && displayData.race_status === 'racing';
   // 选手已上场但未开始比赛：current_racer 存在且状态为 waiting 或 idle
@@ -469,14 +466,7 @@ export default function ScreenDisplay() {
           <span style={{ fontSize: 20, fontWeight: 500 }}>{displayData.venue_name}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{
-            width: 10, height: 10, borderRadius: '50%',
-            background: displayData.venue_status === 'open' ? '#52c41a' : '#f5222d',
-            display: 'inline-block',
-            boxShadow: `0 0 8px ${displayData.venue_status === 'open' ? '#52c41a' : '#f5222d'}`,
-          }} />
-          <span style={{ fontSize: 18, color: '#ccc' }}>{venueStatusLabel}</span>
-          <WifiOutlined style={{ color: connected ? '#52c41a' : '#f5222d', fontSize: 18, marginLeft: 8 }} />
+          <WifiOutlined style={{ color: connected ? '#52c41a' : '#f5222d', fontSize: 18 }} />
           <button
             onClick={() => {
               if (!document.fullscreenElement) {
