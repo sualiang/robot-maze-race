@@ -146,10 +146,14 @@ function handleMessage(ws: WebSocket, msg: any) {
           }
           if (!venueName) {
             try {
-              const { query: dbQuery } = require('../config/database');
-              const rows = await dbQuery('SELECT name FROM venues WHERE id = $1', [venueId]);
-              if (rows?.[0]?.name) {
-                venueName = rows[0].name;
+              const { getAllOpPools, doQueryOne } = require('../config/database');
+              const pools: Map<any, any> = getAllOpPools();
+              for (const [dbName, pool] of pools) {
+                const row = await doQueryOne(pool, 'SELECT name FROM venues WHERE id = ?', [venueId]);
+                if (row?.name) {
+                  venueName = row.name;
+                  break;
+                }
               }
             } catch (_) { /* ignore */ }
           }
