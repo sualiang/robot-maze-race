@@ -318,7 +318,7 @@ Page({
           score: score,
           scoreText: scoreText,
           rank: rank,
-          rankText: rank > 0 ? '成绩排名 ' + rank : '',
+          rankText: rank > 0 ? '第' + rank + '名' : '',
           medal: medal,
           dateText: dateText,
           bonusText: bonusText,
@@ -492,7 +492,7 @@ Page({
 
     var detailParts = [];
     if (record.scoretext) detailParts.push('成绩: ' + record.scoretext);
-    if (record.ranktext) detailParts.push(record.ranktext);
+    if (record.ranktext) detailParts.push('排名: ' + record.ranktext);
     if (record.datetext) detailParts.push('时间: ' + record.datetext);
     if (record.bonustext) detailParts.push(record.bonustext);
 

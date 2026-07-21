@@ -23,7 +23,7 @@
       <view class="record-card">
         <view class="record-top">
           <text class="record-score {{item.medal || ''}}">{{item.scoreText}}</text>
-          <text wx:if="{{item.rank > 0 && item.medal}}" class="record-rank">{{item.medal}}</text>
+          <text wx:if="{{item.rank > 0}}" class="record-rank">第{{item.rank}}名</text>
         </view>
         <view class="record-meta">
           <text class="record-date">{{item.dateText}}</text>

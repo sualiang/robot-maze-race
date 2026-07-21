@@ -104,7 +104,7 @@
           <text class="best-card-label">本赛季最佳成绩</text>
           <text class="best-card-score">{{seasonBest.scoreText}}</text>
           <text class="best-card-desc">
-            已超 {{seasonBest.beatPercent}}% 玩家
+            最佳排名 第{{seasonBest.rank}}名 · 已超 {{seasonBest.beatPercent}}% 玩家
           </text>
           <text class="best-card-tip">继续参赛刷新成绩，冲击决赛名额</text>
         </view>
@@ -179,6 +179,7 @@
         </view>
         <view class="history-middle">
           <text wx:if="{{item.medal}}" class="history-medal">{{item.medal}}</text>
+          <text class="history-rank">{{item.rankText || '-'}}</text>
         </view>
         <view wx:if="{{item.bonusText}}" class="history-right">
           <text class="history-bonus">{{item.bonusText}}</text>
@@ -202,7 +203,7 @@
   <view wx:if="{{showResultCard && lastRaceResult}}" class="result-card {{resultCardClosing ? 'result-card-closing' : ''}}">
     <text class="result-card-title">比赛结束</text>
     <text class="result-card-score">{{lastRaceResult.scoreText}}</text>
-
+    <text class="result-card-rank">{{lastRaceResult.rank > 0 ? '排名: 第' + lastRaceResult.rank + '名' : ''}}</text>
   </view>
 
 </view>

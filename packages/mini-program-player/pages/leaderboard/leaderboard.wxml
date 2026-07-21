@@ -23,14 +23,16 @@
 
     <view wx:else class="lb-live-list">
       <view class="lb-live-table-header">
+        <text class="lb-live-col-rank">排名</text>
         <text class="lb-live-col-name">选手</text>
         <text class="lb-live-col-time">用时</text>
       </view>
       <view
         wx:for="{{liveLeaderboard}}"
         wx:key="rank"
-        class="lb-live-item"
+        class="lb-live-item {{item.rank <= 3 ? 'lb-live-top3-' + item.rank : ''}}"
       >
+        <text class="lb-live-rank">{{item.rank <= 3 ? ['🥇','🥈','🥉'][item.rank - 1] : item.rank}}</text>
         <text class="lb-live-name">{{item.nickname}}</text>
         <text class="lb-live-time">{{item.displayTime}}</text>
       </view>
@@ -58,7 +60,10 @@
         <text class="my-rank-badge">近期最佳成绩</text>
         <text class="my-rank-region">{{myRanking.bestScore}}</text>
       </view>
-
+      <view class="my-rank-top" style="margin-top: 12rpx;">
+        <text class="my-rank-badge">今日全区排名</text>
+        <text class="my-rank-region">第 {{myRanking.rank}} 名</text>
+      </view>
 
       <view class="my-rank-info-row">
         <view class="my-rank-info-item">
@@ -142,7 +147,7 @@
           <text class="section-title">已达门槛选手</text>
           <view class="qualified-list">
             <view wx:for="{{qualifiedList}}" wx:key="userId" class="qualified-item">
-    
+              <text class="qualified-rank">{{item.rank}}.</text>
               <image class="qualified-avatar" src="{{item.avatarUrl || '/assets/images/default-avatar.png'}}" mode="aspectFill" />
               <text class="qualified-name">{{item.nickname}}</text>
               <text class="qualified-score">{{item.displayScore}}</text>
@@ -226,6 +231,7 @@
         <!-- 4名+ -->
         <view wx:for="{{entries}}" wx:key="userId" class="lb-rank-item {{item.rank >= 4 ? '' : 'lb-rank-hidden-top3'}} {{item.isMe ? 'lb-is-me' : ''}}">
           <block wx:if="{{item.rank >= 4}}">
+            <view class="lb-rank-num-col"><text class="lb-rank-num">{{item.rank}}</text></view>
             <image class="lb-rank-avatar" src="{{item.avatarUrl || '/assets/images/default-avatar.png'}}" mode="aspectFill" />
             <view class="lb-rank-name-col"><text class="lb-rank-name">{{item.nickname}}</text></view>
             <view class="lb-rank-score-col"><text class="lb-rank-score">{{item.displayScore}}</text></view>
@@ -265,7 +271,9 @@
 
         <view class="lb-rank-list">
           <view wx:for="{{finalResult.list}}" wx:key="userId" class="lb-rank-item {{item.isMe ? 'lb-is-me' : ''}} {{item.isPromoted ? 'lb-promoted' : ''}}">
-
+            <view class="lb-rank-num-col">
+              <text class="lb-rank-num {{item.rank <= 3 ? 'lb-rank-num-medal' : ''}}">{{item.rank}}</text>
+            </view>
             <image class="lb-rank-avatar" src="{{item.avatarUrl || '/assets/images/default-avatar.png'}}" mode="aspectFill" />
             <view class="lb-rank-name-col">
               <text class="lb-rank-name">{{item.nickname}}</text>
@@ -293,15 +301,15 @@
           <text class="section-title">🎁 积分奖励</text>
           <view class="reward-list">
             <view class="reward-item">
-              <text class="reward-rank">🥇 冠军</text>
+              <text class="reward-rank">🥇 第1名</text>
               <text class="reward-value">+1000 积分</text>
             </view>
             <view class="reward-item">
-              <text class="reward-rank">🥈 亚军</text>
+              <text class="reward-rank">🥈 第2名</text>
               <text class="reward-value">+800 积分</text>
             </view>
             <view class="reward-item">
-              <text class="reward-rank">🥉 季军</text>
+              <text class="reward-rank">🥉 第3名</text>
               <text class="reward-value">+500 积分</text>
             </view>
             <view class="reward-item">
