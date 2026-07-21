@@ -36,7 +36,7 @@
 
 /* ===== 页面容器 ===== */
 .container {
-  padding: 52rpx 24rpx 48rpx;
+  padding: 52rpx 32rpx 48rpx;
   min-height: 100vh;
   background: #0F172A;
   box-sizing: border-box;
@@ -58,7 +58,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 20rpx 32rpx;
-  padding-top: 100rpx;
+  padding-top: 110rpx;
 }
 .custom-nav-logo {
   position: absolute;
