@@ -11,10 +11,6 @@
 <view style="height:{{navHeight}}px"></view>
 
 <view class="container">
-
-  <!-- ============================================================ -->
-  <!-- 模块2: 主视觉Banner -->
-  <!-- ============================================================ -->
   <view class="hero-banner-image">
     <image class="hero-banner-img" src="/assets/images/home-banner.png" mode="widthFix" />
   </view>
