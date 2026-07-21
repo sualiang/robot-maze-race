@@ -229,6 +229,7 @@ export default function AttendancePage() {
         )}
 
         {status === 'checked' && <button className="referee-btn referee-btn-danger referee-btn-lg" onClick={checkOut} disabled={actionLoading}>🏁 签退暂停赛场</button>}
+        {status === 'checked' && <button className="referee-btn referee-btn-outline" onClick={async () => { if (!window.confirm('⚠️ 将清空当前赛场所有选手排队数据，此操作不可撤销。\n\n确定清空？')) return; setActionLoading(true); try { await api.post('/referees/match/clear-queue'); setErrorMsg('🧹 排队队列已清空'); setTimeout(() => setErrorMsg(''), 2000); } catch { setErrorMsg('清空失败，请重试'); } finally { setActionLoading(false); } }} disabled={actionLoading} style={{ marginTop: 12, borderColor: '#e74c3c', color: '#e74c3c' }}>🧹 清空排队队列</button>}
         {status === 'loading' && <button className="referee-btn referee-btn-primary referee-btn-lg" disabled>⏳ 处理中...</button>}
       </div>
       {errorMsg && <div style={{ background: 'rgba(39,174,96,0.1)', color: '#27ae60', padding: '8px 16px', borderRadius: 8, fontSize: 14, textAlign: 'center', marginBottom: 12 }}>{errorMsg}</div>}
