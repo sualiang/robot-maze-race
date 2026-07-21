@@ -365,7 +365,7 @@ export default function MatchPage() {
           {status === 'finished' && <span className="referee-tag referee-tag-danger">🏁 比赛结束</span>}
         </div>
         <div className="referee-actions">
-          {checkedIn !== true && <div className="referee-card" style={{ textAlign: 'center', padding: 24, marginTop: 8 }}><button onClick={() => navigate('/referee/attendance')} style={{ background: 'rgba(0,122,255,0.1)', border: '1px solid rgba(0,122,255,0.3)', borderRadius: 12, padding: '16px 24px', color: '#007aff', fontSize: 16, fontWeight: 500, cursor: 'pointer' }}>📍 请先签到激活赛场</button></div>}
+          {checkedIn !== true && <div className="referee-card" style={{ textAlign: 'center', padding: 24, marginTop: 8 }}><button onClick={() => navigate('/referee/attendance')} style={{ background: '#ff6b35', border: 'none', borderRadius: 10, padding: '14px 28px', color: '#fff', fontSize: 15, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>📍 请先签到激活赛场</button></div>}
           {checkedIn === true && status === 'finished' && (
             <div className="referee-btn-row" style={{ flexDirection: 'column', gap: 8 }}>
               <button className="referee-btn referee-btn-primary referee-btn-lg" onClick={async () => {
