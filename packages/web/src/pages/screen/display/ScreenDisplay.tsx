@@ -35,10 +35,11 @@ interface ScreenData {
 export default function ScreenDisplay() {
   const [searchParams] = useSearchParams();
   const venueId = searchParams.get('venueId') || '';
+  const urlVenueName = searchParams.get('venueName') || '';
 
   // 激活状态跟踪：不再依赖 sessionStorage，由 WS screen_data 的 venue_status 决定
   const [isActivated, setIsActivated] = useState(false);
-  const [venueName, setVenueName] = useState('');
+  const [venueName, setVenueName] = useState(urlVenueName);
   const [activationCode, setActivationCode] = useState('');
 
   const [data, setData] = useState<ScreenData | null>(null);
@@ -405,6 +406,13 @@ export default function ScreenDisplay() {
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           gap: 24,
         }}>
+          {/* Logo + 赛场名 */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, marginBottom: 32 }}>
+            <img src="/iron-dog-logo.png" alt="铁甲快狗" style={{ height: 60, width: 'auto' }} />
+            {venueName && (
+              <span style={{ fontSize: 24, fontWeight: 600, color: '#ff6b35' }}>{venueName}</span>
+            )}
+          </div>
           {activationCode ? (
             <>
               <div style={{ fontSize: 56, marginBottom: 8 }}>🐕</div>
