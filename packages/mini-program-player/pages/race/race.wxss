@@ -465,7 +465,7 @@
 /* 比赛结束成绩卡片 */
 .result-card {
   position: fixed;
-  top: 140rpx;
+  top: 160rpx;
   left: 0;
   right: 0;
   z-index: 100;
