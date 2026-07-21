@@ -1576,7 +1576,7 @@ router.get('/attendance/records', authMiddleware, async (req: Request, res: Resp
       sql += ' LIMIT 5';
     }
 
-    const records = await query<any>(sql, params);
+    const records = await queryOp<any>(req, sql, params);
 
     return res.json({ code: 0, message: 'ok', data: records });
   } catch (error: any) {
