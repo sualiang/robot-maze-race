@@ -96,7 +96,7 @@ export default function RefereeList() {
     try {
       const values = await createForm.validateFields();
       setCreateLoading(true);
-      const data: any = await api.post('/referees/register', {
+      const data: any = await api.post('/referees/create-by-operator', {
         phone: values.phone,
         name: values.name,
       });
