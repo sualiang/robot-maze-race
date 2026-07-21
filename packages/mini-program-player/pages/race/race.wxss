@@ -465,11 +465,11 @@
 /* 比赛结束成绩卡片 */
 .result-card {
   position: fixed;
-  top: 0;
+  top: 100rpx;
   left: 0;
   right: 0;
   z-index: 100;
-  padding: 80rpx 32rpx 48rpx;
+  padding: 40rpx 32rpx 32rpx;
   background: linear-gradient(180deg, rgba(31, 41, 55, 0.98), rgba(17, 24, 39, 0.98));
   backdrop-filter: blur(20rpx);
   border-bottom: 2rpx solid rgba(139, 92, 246, 0.5);
@@ -478,10 +478,17 @@
   animation: resultCardDown 0.4s ease-out;
   box-shadow: 0 8rpx 40rpx rgba(0, 0, 0, 0.5);
 }
+.result-card-closing {
+  animation: resultCardUp 0.35s ease-in forwards;
+}
 
 @keyframes resultCardDown {
-  from { transform: translateY(-100%); }
-  to { transform: translateY(0); }
+  from { transform: translateY(-110%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes resultCardUp {
+  from { transform: translateY(0); opacity: 1; }
+  to { transform: translateY(-110%); opacity: 0; }
 }
 
 .result-card-title {

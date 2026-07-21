@@ -25,6 +25,7 @@ Page({
     prevMyStatus: 'idle',
     lastRaceResult: null, // 最近一次比赛成绩
     showResultCard: false,
+    resultCardClosing: false,
     resultCardTimer: null,
 
     // 赛季最佳成绩
@@ -214,7 +215,10 @@ Page({
         // 4秒后自动消失
         if (that.data.resultCardTimer) clearTimeout(that.data.resultCardTimer);
         var timer = setTimeout(function () {
-          that.setData({ showResultCard: false });
+          that.setData({ resultCardClosing: true });
+          setTimeout(function () {
+            that.setData({ showResultCard: false, resultCardClosing: false });
+          }, 400);
         }, 4000);
         that.data.resultCardTimer = timer;
       }

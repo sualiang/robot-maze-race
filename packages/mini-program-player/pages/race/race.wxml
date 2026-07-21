@@ -200,7 +200,7 @@
   </block>
 
   <!-- 比赛结束成绩卡片（浮层，固定底部盖住按钮） -->
-  <view wx:if="{{showResultCard && lastRaceResult}}" class="result-card">
+  <view wx:if="{{showResultCard && lastRaceResult}}" class="result-card {{resultCardClosing ? 'result-card-closing' : ''}}">
     <text class="result-card-title">比赛结束</text>
     <text class="result-card-score">{{lastRaceResult.scoreText}}</text>
     <text class="result-card-rank">排名: 第{{lastRaceResult.rank}}名 / 共{{lastRaceResult.totalRacers}}人</text>
