@@ -43,7 +43,7 @@
 }
 
 /* ============================================================ */
-/* 自定义导航栏 - 首页顶部 fixed，两行布局 */
+/* 自定义导航栏 - 首页 fixed，左logo右赛场名 */
 /* ============================================================ */
 .custom-nav {
   position: fixed;
@@ -53,10 +53,17 @@
   z-index: 999;
   background: #0F172A;
 }
-.custom-nav-top {
+.custom-nav-inner {
   display: flex;
   align-items: center;
-  padding: 6rpx 32rpx 0;
+  justify-content: space-between;
+  padding: 8rpx 32rpx;
+}
+.custom-nav-logo {
+  width: 200rpx;
+  height: 53rpx;
+  display: block;
+  flex-shrink: 0;
 }
 .custom-nav-venue {
   font-size: 22rpx;
@@ -64,18 +71,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 400rpx;
-}
-.custom-nav-bottom {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4rpx 32rpx 8rpx;
-}
-.custom-nav-logo {
-  width: 340rpx;
-  height: 90rpx;
-  display: block;
+  max-width: 260rpx;
+  flex-shrink: 1;
 }
 
 /* ============================================================ */
