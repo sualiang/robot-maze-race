@@ -1,13 +1,13 @@
 <!-- pages/index/index.wxml - 首页 V2重构版 -->
 <view class="page">
 <!-- 自定义导航栏 -->
-<view class="nav-bar" style="padding-top:{{statusBarHeight}}px">
-  <view class="nav-inner">
+<view class="custom-nav" style="padding-top:{{statusBarHeight}}px">
+  <view class="custom-nav-inner">
     <!-- 左：赛场名称 -->
-    <text class="nav-venue" wx:if="{{venueName}}">📍 {{venueName}}</text>
-    <text class="nav-venue" wx:else>📍 未绑定赛场</text>
+    <text class="custom-nav-venue" wx:if="{{venueName}}">📍 {{venueName}}</text>
+    <text class="custom-nav-venue" wx:else>📍 未绑定赛场</text>
     <!-- 中：logo -->
-    <image class="nav-logo" src="/assets/logo-header.png" mode="aspectFit" />
+    <image class="custom-nav-logo" src="/assets/logo-header.png" mode="aspectFit" />
   </view>
 </view>
 <view style="height:{{navHeight}}px"></view>
