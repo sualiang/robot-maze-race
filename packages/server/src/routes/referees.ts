@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import crypto from 'crypto';
 import { broadcastToScreen, validateActivationCode } from '../ws/handler';
 import { WebSocket } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
@@ -58,16 +59,19 @@ router.post('/create-by-operator', authMiddleware, async (req: Request, res: Res
     );
 
     let userId: string;
-    // 创建 users 记录（裁判仅微信OAuth登录，无需密码）
+    // 生成随机初始密码并创建 users 记录
+    const initPassword = crypto.randomBytes(4).toString('hex').toUpperCase();
     if (!existingUser) {
       userId = uuidv4();
       await execute(
-        `INSERT INTO users (id, openid, nickname, phone, role)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [userId, 'ref_' + phone, name, phone, 'referee']
+        `INSERT INTO users (id, openid, nickname, phone, role, password, first_login)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [userId, 'ref_' + phone, name, phone, 'referee', initPassword, 1]
       );
     } else {
       userId = existingUser.id;
+      // 对已存在用户也重置密码
+      await execute('UPDATE users SET password=$1, first_login=1 WHERE id=$2', [initPassword, userId]);
     }
 
     const refereeId = uuidv4();
@@ -86,6 +90,7 @@ router.post('/create-by-operator', authMiddleware, async (req: Request, res: Res
         name,
         phone,
         venue_id: venue_id || null,
+        password: initPassword,
       },
     });
   } catch (error: any) {
