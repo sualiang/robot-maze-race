@@ -8,6 +8,9 @@ Page({
     // 通用状态
     loaded: false,
     isLoggedIn: false,
+    // 自定义导航栏
+    statusBarHeight: 20,
+    navHeight: 64,
     // 模块1: 导航栏
     venueName: '',  // 上次扫码赛场名, 从微信缓存取
     couponCount: 0,
@@ -31,6 +34,10 @@ Page({
 
   /* ======== 生命周期 ======== */
   onLoad: function () {
+    var info = wx.getSystemInfoSync();
+    var statusBarHeight = info.statusBarHeight || 20;
+    var navHeight = statusBarHeight + 44; // 44px ≈ 88rpx
+    this.setData({ statusBarHeight: statusBarHeight, navHeight: navHeight });
     this.loadAllData();
   },
 
