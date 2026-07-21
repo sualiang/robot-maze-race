@@ -64,8 +64,8 @@
   position: absolute;
   left: 32rpx;
   top: 104rpx;
-  width: 240rpx;
-  height: 63rpx;
+  width: 280rpx;
+  height: 74rpx;
   display: block;
   flex-shrink: 0;
 }
