@@ -36,7 +36,7 @@
 
 /* ===== 页面容器 ===== */
 .container {
-  padding: 16rpx 24rpx 48rpx;
+  padding: 32rpx 24rpx 48rpx;
   min-height: 100vh;
   background: #0F172A;
   box-sizing: border-box;
