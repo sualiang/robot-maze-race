@@ -37,19 +37,8 @@ function handleConnection(ws: WebSocket, req: IncomingMessage) {
   // 如果是大屏客户端，立即发送当前赛场数据
   if (path.includes('/ws/screen')) {
     screenClients.add(ws);
-    const screenData = getCurrentScreenData ? getCurrentScreenData() : null;
-    if (screenData) {
-      ws.send(JSON.stringify({ type: 'screen_data', data: screenData }));
-    }
-    // 异步触发 broadcastAfterUpdate 拉取 DB 中的排行榜/排队数据推送
-    const venueId = getCachedVenueId();
-    if (venueId) {
-      setImmediate(() => {
-        broadcastAfterUpdate({} as any).catch((e: any) =>
-          console.error('[WS] initial broadcastAfterUpdate failed:', e.message)
-        );
-      });
-    }
+    // 不在这里推送 screen_data——需要等大屏发 screen_login 带 venueId
+    // 以该 venueId 为准查询对应赛场数据，避免全局 cachedVenueId 串数据
   }
 
   // 裁判客户端单独跟踪（用于推送 venue 状态变更）
@@ -113,10 +102,17 @@ function handleMessage(ws: WebSocket, msg: any) {
       // 客户端主动请求当前数据，从 DB 恢复排行榜
       (async () => {
         const data = getCurrentScreenData();
-        const venueId = data.venue_id || getCachedVenueId();
-        if (venueId) {
+        const cachedVId = data.venue_id || getCachedVenueId();
+        // 检查该大屏是否已通过 screen_login 注册了 venueId
+        const screenVenueId = screenVenueMap.get(ws);
+        // 如果大屏的 venueId 跟全局缓存的不匹配，返回 inactive 状态
+        if (screenVenueId && cachedVId !== screenVenueId) {
+          data.venue_id = screenVenueId;
+          data.venue_status = 'inactive';
+          data.leaderboard = [];
+        } else if (cachedVId) {
           try {
-            const leaderboard = await fetchLeaderboardFromDb(venueId);
+            const leaderboard = await fetchLeaderboardFromDb(cachedVId);
             data.leaderboard = leaderboard.map((e: any) => ({
               rank: e.rank,
               nickname: e.name,
@@ -138,16 +134,57 @@ function handleMessage(ws: WebSocket, msg: any) {
       const code = msg.activation_code;
       if (!code || typeof code !== 'string') break;
       const venueId = msg.venueId || undefined;
-      const venueName = msg.venueName || undefined;
+      let venueName = msg.venueName || undefined;
+      // 前端没传 venueName 时，从 DB 查（兜底）
+      if (venueId && !venueName) {
+        const { query } = require('../config/database');
+        query('SELECT name FROM venues WHERE id = $1', [venueId]).then((rows: any) => {
+          if (rows?.[0]?.name) {
+            ws.send(JSON.stringify({ type: 'login_ack', message: '等待裁判扫码', venue_name: rows[0].name, venue_id: venueId || '' }));
+          }
+        }).catch(() => {});
+      }
       // 记录 ws → venueId 映射，解决跨运营商大屏数据串问题
       if (venueId) {
         screenVenueMap.set(ws, venueId);
+        // 大屏注册时 venueId 是在 URL 传过来的，用它拉对应赛场数据
+        // 避免使用全局 cachedVenueId（那是裁判操作设置的，可能指向其他赛场）
+        const screenData = getCurrentScreenData();
+        const screenVenue = screenData?.venue_id;
+        if (screenVenue !== venueId) {
+          // 全局 cachedVenueId 跟当前大屏不匹配，用正确的 venueId 构造初始数据
+          const initialData = {
+            race_status: 'idle',
+            venue_status: 'inactive',
+            current_racer: null,
+            elapsed_ms: 0,
+            start_time: null,
+            next_racer: null,
+            queue: [],
+            venue_name: venueName || '',
+            venue_id: venueId,
+            leaderboard: [],
+            last_result: null,
+            timestamp: new Date().toISOString(),
+          };
+          ws.send(JSON.stringify({ type: 'screen_data', data: initialData }));
+        } else {
+          // venueId 匹配，直接推送当前数据
+          ws.send(JSON.stringify({ type: 'screen_data', data: screenData }));
+        }
+        // 异步拉 DB 排行榜
+        setImmediate(() => {
+          fetchLeaderboardFromDb(venueId).then((leaderboard) => {
+            const data = { ...(screenData || {}), leaderboard: leaderboard || [], venue_id: venueId, venue_name: venueName || '' };
+            ws.send(JSON.stringify({ type: 'screen_data', data }));
+          }).catch(() => {});
+        });
       }
       setTempToken('activation_code', code, { venueId, venueName }, 300).catch((err) =>
         console.error('[WS] setTempToken error:', err.message),
       );
       activationCodeWs.set(code, ws);
-      ws.send(JSON.stringify({ type: 'login_ack', message: '等待裁判扫码' }));
+      ws.send(JSON.stringify({ type: 'login_ack', message: '等待裁判扫码', venue_name: venueName || '', venue_id: venueId || '' }));
       break;
     }
 
