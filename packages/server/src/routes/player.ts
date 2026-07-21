@@ -557,7 +557,7 @@ router.get('/queue/current', authMiddleware, rateLimiter(10, 60), async (req: Re
     // 2) lastRaceResult: 用户最近一次 completed 比赛成绩
     let lastRaceResult: any = null;
     const lastResultRow = await queryOpOne<any>(req,
-      `SELECT id, score_ms, \`rank\`, created_at
+      `SELECT id, score_ms, \`rank\`, created_at, venue_id, race_type, finished_at
        FROM race_results
        WHERE user_id = $1 AND status = 'completed'
        ORDER BY created_at DESC LIMIT 1`,
@@ -570,11 +570,21 @@ router.get('/queue/current', authMiddleware, rateLimiter(10, 60), async (req: Re
         if (s < 60) scoreText = s.toFixed(1) + 's';
         else { const m = Math.floor(s / 60); const sec = (s % 60).toFixed(1); scoreText = m + 'm' + sec + 's'; }
       }
+      // 获取同一场比赛(venue+race_type+时间窗口)的总参赛人数
+      const totalRow = await queryOpOne<any>(req,
+        `SELECT COUNT(*) as total
+         FROM race_results
+         WHERE venue_id = $1 AND race_type = $2
+           AND finished_at >= DATE_SUB($3, INTERVAL 30 MINUTE)
+           AND finished_at <= DATE_ADD($3, INTERVAL 30 MINUTE)
+           AND status = 'completed'`,
+        [lastResultRow.venue_id, lastResultRow.race_type ?? 1, lastResultRow.finished_at || lastResultRow.created_at]
+      );
       lastRaceResult = {
         score: s,
         scoreText,
         rank: lastResultRow.rank ?? 0,
-        totalRacers: 0,
+        totalRacers: totalRow ? Number(totalRow.total) : 0,
       };
     }
 
