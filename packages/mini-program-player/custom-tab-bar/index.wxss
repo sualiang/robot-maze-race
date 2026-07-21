@@ -4,7 +4,7 @@
   bottom: 0;
   left: 0;
   right: 0;
-  height: 140rpx;
+  height: 170rpx;
   background: #1a1a2e;
   border-top: 1rpx solid rgba(255,255,255,0.06);
   padding-bottom: env(safe-area-inset-bottom);
@@ -16,15 +16,15 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 8rpx;
-  padding-top: 8rpx;
+  justify-content: flex-start;
+  gap: 10rpx;
+  padding-top: 24rpx;
   transition: all 0.2s;
 }
 
 .tab-icon {
-  width: 64rpx;
-  height: 64rpx;
+  width: 56rpx;
+  height: 56rpx;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -44,11 +44,11 @@
   font-weight: 700;
 }
 
-/* ============ 首页图标 - 房子 ============ */
+/* ============ 首页图标 - 实心房子 ============ */
 .icon-home {
   position: relative;
-  width: 54rpx;
-  height: 48rpx;
+  width: 50rpx;
+  height: 44rpx;
 }
 .home-roof {
   position: absolute;
@@ -57,102 +57,101 @@
   transform: translateX(-50%);
   width: 0;
   height: 0;
-  border-left: 27rpx solid transparent;
-  border-right: 27rpx solid transparent;
-  border-bottom: 22rpx solid #888;
+  border-left: 25rpx solid transparent;
+  border-right: 25rpx solid transparent;
+  border-bottom: 20rpx solid #888;
   transition: border-bottom-color 0.2s;
 }
-.home-body {
+.home-roof::after {
+  content: '';
   position: absolute;
-  bottom: 0;
+  top: 18rpx;
   left: 50%;
   transform: translateX(-50%);
-  width: 36rpx;
-  height: 26rpx;
-  border: 3rpx solid #888;
-  border-top: none;
+  width: 34rpx;
+  height: 24rpx;
+  background: #888;
   border-radius: 0 0 6rpx 6rpx;
-  transition: border-color 0.2s;
+  transition: background 0.2s;
 }
+.home-body { display: none; }
 .tab-item.active .home-roof { border-bottom-color: #e8453c; }
-.tab-item.active .home-body { border-color: #e8453c; }
+.tab-item.active .home-roof::after { background: #e8453c; }
 
-/* ============ 比赛图标 - 旗帜 ============ */
+/* ============ 比赛图标 - 实心旗帜 ============ */
 .icon-race {
   position: relative;
-  width: 50rpx;
-  height: 60rpx;
+  width: 46rpx;
+  height: 50rpx;
 }
 .race-pole {
   position: absolute;
-  left: 6rpx;
-  bottom: 0;
+  left: 4rpx;
+  bottom: 4rpx;
   width: 4rpx;
-  height: 60rpx;
+  height: 46rpx;
   background: #888;
   border-radius: 2rpx;
   transition: background 0.2s;
 }
 .race-flag {
   position: absolute;
-  left: 10rpx;
-  top: 6rpx;
-  width: 36rpx;
-  height: 24rpx;
-  border: 3rpx solid #888;
+  left: 8rpx;
+  top: 4rpx;
+  width: 34rpx;
+  height: 22rpx;
+  background: #888;
   border-radius: 3rpx;
-  background: rgba(136,136,136,0.06);
-  transition: border-color 0.2s;
+  transition: background 0.2s;
 }
 .tab-item.active .race-pole { background: #e8453c; }
-.tab-item.active .race-flag { border-color: #e8453c; }
+.tab-item.active .race-flag { background: #e8453c; }
 
-/* ============ 排行榜图标 - 柱状图 ============ */
+/* ============ 排行榜图标 - 实心柱状图 ============ */
 .icon-chart {
   display: flex;
   align-items: flex-end;
-  gap: 7rpx;
-  height: 58rpx;
+  gap: 6rpx;
+  height: 48rpx;
 }
 .chart-bar {
-  width: 11rpx;
+  width: 12rpx;
   border-radius: 4rpx;
   background: #888;
   transition: background 0.2s;
 }
-.bar1 { height: 28rpx; }
-.bar2 { height: 42rpx; }
-.bar3 { height: 58rpx; }
+.bar1 { height: 24rpx; }
+.bar2 { height: 36rpx; }
+.bar3 { height: 48rpx; }
 .tab-item.active .chart-bar { background: #e8453c; }
 
-/* ============ 我的图标 - 人物 ============ */
+/* ============ 我的图标 - 实心人物 ============ */
 .icon-profile {
   position: relative;
-  width: 52rpx;
-  height: 60rpx;
+  width: 46rpx;
+  height: 50rpx;
 }
 .profile-head {
   position: absolute;
   top: 0;
   left: 50%;
   transform: translateX(-50%);
-  width: 28rpx;
-  height: 28rpx;
-  border: 3rpx solid #888;
+  width: 26rpx;
+  height: 26rpx;
+  background: #888;
   border-radius: 50%;
-  transition: border-color 0.2s;
+  transition: background 0.2s;
 }
 .profile-body {
   position: absolute;
-  bottom: 0;
+  bottom: 4rpx;
   left: 50%;
   transform: translateX(-50%);
-  width: 48rpx;
-  height: 26rpx;
-  border: 3rpx solid #888;
-  border-radius: 22rpx 22rpx 0 0;
-  border-bottom: none;
-  transition: border-color 0.2s;
+  width: 42rpx;
+  height: 22rpx;
+  background: #888;
+  border-radius: 20rpx 20rpx 0 0;
+  transition: background 0.2s;
 }
-.tab-item.active .profile-head { border-color: #e8453c; }
-.tab-item.active .profile-body { border-color: #e8453c; }
+.tab-item.active .profile-head { background: #e8453c; }
+.tab-item.active .profile-body { background: #e8453c; }
