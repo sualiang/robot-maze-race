@@ -1030,7 +1030,7 @@ router.post('/match/malfunction', authMiddleware, async (req: Request, res: Resp
     );
 
     // 广播故障事件到大屏
-    broadcastToScreen({
+    broadcastToScreen(cachedVenueId, {
       event: 'racer_malfunction',
       data: {
         racerName: row?.nickname || '选手',
@@ -1097,7 +1097,7 @@ router.post('/match/forfeit', authMiddleware, async (req: Request, res: Response
       );
     }
 
-    broadcastToScreen({
+    broadcastToScreen(cachedVenueId, {
       event: 'racer_forfeit',
       data: {
         racerName: row.nickname || '选手',
@@ -1149,7 +1149,7 @@ router.post('/match/invalidate', authMiddleware, async (req: Request, res: Respo
       [row.nickname]
     );
 
-    broadcastToScreen({
+    broadcastToScreen(cachedVenueId, {
       event: 'racer_invalid',
       data: {
         racerName: row.nickname || '选手',
@@ -1319,14 +1319,14 @@ router.post('/attendance/check-in', authMiddleware, async (req: Request, res: Re
     try { await executeOp(req, 'UPDATE venues SET status = \'open\' LIMIT 1'); } catch (_) {}
 
     // 广播赛场重新开放到大屏，大屏恢复全新状态
-    broadcastToScreen({
+    broadcastToScreen(cachedVenueId, {
       event: 'venue_reopen',
       data: { reopenedAt: now },
     });
 
     // 再推送一次当前 screen_data，让大屏直接显示比赛界面
     const screenData = getCurrentScreenData();
-    broadcastToScreen({ type: 'screen_data', data: screenData });
+    broadcastToScreen(cachedVenueId, { type: 'screen_data', data: screenData });
 
     // 从数据库获取真实的赛场信息
     let venueName = finalVenueId;
@@ -1390,7 +1390,7 @@ router.post('/attendance/check-out', authMiddleware, async (req: Request, res: R
     } catch (_) {}
 
     // 广播赛场关闭通知到大屏（含清空后的队列和选手信息）
-    broadcastToScreen({
+    broadcastToScreen(cachedVenueId, {
       event: 'venue_closed',
       data: {
         closedAt: now,
@@ -1401,7 +1401,7 @@ router.post('/attendance/check-out', authMiddleware, async (req: Request, res: R
     });
     // 同时推送最新 screen_data（venue_status = inactive, queue 为空）
     const closedScreenData = getCurrentScreenData();
-    broadcastToScreen({ type: 'screen_data', data: closedScreenData });
+    broadcastToScreen(cachedVenueId, { type: 'screen_data', data: closedScreenData });
 
     return res.json({ code: 0, message: '签退成功', data: { checkoutAt: now } });
   } catch (error: any) {
@@ -1501,7 +1501,7 @@ router.post('/attendance/check-in-by-qr', authMiddleware, async (req: Request, r
 
     // 9. 广播 screen_data 更新
     const screenData = getCurrentScreenData();
-    broadcastToScreen({ type: 'screen_data', data: screenData });
+    broadcastToScreen(cachedVenueId, { type: 'screen_data', data: screenData });
 
     return res.json({
       code: 0,
@@ -1728,7 +1728,7 @@ export async function broadcastAfterUpdate(req: Request) {
       elapsed: lastFinished.finish_time_ms,
     } : undefined;
 
-    broadcastToScreen({
+    broadcastToScreen(cachedVenueId, {
       race_status: raceStatus,
       current_racer: currentRacer,
       elapsed_ms,

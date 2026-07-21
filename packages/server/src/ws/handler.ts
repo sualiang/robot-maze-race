@@ -8,6 +8,8 @@ import { setTempToken, getTempToken, listTempTokensWithData, deleteTempToken } f
 const rooms = new Map<string, Set<WebSocket>>();
 const clientRooms = new Map<WebSocket, string>();
 const screenClients = new Set<WebSocket>();
+// 大屏 WebSocket → venueId 映射（解决跨运营商 screen_data 串数据问题）
+const screenVenueMap = new Map<WebSocket, string>();
 const refereeClients = new Set<WebSocket>();
 
 // 激活码关联的 WebSocket（用于激活后回推通知）
@@ -58,6 +60,7 @@ function handleConnection(ws: WebSocket, req: IncomingMessage) {
 
 async function handleClose(ws: WebSocket) {
   screenClients.delete(ws);
+  screenVenueMap.delete(ws);
   refereeClients.delete(ws);
   // 清理内存 ws 映射，但保留 Redis 激活码（靠 TTL 自然过期）
   // 大屏 WS 重连后会重新发 screen_login 注册新的
@@ -136,6 +139,10 @@ function handleMessage(ws: WebSocket, msg: any) {
       if (!code || typeof code !== 'string') break;
       const venueId = msg.venueId || undefined;
       const venueName = msg.venueName || undefined;
+      // 记录 ws → venueId 映射，解决跨运营商大屏数据串问题
+      if (venueId) {
+        screenVenueMap.set(ws, venueId);
+      }
       setTempToken('activation_code', code, { venueId, venueName }, 300).catch((err) =>
         console.error('[WS] setTempToken error:', err.message),
       );
@@ -224,8 +231,8 @@ export function setupWebSocket(server: Server) {
   return [wssScreen, wssReferee];
 }
 
-/** 向所有大屏客户端 + 所有裁判端客户端广播消息 */
-export function broadcastToScreen(data: any) {
+/** 向指定 venueId 的大屏 + 所有裁判端广播消息 */
+export function broadcastToScreen(venueId: string, data: any) {
   // 已经是 type=screen_data 格式或 event 格式都直接透传
   const isRaw = data.event || data.type === 'screen_data';
   // 注入 venue_status 防止大屏端丢失导致回退到 mock 的 inactive
@@ -235,6 +242,8 @@ export function broadcastToScreen(data: any) {
   const msg = JSON.stringify(isRaw ? data : { type: 'screen_data', data });
   let screenCount = 0;
   screenClients.forEach((ws) => {
+    // venueId 隔离：只发给匹配的大屏（未指定时广播所有，兼容旧调用）
+    if (venueId && screenVenueMap.get(ws) !== venueId) return;
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(msg);
       screenCount++;
@@ -248,5 +257,5 @@ export function broadcastToScreen(data: any) {
       refereeCount++;
     }
   });
-  console.log(`[WS] 已广播 ${isRaw ? data.event : 'screen_data'} 给 ${screenCount} 个大屏 + ${refereeCount} 个裁判客户端`);
+  console.log(`[WS] 已广播 ${isRaw ? data.event : 'screen_data'} venueId=${venueId || 'all'} 给 ${screenCount} 个大屏 + ${refereeCount} 个裁判客户端`);
 }

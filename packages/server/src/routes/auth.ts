@@ -798,7 +798,7 @@ router.post('/login', async (req: Request, res: Response) => {
       return res.status(400).json({ code: 400, message: '缺少手机号或密码', data: null });
     }
 
-    // 检查是否是裁判手机号（遍历 op_* 库 referees 表）
+    // 检查是否是裁判手机号（遍历 op_* 库 referees 表，逐个比对密码直到匹配）
     let refereeInfo: { id: string; phone: string; name: string; operatorId: string; password: string; isFirstLogin: boolean; userId?: string } | null = null;
     try {
       const regRows = await query<{ db_name: string }>(
@@ -811,14 +811,22 @@ router.post('/login', async (req: Request, res: Response) => {
           const pool = getOperatorPool(reg.db_name);
           console.log('[Login] trying pool:', reg.db_name);
           const [rows] = await pool.execute(
-            'SELECT r.id, r.phone, r.name, r.password, r.is_first_login, r.operator_id, r.user_id FROM referees r WHERE r.phone = ? LIMIT 1',
+            'SELECT r.id, r.phone, r.name, r.password, r.is_first_login, r.operator_id, r.user_id FROM referees r WHERE r.phone = ?',
             [phone]
           ) as any[];
           console.log('[Login] pool result rows:', (rows as any[])?.length);
           if ((rows as any[])?.[0]) {
-            refereeInfo = { ...rows[0], operatorId: rows[0].operator_id, isFirstLogin: rows[0].is_first_login === 1, userId: rows[0].user_id };
-            console.log('[Login] found referee in', reg.db_name, ':', refereeInfo.name);
-            break;
+            // 遍历该库中所有匹配的记录，逐个比对密码
+            for (const row of (rows as any[])) {
+              const valid = compareSync(password, row.password);
+              console.log('[Login] bcrypt verify against', reg.db_name, row.name, ':', valid);
+              if (valid) {
+                refereeInfo = { ...row, operatorId: row.operator_id, isFirstLogin: row.is_first_login === 1, userId: row.user_id };
+                console.log('[Login] matched referee in', reg.db_name, ':', refereeInfo.name);
+                break;
+              }
+            }
+            if (refereeInfo) break;
           }
         } catch (e: any) { 
           console.log('[Login] pool error:', reg.db_name, e.message); 
@@ -829,11 +837,7 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     if (refereeInfo) {
-      // 裁判手机号+密码登录
-      const valid = compareSync(password, refereeInfo.password);
-      if (!valid) {
-        return res.status(401).json({ code: 401, message: '手机号或密码错误', data: null });
-      }
+      // 裁判手机号+密码登录（密码已在 op_* 遍历中验证通过）
       const payload: AuthPayload = {
         userId: refereeInfo.userId || refereeInfo.id,
         openid: 'ref_sms_' + refereeInfo.id,
