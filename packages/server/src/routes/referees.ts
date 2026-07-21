@@ -1728,8 +1728,10 @@ export async function broadcastAfterUpdate(req: Request) {
         ? Date.now() - (currentRow.start_time_ms || 0)
         : (currentRow.paused_elapsed_ms || 0);
 
+    const hasJustFinished = !currentRow && lastFinished && lastFinished.finish_time_ms != null;
     const raceStatus = currentRow?.status === 'racing' ? 'racing'
       : currentRow?.status === 'paused' ? 'paused'
+      : hasJustFinished ? 'finished'
       : queueRows.length > 0 ? 'waiting' : 'idle';
 
     const lastResult = lastFinished?.finish_time_ms != null ? {
@@ -1749,9 +1751,9 @@ export async function broadcastAfterUpdate(req: Request) {
       venue_id: cachedVenueId,
       leaderboard: leaderboardRows.map((r, i) => ({
         rank: i + 1,
-        name: r.nickname || '选手',
+        nickname: r.nickname || '选手',
         avatar: r.avatar_url || undefined,
-        elapsed: r.finish_time_ms || 0,
+        finish_time_ms: r.finish_time_ms || 0,
         status: r.finish_status || 'finished',
       })),
       last_result: lastResult,
