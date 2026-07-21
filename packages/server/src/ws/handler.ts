@@ -146,14 +146,19 @@ function handleMessage(ws: WebSocket, msg: any) {
           }
           if (!venueName) {
             try {
-              const { getAllOpPools, doQueryOne } = require('../config/database');
-              const pools: Map<any, any> = getAllOpPools();
-              for (const [dbName, pool] of pools) {
-                const row = await doQueryOne(pool, 'SELECT name FROM venues WHERE id = ?', [venueId]);
-                if (row?.name) {
-                  venueName = row.name;
-                  break;
-                }
+              const { query: dbQuery, getOperatorPool, doQueryOne } = require('../config/database');
+              // 先从 operators_registry 获取所有运营商库名
+              const registries = await dbQuery('SELECT db_name FROM operators_registry');
+              for (const reg of registries || []) {
+                if (!reg.db_name) continue;
+                try {
+                  const pool = getOperatorPool(reg.db_name);
+                  const row = await doQueryOne(pool, 'SELECT name FROM venues WHERE id = ?', [venueId]);
+                  if (row?.name) {
+                    venueName = row.name;
+                    break;
+                  }
+                } catch (_) { /* 继续下一个库 */ }
               }
             } catch (_) { /* ignore */ }
           }
