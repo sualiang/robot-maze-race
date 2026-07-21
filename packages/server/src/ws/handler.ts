@@ -240,8 +240,8 @@ function setupWSS(wss: WebSocketServer) {
 const SCREEN_PATH = '/ws/screen';
 const REFEREE_PATHS = ['/ws/referee', '/api/v1/ws/referee'];
 
-const wssScreen = new WebSocketServer({ noServer: true });
-const wssReferee = new WebSocketServer({ noServer: true });
+const wssScreen = new WebSocketServer({ noServer: true, pingInterval: 10000 });
+const wssReferee = new WebSocketServer({ noServer: true, pingInterval: 30000 });
 
 setupWSS(wssScreen);
 setupWSS(wssReferee);

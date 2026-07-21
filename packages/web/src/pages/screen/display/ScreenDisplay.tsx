@@ -92,13 +92,13 @@ export default function ScreenDisplay() {
 
       // 请求一次当前数据（防止签到后打开大屏没有初始数据）
       ws.send(JSON.stringify({ type: 'get_screen_data' }));
-      // 心跳保活：每 30 秒发一次 ping，防止 NAT/防火墙断开空闲连接
+      // 心跳保活：每 15 秒发一次 ping，防止 NAT/防火墙断开空闲连接
       if (heartbeatRef.current) clearInterval(heartbeatRef.current);
       heartbeatRef.current = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ event: 'ping' }));
         }
-      }, 30000);
+      }, 15000);
     };
 
     ws.onmessage = (event) => {
