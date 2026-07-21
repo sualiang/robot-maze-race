@@ -673,6 +673,31 @@ router.get('/match/queue', authMiddleware, async (req: Request, res: Response) =
 });
 
 /**
+ * POST /api/v1/referees/match/clear-queue
+ * 清空当前赛场选手排队队列（checkins + race_queues）
+ */
+router.post('/match/clear-queue', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const venueId = (req as any).venueId;
+    if (!venueId) return res.status(400).json({ code: 400, message: '未绑定赛场', data: null });
+
+    // 清空 checkins 表中该赛场的排队记录
+    await executeOp(req, 'DELETE FROM checkins WHERE venue_id = $1', [venueId]);
+    // 清空 race_queues 表中该赛场的记录
+    await executeOp(req, 'DELETE FROM race_queues WHERE venue_id = $1', [venueId]);
+
+    // 广播空队列到大屏
+    await broadcastAfterUpdate(req);
+
+    console.log(`[Match] clear-queue: venueId=${venueId}`);
+    return res.json({ code: 0, message: '已清空排队队列', data: { clearedCount: -1 } });
+  } catch (e: any) {
+    console.error('[Match] clear-queue error:', e.message);
+    return res.status(500).json({ code: 500, message: '清空失败', data: null });
+  }
+});
+
+/**
  * POST /api/v1/referees/match/select-racer
  * 选号（从排队队列选下一个选手，状态 waiting→called）
  */

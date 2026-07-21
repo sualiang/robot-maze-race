@@ -400,7 +400,7 @@ export default function MatchPage() {
       {checkedIn === true && currentRacer && status === 'finished' && <div className="referee-card referee-card-compact" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16, padding: 16 }}><button className="referee-btn referee-btn-outline" style={{ borderColor: '#e74c3c', color: '#e74c3c' }} onClick={handleInvalidate} disabled={actionLoading}>❌ 标记成绩无效</button></div>}
       {checkedIn === true && currentRacer && (status === 'called' || status === 'waiting') && <div className="referee-card referee-card-compact" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16, padding: 16 }}><button className="referee-btn referee-btn-ghost referee-btn-sm" onClick={handleSkip} disabled={actionLoading}>⏭ 跳过此选手</button></div>}
       {checkedIn === true && <><div className="referee-section">
-        <div className="referee-section-header"><span>📋 排队列表</span><span className="referee-section-count">{queue.length} 人</span></div>
+        <div className="referee-section-header"><span>📋 排队列表</span><span className="referee-section-count">{queue.length} 人</span><button className="referee-btn referee-btn-ghost referee-btn-sm" onClick={() => loadQueue()} disabled={actionLoading} style={{ marginLeft: 'auto' }}>🔄 刷新</button></div>
         {queue.length === 0 && <div className="referee-empty"><span className="referee-empty-icon">📭</span><span className="referee-empty-text">暂无排队选手</span></div>}
         {queue.map((item, index) => (
           <div key={item.id} className="referee-card referee-queue-item" data-active={item.isCurrent} onClick={() => { if (!item.isCurrent && status === 'idle') selectRacer(item.id); }}>

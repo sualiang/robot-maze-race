@@ -139,13 +139,19 @@ export default function AttendancePage() {
   };
 
   const checkOut = async () => {
-    const confirm = window.confirm(
+    const confirm1 = window.confirm(
       '⚠️ 确认要签退吗？\n\n' +
       '比赛时间未结束，签退后赛场将暂停运营，' +
       '选手将无法继续比赛。如需继续比赛请重新签到。\n\n' +
       '确定签退？'
     );
-    if (!confirm) return;
+    if (!confirm1) return;
+
+    // 第二个弹窗：是否清空排队队列
+    if (window.confirm('📋 当前赛场可能还有选手排队。\n\n是否需要同时清空选手排队队列？\n（不清空可能导致选手无法重新签到）')) {
+      try { await api.post('/referees/match/clear-queue'); }
+      catch (_) { /* 清空失败不影响签退 */ }
+    }
 
     setActionLoading(true);
     try {
