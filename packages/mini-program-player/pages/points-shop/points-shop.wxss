@@ -165,7 +165,7 @@ page {
   flex-direction: column;
 }
 .modal-content {
-  padding: 48rpx 32rpx 32rpx;
+  padding: 80rpx 32rpx 32rpx;
   display: flex;
   flex-direction: column;
   gap: 16rpx;
