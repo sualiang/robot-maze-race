@@ -60,6 +60,7 @@ export default function AttendancePage() {
   });
   const [pageLoading, setPageLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
   const [inputCode, setInputCode] = useState('');
   const [scanError, setScanError] = useState('');
   const checkInTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -87,6 +88,17 @@ export default function AttendancePage() {
     setPageLoading(true);
     try { await checkAttendanceStatus(); } catch {}
     setPageLoading(false);
+    // 加载签到记录
+    loadRecords();
+  };
+
+  const loadRecords = async () => {
+    try {
+      const res: any = await api.get('/referees/attendance/records');
+      if (!destroyedRef.current && res?.data) {
+        setAttendanceRecords(res.data);
+      }
+    } catch (_) {}
   };
 
   const checkAttendanceStatus = async () => {
@@ -122,6 +134,7 @@ export default function AttendancePage() {
       saveCheckinCache(vi, checkinAt); startCheckInTimer();
       setErrorMsg('✅ 签到成功！赛场已激活');
       setTimeout(() => setErrorMsg(''), 2000);
+      loadRecords();
     } catch (e: any) {
       setStatus('unchecked');
       setScanError(e?.message || '激活码无效，请重试');
@@ -244,6 +257,37 @@ export default function AttendancePage() {
           <div className="referee-row-line"><span className="referee-row-label">赛场状态</span><span className="referee-tag referee-tag-success">活跃</span></div>
         </div>
       </div>}
+
+      {/* 签到记录 */}
+      {status === 'checked' && (
+        <div className="referee-card" style={{ marginBottom: 16 }}>
+          <div className="referee-card-title">📋 签到记录</div>
+          {attendanceRecords.length === 0 ? (
+            <div style={{ color: '#999', fontSize: 14, textAlign: 'center', padding: 16 }}>加载中...</div>
+          ) : (
+            attendanceRecords.map((r: any) => (
+              <div key={r.id} style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '8px 0', borderBottom: '1px solid #f0f0f0', fontSize: 13,
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ color: '#333' }}>{r.venue_name || '未知赛场'}</div>
+                  <div style={{ color: '#999', fontSize: 12 }}>
+                    {r.checkin_at ? new Date(r.checkin_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}
+                    {' → '}
+                    {r.checkout_at ? new Date(r.checkout_at).toLocaleString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '进行中'}
+                  </div>
+                </div>
+                <span style={{
+                  padding: '2px 8px', borderRadius: 4, fontSize: 11,
+                  background: r.checkout_at ? '#f5f5f5' : '#e6f7ff',
+                  color: r.checkout_at ? '#999' : '#1890ff',
+                }}>{r.checkout_at ? '已签退' : '签退中'}</span>
+              </div>
+            ))
+          )}
+        </div>
+      )}
 
       {/* 清空队列确认弹窗 */}
       {showClearConfirm && (
