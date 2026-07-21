@@ -203,7 +203,6 @@
   <view wx:if="{{showResultCard && lastRaceResult}}" class="result-card {{resultCardClosing ? 'result-card-closing' : ''}}">
     <text class="result-card-title">比赛结束</text>
     <text class="result-card-score">{{lastRaceResult.scoreText}}</text>
-    <text class="result-card-rank">{{lastRaceResult.rank > 0 ? '排名: 第' + lastRaceResult.rank + '名' : ''}}</text>
   </view>
 
 </view>
