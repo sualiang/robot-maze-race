@@ -1401,8 +1401,7 @@ router.post('/attendance/check-out', authMiddleware, async (req: Request, res: R
     setVenueActive(false);
     cachedVenueStatus = 'closed';
 
-    // 回写 venues 表
-    try { await executeOp(req, 'UPDATE venues SET status = \'closed\' WHERE id = $1', [cachedVenueId]); } catch (_) {}
+
 
     // 清空排队队列和当前选手，重置所有比赛状态（新玩家需重新扫码排队）
     try {
