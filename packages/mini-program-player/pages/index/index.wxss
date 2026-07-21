@@ -123,6 +123,7 @@
 .hero-banner-image {
   position: relative;
   width: 686rpx;
+  display: inline-block;
   margin: 0 auto 24rpx;
   border-radius: 24rpx;
   overflow: hidden;
