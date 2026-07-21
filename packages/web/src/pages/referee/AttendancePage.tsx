@@ -39,6 +39,7 @@ export default function AttendancePage() {
     return cached ? 'checked' : 'unchecked';
   });
   const [actionLoading, setActionLoading] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [venueInfo, setVenueInfo] = useState<VenueInfo | null>(() => {
     const cached = loadCheckinCache();
     return cached?.vi || null;
@@ -229,7 +230,7 @@ export default function AttendancePage() {
         )}
 
         {status === 'checked' && <button className="referee-btn referee-btn-danger referee-btn-lg" onClick={checkOut} disabled={actionLoading}>🏁 签退暂停赛场</button>}
-        {status === 'checked' && <button className="referee-btn referee-btn-outline" onClick={async () => { if (!window.confirm('⚠️ 将清空当前赛场所有选手排队数据，此操作不可撤销。\n\n确定清空？')) return; setActionLoading(true); try { await api.post('/referees/match/clear-queue'); setErrorMsg('🧹 排队队列已清空'); setTimeout(() => setErrorMsg(''), 2000); } catch { setErrorMsg('清空失败，请重试'); } finally { setActionLoading(false); } }} disabled={actionLoading} style={{ marginTop: 12, borderColor: '#e74c3c', color: '#e74c3c' }}>🧹 清空排队队列</button>}
+        {status === 'checked' && <button className="referee-btn referee-btn-outline" onClick={() => setShowClearConfirm(true)} disabled={actionLoading} style={{ marginTop: 12, borderColor: '#e74c3c', color: '#e74c3c' }}>🧹 清空排队队列</button>}
         {status === 'loading' && <button className="referee-btn referee-btn-primary referee-btn-lg" disabled>⏳ 处理中...</button>}
       </div>
       {errorMsg && <div style={{ background: 'rgba(39,174,96,0.1)', color: '#27ae60', padding: '8px 16px', borderRadius: 8, fontSize: 14, textAlign: 'center', marginBottom: 12 }}>{errorMsg}</div>}
@@ -243,6 +244,51 @@ export default function AttendancePage() {
           <div className="referee-row-line"><span className="referee-row-label">赛场状态</span><span className="referee-tag referee-tag-success">活跃</span></div>
         </div>
       </div>}
+
+      {/* 清空队列确认弹窗 */}
+      {showClearConfirm && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.7)', zIndex: 10000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }} onClick={() => setShowClearConfirm(false)}>
+          <div style={{
+            background: '#fff', borderRadius: 16, padding: '32px 28px 24px',
+            maxWidth: 380, width: '90%', textAlign: 'center',
+          }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: '#e74c3c', marginBottom: 12 }}>清空排队队列</div>
+            <div style={{ fontSize: 14, color: '#666', lineHeight: 1.8, textAlign: 'left', marginBottom: 24 }}>
+              <p style={{ margin: '0 0 12px' }}>清空排队队列会导致<strong style={{ color: '#e74c3c' }}>正在排队的玩家损失一次参赛次数</strong>。</p>
+              <p style={{ margin: '0 0 12px' }}>此功能仅建议在<strong>每天关闭赛场时</strong>执行一次，不要在比赛进行中使用，否则会导致玩家利益损失，引起客诉！</p>
+            </div>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button
+                className="referee-btn referee-btn-ghost"
+                onClick={() => setShowClearConfirm(false)}
+                style={{ flex: 1 }}
+              >取消</button>
+              <button
+                className="referee-btn"
+                onClick={async () => {
+                  setShowClearConfirm(false);
+                  setActionLoading(true);
+                  try {
+                    await api.post('/referees/match/clear-queue');
+                    setErrorMsg('🧹 排队队列已清空');
+                    setTimeout(() => setErrorMsg(''), 2000);
+                  } catch {
+                    setErrorMsg('清空失败，请重试');
+                  } finally {
+                    setActionLoading(false);
+                  }
+                }}
+                style={{ flex: 1, background: '#e74c3c', color: '#fff', border: 'none' }}
+              >确认清空</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
