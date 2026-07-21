@@ -209,6 +209,8 @@ export default function ScreenDisplay() {
           // 大屏收到激活，切换到已激活状态
           setIsActivated(true);
           setVenueName(msg.data?.venue_name || '');
+          // 立刻将 status 设为 open，避免短暂显示"已关闭"
+          setData(prev => ({ ...prev, venue_status: 'open', venue_name: msg.data?.venue_name || prev.venue_name }));
         } else if (msg.type === 'deactivated' || msg.event === 'venue_closed') {
           // 大屏收到去激活，回到激活码输入状态
           setIsActivated(false);
