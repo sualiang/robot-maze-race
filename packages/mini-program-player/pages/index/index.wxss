@@ -63,7 +63,7 @@
 .custom-nav-logo {
   position: absolute;
   left: 32rpx;
-  top: 48rpx;
+  top: 64rpx;
   width: 200rpx;
   height: 53rpx;
   display: block;
