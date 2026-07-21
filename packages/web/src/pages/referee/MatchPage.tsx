@@ -144,7 +144,7 @@ export default function MatchPage() {
           }
         } catch {}
       };
-      ws.onclose = () => { console.log('[WS] 关闭'); setWsConnected(false); if (checkedInRef.current === true) { setShowDcAlert(true); } if (!destroyedRef.current && reconnectCountRef.current < 10) { reconnectCountRef.current++; reconnectTimerRef.current = setTimeout(() => { if (!destroyedRef.current) connectWebSocket(); }, 3000); } };
+      ws.onclose = () => { console.log('[WS] 关闭'); setWsConnected(false); if (checkedInRef.current === true) { setShowDcAlert(true); api.post('/referees/attendance/check-out').catch(() => {}); setCheckedIn(false); sessionStorage.removeItem('referee_checkin_status'); } if (!destroyedRef.current && reconnectCountRef.current < 10) { reconnectCountRef.current++; reconnectTimerRef.current = setTimeout(() => { if (!destroyedRef.current) connectWebSocket(); }, 3000); } };
       ws.onerror = () => setWsConnected(false);
     } catch { console.warn('[WS] 不可用'); }
   }, []);
