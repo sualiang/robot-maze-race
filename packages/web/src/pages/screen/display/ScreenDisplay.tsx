@@ -446,7 +446,7 @@ export default function ScreenDisplay() {
         background: 'rgba(255,255,255,0.03)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <img src="/logo-operator.png" alt="logo" style={{ height: 50, width: 'auto' }} />
+          <img src="/iron-dog-logo.png" alt="铁甲快狗" style={{ height: 50, width: 'auto' }} />
           <h1 style={{ fontSize: 32, margin: 0, lineHeight: 1.4, fontWeight: 700, background: 'linear-gradient(90deg, #ff6b35, #ff9a3c)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
             闯关竞速赛
           </h1>
