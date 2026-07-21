@@ -183,7 +183,7 @@ export default function AttendancePage() {
             animation: status === 'checked' ? 'referee-pulse 2s ease-in-out infinite' : status === 'loading' ? 'referee-pulse 1s ease-in-out infinite' : undefined,
           }} />
           <span style={{ fontSize: 18, fontWeight: 600 }}>
-            {status === 'checked' ? '已签到 · 赛场激活中' : status === 'loading' ? '签到中...' : '未签到'}
+            {status === 'checked' ? '已签到 · 赛场已激活' : status === 'loading' ? '签到中...' : '未签到'}
           </span>
         </div>
 
