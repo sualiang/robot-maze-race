@@ -64,8 +64,8 @@
 .custom-nav-logo {
   position: relative;
   z-index: 10;
-  height: 50rpx;
-  width: auto;
+  width: 250rpx;
+  height: 66rpx;
   display: block;
 }
 .custom-nav-venue {
