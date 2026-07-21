@@ -139,3 +139,53 @@ export async function createVenueMiniCode(
     contentType: 'image/jpeg',
   };
 }
+
+/**
+ * 生成微信小程序 URL Scheme
+ *
+ * 通过微信 generatescheme API 生成加密 URL Scheme，支持 H5/短信等渠道
+ * 拉起小程序并跳转到指定页面。
+ *
+ * API: POST https://api.weixin.qq.com/wxa/generatescheme?access_token=TOKEN
+ * 文档: https://developers.weixin.qq.com/miniprogram/dev/OpenApiDoc/qrcode-link/url-scheme/generateScheme.html
+ *
+ * @param path       小程序页面路径（如 pages/index/index）
+ * @param query      页面参数（如 operator_id=xxx&venue_id=xxx）
+ * @param expireType 0=永久有效（上限10万条）, 1=指定过期（默认0）
+ * @param expireTime 当 expireType=1 时，到期的秒级时间戳（默认 7天后）
+ * @returns 生成的 URL Scheme 字符串
+ */
+export async function generateUrlScheme(
+  path: string,
+  query: string,
+  expireType: 0 | 1 = 0,
+  expireTime?: number,
+): Promise<string> {
+  const accessToken = await getMiniProgramAccessToken();
+
+  const url = `https://api.weixin.qq.com/wxa/generatescheme?access_token=${accessToken}`;
+
+  const bodyObj: any = {
+    jump_wxa: { path, query },
+    is_expire: expireType === 1,
+  };
+  if (expireType === 1 && expireTime) {
+    bodyObj.expire_time = expireTime;
+  }
+
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(bodyObj),
+  });
+
+  const data: any = await resp.json();
+
+  if (data.errcode && data.errcode !== 0) {
+    throw new Error(
+      `生成 URL Scheme 失败: ${data.errmsg || '未知错误'} (errcode=${data.errcode})`
+    );
+  }
+
+  return data.openlink as string;
+}

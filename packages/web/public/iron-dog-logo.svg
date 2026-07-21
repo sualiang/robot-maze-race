@@ -1,0 +1,159 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <defs>
+    <!-- 主渐变 - 橙色到金黄 -->
+    <linearGradient id="bodyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF8C00;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#FF6B00;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E55A00;stop-opacity:1" />
+    </linearGradient>
+    <!-- 高光渐变 -->
+    <linearGradient id="highlightGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFD700;stop-opacity:0.6" />
+      <stop offset="100%" style="stop-color:#FF8C00;stop-opacity:0" />
+    </linearGradient>
+    <!-- 金属渐变 -->
+    <linearGradient id="metalGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFE55C;stop-opacity:1" />
+      <stop offset="30%" style="stop-color:#FFB347;stop-opacity:1" />
+      <stop offset="70%" style="stop-color:#FF8C00;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#CC5500;stop-opacity:1" />
+    </linearGradient>
+    <!-- 辉光 -->
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- 阴影 -->
+    <filter id="shadow">
+      <feDropShadow dx="2" dy="3" stdDeviation="3" flood-color="#222" flood-opacity="0.4"/>
+    </filter>
+    <!-- 速度线渐变 -->
+    <linearGradient id="speedGrad" x1="100%" y1="50%" x2="0%" y2="50%">
+      <stop offset="0%" style="stop-color:#FFD700;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#FFD700;stop-opacity:0" />
+    </linearGradient>
+  </defs>
+
+  <!-- 背景圆形 -->
+  <circle cx="200" cy="200" r="195" fill="#1A1A2E" stroke="#FF8C00" stroke-width="3"/>
+  <circle cx="200" cy="200" r="188" fill="#1A1A2E" stroke="#FFD700" stroke-width="1" stroke-dasharray="6,4"/>
+
+  <!-- ========== 速度线 ========== -->
+  <line x1="30" y1="170" x2="110" y2="170" stroke="#FFD700" stroke-width="3" stroke-linecap="round" opacity="0.6" filter="url(#glow)"/>
+  <line x1="15" y1="190" x2="100" y2="190" stroke="#FFD700" stroke-width="2.5" stroke-linecap="round" opacity="0.5"/>
+  <line x1="40" y1="210" x2="120" y2="210" stroke="#FFD700" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
+  <line x1="25" y1="230" x2="105" y2="230" stroke="#FF8C00" stroke-width="2" stroke-linecap="round" opacity="0.3"/>
+
+  <!-- ========== 机器狗身体 ========== -->
+  <g filter="url(#shadow)">
+    <!-- 后腿 -->
+    <path d="M 250,250 Q 260,280 245,310 L 240,310 Q 255,280 240,250" fill="url(#metalGrad)" stroke="#CC5500" stroke-width="1.5"/>
+    <path d="M 220,245 Q 225,275 215,305 L 210,305 Q 220,275 210,245" fill="#E55A00" stroke="#CC5500" stroke-width="1.5"/>
+    <!-- 后腿关节 -->
+    <circle cx="248" cy="270" r="5" fill="#FFD700" stroke="#CC5500" stroke-width="1"/>
+    <circle cx="218" cy="265" r="4.5" fill="#FFD700" stroke="#CC5500" stroke-width="1"/>
+
+    <!-- 身体主体 -->
+    <ellipse cx="220" cy="200" rx="70" ry="45" fill="url(#bodyGrad)" stroke="#CC5500" stroke-width="2"/>
+    
+    <!-- 身体高光 -->
+    <ellipse cx="225" cy="185" rx="50" ry="25" fill="url(#highlightGrad)" opacity="0.5"/>
+
+    <!-- 身体装甲板 -->
+    <path d="M 175,185 Q 200,170 230,185 Q 235,200 220,210 Q 195,210 175,200 Z" fill="none" stroke="#FFD700" stroke-width="1.5" opacity="0.4"/>
+    <path d="M 230,185 Q 260,170 280,185 Q 285,200 270,210 Q 245,210 230,200 Z" fill="none" stroke="#FFD700" stroke-width="1.5" opacity="0.4"/>
+
+    <!-- 身体上的螺丝 -->
+    <circle cx="185" cy="195" r="3" fill="#FFD700" opacity="0.6"/>
+    <circle cx="255" cy="195" r="3" fill="#FFD700" opacity="0.6"/>
+
+    <!-- 前腿 -->
+    <path d="M 170,240 Q 175,270 165,300 L 160,300 Q 170,270 160,240" fill="url(#metalGrad)" stroke="#CC5500" stroke-width="1.5"/>
+    <path d="M 195,245 Q 200,275 192,305 L 187,305 Q 195,275 185,245" fill="#E55A00" stroke="#CC5500" stroke-width="1.5"/>
+    <!-- 前腿关节 -->
+    <circle cx="168" cy="260" r="4.5" fill="#FFD700" stroke="#CC5500" stroke-width="1"/>
+    <circle cx="192" cy="258" r="4" fill="#FFD700" stroke="#CC5500" stroke-width="1"/>
+
+    <!-- 脚爪 -->
+    <ellipse cx="242" cy="312" rx="8" ry="4" fill="#333" stroke="#FFD700" stroke-width="1"/>
+    <ellipse cx="212" cy="307" rx="7" ry="3.5" fill="#333" stroke="#FFD700" stroke-width="1"/>
+    <ellipse cx="162" cy="302" rx="7" ry="3.5" fill="#333" stroke="#FFD700" stroke-width="1"/>
+    <ellipse cx="189" cy="307" rx="7" ry="3.5" fill="#333" stroke="#FFD700" stroke-width="1"/>
+  </g>
+
+  <!-- ========== 尾巴 ========== -->
+  <g>
+    <path d="M 285,185 Q 310,170 320,150 Q 325,140 315,135" fill="none" stroke="url(#metalGrad)" stroke-width="6" stroke-linecap="round"/>
+    <path d="M 315,135 Q 310,130 318,125" fill="none" stroke="#FFD700" stroke-width="4" stroke-linecap="round" filter="url(#glow)"/>
+  </g>
+
+  <!-- ========== 头部 ========== -->
+  <g filter="url(#shadow)">
+    <!-- 脖子 -->
+    <ellipse cx="155" cy="170" rx="25" ry="30" fill="url(#bodyGrad)" stroke="#CC5500" stroke-width="2"/>
+    
+    <!-- 头部主体 -->
+    <ellipse cx="130" cy="145" rx="38" ry="32" fill="url(#metalGrad)" stroke="#CC5500" stroke-width="2"/>
+    
+    <!-- 头部装甲 -->
+    <path d="M 105,135 Q 120,120 145,130 Q 155,140 145,150 Q 125,155 105,145 Z" fill="none" stroke="#FFD700" stroke-width="1.5" opacity="0.5"/>
+    
+    <!-- 嘴巴/鼻子 -->
+    <ellipse cx="100" cy="150" rx="10" ry="6" fill="#333" stroke="#FF8C00" stroke-width="1"/>
+    <ellipse cx="100" cy="150" rx="6" ry="3" fill="#555" opacity="0.5"/>
+
+    <!-- 牙齿/格栅 -->
+    <line x1="94" y1="148" x2="94" y2="155" stroke="#FFD700" stroke-width="1" opacity="0.5"/>
+    <line x1="98" y1="148" x2="98" y2="155" stroke="#FFD700" stroke-width="1" opacity="0.5"/>
+    <line x1="102" y1="148" x2="102" y2="155" stroke="#FFD700" stroke-width="1" opacity="0.5"/>
+
+    <!-- 耳机/天线 -->
+    <rect x="115" y="108" width="8" height="12" rx="3" fill="#333" stroke="#FFD700" stroke-width="1"/>
+    <rect x="135" y="106" width="8" height="14" rx="3" fill="#333" stroke="#FFD700" stroke-width="1"/>
+    <circle cx="119" cy="106" r="4" fill="#FFD700" filter="url(#glow)"/>
+    <circle cx="139" cy="104" r="4" fill="#FFD700" filter="url(#glow)"/>
+
+    <!-- 左眼（发光） -->
+    <ellipse cx="120" cy="140" rx="9" ry="8" fill="#00BFFF" filter="url(#glow)"/>
+    <ellipse cx="120" cy="140" rx="6" ry="5" fill="#00FFFF"/>
+    <circle cx="122" cy="138" r="3" fill="white" opacity="0.8"/>
+
+    <!-- 右眼（发光） -->
+    <ellipse cx="148" cy="138" rx="9" ry="8" fill="#00BFFF" filter="url(#glow)"/>
+    <ellipse cx="148" cy="138" rx="6" ry="5" fill="#00FFFF"/>
+    <circle cx="150" cy="136" r="3" fill="white" opacity="0.8"/>
+
+    <!-- 眉毛（酷表情） -->
+    <path d="M 110,128 Q 118,123 128,128" fill="none" stroke="#333" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M 140,126 Q 150,121 160,127" fill="none" stroke="#333" stroke-width="2.5" stroke-linecap="round"/>
+
+    <!-- 耳朵 -->
+    <path d="M 105,120 Q 90,105 95,125 Z" fill="url(#metalGrad)" stroke="#CC5500" stroke-width="1.5"/>
+    <path d="M 160,118 Q 175,100 170,122 Z" fill="url(#metalGrad)" stroke="#CC5500" stroke-width="1.5"/>
+  </g>
+
+  <!-- ========== 颈部红色围巾/披风（增加动感） ========== -->
+  <path d="M 140,165 Q 130,175 145,185 Q 155,180 150,170 Z" fill="#FF3333" opacity="0.7"/>
+  <path d="M 150,170 Q 165,190 180,195 Q 170,185 160,175 Z" fill="#FF3333" opacity="0.5"/>
+
+  <!-- ========== 文字：铁甲快狗 ========== -->
+  <g filter="url(#shadow)">
+    <text x="200" y="370" text-anchor="middle" font-family="'PingFang SC', 'Microsoft YaHei', 'SimHei', 'Noto Sans SC', sans-serif" font-weight="900" font-size="48" fill="#FFD700" stroke="#CC5500" stroke-width="2" letter-spacing="4">
+      铁甲快狗
+    </text>
+    <!-- 文字高光 -->
+    <text x="200" y="370" text-anchor="middle" font-family="'PingFang SC', 'Microsoft YaHei', 'SimHei', 'Noto Sans SC', sans-serif" font-weight="900" font-size="48" fill="url(#highlightGrad)" opacity="0.4" letter-spacing="4">
+      铁甲快狗
+    </text>
+  </g>
+
+  <!-- ========== 文字下方闪电装饰 ========== -->
+  <path d="M 170,378 L 185,378 L 180,386 L 200,386 L 185,395 L 190,386 L 175,386 Z" fill="#FFD700" opacity="0.6"/>
+  <path d="M 205,378 L 215,378 L 210,384 L 228,384 L 215,392 L 218,384 L 208,384 Z" fill="#FFD700" opacity="0.4"/>
+
+  <!-- 底部装饰弧线 -->
+  <path d="M 140,345 Q 200,335 260,345" fill="none" stroke="#FFD700" stroke-width="1.5" opacity="0.3"/>
+</svg>

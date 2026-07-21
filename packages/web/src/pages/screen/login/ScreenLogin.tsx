@@ -7,25 +7,16 @@ export default function ScreenLogin() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const venueId = searchParams.get('venueId') || '';
+  // venueName 直接用 searchParams（和 venueId 一致），不搞 window.location.search
+  const venueName = searchParams.get('venueName') || '';
   const [activationCode, setActivationCode] = useState('');
   const [activated, setActivated] = useState(false);
-  const [venueName, setVenueName] = useState('');
   const [venueClosed, setVenueClosed] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [expired, setExpired] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // 加载赛场名称
-  useEffect(() => {
-    if (!venueId) return;
-    api.get(`/venues/${venueId}`).then((res: any) => {
-      const v = res.data || res;
-      setVenueName(v.name || '');
-      if (v.status === 'closed') setVenueClosed(true);
-    }).catch(() => {});
-  }, [venueId]);
 
   // 激活后 2 秒自动跳转到大屏
   useEffect(() => {
@@ -41,9 +32,7 @@ export default function ScreenLogin() {
     const code = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
     setActivationCode(code);
     setExpired(false);
-    // 不再倒计时 — 激活码永久有效
     if (timerRef.current) clearInterval(timerRef.current);
-
     return code;
   }, []);
 
@@ -58,8 +47,8 @@ export default function ScreenLogin() {
         type: 'screen_login',
         activation_code: code,
         venueId: venueId,
+        venueName: venueName || '',
       }));
-      // 心跳保活，防止 NAT/防火墙空闲断开
       if (heartbeatRef.current) clearInterval(heartbeatRef.current);
       heartbeatRef.current = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) {
@@ -73,7 +62,6 @@ export default function ScreenLogin() {
         const msg = JSON.parse(event.data);
         if (msg.type === 'activated') {
           setActivated(true);
-          setVenueName(msg.data?.venue_name || '赛场');
         }
       } catch { /* ignore */ }
     };
@@ -83,7 +71,7 @@ export default function ScreenLogin() {
       ws.close();
     };
     wsRef.current = ws;
-  }, [venueId]);
+  }, [venueId, venueName]);
 
   useEffect(() => {
     const code = generateCode();
@@ -145,15 +133,7 @@ export default function ScreenLogin() {
     }}>
       {/* 标题 */}
       <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 56, marginBottom: 20 }}>🐕</div>
-        <h1 style={{
-          fontSize: 48, margin: 0, fontWeight: 800,
-          lineHeight: 1.2,
-          background: 'linear-gradient(90deg, #ff6b35, #ff9a3c)',
-          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-        }}>
-          机器狗迷宫竞速
-        </h1>
+        <img src="/iron-dog-logo.png" alt="铁甲快狗" style={{ width: 200, marginBottom: 16 }} />
         <p style={{ fontSize: 20, color: '#888', marginTop: 8 }}>
           赛场大屏展示端
         </p>
@@ -182,7 +162,7 @@ export default function ScreenLogin() {
           fontSize: 72, fontFamily: 'monospace', fontWeight: 800,
           letterSpacing: 16, color: '#ff6b35',
           marginBottom: 12, textAlign: 'center',
-          paddingLeft: 16, /* compensate for letter-spacing on last char */
+          paddingLeft: 16,
         }}>
           {activationCode}
         </div>

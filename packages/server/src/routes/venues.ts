@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
-import { createVenueMiniCode } from '../services/wechat-qrcode';
+import { createVenueMiniCode, generateUrlScheme } from '../services/wechat-qrcode';
 import { getOperatorContext } from '../middleware/operator-context';
 import {
   ApiResponse,
@@ -482,6 +482,53 @@ router.get('/:id/qrcode', authMiddleware, async (req: Request, res: Response) =>
     return res.status(500).json({
       code: 500,
       message: `生成小程序码失败: ${error.message}`,
+      data: null,
+    });
+  }
+});
+
+/**
+ * GET /api/v1/venues/:id/url-scheme
+ * 生成赛场小程序 URL Scheme
+ *
+ * 调用微信 generatescheme API，生成加密 URL Scheme，
+ * 可用于 H5 中转页拉起小程序。
+ */
+router.get('/:id/url-scheme', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.userId;
+
+    const operatorId = (req.user as any)?.operatorId || (await getOperatorContext(userId))?.operator_id;
+    if (!operatorId) {
+      return res.status(400).json({ code: 400, message: '无法获取运营商上下文', data: null });
+    }
+
+    const venue = await queryOpOne<{ id: string; name: string }>(req,
+      'SELECT id, name FROM venues WHERE id = $1', [id]
+    );
+    if (!venue) {
+      return res.status(404).json({ code: 404, message: '赛场不存在', data: null });
+    }
+
+    const query = `operator_id=${encodeURIComponent(operatorId)}&venue_id=${encodeURIComponent(venue.id)}`;
+    const openlink = await generateUrlScheme('pages/index/index', query);
+
+    return res.json({
+      code: 0,
+      message: 'ok',
+      data: {
+        venueId: venue.id,
+        venueName: venue.name,
+        operatorId,
+        urlScheme: openlink,
+      },
+    });
+  } catch (error: any) {
+    console.error('[Venues] url-scheme error:', error.message);
+    return res.status(500).json({
+      code: 500,
+      message: `生成 URL Scheme 失败: ${error.message}`,
       data: null,
     });
   }

@@ -135,50 +135,54 @@ function handleMessage(ws: WebSocket, msg: any) {
       if (!code || typeof code !== 'string') break;
       const venueId = msg.venueId || undefined;
       let venueName = msg.venueName || undefined;
-      // 前端没传 venueName 时，从 DB 查（兜底）
-      if (venueId && !venueName) {
-        const { query } = require('../config/database');
-        query('SELECT name FROM venues WHERE id = $1', [venueId]).then((rows: any) => {
-          if (rows?.[0]?.name) {
-            ws.send(JSON.stringify({ type: 'login_ack', message: '等待裁判扫码', venue_name: rows[0].name, venue_id: venueId || '' }));
-          }
-        }).catch(() => {});
-      }
       // 记录 ws → venueId 映射，解决跨运营商大屏数据串问题
       if (venueId) {
         screenVenueMap.set(ws, venueId);
-        // 大屏注册时 venueId 是在 URL 传过来的，用它拉对应赛场数据
-        // 避免使用全局 cachedVenueId（那是裁判操作设置的，可能指向其他赛场）
-        const screenData = getCurrentScreenData();
-        const screenVenue = screenData?.venue_id;
-        if (screenVenue !== venueId) {
-          // 全局 cachedVenueId 跟当前大屏不匹配，用正确的 venueId 构造初始数据
-          const initialData = {
-            race_status: 'idle',
-            venue_status: 'inactive',
-            current_racer: null,
-            elapsed_ms: 0,
-            start_time: null,
-            next_racer: null,
-            queue: [],
-            venue_name: venueName || '',
-            venue_id: venueId,
-            leaderboard: [],
-            last_result: null,
-            timestamp: new Date().toISOString(),
-          };
-          ws.send(JSON.stringify({ type: 'screen_data', data: initialData }));
-        } else {
-          // venueId 匹配，直接推送当前数据
-          ws.send(JSON.stringify({ type: 'screen_data', data: screenData }));
-        }
-        // 异步拉 DB 排行榜
-        setImmediate(() => {
-          fetchLeaderboardFromDb(venueId).then((leaderboard) => {
-            const data = { ...(screenData || {}), leaderboard: leaderboard || [], venue_id: venueId, venue_name: venueName || '' };
-            ws.send(JSON.stringify({ type: 'screen_data', data }));
-          }).catch(() => {});
+        // 用 IIFE 包裹异步逻辑，确保 venueName 先查 DB 再构造 initialData
+        (async () => {
+          // 从 DB 查赛场名（前端 URL 可能只有 venueId 没有 venueName）
+          if (!venueName) {
+            try {
+              const { query } = require('../config/database');
+              const rows = await query('SELECT name FROM venues WHERE id = $1', [venueId]);
+              if (rows?.[0]?.name) {
+                venueName = rows[0].name;
+              }
+            } catch (_) { /* ignore */ }
+          }
+          // 大屏注册时 venueId 是在 URL 传过来的，用它拉对应赛场数据
+          // 避免使用全局 cachedVenueId（那是裁判操作设置的，可能指向其他赛场）
+          const screenData = getCurrentScreenData();
+          const screenVenue = screenData?.venue_id;
+          if (screenVenue !== venueId) {
+            // 全局 cachedVenueId 跟当前大屏不匹配，用正确的 venueId 构造初始数据
+            const initialData = {
+              race_status: 'idle',
+              venue_status: 'inactive',
+              current_racer: null,
+              elapsed_ms: 0,
+              start_time: null,
+              next_racer: null,
+              queue: [],
+              venue_name: venueName || '',
+              venue_id: venueId,
+              leaderboard: [],
+              last_result: null,
+              timestamp: new Date().toISOString(),
+            };
+            ws.send(JSON.stringify({ type: 'screen_data', data: initialData }));
+          } else {
+            // venueId 匹配，直接推送当前数据
+            ws.send(JSON.stringify({ type: 'screen_data', data: screenData }));
+          }
+          // 异步拉 DB 排行榜
+          setImmediate(() => {
+            fetchLeaderboardFromDb(venueId).then((leaderboard) => {
+              const data = { ...(screenData || {}), leaderboard: leaderboard || [], venue_id: venueId, venue_name: venueName || '' };
+              ws.send(JSON.stringify({ type: 'screen_data', data }));
+            }).catch(() => {});
         });
+        })();
       }
       setTempToken('activation_code', code, { venueId, venueName }, 300).catch((err) =>
         console.error('[WS] setTempToken error:', err.message),

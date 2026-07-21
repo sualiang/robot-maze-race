@@ -170,7 +170,7 @@ router.post('/register', async (req: Request, res: Response) => {
     res.json({
       code: 0,
       message: '注册成功',
-      data: { id },
+      data: { id, username, password },
     });
   } catch (e: any) {
     console.error('[MerchantAuth] register error:', e?.message || e);
@@ -191,19 +191,42 @@ router.post('/login', async (req: Request, res: Response) => {
       res.json({ code: 400, message: '用户名和密码不能为空', data: null });
       return;
     }
-    if (!operatorId) {
-      res.json({ code: 400, message: '缺少运营商信息', data: null });
-      return;
-    }
 
-    const opDbName = (await queryOne<{ db_name: string }>(
-      'SELECT db_name FROM operators_registry WHERE operator_id = $1', [operatorId]
-    ))?.db_name;
-    if (!opDbName) {
-      res.json({ code: 500, message: '运营商信息不完整', data: null });
+    // 未传 operatorId 时遍历所有运营商库查找该商家账号
+    const getOpPool = async (): Promise<{ pool: any; opDbName: string } | null> => {
+      if (operatorId) {
+        const opDbName = (await queryOne<{ db_name: string }>(
+          'SELECT db_name FROM operators_registry WHERE operator_id = $1', [operatorId]
+        ))?.db_name;
+        if (!opDbName) return null;
+        return { pool: getOperatorPool(opDbName), opDbName };
+      }
+      // 遍历 operators_registry 中所有运营商
+      const registries = await query<{ db_name: string; operator_id: string }>(
+        'SELECT db_name, operator_id FROM operators_registry', []
+      );
+      for (const reg of registries) {
+        try {
+          const pool = getOperatorPool(reg.db_name);
+          const [rows] = await pool.execute('SELECT 1 FROM merchant_admin WHERE username = ? LIMIT 1', [username]);
+          if ((rows as any[])?.length > 0) {
+            return { pool, opDbName: reg.db_name };
+          }
+        } catch { /* continue */ }
+      }
+      return null;
+    };
+
+    const poolResult = await getOpPool();
+    if (!poolResult) {
+      if (operatorId) {
+        res.json({ code: 500, message: '运营商信息不完整', data: null });
+        return;
+      }
+      res.json({ code: 401, message: '用户名或密码错误', data: null });
       return;
     }
-    const pool = getOperatorPool(opDbName);
+    const { pool, opDbName } = poolResult;
 
     const [adminRows] = await pool.execute(
       `SELECT ma.*, m.merchant_name

@@ -1577,7 +1577,17 @@ export function setVenueActive(active: boolean) {
   // venActive 由签到/签退控制
 }
 
-export async function initVenueCache(): Promise<void> { return; }
+export async function initVenueCache(): Promise<void> {
+  try {
+    const row = await queryOne('SELECT id, name FROM venues LIMIT 1');
+    if (row) {
+      cachedVenueName = row.name || cachedVenueName;
+      cachedVenueId = row.id || cachedVenueId;
+    }
+  } catch (e) {
+    console.warn('[VenueCache] 初始化失败，使用默认值:', (e as any)?.message || e);
+  }
+}
 
 /** 获取当前大屏数据（从 DB 异步查询） */
 export function getCurrentScreenData() {

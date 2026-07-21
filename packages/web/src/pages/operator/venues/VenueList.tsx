@@ -241,7 +241,7 @@ function VenueTab() {
   };
 
   const handleScreenUrl = (record: VenueItem) => {
-    const url = `https://dog.amberrobot.com.cn/screen?venueId=${record.id}`;
+    const url = `https://dog.amberrobot.com.cn/screen?venueId=${record.id}&venueName=${encodeURIComponent(record.name)}`;
     const modal = Modal.info({
       title: `现场大屏 — ${record.name}`,
       content: (
