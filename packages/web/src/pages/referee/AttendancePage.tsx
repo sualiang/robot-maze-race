@@ -147,12 +147,6 @@ export default function AttendancePage() {
     );
     if (!confirm1) return;
 
-    // 第二个弹窗：是否清空排队队列
-    if (window.confirm('📋 当前赛场可能还有选手排队。\n\n是否需要同时清空选手排队队列？\n（不清空可能导致选手无法重新签到）')) {
-      try { await api.post('/referees/match/clear-queue'); }
-      catch (_) { /* 清空失败不影响签退 */ }
-    }
-
     setActionLoading(true);
     try {
       await api.post('/referees/attendance/check-out');
