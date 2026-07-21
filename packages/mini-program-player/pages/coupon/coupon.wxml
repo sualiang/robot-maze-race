@@ -1,5 +1,6 @@
 <!-- 我的卡券 V3.6 - 3Tab 统一页面（参赛抵扣卡已废弃） -->
 <view class="cc-page">
+  <nav-bar title="我的卡券" />
 
   <!-- ========== 模块1: 页面大标题 ========== -->
   <view class="cc-header">

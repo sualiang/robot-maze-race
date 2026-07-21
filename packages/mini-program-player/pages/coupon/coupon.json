@@ -1,5 +1,4 @@
 {
-  "navigationBarTitleText": "商圈消费券",
-  "usingComponents": {},
-  "enablePullDownRefresh": true
+  "usingComponents": { "nav-bar": "/components/nav-bar/index" },
+  "navigationBarTitleText": "我的卡券"
 }
