@@ -422,9 +422,9 @@ router.post('/checkin', authMiddleware, async (req: Request, res: Response) => {
     try {
       await queryOp(req,
         `INSERT INTO race_queues (id, user_id, venue_id, queue_number, status, remaining_races, checkin_id, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, 'waiting', 1, $5, NOW(), NOW())
-         ON DUPLICATE KEY UPDATE status = 'waiting', queue_number = $4, checkin_id = $5, updated_at = NOW()`,
-        [uuidv4(), userId, venueId, queueNumber, checkinId]
+         VALUES ($1, $2, $3, $4, 'waiting', $6, $5, NOW(), NOW())
+         ON DUPLICATE KEY UPDATE status = 'waiting', queue_number = $4, checkin_id = $5, remaining_races = $6, updated_at = NOW()`,
+        [uuidv4(), userId, venueId, queueNumber, checkinId, remainingRaces]
       );
     } catch (e: any) {
       console.error('[签到] race_queues 写入失败:', e?.message || e);
