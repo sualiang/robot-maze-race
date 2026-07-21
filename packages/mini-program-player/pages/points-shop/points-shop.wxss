@@ -363,6 +363,7 @@ page {
   z-index: 210;
   display: flex;
   flex-direction: column;
+  padding-top: 140rpx;
   transform: translateY(100%);
   transition: transform 0.35s ease-out;
   overflow-y: auto;
