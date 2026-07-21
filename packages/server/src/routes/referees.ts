@@ -1596,6 +1596,9 @@ let cachedVenueId = '';
 export function getCachedVenueId(): string {
   return cachedVenueId;
 }
+export function getCachedVenueName(): string {
+  return cachedVenueName;
+}
 let cachedVenueStatus = 'inactive';
 
 export function setVenueActive(active: boolean) {

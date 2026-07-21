@@ -1,7 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { IncomingMessage } from 'http';
 import { Server } from 'http';
-import { getCurrentScreenData, broadcastAfterUpdate, getCachedVenueId, fetchLeaderboardFromDb } from '../routes/referees';
+import { getCurrentScreenData, broadcastAfterUpdate, getCachedVenueId, getCachedVenueName, fetchLeaderboardFromDb } from '../routes/referees';
 import { setTempToken, getTempToken, listTempTokensWithData, deleteTempToken } from '../utils/temp-token';
 
 // 存储所有连接的客户端，按房间分组
@@ -140,11 +140,14 @@ function handleMessage(ws: WebSocket, msg: any) {
         screenVenueMap.set(ws, venueId);
         // 用 IIFE 包裹异步逻辑，确保 venueName 先查 DB 再构造 initialData
         (async () => {
-          // 从 DB 查赛场名（前端 URL 可能只有 venueId 没有 venueName）
+          // venueName 优先级：URL参数 > 全局缓存 > DB查询
+          if (!venueName && venueId === getCachedVenueId()) {
+            venueName = getCachedVenueName();
+          }
           if (!venueName) {
             try {
-              const { query } = require('../config/database');
-              const rows = await query('SELECT name FROM venues WHERE id = $1', [venueId]);
+              const { query: dbQuery } = require('../config/database');
+              const rows = await dbQuery('SELECT name FROM venues WHERE id = $1', [venueId]);
               if (rows?.[0]?.name) {
                 venueName = rows[0].name;
               }
