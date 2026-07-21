@@ -1,11 +1,5 @@
-<!-- pages/edit-profile/edit-profile.wxml — 完善个人信息（深色主题） -->
+<!-- pages/edit-profile/edit-profile.wxml — 完善个人信息（深色主题）-->
 <view class="page">
-
-  <!-- 头像 — 顶部居中大圆（chooseMedia 兼容新版隐私协议） -->
-  <view class="avatar-area" bindtap="onChooseAvatar">
-    <image class="avatar-circle" src="{{avatar || '/assets/images/logo-avatar.png'}}" mode="aspectFill" />
-    <text class="avatar-hint">点击更换头像</text>
-  </view>
 
   <!-- 表单卡片 -->
   <view class="form-card">
