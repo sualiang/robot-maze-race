@@ -389,14 +389,11 @@ const OperatorRaceDetail: React.FC = () => {
               fontWeight: 700,
             }}
           >
-            <Col span={4} style={{ textAlign: 'center' }}>
-              排名
-            </Col>
-            <Col span={8}>选手</Col>
-            <Col span={6} style={{ textAlign: 'right' }}>
+            <Col span={10}>选手</Col>
+            <Col span={7} style={{ textAlign: 'right' }}>
               成绩
             </Col>
-            <Col span={6} style={{ textAlign: 'right' }}>
+            <Col span={7} style={{ textAlign: 'right' }}>
               状态
             </Col>
           </Row>
@@ -412,11 +409,8 @@ const OperatorRaceDetail: React.FC = () => {
                   borderBottom: '1px solid #f0f0f0',
                 }}
               >
-                <Col
-                  span={4}
-                  style={{ textAlign: 'center', fontSize: 13, color: '#8c8c8c' }}
-                >
-                  {getRankDisplay(player)}
+                <Col span={2} style={{ textAlign: 'center' }}>
+                  {player.rank && player.rank <= 3 ? ['🥇','🥈','🥉'][player.rank - 1] : ''}
                 </Col>
                 <Col span={8}>
                   <Text

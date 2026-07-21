@@ -206,7 +206,7 @@ export default function HistoryPage() {
           records.map((item) => (
             <div key={item.id} className="referee-card" style={{ display: 'flex', alignItems: 'center', padding: 16, margin: '0 0 8px 0', cursor: 'pointer' }} onClick={() => handleRecordTap(item.id)}>
               <div style={{ marginRight: 12, flexShrink: 0 }}>
-                {item.rank ? <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 99, fontSize: 12, fontWeight: 600, background: item.rank <= 3 ? 'linear-gradient(135deg, #ffd700, #ffa500)' : '#f5f5f5', color: item.rank <= 3 ? '#fff' : '#999' }}>{item.rank <= 3 ? '🏆' : '#'}{item.rank}</span> : <span style={{ color: '#999', fontSize: 14 }}>-</span>}
+                {item.rank && item.rank <= 3 ? <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 99, fontSize: 12, fontWeight: 600, background: 'linear-gradient(135deg, #ffd700, #ffa500)', color: '#fff' }}>🏆</span> : null}
               </div>
               <div style={{ flex: 1, overflow: 'hidden', minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
@@ -240,7 +240,7 @@ export default function HistoryPage() {
               <div className="referee-row-line"><span className="referee-row-label">机器狗</span><span className="referee-row-value">{selectedRecord.robotName}</span></div>
               <div className="referee-row-line"><span className="referee-row-label">成绩</span><span className="referee-row-value" style={{ fontFamily: "'SF Mono', Menlo, monospace", fontSize: 16, fontWeight: 700, color: '#e94560' }}>{selectedRecord.scoreText}</span></div>
               <div className="referee-row-line"><span className="referee-row-label">状态</span><span className={'referee-tag ' + selectedRecord.statusClass}>{selectedRecord.statusText}</span></div>
-              {selectedRecord.rank && <div className="referee-row-line"><span className="referee-row-label">排名</span><span className="referee-row-value" style={{ color: '#e67e22', fontWeight: 600 }}>第 {selectedRecord.rank} 名</span></div>}
+
               <div className="referee-row-line"><span className="referee-row-label">开始时间</span><span className="referee-row-value">{formatDateTime(selectedRecord.startedAt)}</span></div>
               {selectedRecord.finishedAt && <div className="referee-row-line"><span className="referee-row-label">结束时间</span><span className="referee-row-value">{formatDateTime(selectedRecord.finishedAt)}</span></div>}
               <div className="referee-row-line"><span className="referee-row-label">用时</span><span className="referee-row-value">{selectedRecord.durationText}</span></div>

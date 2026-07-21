@@ -20,7 +20,6 @@ Page({
     // 模块3: 参赛状态&福利
     couponValue: 0,
     bestScoreDisplay: '--',
-    rankDisplay: '--',
     // 模块4: 福利条
     promoText: '',
     // 模块5: 参赛包
@@ -224,7 +223,7 @@ Page({
     var app = getApp();
 
     if (!app.globalData.isLoggedIn) {
-      that.setData({ bestScoreDisplay: '--', rankDisplay: '--' });
+      that.setData({ bestScoreDisplay: '--' });
       return;
     }
 
@@ -234,16 +233,11 @@ Page({
       var rank = d.rank;
 
       var scoreDisplay = that.formatScoreDisplay(bestScore);
-      var rankDisplay = rank !== null && rank !== undefined
-        ? '当前排名 第' + rank + '名'
-        : '--';
-
       that.setData({
-        bestScoreDisplay: scoreDisplay,
-        rankDisplay: rankDisplay
+        bestScoreDisplay: scoreDisplay
       });
     }).catch(function () {
-      that.setData({ bestScoreDisplay: '--', rankDisplay: '--' });
+      that.setData({ bestScoreDisplay: '--' });
     });
   },
 

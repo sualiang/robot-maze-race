@@ -666,7 +666,6 @@ export default function ScreenDisplay() {
             <div>
               {/* 表头 */}
               <div style={{ display: 'flex', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.1)', fontSize: 14, color: '#888', fontWeight: 500 }}>
-                <div style={{ width: 50 }}>排名</div>
                 <div style={{ flex: 1, textAlign: 'left', paddingLeft: 20 }}>选手</div>
                 <div style={{ width: 120, textAlign: 'left' }}>用时</div>
               </div>
@@ -689,12 +688,13 @@ export default function ScreenDisplay() {
                     paddingRight: i < 3 ? 8 : 0,
                   }}>
                     <div style={{
-                      width: 50, fontSize: 20, fontWeight: 700,
+                      width: 40, fontSize: 20, fontWeight: 700,
                       color: rankColors[entry.rank] || '#fff',
+                      textAlign: 'center',
                     }}>
-                      {entry.rank <= 3 ? ['🥇', '🥈', '🥉'][entry.rank - 1] : entry.rank}
+                      {entry.rank <= 3 ? ['🥇', '🥈', '🥉'][entry.rank - 1] : ''}
                     </div>
-                    <div style={{ flex: 1, fontSize: 17, fontWeight: entry.rank <= 3 ? 600 : 400, paddingLeft: 20, overflow: 'hidden' }}>
+                    <div style={{ flex: 1, fontSize: 17, fontWeight: entry.rank <= 3 ? 600 : 400, paddingLeft: 8, overflow: 'hidden' }}>
                       <span className="text-one-line">{entry.nickname}</span>
                     </div>
                     <div style={{

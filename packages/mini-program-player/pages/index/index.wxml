@@ -38,7 +38,7 @@
         <view class="status-number-wrap">
           <text class="status-number-gold">{{bestScoreDisplay}}</text>
         </view>
-        <text class="status-subtext">{{rankDisplay}}</text>
+
       </view>
     </view>
   </view>

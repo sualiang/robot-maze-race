@@ -20,17 +20,12 @@
       </text>
     </view>
 
-    <!-- 战斗力 + 排名 + 入围线 -->
+    <!-- 战斗力 + 入围线 -->
     <view class="combat-card card-elevated">
       <view class="combat-stats-row">
         <view class="combat-stat-item">
           <text class="combat-stat-number">{{combatPower || '--'}}</text>
           <text class="combat-stat-label">战斗力</text>
-        </view>
-        <view class="combat-stat-divider"></view>
-        <view class="combat-stat-item">
-          <text class="combat-stat-number combat-stat-rank">#{{rank || '--'}}</text>
-          <text class="combat-stat-label">战斗力排名</text>
         </view>
         <view class="combat-stat-divider"></view>
         <view class="combat-stat-item">
