@@ -78,9 +78,9 @@ router.post('/create-by-operator', authMiddleware, async (req: Request, res: Res
 
     const refereeId = uuidv4();
     await executeOp(req, 
-      `INSERT INTO referees (id, user_id, phone, venue_id, name, operator_id)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [refereeId, userId, phone, venue_id || null, name, req.user?.operatorId || null]
+      `INSERT INTO referees (id, user_id, phone, venue_id, name, operator_id, password, is_first_login)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [refereeId, userId, phone, venue_id || null, name, req.user?.operatorId || null, hashedPassword, 1]
     );
 
     return res.json({
@@ -121,6 +121,11 @@ router.post('/:id/reset-password', authMiddleware, async (req: Request, res: Res
     await execute(
       'UPDATE users SET password = $1, first_login = 1, updated_at = NOW() WHERE id = $2',
       [hashedPassword, referee.user_id]
+    );
+    // 同步更新 referees 表的密码（裁判登录读取 referees.password）
+    await executeOp(req,
+      'UPDATE referees SET password = $1, is_first_login = 1 WHERE id = $2',
+      [hashedPassword, id]
     );
 
     return res.json({
