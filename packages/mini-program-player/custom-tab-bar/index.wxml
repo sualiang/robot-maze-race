@@ -1,12 +1,37 @@
+<!-- custom-tab-bar -->
 <view class="tab-bar">
-  <view
-    wx:for="{{list}}"
-    wx:key="text"
-    class="tab-bar-item"
-    data-path="{{item.pagePath}}"
-    bindtap="switchTab"
-  >
-    <text class="tab-icon">{{item.icon}}</text>
-    <text class="tab-text {{selected === index ? 'tab-text-active' : ''}}">{{item.text}}</text>
-  </view>
+  <block wx:for="{{list}}" wx:key="index">
+    <view class="tab-item {{selected === index ? 'active' : ''}}" data-path="{{item.pagePath}}" data-index="{{index}}" bindtap="switchTab">
+      <!-- 首页 - 房子 -->
+      <view class="tab-icon" wx:if="{{index === 0}}">
+        <view class="icon-home">
+          <view class="home-roof"></view>
+          <view class="home-body"></view>
+        </view>
+      </view>
+      <!-- 比赛 - 旗帜 -->
+      <view class="tab-icon" wx:if="{{index === 1}}">
+        <view class="icon-race">
+          <view class="race-pole"></view>
+          <view class="race-flag"></view>
+        </view>
+      </view>
+      <!-- 排行榜 - 柱状图 -->
+      <view class="tab-icon" wx:if="{{index === 2}}">
+        <view class="icon-chart">
+          <view class="chart-bar bar1"></view>
+          <view class="chart-bar bar2"></view>
+          <view class="chart-bar bar3"></view>
+        </view>
+      </view>
+      <!-- 我的 - 人物 -->
+      <view class="tab-icon" wx:if="{{index === 3}}">
+        <view class="icon-profile">
+          <view class="profile-head"></view>
+          <view class="profile-body"></view>
+        </view>
+      </view>
+      <text class="tab-label">{{item.text}}</text>
+    </view>
+  </block>
 </view>

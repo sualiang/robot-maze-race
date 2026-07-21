@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="100" viewBox="0 0 400 100">
+  <!-- 首页 - 房子 -->
+  <g transform="translate(25,18)">
+    <path d="M5 45V23L25 7L45 23V45H35V29H15V45H5Z" fill="none" stroke="#999" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <!-- 比赛 - 旗帜 -->
+  <g transform="translate(125,20)">
+    <path d="M8 12v48M8 12l18-8v48M26 4l18 8v48" fill="none" stroke="#999" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="8" y="18" width="36" height="5" rx="1" fill="#999" opacity="0.15"/>
+    <rect x="8" y="28" width="36" height="5" rx="1" fill="#999" opacity="0.15"/>
+    <rect x="8" y="38" width="36" height="5" rx="1" fill="#999" opacity="0.15"/>
+  </g>
+  <!-- 排行榜 - 柱状图 -->
+  <g transform="translate(225,18)">
+    <rect x="4" y="30" width="12" height="26" rx="2" fill="none" stroke="#999" stroke-width="2.2"/>
+    <rect x="19" y="20" width="12" height="36" rx="2" fill="none" stroke="#999" stroke-width="2.2"/>
+    <rect x="34" y="10" width="12" height="46" rx="2" fill="none" stroke="#999" stroke-width="2.2"/>
+    <circle cx="10" cy="60" r="2.5" fill="#999"/>
+    <circle cx="25" cy="60" r="2.5" fill="#999"/>
+    <circle cx="40" cy="60" r="2.5" fill="#999"/>
+  </g>
+  <!-- 我的 - 人物 -->
+  <g transform="translate(325,18)">
+    <circle cx="25" cy="14" r="10" fill="none" stroke="#999" stroke-width="2.2"/>
+    <path d="M5 54c0-11 9-20 20-20s20 9 20 20" fill="none" stroke="#999" stroke-width="2.2" stroke-linecap="round"/>
+  </g>
+</svg>
