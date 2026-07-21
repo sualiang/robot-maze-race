@@ -116,6 +116,11 @@ export default function ScreenDisplay() {
             setVenueName(screenData.venue_name || '');
           } else {
             setIsActivated(false);
+            // 未激活状态下后端可能已查到 venueName（如 IIFE 遍历 op_ 库）
+            // 如果 URL 已有 venueName 则不覆盖
+            if (screenData.venue_name && !venueName) {
+              setVenueName(screenData.venue_name);
+            }
           }
 
           setData(screenData);
