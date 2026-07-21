@@ -16,7 +16,7 @@
   padding: 0 32rpx;
 }
 .nav-logo {
-  height: 40rpx;
+  height: 50rpx;
   width: auto;
 }
 .nav-venue {
