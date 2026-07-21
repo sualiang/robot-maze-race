@@ -214,7 +214,6 @@ export default function ScreenDisplay() {
         } else if (msg.type === 'deactivated' || msg.event === 'venue_closed') {
           // 大屏收到去激活，回到激活码输入状态
           setIsActivated(false);
-          setVenueName('');
           setData(null);
           setElapsed(0);
         } else if (msg.event === 'venue_reopen') {
