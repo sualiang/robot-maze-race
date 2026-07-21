@@ -411,19 +411,22 @@ page {
 }
 .detail-points {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 8rpx;
   margin-bottom: 48rpx;
   padding: 16rpx 40rpx;
   background: rgba(233, 69, 96, 0.12);
   border-radius: 40rpx;
 }
-.detail-points-icon {
-  font-size: 32rpx;
+.detail-points-num {
+  font-size: 48rpx;
+  font-weight: 900;
+  color: #e8453c;
+  line-height: 1;
 }
-.detail-points-text {
+.detail-points-label {
   font-size: 32rpx;
-  color: #e94560;
+  color: #e8453c;
   font-weight: 600;
 }
 .detail-reminder {

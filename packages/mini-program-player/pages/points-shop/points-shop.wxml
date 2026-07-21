@@ -95,11 +95,11 @@
       <text class="detail-name">{{detailItem.name}}</text>
       <text class="detail-desc" wx:if="{{detailItem.description}}">{{detailItem.description}}</text>
       <view class="detail-points">
-        <text class="detail-points-icon">⭐</text>
-        <text class="detail-points-text">需要 {{detailItem.needPoints}} 积分</text>
+        <text class="detail-points-num">{{detailItem.needPoints}}</text>
+        <text class="detail-points-label">积分</text>
       </view>
       <view class="detail-reminder">
-        <text class="detail-reminder-title">⚠️ 兑换提醒</text>
+        <text class="detail-reminder-title">兑换提醒</text>
         <text class="detail-reminder-text">积分兑换礼品</text>
         <text class="detail-reminder-text">请前往比赛现场的礼品兑换处兑换或咨询现场工作人员！</text>
       </view>
