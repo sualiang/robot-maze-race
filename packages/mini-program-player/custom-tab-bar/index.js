@@ -5,26 +5,22 @@ Component({
       {
         pagePath: '/pages/index/index',
         text: '首页',
-        iconPath: '/assets/tabbar/home.png',
-        selectedIconPath: '/assets/tabbar/home-active.png'
+        icon: '🏠'
       },
       {
         pagePath: '/pages/race/race',
         text: '比赛',
-        iconPath: '/assets/tabbar/race.png',
-        selectedIconPath: '/assets/tabbar/race-active.png'
+        icon: '🏁'
       },
       {
         pagePath: '/pages/leaderboard/leaderboard',
-        text: '榜单',
-        iconPath: '/assets/tabbar/leaderboard.png',
-        selectedIconPath: '/assets/tabbar/leaderboard-active.png'
+        text: '排行',
+        icon: '🏆'
       },
       {
         pagePath: '/pages/profile/profile',
         text: '我的',
-        iconPath: '/assets/tabbar/profile.png',
-        selectedIconPath: '/assets/tabbar/profile-active.png'
+        icon: '👤'
       }
     ]
   },

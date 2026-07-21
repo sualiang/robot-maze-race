@@ -22,18 +22,20 @@
         data-id="{{item.id}}"
         bindtap="onExchange"
       >
-        <image wx:if="{{item.image}}" class="card-image" src="{{item.image}}" mode="aspectFill" />
-        <view class="card-value">{{item.name}}</view>
-        <view class="card-desc" wx:if="{{item.description}}">{{item.description}}</view>
-        <view class="face-value" wx:if="{{item.faceValue > 0}}">💰 价值 ¥{{item.faceValue}}</view>
-        <view class="card-footer">
-          <view class="card-points">
-            <text class="card-points-icon">⭐</text>
-            <text class="card-points-text">{{item.needPoints}}分</text>
+        <view class="card-image-area">
+          <image wx:if="{{item.image}}" class="card-image" src="{{item.image}}" mode="aspectFill" />
+          <view class="card-type-badge badge-entry">参赛抵扣</view>
+        </view>
+        <view class="card-info">
+          <text class="card-name">{{item.name}}</text>
+          <text class="card-desc">{{item.description || ''}}</text>
+          <view class="card-meta">
+            <view class="card-points-badge">
+              <text class="card-points-icon">⭐</text>
+              <text>{{item.needPoints}}分</text>
+            </view>
+            <view class="exchange-arrow">→</view>
           </view>
-          <button class="exchange-btn" size="mini" disabled="{{userPoints < item.needPoints}}">
-            {{userPoints < item.needPoints ? '积分不足' : '立即兑换'}}
-          </button>
         </view>
       </view>
       <!-- 商家消费券/实物礼品区块 -->
@@ -44,18 +46,20 @@
         data-id="{{item.id}}"
         bindtap="onExchange"
       >
-        <image wx:if="{{item.image}}" class="card-image" src="{{item.image}}" mode="aspectFill" />
-        <view class="card-value">{{item.name}}</view>
-        <view class="card-desc" wx:if="{{item.description}}">{{item.description}}</view>
-        <view class="face-value" wx:if="{{item.faceValue > 0}}">💰 价值 ¥{{item.faceValue}}</view>
-        <view class="card-footer">
-          <view class="card-points">
-            <text class="card-points-icon">⭐</text>
-            <text class="card-points-text">{{item.needPoints}}分</text>
+        <view class="card-image-area">
+          <image wx:if="{{item.image}}" class="card-image" src="{{item.image}}" mode="aspectFill" />
+          <view class="card-type-badge badge-coupon">消费券</view>
+        </view>
+        <view class="card-info">
+          <text class="card-name">{{item.name}}</text>
+          <text class="card-desc">{{item.description || ''}}</text>
+          <view class="card-meta">
+            <view class="card-points-badge">
+              <text class="card-points-icon">⭐</text>
+              <text>{{item.needPoints}}分</text>
+            </view>
+            <view class="exchange-arrow">→</view>
           </view>
-          <button class="exchange-btn" size="mini" disabled="{{userPoints < item.needPoints}}">
-            {{userPoints < item.needPoints ? '积分不足' : '立即兑换'}}
-          </button>
         </view>
       </view>
     </view>
