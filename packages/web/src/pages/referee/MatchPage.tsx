@@ -54,6 +54,7 @@ export default function MatchPage() {
   const [maxTimeout] = useState(300);
   const [checkedIn, setCheckedIn] = useState<boolean | null>(null);
   const [checkingStatus, setCheckingStatus] = useState(true);
+  const [showDcAlert, setShowDcAlert] = useState(false);
   const { hasContext, loading: contextLoading } = useOperatorContext();
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const elapsedRef = useRef(0);
@@ -62,6 +63,7 @@ export default function MatchPage() {
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectCountRef = useRef(0);
   const prevCheckedInRef = useRef<boolean | null>(null);
+  const checkedInRef = useRef<boolean | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -78,6 +80,7 @@ export default function MatchPage() {
 
   // 监听签到状态变化：true→false 时（离线签退/轮询检测到签退），清除排队和计时
   useEffect(() => {
+    checkedInRef.current = checkedIn;
     const wasIn = prevCheckedInRef.current;
     prevCheckedInRef.current = checkedIn;
     if (wasIn === true && checkedIn === false) {
@@ -137,7 +140,7 @@ export default function MatchPage() {
           }
         } catch {}
       };
-      ws.onclose = () => { console.log('[WS] 关闭'); setWsConnected(false); if (!destroyedRef.current && reconnectCountRef.current < 10) { reconnectCountRef.current++; reconnectTimerRef.current = setTimeout(() => { if (!destroyedRef.current) connectWebSocket(); }, 3000); } };
+      ws.onclose = () => { console.log('[WS] 关闭'); setWsConnected(false); if (checkedInRef.current === true) { setShowDcAlert(true); } if (!destroyedRef.current && reconnectCountRef.current < 10) { reconnectCountRef.current++; reconnectTimerRef.current = setTimeout(() => { if (!destroyedRef.current) connectWebSocket(); }, 3000); } };
       ws.onerror = () => setWsConnected(false);
     } catch { console.warn('[WS] 不可用'); }
   }, []);
@@ -343,7 +346,7 @@ export default function MatchPage() {
       {/* WS 连接状态 - 页面最顶部 */}
       <div className="referee-ws-badge">
         <div className="referee-ws-dot" style={{ background: wsConnected && checkedIn !== true ? '#e74c3c' : undefined }} data-connected={wsConnected} />
-        <span>{wsConnected ? (checkedIn === true ? '赛场已激活 · 大屏已连接' : '离线未签到 ↴ 请去签到页签到') : '离线模式'}</span>
+        <span>{wsConnected ? (checkedIn === true ? '赛场已激活 · 大屏已连接' : '离线未签到 ↴ 请去签到页签到') : checkedIn === true ? '⚠️ 赛场未激活 · 大屏未连接' : '离线模式'}</span>
       </div>
       <div className="referee-card referee-timer-card" style={{ textAlign: 'center', padding: '24px 20px', marginBottom: 16 }}>
         <div className="referee-timer-display" data-running={status === 'running'} data-danger={isTimeoutDanger}>
@@ -411,6 +414,31 @@ export default function MatchPage() {
           </div>
         ))}
       </div></>}
+      {/* 大屏断连弹窗 */}
+      {showDcAlert && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+          background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999,
+        }} onClick={() => setShowDcAlert(false)}>
+          <div style={{
+            width: '80%', maxWidth: 360, padding: 28, background: '#fff', borderRadius: 12, textAlign: 'center',
+          }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>🔌</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#333', marginBottom: 8 }}>大屏未连接</div>
+            <div style={{ fontSize: 14, color: '#666', lineHeight: 1.6, marginBottom: 20 }}>大屏已掉线或关闭<br/>请前往签到页重新激活赛场</div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                style={{ flex: 1, padding: '10px 0', border: '1px solid #ddd', borderRadius: 8, background: '#f5f5f5', color: '#333', fontSize: 14, cursor: 'pointer' }}
+                onClick={() => setShowDcAlert(false)}
+              >知道了</button>
+              <button
+                style={{ flex: 1, padding: '10px 0', border: 'none', borderRadius: 8, background: '#27ae60', color: '#fff', fontSize: 14, cursor: 'pointer' }}
+                onClick={() => { setShowDcAlert(false); navigate('/referee/attendance'); }}
+              >前往签到</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
