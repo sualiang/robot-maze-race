@@ -6,10 +6,16 @@ var request = require('../../utils/request');
  */
 function fmtDateTime(val) {
   if (!val) return '';
-  var s = String(val);
-  s = s.replace('T', ' ');
-  if (s.length >= 19) s = s.substring(0, 19);
-  return s;
+  var d = new Date(val);
+  if (isNaN(d.getTime())) return '';
+  // 格式化为北京时间 YYYY-MM-DD HH:mm:ss
+  var pad = function (n) { return n < 10 ? '0' + n : String(n); };
+  return d.getFullYear() + '-' +
+    pad(d.getMonth() + 1) + '-' +
+    pad(d.getDate()) + ' ' +
+    pad(d.getHours()) + ':' +
+    pad(d.getMinutes()) + ':' +
+    pad(d.getSeconds());
 }
 
 Page({
