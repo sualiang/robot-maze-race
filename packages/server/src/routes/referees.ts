@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
+import { hashSync } from 'bcryptjs';
 import { broadcastToScreen, validateActivationCode } from '../ws/handler';
 import { WebSocket } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
@@ -59,19 +60,20 @@ router.post('/create-by-operator', authMiddleware, async (req: Request, res: Res
     );
 
     let userId: string;
-    // 生成随机初始密码并创建 users 记录
+    // 生成随机初始密码并创建 users 记录（bcrypt 哈希存储）
     const initPassword = crypto.randomBytes(4).toString('hex').toUpperCase();
+    const hashedPassword = hashSync(initPassword, 10);
     if (!existingUser) {
       userId = uuidv4();
       await execute(
         `INSERT INTO users (id, openid, nickname, phone, role, password, first_login)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [userId, 'ref_' + phone, name, phone, 'referee', initPassword, 1]
+        [userId, 'ref_' + phone, name, phone, 'referee', hashedPassword, 1]
       );
     } else {
       userId = existingUser.id;
       // 对已存在用户也重置密码
-      await execute('UPDATE users SET password=$1, first_login=1 WHERE id=$2', [initPassword, userId]);
+      await execute('UPDATE users SET password=$1, first_login=1 WHERE id=$2', [hashedPassword, userId]);
     }
 
     const refereeId = uuidv4();
@@ -115,9 +117,10 @@ router.post('/:id/reset-password', authMiddleware, async (req: Request, res: Res
     }
 
     const initPassword = crypto.randomBytes(4).toString('hex').toUpperCase();
+    const hashedPassword = hashSync(initPassword, 10);
     await execute(
       'UPDATE users SET password = $1, first_login = 1, updated_at = NOW() WHERE id = $2',
-      [initPassword, referee.user_id]
+      [hashedPassword, referee.user_id]
     );
 
     return res.json({
