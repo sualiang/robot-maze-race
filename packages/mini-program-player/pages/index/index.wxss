@@ -122,7 +122,7 @@
 /* ============================================================ */
 .hero-banner-image {
   position: relative;
-  width: 100%;
+  width: 686rpx;
   margin: 24rpx auto;
   border-radius: 24rpx;
   overflow: hidden;
