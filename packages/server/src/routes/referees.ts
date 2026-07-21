@@ -99,6 +99,38 @@ router.post('/create-by-operator', authMiddleware, async (req: Request, res: Res
   }
 });
 
+/**
+ * POST /api/v1/referees/:id/reset-password
+ * 重置裁判登录密码
+ */
+router.post('/:id/reset-password', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const referee = await queryOpOne<{ user_id: string; phone: string }>(req,
+      'SELECT user_id, phone FROM referees WHERE id = $1', [id]
+    );
+    if (!referee) {
+      return res.status(404).json({ code: 404, message: '裁判不存在', data: null });
+    }
+
+    const initPassword = crypto.randomBytes(4).toString('hex').toUpperCase();
+    await execute(
+      'UPDATE users SET password = $1, first_login = 1, updated_at = NOW() WHERE id = $2',
+      [initPassword, referee.user_id]
+    );
+
+    return res.json({
+      code: 0,
+      message: '密码重置成功',
+      data: { phone: referee.phone, init_password: initPassword },
+    });
+  } catch (error: any) {
+    console.error('[Referees] reset-password error:', error.message);
+    return res.status(500).json({ code: 500, message: '密码重置失败: ' + error.message, data: null });
+  }
+});
+
 /** 扩展的裁判类型，包含关联用户信息 */
 interface RefereeWithUser extends Referee {
   nickname?: string;
