@@ -1,3 +1,4 @@
 {
-  "usingComponents": {}
+  "usingComponents": { "nav-bar": "/components/nav-bar/index" },
+  "navigationBarTitleText": "注册"
 }

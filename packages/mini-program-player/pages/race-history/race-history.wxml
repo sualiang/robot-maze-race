@@ -1,5 +1,6 @@
 <!-- pages/race-history/race-history.wxml - 历史参赛记录（全部） -->
 <view class="page">
+  <nav-bar title="比赛历史" />
   <view class="header">
     <view class="header-back" bindtap="onBack">
       <text class="back-icon">‹</text>

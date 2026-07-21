@@ -1,5 +1,4 @@
 {
-  "usingComponents": {},
-  "navigationBarTitleText": "购买参赛包",
-  "enablePullDownRefresh": true
+  "usingComponents": { "nav-bar": "/components/nav-bar/index" },
+  "navigationBarTitleText": "购买参赛包"
 }

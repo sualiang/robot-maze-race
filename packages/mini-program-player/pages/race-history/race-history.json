@@ -1,4 +1,4 @@
 {
-  "usingComponents": {},
-  "navigationStyle": "custom"
+  "usingComponents": { "nav-bar": "/components/nav-bar/index" },
+  "navigationBarTitleText": "比赛历史"
 }

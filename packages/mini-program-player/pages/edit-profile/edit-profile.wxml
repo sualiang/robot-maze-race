@@ -1,5 +1,6 @@
 <!-- pages/edit-profile/edit-profile.wxml — 完善个人信息（深色主题）-->
 <view class="page">
+  <nav-bar title="编辑个人信息" />
 
   <!-- 表单卡片 -->
   <view class="form-card">

@@ -1,5 +1,6 @@
 <!-- pages/orders/orders.wxml - 我的订单 -->
 <view class="page">
+  <nav-bar title="我的订单" />
   <view class="header">
     <text class="header-title">我的订单</text>
   </view>

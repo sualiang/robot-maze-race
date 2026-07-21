@@ -1,7 +1,6 @@
 <!-- pages/register/register.wxml — 新用户注册（昵称+手机号） -->
 <view class="page">
-
-  <!-- 表单卡片 -->
+  <nav-bar title="注册" />  <!-- 表单卡片 -->
   <view class="form-card">
 
     <!-- 玩家昵称 -->

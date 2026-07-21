@@ -2,6 +2,7 @@
 <!-- 参赛包购买页：展示剩余次数、参赛包列表、购买流程 -->
 
 <view class="page">
+  <nav-bar title="购买参赛包" />
 
   <!-- ===== 顶部提示条 ===== -->
   <view wx:if="{{!loading}}" class="top-banner">

@@ -1,5 +1,6 @@
 <!-- pages/login/login.wxml — 手机号快捷登录 -->
 <view class="page">
+  <nav-bar title="登录" />
   <!-- Logo + 标题 -->
   <view class="header">
     <image class="logo" src="/assets/images/logo-avatar.png" mode="aspectFit" />
