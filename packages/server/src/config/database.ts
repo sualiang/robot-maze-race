@@ -230,9 +230,6 @@ export async function doQueryOne(pool: mysql.Pool, text: string, params?: any[])
   const rows = await doQuery(pool, text, params);
   return rows.length > 0 ? rows[0] : null;
 }
-export function getAllOpPools(): Map<string, mysql.Pool> {
-  return operatorPools;
-}
 
 async function doExecute(pool: mysql.Pool, text: string, params?: any[]): Promise<{ changes: number; lastInsertRowid: number | bigint }> {
   const sql = convertSql(text);

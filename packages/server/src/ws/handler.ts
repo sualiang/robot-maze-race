@@ -138,29 +138,11 @@ function handleMessage(ws: WebSocket, msg: any) {
       // 记录 ws → venueId 映射，解决跨运营商大屏数据串问题
       if (venueId) {
         screenVenueMap.set(ws, venueId);
-        // 用 IIFE 包裹异步逻辑，确保 venueName 先查 DB 再构造 initialData
+        // 用 IIFE 包裹异步逻辑
         (async () => {
-          // venueName 优先级：URL参数 > 全局缓存 > DB查询
+          // 如果 URL 没传 venueName，尝试从全局缓存取（裁判已签到的情况下）
           if (!venueName && venueId === getCachedVenueId()) {
             venueName = getCachedVenueName();
-          }
-          if (!venueName) {
-            try {
-              const { query: dbQuery, getOperatorPool, doQueryOne } = require('../config/database');
-              // 先从 operators_registry 获取所有运营商库名
-              const registries = await dbQuery('SELECT db_name FROM operators_registry');
-              for (const reg of registries || []) {
-                if (!reg.db_name) continue;
-                try {
-                  const pool = getOperatorPool(reg.db_name);
-                  const row = await doQueryOne(pool, 'SELECT name FROM venues WHERE id = ?', [venueId]);
-                  if (row?.name) {
-                    venueName = row.name;
-                    break;
-                  }
-                } catch (_) { /* 继续下一个库 */ }
-              }
-            } catch (_) { /* ignore */ }
           }
           // 大屏注册时 venueId 是在 URL 传过来的，用它拉对应赛场数据
           // 避免使用全局 cachedVenueId（那是裁判操作设置的，可能指向其他赛场）
