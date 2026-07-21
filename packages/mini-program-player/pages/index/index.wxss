@@ -181,11 +181,12 @@
 /* ============================================================ */
 .status-card {
   width: 686rpx;
+  max-width: 100%;
   background: #1E293B;
   border-radius: 24rpx;
   box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.2);
   overflow: hidden;
-  margin-bottom: 24rpx;
+  margin: 0 auto 24rpx;
 }
 
 .status-card-body {
@@ -276,12 +277,13 @@
 /* ============================================================ */
 .promo-bar {
   width: 686rpx;
+  max-width: 100%;
   height: 72rpx;
   background: #FF3B5C;
   border-radius: 12rpx;
   display: flex;
   align-items: center;
-  margin-bottom: 24rpx;
+  margin: 0 auto 24rpx;
   overflow: hidden;
 }
 
