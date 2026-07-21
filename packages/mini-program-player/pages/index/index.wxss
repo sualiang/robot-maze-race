@@ -184,7 +184,7 @@
 /* 模块3: 参赛状态&福利总览卡 */
 /* ============================================================ */
 .status-card {
-  width: 100%;
+  width: 686rpx;
   background: #1E293B;
   border-radius: 24rpx;
   box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.2);
@@ -279,7 +279,7 @@
 /* 模块4: 今日专属福利条 - 跑马灯滚动 */
 /* ============================================================ */
 .promo-bar {
-  width: 100%;
+  width: 686rpx;
   height: 72rpx;
   background: #FF3B5C;
   border-radius: 12rpx;
@@ -324,7 +324,8 @@
 /* 模块5: 参赛包推荐区 */
 /* ============================================================ */
 .packages-section {
-  margin-bottom: 24rpx;
+  width: 686rpx;
+  margin: 0 auto 24rpx;
 }
 
 .section-header {
