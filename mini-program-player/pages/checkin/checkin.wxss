@@ -1,0 +1,102 @@
+/* 签到确认页 */
+
+/* 赛场信息 */
+.venue-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-base);
+  padding: var(--space-lg);
+}
+.venue-icon {
+  font-size: 56rpx;
+  flex-shrink: 0;
+}
+.venue-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+.venue-name {
+  font-size: var(--font-xl);
+  font-weight: 700;
+  color: var(--color-text);
+}
+.venue-address {
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+}
+
+/* 排队状态 */
+.queue-status {
+  padding: var(--space-lg);
+}
+.queue-header {
+  margin-bottom: var(--space-base);
+}
+.queue-label {
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+}
+.queue-body {
+  display: flex;
+  justify-content: space-around;
+}
+.queue-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.queue-num {
+  font-size: var(--font-xxl);
+  font-weight: 700;
+  color: var(--color-primary);
+}
+.queue-desc {
+  font-size: var(--font-xs);
+  color: var(--color-text-light);
+  margin-top: 4rpx;
+}
+
+/* 信息卡片 */
+.info-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: var(--space-base);
+}
+.info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) 0;
+}
+.info-label {
+  font-size: var(--font-base);
+  color: var(--color-text-secondary);
+}
+.info-value {
+  font-size: var(--font-base);
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+/* 操作按钮 */
+.actions {
+  margin-top: var(--space-lg);
+}
+.cancel-btn {
+  margin-top: var(--space-sm);
+  color: var(--color-text-light);
+}
+
+/* 次数不足 */
+.no-count-card {
+  margin-top: var(--space-base);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.no-count-text {
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+}

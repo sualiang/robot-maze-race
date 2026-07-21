@@ -1,0 +1,483 @@
+/* ==================== 商家端优惠券管理 ==================== */
+
+.mch-coupon-page {
+  padding: 14px;
+  padding-bottom: 84px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+/* 顶部 Tab 切换 */
+.mch-coupon-tabs {
+  display: flex;
+  overflow-x: auto;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 2px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.mch-coupon-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.mch-coupon-tab {
+  flex: 0 0 auto;
+  padding: 8px 16px;
+  font-size: 14px;
+  color: rgba(255,255,255,0.5);
+  cursor: pointer;
+  white-space: nowrap;
+  border-radius: 8px;
+  transition: all 0.2s;
+  user-select: none;
+}
+
+.mch-coupon-tab:hover {
+  color: rgba(255,255,255,0.8);
+  background: rgba(255,255,255,0.05);
+}
+
+.mch-coupon-tab-active,
+.mch-coupon-tab-active:hover {
+  color: #818cf8;
+  background: rgba(99, 102, 241, 0.15);
+}
+
+.mch-coupon-tab-item {
+  flex-shrink: 0;
+  padding: 8px 16px;
+  border-radius: 99px;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.mch-coupon-tab-item:active {
+  transform: scale(0.95);
+}
+
+.mch-coupon-tab-item.mch-tab-active {
+  color: #00d4ff;
+  background: rgba(0, 212, 255, 0.1);
+  border-color: rgba(0, 212, 255, 0.25);
+}
+
+/* 操作按钮行 */
+.mch-coupon-actions {
+  margin-bottom: 14px;
+}
+
+.mch-coupon-create-btn {
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  letter-spacing: 1px;
+  box-shadow: 0 3px 12px rgba(99, 102, 241, 0.25);
+}
+
+.mch-coupon-create-btn:active {
+  transform: scale(0.97);
+}
+
+/* 优惠券卡片 */
+.mch-coupon-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 12px;
+  backdrop-filter: blur(12px);
+  transition: border-color 0.2s;
+}
+
+.mch-coupon-card:active {
+  border-color: rgba(0, 212, 255, 0.2);
+}
+
+.mch-coupon-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.mch-coupon-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #e8e8f0;
+  flex: 1;
+  margin-right: 8px;
+}
+
+.mch-coupon-type-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.mch-coupon-type-full {
+  color: #00d4ff;
+  background: rgba(0, 212, 255, 0.1);
+  border: 1px solid rgba(0, 212, 255, 0.15);
+}
+
+.mch-coupon-type-reduce {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.15);
+}
+
+.mch-coupon-type-nothreshold {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.15);
+}
+
+.mch-coupon-type-discount {
+  color: #8b5cf6;
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.15);
+}
+
+.mch-coupon-card-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.mch-coupon-info-item {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.mch-coupon-info-item strong {
+  color: #e8e8f0;
+  font-weight: 500;
+}
+
+.mch-coupon-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.mch-coupon-status-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 12px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.mch-coupon-status-pending {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.mch-coupon-status-active {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.mch-coupon-status-rejected {
+  color: #ff6b6b;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.mch-coupon-status-offline {
+  color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.mch-coupon-status-offline-rejected {
+  color: #a855f7;
+  background: rgba(168, 85, 247, 0.1);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+}
+
+.mch-coupon-actions-row {
+  display: flex;
+  gap: 8px;
+}
+
+.mch-coupon-action-btn {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.mch-coupon-action-btn:active {
+  transform: scale(0.95);
+}
+
+.mch-coupon-action-edit {
+  color: #00d4ff;
+  background: rgba(0, 212, 255, 0.1);
+  border: 1px solid rgba(0, 212, 255, 0.15);
+}
+
+.mch-coupon-action-delete {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.15);
+}
+
+.mch-coupon-action-online {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.15);
+}
+
+.mch-coupon-action-offline {
+  color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* 弹窗覆盖 */
+.mch-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 24px;
+}
+
+.mch-modal-content {
+  width: 100%;
+  max-width: 420px;
+  max-height: 80vh;
+  overflow-y: auto;
+  background: rgba(20, 25, 50, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 24px 20px;
+  backdrop-filter: blur(20px);
+}
+
+.mch-modal-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #e8e8f0;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.mch-form-group {
+  margin-bottom: 16px;
+}
+
+.mch-form-label {
+  display: block;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.mch-form-input {
+  width: 100%;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  font-size: 15px;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+  color: #e8e8f0;
+}
+
+.mch-form-input:focus {
+  border-color: #00d4ff;
+  box-shadow: 0 0 8px rgba(0, 212, 255, 0.1);
+}
+
+.mch-form-input::placeholder {
+  color: rgba(255, 255, 255, 0.2);
+}
+
+.mch-form-select {
+  width: 100%;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s;
+  color: #e8e8f0;
+  appearance: none;
+  cursor: pointer;
+}
+
+.mch-form-select:focus {
+  border-color: #00d4ff;
+}
+
+.mch-form-textarea {
+  width: 100%;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+  color: #e8e8f0;
+  resize: vertical;
+  min-height: 80px;
+  font-family: inherit;
+}
+
+.mch-form-textarea:focus {
+  border-color: #00d4ff;
+}
+
+.mch-form-checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.mch-form-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: #e8e8f0;
+  cursor: pointer;
+}
+
+.mch-form-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #6366f1;
+  cursor: pointer;
+}
+
+.mch-form-row {
+  display: flex;
+  gap: 12px;
+}
+
+.mch-form-row .mch-form-group {
+  flex: 1;
+}
+
+.mch-modal-buttons {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.mch-modal-btn {
+  flex: 1;
+  padding: 14px;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 1px;
+}
+
+.mch-modal-btn:active {
+  transform: scale(0.97);
+}
+
+.mch-modal-btn-primary {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+}
+
+.mch-modal-btn-cancel {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.mch-modal-btn-danger {
+  background: linear-gradient(135deg, #dc2626, #ef4444);
+  color: #fff;
+}
+
+/* 有效期选择 */
+.mch-expiry-options {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.mch-expiry-option {
+  flex: 1;
+  padding: 10px;
+  text-align: center;
+  border-radius: 10px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.mch-expiry-option.mch-expiry-active {
+  color: #00d4ff;
+  background: rgba(0, 212, 255, 0.1);
+  border-color: rgba(0, 212, 255, 0.25);
+}
+
+/* 空状态 */
+.mch-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 48px 0;
+  color: rgba(255, 255, 255, 0.25);
+  font-size: 14px;
+}
+
+/* 确保 antd message/toast 高于弹窗遮罩层 (.mch-modal-overlay z-index=9999) */
+.ant-message {
+  z-index: 10001 !important;
+}

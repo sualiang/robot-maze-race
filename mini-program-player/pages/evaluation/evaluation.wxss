@@ -1,0 +1,159 @@
+/* 实时评估区 */
+
+.page-header {
+  text-align: center;
+  padding: var(--space-base) 0;
+}
+.page-title {
+  font-size: var(--font-xl);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+/* 加载状态 */
+.load-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xl) 0;
+  gap: var(--space-base);
+}
+.load-text {
+  font-size: var(--font-sm);
+  color: var(--color-text-light);
+}
+
+/* 门槛状态卡 */
+.threshold-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-lg) var(--space-base);
+  margin-bottom: var(--space-base);
+}
+.threshold-card.threshold-pass {
+  border: 2rpx solid var(--color-success);
+}
+.threshold-card.threshold-fail {
+  border: 2rpx solid var(--color-danger);
+}
+.threshold-icon {
+  font-size: 64rpx;
+  margin-bottom: var(--space-sm);
+}
+.threshold-title {
+  font-size: var(--font-lg);
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: var(--space-xs);
+}
+.threshold-gap {
+  font-size: var(--font-sm);
+  color: var(--color-danger);
+}
+
+/* 战斗力卡片 */
+.combat-card {
+  margin-bottom: var(--space-base);
+}
+.combat-stats-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+}
+.combat-stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+.combat-stat-number {
+  font-size: var(--font-xxl);
+  font-weight: 900;
+  color: var(--color-primary);
+  line-height: 1.1;
+}
+.combat-stat-rank {
+  font-size: var(--font-xl);
+}
+.combat-stat-line {
+  font-size: var(--font-xl);
+  color: var(--color-info);
+}
+.combat-stat-label {
+  font-size: var(--font-xs);
+  color: var(--color-text-light);
+  margin-top: 4rpx;
+}
+.combat-stat-divider {
+  width: 1rpx;
+  height: 48rpx;
+  background: var(--color-border);
+}
+
+/* 差距详情 */
+.gap-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-base);
+  margin-bottom: var(--space-base);
+}
+.gap-text {
+  font-size: var(--font-base);
+  font-weight: 700;
+}
+.gap-positive {
+  color: var(--color-success);
+}
+.gap-negative {
+  color: var(--color-danger);
+}
+
+/* 提升建议 */
+.suggestions-section {
+  margin-bottom: var(--space-xl);
+}
+.section-label {
+  font-size: var(--font-base);
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: var(--space-base);
+  display: block;
+}
+.suggestion-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-base);
+  margin-bottom: var(--space-sm);
+}
+.suggestion-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-base);
+  flex: 1;
+}
+.suggestion-icon {
+  font-size: 36rpx;
+}
+.suggestion-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+.suggestion-title {
+  font-size: var(--font-base);
+  font-weight: 600;
+  color: var(--color-text);
+}
+.suggestion-desc {
+  font-size: var(--font-xs);
+  color: var(--color-text-secondary);
+}
+.suggestion-arrow {
+  font-size: var(--font-xl);
+  color: var(--color-text-light);
+  margin-left: var(--space-sm);
+}

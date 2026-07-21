@@ -1,0 +1,606 @@
+/* 我的卡券 V3.6 - 4Tab 统一页面 */
+/* 设计基准 750rpx, 深色主题 #0F172A */
+/* 参赛抵扣卡: 金色主题, 1E293B 背景 */
+/* 消费券卡片: 白色/浅色背景, 区分于参赛抵扣卡 */
+
+/* ===== 页面容器 ===== */
+.cc-page {
+  min-height: 100vh;
+  padding: 0 32rpx 48rpx;
+  background: #0F172A;
+  box-sizing: border-box;
+}
+
+/* ===== 模块1: 页面大标题 ===== */
+.cc-header {
+  padding: 32rpx 0 16rpx;
+}
+.cc-header-title {
+  display: block;
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.3;
+}
+.cc-header-subtitle {
+  display: block;
+  font-size: 26rpx;
+  color: #94A3B8;
+  margin-top: 8rpx;
+}
+
+/* ===== 模块2: 分类Tab栏 ===== */
+.cc-tabs {
+  display: flex;
+  height: 88rpx;
+  margin-bottom: 24rpx;
+  border-bottom: 2rpx solid #1E293B;
+}
+.cc-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.cc-tab-label {
+  font-size: 26rpx;
+  color: #64748B;
+  transition: color 0.2s;
+}
+.cc-tab-active .cc-tab-label {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #FF3B5C;
+}
+.cc-tab-bar {
+  position: absolute;
+  bottom: 0;
+  width: 48rpx;
+  height: 4rpx;
+  background: #FF3B5C;
+  border-radius: 2rpx;
+}
+
+/* ===== 兑换记录入口 ===== */
+.cc-exch-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16rpx 24rpx;
+  margin-bottom: 16rpx;
+  background: #1E293B;
+  border-radius: 12rpx;
+}
+.cc-exch-entry:active {
+  opacity: 0.7;
+}
+.cc-exch-entry-text {
+  font-size: 26rpx;
+  color: #00D4FF;
+  font-weight: 500;
+}
+.cc-exch-entry-arrow {
+  font-size: 30rpx;
+  color: #64748B;
+}
+
+/* ===== 卡券列表 ===== */
+.cc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+  padding-bottom: 24rpx;
+}
+
+/* ============================================================== */
+/* ===== 参赛抵扣卡（Tab 0）— 保持原有风格 ===== */
+/* ============================================================== */
+.cc-card {
+  display: flex;
+  background: #1E293B;
+  border-radius: 20rpx;
+  overflow: hidden;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.25);
+  position: relative;
+  transition: transform 0.15s;
+}
+.cc-card:active {
+  transform: scale(0.98);
+}
+
+.cc-card-inactive {
+  opacity: 0.55;
+}
+
+/* 左侧装饰渐变条 */
+.cc-card-accent {
+  width: 8rpx;
+  flex-shrink: 0;
+  background: linear-gradient(180deg, #FF3B5C 0%, #F59E0B 100%);
+}
+.cc-accent-gold {
+  background: linear-gradient(180deg, #F59E0B 0%, #FFD700 100%);
+}
+.cc-accent-inactive {
+  background: linear-gradient(180deg, #475569 0%, #64748B 100%);
+}
+
+.cc-card-body {
+  flex: 1;
+  padding: 24rpx 28rpx 20rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.cc-card-top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 12rpx;
+}
+
+.cc-amount-area {
+  display: flex;
+  align-items: baseline;
+  gap: 4rpx;
+}
+.cc-amount-symbol {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #F59E0B;
+  line-height: 1;
+}
+.cc-amount-value {
+  font-size: 56rpx;
+  font-weight: 800;
+  color: #F59E0B;
+  line-height: 1;
+}
+.cc-amount-label {
+  font-size: 24rpx;
+  color: #94A3B8;
+  margin-left: 6rpx;
+}
+
+.cc-status-tag {
+  font-size: 22rpx;
+  padding: 6rpx 16rpx;
+  border-radius: 20rpx;
+  flex-shrink: 0;
+}
+.cc-status-active {
+  background: rgba(255, 59, 92, 0.15);
+  color: #FF3B5C;
+}
+.cc-status-inactive {
+  background: #334155;
+  color: #64748B;
+}
+
+.cc-divider {
+  height: 1rpx;
+  background: #334155;
+  margin: 12rpx 0;
+}
+
+.cc-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+.cc-info-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+.cc-info-label {
+  font-size: 24rpx;
+  color: #64748B;
+  flex-shrink: 0;
+  width: 3.5em;
+}
+.cc-info-value {
+  font-size: 24rpx;
+  color: #E2E8F0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cc-info-gold {
+  color: #F59E0B;
+  font-weight: 600;
+}
+
+.cc-card-action {
+  margin-top: 14rpx;
+  display: flex;
+  justify-content: flex-end;
+  position: relative;
+  z-index: 10;
+}
+.cc-action-btn-text {
+  font-size: 24rpx;
+  padding: 16rpx 32rpx;
+  border-radius: 24rpx;
+}
+.cc-action-deduct {
+  background: rgba(245, 158, 11, 0.15);
+  color: #F59E0B;
+}
+/* button 覆盖样式 */
+.cc-action-deduct-btn {
+  font-size: 24rpx !important;
+  padding: 8rpx 24rpx !important;
+  background: rgba(245, 158, 11, 0.15) !important;
+  color: #F59E0B !important;
+  border: none !important;
+  border-radius: 24rpx !important;
+  line-height: 1.4 !important;
+  margin: 0 !important;
+  text-align: center !important;
+  display: inline-block !important;
+  width: auto !important;
+}
+.cc-action-deduct-btn::after {
+  border: none !important;
+}
+
+/* ============================================================== */
+/* ===== 消费券卡片 — 全新浅色样式 ===== */
+/* ============================================================== */
+.coup-card {
+  background: #ffffff;
+  border-radius: 20rpx;
+  overflow: hidden;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.08);
+  padding: 24rpx 28rpx 20rpx;
+  position: relative;
+}
+.coup-card-inactive {
+  opacity: 0.55;
+}
+
+/* ----- 卡片头部：商家logo + 名称 + 券名 ----- */
+.coup-card-header {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-bottom: 16rpx;
+}
+
+.coup-merchant-logo {
+  width: 50rpx;
+  height: 50rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #F1F5F9;
+}
+
+.coup-merchant-no-logo {
+  width: 50rpx;
+  height: 50rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #3B82F6, #8B5CF6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.coup-merchant-no-logo-text {
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.coup-merchant-info {
+  flex: 1;
+  min-width: 0;
+}
+.coup-merchant-name {
+  display: block;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #1E293B;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.coup-coupon-name {
+  display: block;
+  font-size: 22rpx;
+  color: #64748B;
+  line-height: 1.3;
+  margin-top: 2rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ----- 面额区 ----- */
+.coup-amount-area {
+  display: flex;
+  align-items: baseline;
+  gap: 6rpx;
+  margin-bottom: 12rpx;
+}
+.coup-amount-symbol {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #FF3B5C;
+  line-height: 1;
+}
+.coup-amount-value {
+  font-size: 64rpx;
+  font-weight: 800;
+  color: #FF3B5C;
+  line-height: 1;
+}
+.coup-amount-label {
+  font-size: 24rpx;
+  font-weight: 500;
+  color: #FF3B5C;
+  margin-left: 6rpx;
+  background: rgba(255, 59, 92, 0.08);
+  padding: 2rpx 12rpx;
+  border-radius: 8rpx;
+}
+
+/* ----- 信息行：券种类 + 有效期 + 状态 ----- */
+.coup-info-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 8rpx;
+  flex-wrap: wrap;
+}
+
+.coup-type-tag {
+  font-size: 22rpx;
+  color: #3B82F6;
+  background: rgba(59, 130, 246, 0.08);
+  padding: 4rpx 14rpx;
+  border-radius: 8rpx;
+  flex-shrink: 0;
+}
+
+.coup-valid-range {
+  font-size: 22rpx;
+  color: #94A3B8;
+  flex-shrink: 0;
+}
+
+.coup-status-badge {
+  font-size: 20rpx;
+  padding: 2rpx 14rpx;
+  border-radius: 20rpx;
+  flex-shrink: 0;
+}
+.coup-status-ok {
+  background: rgba(34, 197, 94, 0.12);
+  color: #16A34A;
+}
+.coup-status-expired {
+  background: #F1F5F9;
+  color: #94A3B8;
+}
+
+/* ----- 条件行（满减条件、兑换商品描述） ----- */
+.coup-condition-row {
+  margin-bottom: 12rpx;
+}
+.coup-condition-text {
+  font-size: 22rpx;
+  color: #64748B;
+  background: #F8FAFC;
+  padding: 4rpx 14rpx;
+  border-radius: 8rpx;
+  display: inline-block;
+}
+
+/* ----- 卡片底部 ----- */
+.coup-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14rpx;
+  padding-top: 14rpx;
+  border-top: 1rpx solid #F1F5F9;
+  min-height: 60rpx;
+}
+
+/* 地址行 */
+.coup-address-row {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+  flex: 1;
+  min-width: 0;
+  padding: 6rpx 0;
+}
+.coup-address-row:active {
+  opacity: 0.6;
+}
+.coup-address-icon {
+  font-size: 24rpx;
+  flex-shrink: 0;
+}
+.coup-address-text {
+  font-size: 22rpx;
+  color: #3B82F6;
+  text-decoration: underline;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+/* 立即使用按钮 */
+.coup-use-btn {
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+  border-radius: 28rpx;
+  padding: 12rpx 32rpx;
+  margin-left: 12rpx;
+  box-shadow: 0 2rpx 8rpx rgba(59, 130, 246, 0.3);
+}
+.coup-use-btn:active {
+  opacity: 0.8;
+  transform: scale(0.95);
+}
+.coup-use-btn-text {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+/* ============================================================== */
+/* ===== 核销弹窗 ===== */
+/* ============================================================== */
+.verify-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.verify-modal {
+  width: 560rpx;
+  background: #ffffff;
+  border-radius: 24rpx;
+  padding: 40rpx 40rpx 48rpx;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.verify-modal-close {
+  position: absolute;
+  top: 20rpx;
+  right: 24rpx;
+  width: 48rpx;
+  height: 48rpx;
+  text-align: center;
+  line-height: 48rpx;
+  font-size: 32rpx;
+  color: #94A3B8;
+}
+.verify-modal-close:active {
+  opacity: 0.6;
+}
+
+.verify-modal-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #1E293B;
+  margin-bottom: 28rpx;
+}
+
+.verify-qr-area {
+  width: 320rpx;
+  height: 320rpx;
+  background: linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%);
+  border: 2rpx dashed #93C5FD;
+  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24rpx;
+}
+.verify-qr-code {
+  font-size: 48rpx;
+  font-weight: 900;
+  color: #1E40AF;
+  text-align: center;
+  letter-spacing: 8rpx;
+  font-family: monospace;
+}
+
+.verify-code-area {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 12rpx;
+}
+.verify-code-label {
+  font-size: 24rpx;
+  color: #64748B;
+}
+.verify-code-value {
+  font-size: 36rpx;
+  font-weight: 800;
+  color: #1E293B;
+  letter-spacing: 4rpx;
+}
+
+.verify-modal-hint {
+  font-size: 24rpx;
+  color: #94A3B8;
+  margin-top: 8rpx;
+}
+
+/* ===== 加载态 ===== */
+.cc-loading {
+  display: flex;
+  justify-content: center;
+  padding: 80rpx 0;
+}
+.cc-loading-text {
+  font-size: 28rpx;
+  color: #64748B;
+}
+
+/* ===== 空状态 ===== */
+.cc-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 100rpx 0;
+  gap: 12rpx;
+}
+.cc-empty-icon {
+  font-size: 80rpx;
+}
+.cc-empty-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #E2E8F0;
+}
+.cc-empty-desc {
+  font-size: 26rpx;
+  color: #64748B;
+}
+.cc-empty-btn {
+  width: 280rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  text-align: center;
+  background: linear-gradient(135deg, #FF3B5C 0%, #FF6B6B 100%);
+  border-radius: 36rpx;
+  color: #ffffff;
+  font-size: 28rpx;
+  font-weight: 600;
+  margin-top: 24rpx;
+  box-shadow: 0 4rpx 16rpx rgba(255, 59, 92, 0.3);
+}
+.cc-empty-btn:active {
+  opacity: 0.85;
+  transform: scale(0.95);
+}
+.cc-empty-btn-secondary {
+  background: linear-gradient(135deg, #1E293B 0%, #334155 100%);
+  color: #00D4FF;
+  box-shadow: none;
+  border: 2rpx solid #334155;
+}

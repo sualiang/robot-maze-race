@@ -1,0 +1,88 @@
+<!-- pages/help/help.wxml - 发起者助力管理页 -->
+<view class="container">
+  <!-- ===== 加载中 ===== -->
+  <view wx:if="{{loading}}" class="loading-state">
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <!-- ===== 助力活动内容 ===== -->
+  <block wx:if="{{!loading && activity}}">
+    <!-- 进度卡片 -->
+    <view class="progress-card card">
+      <view class="progress-card-header">
+        <text class="progress-card-title">助力进度</text>
+        <view class="progress-card-badge {{activity.status}}">
+          {{activity.status === 'completed' ? '✅ 已完成' : activity.status === 'expired' ? '⏰ 已过期' : '🔥 进行中'}}
+        </view>
+      </view>
+      <view class="progress-number-row">
+        <text class="progress-number-current">{{activity.currentHelpCount}}</text>
+        <text class="progress-number-sep">/</text>
+        <text class="progress-number-target">{{activity.requiredHelpCount}}</text>
+      </view>
+      <view class="progress-bar-bg">
+        <view class="progress-bar-fill" style="width: {{activity.progressPercent}}%"></view>
+      </view>
+      <text class="progress-tip">还差 {{activity.requiredHelpCount - activity.currentHelpCount}} 人助力即可免费获得参赛次数</text>
+    </view>
+
+    <!-- 已助力好友头像组 -->
+    <view class="helpers-card card">
+      <text class="section-title">已助力好友（{{activity.helpers.length}}/{{activity.requiredHelpCount}}）</text>
+      <view class="helpers-avatar-row">
+        <view wx:for="{{activity.helpers}}" wx:key="id" class="avatar-wrapper" data-helpername="{{item.helperNickname}}" bindtap="onViewHelper">
+          <image class="helper-avatar" src="{{item.helperAvatarUrl}}" mode="aspectFill" wx:if="{{item.helperAvatarUrl}}" />
+          <view class="helper-avatar helper-avatar-placeholder" wx:else>
+            <text class="placeholder-text">{{item.helperNickname ? item.helperNickname.slice(0, 1) : '?'}}</text>
+          </view>
+        </view>
+        <!-- 未满占位灰色头像 -->
+        <view wx:for="{{emptySlots}}" wx:for-item="empty" wx:key="index" class="avatar-wrapper">
+          <view class="helper-avatar helper-avatar-empty">
+            <text class="empty-text">+</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 目标奖励 -->
+    <view class="reward-card card" wx:if="{{activity.targetPackageName}}">
+      <text class="section-title">助力奖励</text>
+      <text class="reward-text">完成后可获得 <text class="reward-highlight">{{activity.freeAttempts || '1'}} 次</text> 免费参赛次数</text>
+    </view>
+
+    <!-- 分享到微信好友按钮 -->
+    <view class="action-section">
+      <button class="btn-share" open-type="share" bindtap="onShareTap">
+        <text class="btn-share-icon">📤</text>
+        <text class="btn-share-text">分享到微信好友</text>
+      </button>
+    </view>
+
+    <!-- 保存分享海报 -->
+    <view class="poster-section card">
+      <text class="section-title">分享海报</text>
+      <text class="poster-tip">保存海报分享到朋友圈或发送给好友</text>
+      <canvas canvas-id="shareCanvas" id="shareCanvas" class="share-canvas"
+        style="width: {{canvasWidth}}px; height: {{canvasHeight}}px;">
+      </canvas>
+      <view class="btn-poster-save" bindtap="onSaveShareCard">
+        <text class="btn-poster-save-icon">💾</text>
+        <text class="btn-poster-save-text">保存分享海报</text>
+      </view>
+    </view>
+
+    <!-- 底部提示 -->
+    <view class="footer-tip">
+      <text>完成后获得 {{activity.freeAttempts || 'X'}} 次免费参赛次数</text>
+    </view>
+  </block>
+
+  <!-- ===== 没有活动 - 创建入口 ===== -->
+  <view wx:if="{{!loading && !activity}}" class="empty-state">
+    <text class="empty-emoji">🤝</text>
+    <text class="empty-title">发起好友助力</text>
+    <text class="empty-desc">邀请好友助力，免费获取参赛次数</text>
+    <button class="btn-create-help" bindtap="createHelpActivity">发起助力</button>
+  </view>
+</view>

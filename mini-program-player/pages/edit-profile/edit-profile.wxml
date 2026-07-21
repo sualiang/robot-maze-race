@@ -1,0 +1,47 @@
+<!-- pages/edit-profile/edit-profile.wxml — 完善个人信息（深色主题） -->
+<view class="page">
+
+  <!-- 头像 — 顶部居中大圆（chooseMedia 兼容新版隐私协议） -->
+  <view class="avatar-area" bindtap="onChooseAvatar">
+    <image class="avatar-circle" src="{{avatar || '/assets/images/logo-avatar.png'}}" mode="aspectFill" />
+    <text class="avatar-hint">点击更换头像</text>
+  </view>
+
+  <!-- 表单卡片 -->
+  <view class="form-card">
+
+    <!-- 昵称 -->
+    <view class="form-cell">
+      <text class="form-cell__hd">昵称</text>
+      <view class="form-cell__bd form-cell__bd_right">
+        <input class="form-input" type="text" value="{{nickname}}" placeholder="请输入昵称" placeholder-style="color:#475569" maxlength="12" bindinput="onNicknameInput" />
+      </view>
+    </view>
+
+    <!-- 性别 -->
+    <picker mode="selector" range="{{genderOptions}}" bindchange="onGenderChange">
+      <view class="form-cell form-cell_tap">
+        <text class="form-cell__hd">性别</text>
+        <view class="form-cell__bd form-cell__bd_right">
+          <text class="form-cell__value">{{genderOptions[genderIndex]}}</text>
+        </view>
+        <text class="form-cell__arrow">›</text>
+      </view>
+    </picker>
+
+    <!-- 手机号 — 不可修改（注册时锁定） -->
+    <view class="form-cell form-cell_disabled">
+      <text class="form-cell__hd">手机号</text>
+      <view class="form-cell__bd form-cell__bd_right">
+        <text class="form-cell__value form-cell__value--dim">{{phone || '未填写'}}</text>
+      </view>
+    </view>
+
+  </view>
+
+  <!-- 保存按钮 -->
+  <view class="btn-area">
+    <button class="save-btn" bindtap="onSave">保存</button>
+  </view>
+
+</view>

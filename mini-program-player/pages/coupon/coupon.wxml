@@ -1,0 +1,145 @@
+<!-- 我的卡券 V3.6 - 3Tab 统一页面（参赛抵扣卡已废弃） -->
+<view class="cc-page">
+
+  <!-- ========== 模块1: 页面大标题 ========== -->
+  <view class="cc-header">
+    <text class="cc-header-title">我的卡券</text>
+    <text class="cc-header-subtitle">查看和管理你所有的卡券</text>
+  </view>
+
+  <!-- ========== 模块2: 分类Tab栏 ========== -->
+  <view class="cc-tabs">
+    <view
+      wx:for="{{tabs}}"
+      wx:key="key"
+      class="cc-tab {{currentTab === item.key ? 'cc-tab-active' : ''}}"
+      data-key="{{item.key}}"
+      bindtap="onTabChange"
+    >
+      <text class="cc-tab-label">{{item.label}}</text>
+      <view wx:if="{{currentTab === item.key}}" class="cc-tab-bar"></view>
+    </view>
+  </view>
+
+  <!-- ========== 兑换记录入口 ========== -->
+  <view wx:if="{{cardList.length > 0}}" class="cc-exch-entry" bindtap="onExchangeRecords">
+    <text class="cc-exch-entry-text">📋 兑换记录</text>
+    <text class="cc-exch-entry-arrow">›</text>
+  </view>
+
+  <!-- ========== 模块3: 卡券列表（仅消费券） ========== -->
+  <view class="cc-list" wx:if="{{cardList.length > 0 && !loading}}">
+
+    <block wx:for="{{cardList}}" wx:key="id">
+      <!-- 消费券卡片（立减/满减/兑换） -->
+      <view
+        class="coup-card {{item.status !== 1 ? 'coup-card-inactive' : ''}}"
+        data-item="{{item}}"
+      >
+        <!-- 顶部：商家logo + 名称 + 券信息 -->
+        <view class="coup-card-header">
+          <image class="coup-merchant-logo" src="{{item.merchantLogo}}" mode="aspectFill" wx:if="{{item.merchantLogo}}"></image>
+          <view class="coup-merchant-no-logo" wx:else>
+            <text class="coup-merchant-no-logo-text">{{item.merchantName.charAt(0)}}</text>
+          </view>
+          <view class="coup-merchant-info">
+            <text class="coup-merchant-name">{{item.merchantName || '商家'}}</text>
+            <text class="coup-coupon-name">{{item.name}}</text>
+          </view>
+        </view>
+
+        <!-- 面额区 -->
+        <view class="coup-amount-area">
+          <text class="coup-amount-symbol">¥</text>
+          <text class="coup-amount-value">{{item.denominationYuan.toFixed(0)}}</text>
+          <text class="coup-amount-label" wx:if="{{item.couponType === 1}}">立减券</text>
+          <text class="coup-amount-label" wx:elif="{{item.couponType === 3}}">满减券</text>
+          <text class="coup-amount-label" wx:elif="{{item.couponType === 4}}">兑换券</text>
+        </view>
+
+        <!-- 信息行：券种类 + 有效期 + 有效/超期状态 -->
+        <view class="coup-info-row">
+          <text class="coup-type-tag">
+            <block wx:if="{{item.couponType === 1}}">无门槛立减</block>
+            <block wx:elif="{{item.couponType === 3 && item.minConsumeYuan > 0}}">满¥{{item.minConsumeYuan.toFixed(0)}}减</block>
+            <block wx:elif="{{item.couponType === 4}}">兑换券</block>
+          </text>
+          <text class="coup-valid-range">{{item.validEnd || '长期有效'}}</text>
+          <text class="coup-status-badge coup-status-{{item.status === 1 ? 'ok' : 'expired'}}">{{item.statusText}}</text>
+        </view>
+
+        <!-- 满减条件（额外显示） -->
+        <view wx:if="{{item.couponType === 3 && item.minConsumeYuan > 0}}" class="coup-condition-row">
+          <text class="coup-condition-text">满¥{{item.minConsumeYuan.toFixed(2)}}可用</text>
+        </view>
+
+        <!-- 兑换券商品描述 -->
+        <view wx:if="{{item.couponType === 4 && item.description}}" class="coup-condition-row">
+          <text class="coup-condition-text">{{item.description}}</text>
+        </view>
+
+        <!-- 底部操作栏 -->
+        <view class="coup-card-footer">
+          <!-- 商家地址（可点击导航） -->
+          <view class="coup-address-row" wx:if="{{item.merchantAddress}}" data-item="{{item}}" bindtap="onNavigateStore">
+            <text class="coup-address-icon">📍</text>
+            <text class="coup-address-text">{{item.merchantAddress}}</text>
+          </view>
+          <!-- 立即使用按钮 -->
+          <view class="coup-use-btn" wx:if="{{item.status === 1}}" data-item="{{item}}" bindtap="onUseCoupon">
+            <text class="coup-use-btn-text">立即使用</text>
+          </view>
+        </view>
+      </view>
+    </block>
+  </view>
+
+  <!-- ========== 加载态 ========== -->
+  <view wx:elif="{{loading}}" class="cc-loading">
+    <text class="cc-loading-text">加载中...</text>
+  </view>
+
+  <!-- ========== 空状态（按 Tab 显示不同提示） ========== -->
+  <view wx:elif="{{isEmpty && !loading}}" class="cc-empty">
+    <block wx:if="{{currentTab === 1}}">
+      <text class="cc-empty-icon">🎫</text>
+      <text class="cc-empty-title">暂无立减券</text>
+      <text class="cc-empty-desc">购买参赛包可获赠商家立减券</text>
+      <view class="cc-empty-btn cc-empty-btn-secondary" bindtap="onGetCards">去购买参赛包 →</view>
+    </block>
+    <block wx:elif="{{currentTab === 3}}">
+      <text class="cc-empty-icon">🏪</text>
+      <text class="cc-empty-title">暂无满减券</text>
+      <text class="cc-empty-desc">购买参赛包可获赠商家满减券</text>
+      <view class="cc-empty-btn cc-empty-btn-secondary" bindtap="onGetCards">去购买参赛包 →</view>
+    </block>
+    <block wx:elif="{{currentTab === 4}}">
+      <text class="cc-empty-icon">🎁</text>
+      <text class="cc-empty-title">暂无兑换券</text>
+      <text class="cc-empty-desc">购买参赛包可获赠商家兑换券</text>
+      <view class="cc-empty-btn cc-empty-btn-secondary" bindtap="onGetCards">去购买参赛包 →</view>
+    </block>
+  </view>
+
+  <!-- ========== 核销弹窗 ========== -->
+  <view wx:if="{{showVerifyModal && verifyItem}}" class="verify-mask" bindtap="onCloseVerify">
+    <view class="verify-modal" catchtap="">
+      <view class="verify-modal-close" bindtap="onCloseVerify">✕</view>
+      <view class="verify-modal-title">核销二维码</view>
+
+      <!-- 二维码展示区 — 用 verifyCode 文本展示，带防伪装饰 -->
+      <view class="verify-qr-area">
+        <text class="verify-qr-code">{{verifyItem.verifyCode}}</text>
+      </view>
+
+      <!-- 核销码数字 -->
+      <view class="verify-code-area">
+        <text class="verify-code-label">核销码</text>
+        <text class="verify-code-value">{{verifyItem.verifyCode}}</text>
+      </view>
+
+      <view class="verify-modal-hint">请向商家出示此码</view>
+    </view>
+  </view>
+
+</view>

@@ -1,0 +1,298 @@
+<!--
+  pages/leaderboard/leaderboard.wxml - V4 全市季度赛/全省年度总决赛 四阶段
+-->
+<view class="page-leaderboard">
+
+  <!-- 加载遮罩 -->
+  <view wx:if="{{pageLoading}}" class="loading-mask">
+    <view class="spinner"></view>
+  </view>
+
+  <block wx:else>
+
+    <!-- 顶部标题 -->
+    <view class="lb-header">
+      <text class="lb-header-title">我的榜单</text>
+    </view>
+
+    <!-- 我的排名卡片：近期最佳成绩 + 今日全区排名 -->
+    <view class="my-rank-card">
+      <view class="my-rank-top">
+        <text class="my-rank-badge">近期最佳成绩</text>
+        <text class="my-rank-region">{{myRanking.bestScore}}</text>
+      </view>
+      <view class="my-rank-top" style="margin-top: 12rpx;">
+        <text class="my-rank-badge">今日全区排名</text>
+        <text class="my-rank-region">第 {{myRanking.rank}} 名</text>
+      </view>
+
+      <view class="my-rank-info-row">
+        <view class="my-rank-info-item">
+          <text class="my-rank-info-val">{{myRanking.clubName}}</text>
+          <text class="my-rank-info-lbl">所属俱乐部</text>
+        </view>
+        <view class="my-rank-info-item">
+          <text class="my-rank-info-val">{{myRanking.totalRaces}}次</text>
+          <text class="my-rank-info-lbl">累计训练</text>
+        </view>
+        <view class="my-rank-info-item">
+          <text class="my-rank-info-val">{{myRanking.beatPercent}}%</text>
+          <text class="my-rank-info-lbl">击败玩家</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 双标签 -->
+    <view class="lb-tabs-bar">
+      <view
+        wx:for="{{tabs}}"
+        wx:key="key"
+        class="lb-tab-item {{currentTab === item.key ? 'lb-tab-active' : ''}}"
+        data-key="{{item.key}}"
+        bindtap="onTabChange">
+        <text>{{item.label}}</text>
+      </view>
+    </view>
+
+    <!-- ========== 阶段0: 赛事预告（未开启） ========== -->
+    <view wx:if="{{config}}" class="phase-section">
+      <block wx:if="{{config[currentTab]}}">
+        <view class="phase-badge phase-badge-not-started">
+          <text>赛事预告</text>
+        </view>
+
+        <!-- 赛事预告卡片 -->
+        <view class="phase-card">
+          <text class="phase-card-title">{{config[currentTab].name}}</text>
+          <text class="phase-card-desc">赛程即将公布，敬请期待</text>
+          <view class="phase-card-threshold">
+            <text class="threshold-label">入围门槛</text>
+            <text class="threshold-value">{{threshold.thresholdDisplay || '--'}}</text>
+          </view>
+          <view class="phase-card-compare">
+            <block wx:if="{{threshold.qualified}}">
+              <text class="compare-pass">✅ 已达标 — 你的成绩 {{threshold.myBestDisplay}} 已达门槛</text>
+            </block>
+            <block wx:elif="{{threshold.myBest}}">
+              <text class="compare-fail">⚠️ 差 {{threshold.diffDisplay}} — 继续加油！</text>
+            </block>
+            <block wx:else>
+              <text class="compare-none">暂无成绩，快去训练吧</text>
+            </block>
+          </view>
+        </view>
+
+        <!-- 晋级说明 -->
+        <view class="promotion-path">
+          <text class="path-title">晋级链路</text>
+          <view class="path-steps">
+            <view class="path-step">
+              <view class="path-step-num">1</view>
+              <text class="path-step-text">达到门槛分数线</text>
+            </view>
+            <view class="path-arrow">→</view>
+            <view class="path-step">
+              <view class="path-step-num">2</view>
+              <text class="path-step-text">报名期内完成报名</text>
+            </view>
+            <view class="path-arrow">→</view>
+            <view class="path-step">
+              <view class="path-step-num">3</view>
+              <text class="path-step-text">参加比赛争夺名次</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 已达门槛玩家 TOP10 -->
+        <view wx:if="{{qualifiedList.length > 0}}" class="qualified-section">
+          <text class="section-title">已达门槛选手</text>
+          <view class="qualified-list">
+            <view wx:for="{{qualifiedList}}" wx:key="userId" class="qualified-item">
+              <text class="qualified-rank">{{item.rank}}.</text>
+              <image class="qualified-avatar" src="{{item.avatarUrl || '/assets/images/default-avatar.png'}}" mode="aspectFill" />
+              <text class="qualified-name">{{item.nickname}}</text>
+              <text class="qualified-score">{{item.displayScore}}</text>
+            </view>
+          </view>
+        </view>
+
+      </block>
+    </view>
+
+    <!-- ========== 阶段1: 报名期 ========== -->
+    <view wx:if="{{config && config[currentTab] && config[currentTab].phase === 'registration'}}" class="phase-section">
+      <view class="phase-badge phase-badge-registration">
+        <text>报名中</text>
+      </view>
+
+      <view class="phase-card">
+        <text class="phase-card-title">{{config[currentTab].name}}</text>
+        <text class="phase-card-desc">报名通道已开启</text>
+
+        <!-- 名额进度条 -->
+        <view class="reg-progress">
+          <view class="reg-progress-bar">
+            <view class="reg-progress-fill" style="width: {{regStatus && regStatus.quota ? (regStatus.registeredCount / regStatus.quota * 100) : 0}}%"></view>
+          </view>
+          <view class="reg-progress-text">
+            <text>已报名 {{regStatus.registeredCount || 0}} 人 / 总名额 {{regStatus.quota || 0}} 人</text>
+          </view>
+        </view>
+
+        <!-- 报名按钮（占位） -->
+        <button class="reg-btn reg-btn-disabled" disabled>
+          <text>报名系统即将开放</text>
+        </button>
+      </view>
+    </view>
+
+    <!-- ========== 阶段2: 进行中 — 实时榜单 ========== -->
+    <view wx:if="{{config && config[currentTab] && config[currentTab].phase === 'ongoing'}}" class="phase-section">
+      <view class="phase-badge phase-badge-ongoing">
+        <text>进行中</text>
+      </view>
+
+      <!-- 加载骨架 -->
+      <view wx:if="{{listLoading && entries.length === 0}}" class="lb-list-skeleton">
+        <view class="lb-skeleton-item"></view>
+        <view class="lb-skeleton-item"></view>
+        <view class="lb-skeleton-item"></view>
+      </view>
+
+      <!-- 实时积分榜单 -->
+      <view wx:elif="{{entries.length > 0}}" class="lb-rank-list">
+        <!-- 前三名 -->
+        <view wx:if="{{entries.length >= 3}}" class="lb-top3-wrapper">
+          <view class="lb-top3-item {{entries[1].isMe ? 'lb-is-me' : ''}}">
+            <view class="lb-top3-avatar-wrap">
+              <image class="lb-top3-avatar" src="{{entries[1].avatarUrl || '/assets/images/default-avatar.png'}}" mode="aspectFill" />
+              <text class="lb-top3-medal lb-medal-silver">🥈</text>
+            </view>
+            <text class="lb-top3-name">{{entries[1].nickname}}</text>
+            <text class="lb-top3-score lb-score-silver">{{entries[1].displayScore}}</text>
+          </view>
+          <view class="lb-top3-item lb-top3-center {{entries[0].isMe ? 'lb-is-me' : ''}}">
+            <view class="lb-top3-avatar-wrap lb-top3-avatar-gold">
+              <image class="lb-top3-avatar lb-top3-avatar-big" src="{{entries[0].avatarUrl || '/assets/images/default-avatar.png'}}" mode="aspectFill" />
+              <text class="lb-top3-medal">🥇</text>
+            </view>
+            <text class="lb-top3-name">{{entries[0].nickname}}</text>
+            <text class="lb-top3-score lb-score-gold">{{entries[0].displayScore}}</text>
+          </view>
+          <view class="lb-top3-item {{entries[2].isMe ? 'lb-is-me' : ''}}">
+            <view class="lb-top3-avatar-wrap">
+              <image class="lb-top3-avatar" src="{{entries[2].avatarUrl || '/assets/images/default-avatar.png'}}" mode="aspectFill" />
+              <text class="lb-top3-medal lb-medal-bronze">🥉</text>
+            </view>
+            <text class="lb-top3-name">{{entries[2].nickname}}</text>
+            <text class="lb-top3-score lb-score-bronze">{{entries[2].displayScore}}</text>
+          </view>
+        </view>
+
+        <!-- 4名+ -->
+        <view wx:for="{{entries}}" wx:key="userId" class="lb-rank-item {{item.rank >= 4 ? '' : 'lb-rank-hidden-top3'}} {{item.isMe ? 'lb-is-me' : ''}}">
+          <block wx:if="{{item.rank >= 4}}">
+            <view class="lb-rank-num-col"><text class="lb-rank-num">{{item.rank}}</text></view>
+            <image class="lb-rank-avatar" src="{{item.avatarUrl || '/assets/images/default-avatar.png'}}" mode="aspectFill" />
+            <view class="lb-rank-name-col"><text class="lb-rank-name">{{item.nickname}}</text></view>
+            <view class="lb-rank-score-col"><text class="lb-rank-score">{{item.displayScore}}</text></view>
+          </block>
+        </view>
+
+        <view wx:if="{{hasMore}}" class="lb-load-more"><text>加载更多</text></view>
+        <view wx:else class="lb-load-end"><text>— 已加载全部 —</text></view>
+      </view>
+
+      <!-- 空状态 -->
+      <view wx:if="{{!listLoading && entries.length === 0}}" class="empty-state">
+        <text class="empty-icon">🏆</text>
+        <text class="empty-title">暂无排行数据</text>
+        <text class="empty-desc">比赛开始后实时更新</text>
+      </view>
+    </view>
+
+    <!-- ========== 阶段3: 结束后 — 最终榜单 ========== -->
+    <view wx:if="{{config && config[currentTab] && config[currentTab].phase === 'ended'}}" class="phase-section">
+      <view class="phase-badge phase-badge-ended">
+        <text>已结束</text>
+      </view>
+
+      <!-- 加载骨架 -->
+      <view wx:if="{{listLoading}}" class="lb-list-skeleton">
+        <view class="lb-skeleton-item"></view>
+        <view class="lb-skeleton-item"></view>
+      </view>
+
+      <block wx:elif="{{finalResult}}">
+
+        <!-- 最终榜单 -->
+        <view wx:if="{{finalResult.list.length > 0}}" class="final-header">
+          <text class="final-title">{{config[currentTab].name}} · 最终排名</text>
+        </view>
+
+        <view class="lb-rank-list">
+          <view wx:for="{{finalResult.list}}" wx:key="userId" class="lb-rank-item {{item.isMe ? 'lb-is-me' : ''}} {{item.isPromoted ? 'lb-promoted' : ''}}">
+            <view class="lb-rank-num-col">
+              <text class="lb-rank-num {{item.rank <= 3 ? 'lb-rank-num-medal' : ''}}">{{item.rank}}</text>
+            </view>
+            <image class="lb-rank-avatar" src="{{item.avatarUrl || '/assets/images/default-avatar.png'}}" mode="aspectFill" />
+            <view class="lb-rank-name-col">
+              <text class="lb-rank-name">{{item.nickname}}</text>
+              <text wx:if="{{item.isPromoted}}" class="lb-promoted-tag">🏅 晋级</text>
+            </view>
+            <view class="lb-rank-score-col">
+              <text class="lb-rank-score">{{item.displayScore}}</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 晋级名单 -->
+        <view wx:if="{{finalResult.promoted.length > 0}}" class="promoted-section">
+          <text class="section-title">🏅 晋级名单（前 {{finalResult.quota}} 名）</text>
+          <view class="promoted-grid">
+            <view wx:for="{{finalResult.promoted}}" wx:key="userId" class="promoted-item">
+              <image class="promoted-avatar" src="{{item.avatarUrl || '/assets/images/default-avatar.png'}}" mode="aspectFill" />
+              <text class="promoted-name">{{item.nickname}}</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 积分奖励 -->
+        <view class="reward-section">
+          <text class="section-title">🎁 积分奖励</text>
+          <view class="reward-list">
+            <view class="reward-item">
+              <text class="reward-rank">🥇 第1名</text>
+              <text class="reward-value">+1000 积分</text>
+            </view>
+            <view class="reward-item">
+              <text class="reward-rank">🥈 第2名</text>
+              <text class="reward-value">+800 积分</text>
+            </view>
+            <view class="reward-item">
+              <text class="reward-rank">🥉 第3名</text>
+              <text class="reward-value">+500 积分</text>
+            </view>
+            <view class="reward-item">
+              <text class="reward-rank">晋级者</text>
+              <text class="reward-value">+200 积分</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 下届预告 -->
+        <view class="next-season">
+          <text class="next-season-text">下届赛事即将公布，敬请期待 🎉</text>
+        </view>
+
+      </block>
+
+      <view wx:if="{{!listLoading && !finalResult}}" class="empty-state">
+        <text class="empty-icon">🏆</text>
+        <text class="empty-title">赛事结果尚未公布</text>
+      </view>
+
+    </view>
+
+  </block>
+</view>

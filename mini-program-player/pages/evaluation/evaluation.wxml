@@ -1,0 +1,65 @@
+<view class="page">
+  <!-- 页面标题 -->
+  <view class="page-header">
+    <text class="page-title">实时评估区</text>
+  </view>
+
+  <!-- 加载状态 -->
+  <view wx:if="{{!loaded}}" class="load-state">
+    <view class="spinner"></view>
+    <text class="load-text">评估加载中...</text>
+  </view>
+
+  <view wx:else>
+    <!-- 基础门槛达标状态 -->
+    <view class="threshold-card {{thresholdPassed ? 'threshold-pass' : 'threshold-fail'}} card-elevated">
+      <view class="threshold-icon">{{thresholdPassed ? '✅' : '❌'}}</view>
+      <text class="threshold-title">{{thresholdPassed ? '基础门槛已达标' : '基础门槛未达标'}}</text>
+      <text class="threshold-gap" wx:if="{{!thresholdPassed && gapText}}">
+        距入围线还差 {{gapText}}
+      </text>
+    </view>
+
+    <!-- 战斗力 + 排名 + 入围线 -->
+    <view class="combat-card card-elevated">
+      <view class="combat-stats-row">
+        <view class="combat-stat-item">
+          <text class="combat-stat-number">{{combatPower || '--'}}</text>
+          <text class="combat-stat-label">战斗力</text>
+        </view>
+        <view class="combat-stat-divider"></view>
+        <view class="combat-stat-item">
+          <text class="combat-stat-number combat-stat-rank">#{{rank || '--'}}</text>
+          <text class="combat-stat-label">战斗力排名</text>
+        </view>
+        <view class="combat-stat-divider"></view>
+        <view class="combat-stat-item">
+          <text class="combat-stat-number combat-stat-line">{{qualifierLine || '--'}}</text>
+          <text class="combat-stat-label">入围线</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 目前差距详情 -->
+    <view wx:if="{{combatGap !== undefined && combatGap !== null}}" class="gap-card card-elevated">
+      <text class="gap-text {{combatGap >= 0 ? 'gap-positive' : 'gap-negative'}}">
+        {{combatGap >= 0 ? '已超出入围线 ' + combatGap : '距离入围线还差 ' + Math.abs(combatGap)}}
+      </text>
+    </view>
+
+    <!-- 提升建议列表 -->
+    <view class="suggestions-section" wx:if="{{suggestions.length > 0}}">
+      <text class="section-label">提升建议</text>
+      <view wx:for="{{suggestions}}" wx:key="id" class="suggestion-item card" data-url="{{item.url}}" bindtap="onSuggestionTap">
+        <view class="suggestion-left">
+          <text class="suggestion-icon">{{item.icon || '💡'}}</text>
+          <view class="suggestion-text">
+            <text class="suggestion-title">{{item.title || '建议'}}</text>
+            <text class="suggestion-desc">{{item.description || ''}}</text>
+          </view>
+        </view>
+        <text class="suggestion-arrow">›</text>
+      </view>
+    </view>
+  </view>
+</view>

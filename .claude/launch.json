@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "--host", "0.0.0.0", "--port", "5173"],
+      "port": 5173,
+      "cwd": "C:/Users/suali/robot-maze-race/web"
+    }
+  ]
+}

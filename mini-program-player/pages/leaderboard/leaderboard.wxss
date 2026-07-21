@@ -1,0 +1,618 @@
+/**
+ * pages/leaderboard/leaderboard.wxss - V4 全市季度赛/全省年度总决赛 四阶段
+ * 配色: #0F172A 背景 | #1E293B 卡片 | #FF3B5C 主色 | #F59E0B 金色
+ *       #E2E8F0 一级正文 | #94A3B8 二级辅助 | #334155 分割线
+ */
+
+/* ===== 页面容器 ===== */
+.page-leaderboard {
+  min-height: 100vh;
+  background: #0F172A;
+  padding: 0 32rpx 140rpx;
+}
+
+.loading-mask {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 70vh;
+}
+
+/* ===== 顶部标题栏 ===== */
+.lb-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32rpx 0 24rpx;
+}
+.lb-header-title {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+
+/* ===== 我的排名卡片 (保留V3) ===== */
+.my-rank-card {
+  margin: 0 auto 24rpx;
+  border-radius: 24rpx;
+  padding: 32rpx 40rpx 24rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+  box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.2);
+  position: relative;
+}
+.my-rank-card::before {
+  content: '';
+  position: absolute; top: -2rpx; left: -2rpx; right: -2rpx; bottom: -2rpx;
+  border-radius: 26rpx;
+  background: linear-gradient(135deg, #F59E0B, #FBBF24, #F59E0B);
+  z-index: -1;
+}
+.my-rank-top {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 16rpx;
+  margin-bottom: 8rpx;
+}
+.my-rank-badge {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #F59E0B;
+}
+.my-rank-region {
+  font-size: 24rpx;
+  color: #94A3B8;
+}
+.my-rank-score {
+  font-size: 48rpx;
+  font-weight: 700;
+  color: #FFFFFF;
+  margin-bottom: 4rpx;
+}
+.my-rank-score-label {
+  font-size: 22rpx;
+  color: #64748B;
+  margin-bottom: 20rpx;
+}
+.my-rank-info-row {
+  width: 100%;
+  display: flex;
+  justify-content: space-around;
+}
+.my-rank-info-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+.my-rank-info-val {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #E2E8F0;
+}
+.my-rank-info-lbl {
+  font-size: 22rpx;
+  color: #94A3B8;
+  margin-top: 4rpx;
+}
+
+/* ===== 双标签栏 ===== */
+.lb-tabs-bar {
+  display: flex;
+  background: #1E293B;
+  border-radius: 16rpx;
+  padding: 6rpx;
+  margin-bottom: 20rpx;
+  height: 80rpx;
+  align-items: center;
+}
+.lb-tab-item {
+  flex: 1;
+  text-align: center;
+  height: 68rpx;
+  line-height: 68rpx;
+  border-radius: 12rpx;
+  font-size: 26rpx;
+  color: #94A3B8;
+}
+.lb-tab-item:active { opacity: 0.8; }
+.lb-tab-active {
+  background: #FF3B5C;
+  color: #FFFFFF;
+  font-weight: 600;
+  font-size: 28rpx;
+}
+
+/* ===== 阶段容器 ===== */
+.phase-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+/* 阶段标记 */
+.phase-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8rpx 0;
+  border-radius: 8rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+}
+.phase-badge-not-started { background: #1E293B; color: #94A3B8; }
+.phase-badge-registration { background: #1a2e1a; color: #22C55E; }
+.phase-badge-ongoing { background: #2e1a1a; color: #FF3B5C; }
+.phase-badge-ended { background: #1E293B; color: #F59E0B; }
+
+/* ===== 通用卡片 ===== */
+.phase-card {
+  background: #1E293B;
+  border-radius: 20rpx;
+  padding: 32rpx 28rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+.phase-card-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #FFFFFF;
+  text-align: center;
+}
+.phase-card-desc {
+  font-size: 24rpx;
+  color: #94A3B8;
+  text-align: center;
+}
+
+/* 门槛分数线 */
+.phase-card-threshold {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20rpx 24rpx;
+  background: rgba(245, 158, 11, 0.08);
+  border-radius: 12rpx;
+  border: 1rpx solid rgba(245, 158, 11, 0.2);
+}
+.threshold-label {
+  font-size: 26rpx;
+  color: #F59E0B;
+}
+.threshold-value {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #F59E0B;
+}
+
+/* 玩家成绩对比 */
+.phase-card-compare {
+  text-align: center;
+  padding: 12rpx 0;
+}
+.compare-pass {
+  font-size: 26rpx;
+  color: #22C55E;
+}
+.compare-fail {
+  font-size: 26rpx;
+  color: #FF3B5C;
+}
+.compare-none {
+  font-size: 26rpx;
+  color: #94A3B8;
+}
+
+/* ===== 晋级链路 ===== */
+.promotion-path {
+  background: #1E293B;
+  border-radius: 20rpx;
+  padding: 24rpx 28rpx;
+}
+.path-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #E2E8F0;
+  margin-bottom: 20rpx;
+  display: block;
+}
+.path-steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+}
+.path-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+  flex: 1;
+}
+.path-step-num {
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 50%;
+  background: rgba(255, 59, 92, 0.15);
+  color: #FF3B5C;
+  font-size: 24rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.path-step-text {
+  font-size: 22rpx;
+  color: #94A3B8;
+  text-align: center;
+  line-height: 1.3;
+}
+.path-arrow {
+  font-size: 28rpx;
+  color: #64748B;
+  margin-bottom: 16rpx;
+}
+
+/* ===== 达标选手列表 ===== */
+.qualified-section,
+.promoted-section,
+.reward-section {
+  background: #1E293B;
+  border-radius: 20rpx;
+  padding: 24rpx 28rpx;
+}
+.section-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #E2E8F0;
+  margin-bottom: 16rpx;
+  display: block;
+}
+.qualified-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+.qualified-item {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 12rpx 0;
+  border-bottom: 1rpx solid rgba(255,255,255,0.04);
+}
+.qualified-item:last-child { border-bottom: none; }
+.qualified-rank {
+  width: 48rpx;
+  font-size: 26rpx;
+  color: #94A3B8;
+  font-weight: 600;
+}
+.qualified-avatar {
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 50%;
+  background: #252540;
+}
+.qualified-name {
+  flex: 1;
+  font-size: 26rpx;
+  color: #E2E8F0;
+}
+.qualified-score {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #F59E0B;
+}
+
+/* ===== 报名期 ===== */
+.reg-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+.reg-progress-bar {
+  width: 100%;
+  height: 12rpx;
+  background: #334155;
+  border-radius: 6rpx;
+  overflow: hidden;
+}
+.reg-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #22C55E, #16A34A);
+  border-radius: 6rpx;
+  transition: width 0.3s ease;
+}
+.reg-progress-text {
+  text-align: center;
+  font-size: 24rpx;
+  color: #94A3B8;
+}
+
+.reg-btn {
+  width: 100%;
+  height: 88rpx;
+  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30rpx;
+  font-weight: 600;
+  border: none;
+  color: #64748B;
+  background: #1a1a2e;
+}
+.reg-btn-disabled {
+  opacity: 0.7;
+}
+
+/* ===== 进行中 — 骨架屏 ===== */
+.lb-list-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+.lb-skeleton-item {
+  height: 120rpx;
+  background: #1E293B;
+  border-radius: 16rpx;
+  opacity: 0.5;
+  animation: lbPulse 1.5s ease-in-out infinite;
+}
+@keyframes lbPulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.8; }
+}
+
+/* ===== 进行中 — 榜单前三 ===== */
+.lb-rank-list {
+  display: flex;
+  flex-direction: column;
+}
+.lb-top3-wrapper {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 16rpx;
+  margin-bottom: 24rpx;
+  padding: 24rpx 16rpx;
+  background: #1E293B;
+  border-radius: 24rpx;
+}
+.lb-top3-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 160rpx;
+}
+.lb-top3-item.lb-is-me {
+  border: 2rpx solid #FF3B5C;
+  border-radius: 16rpx;
+  padding: 8rpx;
+}
+.lb-top3-center { transform: scale(1.08); }
+.lb-top3-avatar-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8rpx;
+}
+.lb-top3-avatar {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 50%;
+  background: #252540;
+}
+.lb-top3-avatar-big {
+  width: 96rpx;
+  height: 96rpx;
+}
+.lb-top3-medal {
+  position: absolute;
+  bottom: -10rpx;
+  right: -10rpx;
+  font-size: 36rpx;
+  line-height: 1;
+}
+.lb-medal-silver { font-size: 32rpx; }
+.lb-medal-bronze { font-size: 32rpx; }
+.lb-top3-name {
+  font-size: 26rpx;
+  color: #E2E8F0;
+  line-height: 1.4;
+  max-width: 120rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+  margin-bottom: 4rpx;
+}
+.lb-top3-score {
+  font-size: 32rpx;
+  font-weight: 700;
+  margin-bottom: 4rpx;
+}
+.lb-score-gold { color: #F59E0B; }
+.lb-score-silver { color: #C0C0C0; }
+.lb-score-bronze { color: #CD7F32; }
+
+/* ===== 榜单条目 ===== */
+.lb-rank-item {
+  display: flex;
+  align-items: center;
+  background: #1E293B;
+  border-radius: 16rpx;
+  padding: 20rpx 24rpx;
+  margin-bottom: 12rpx;
+}
+.lb-rank-item.lb-is-me {
+  border: 2rpx solid #FF3B5C;
+}
+.lb-rank-item:active { background: #243044; }
+.lb-rank-hidden-top3 { display: none; }
+
+.lb-rank-num-col {
+  width: 56rpx;
+  text-align: center;
+  flex-shrink: 0;
+}
+.lb-rank-num {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #94A3B8;
+}
+.lb-rank-num-medal { color: #F59E0B; }
+
+.lb-rank-avatar {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #252540;
+  margin-left: 12rpx;
+}
+.lb-rank-name-col {
+  flex: 1;
+  margin-left: 16rpx;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+.lb-rank-name {
+  font-size: 28rpx;
+  color: #E2E8F0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lb-promoted-tag {
+  font-size: 22rpx;
+  color: #F59E0B;
+  flex-shrink: 0;
+}
+.lb-rank-item.lb-promoted {
+  border-left: 4rpx solid #F59E0B;
+}
+.lb-rank-score-col {
+  text-align: right;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.lb-rank-score {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #E2E8F0;
+}
+
+.lb-load-more,
+.lb-load-end {
+  text-align: center;
+  padding: 24rpx 0;
+  color: #94A3B8;
+  font-size: 24rpx;
+}
+.lb-load-more:active { opacity: 0.7; }
+
+/* ===== 结束后 — 最终榜单 ===== */
+.final-header {
+  text-align: center;
+  padding: 12rpx 0;
+}
+.final-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #F59E0B;
+}
+
+/* 晋级名单 网格 */
+.promoted-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+.promoted-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6rpx;
+  width: 120rpx;
+}
+.promoted-avatar {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  background: #252540;
+}
+.promoted-name {
+  font-size: 22rpx;
+  color: #E2E8F0;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+/* 积分奖励 */
+.reward-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+.reward-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12rpx 16rpx;
+  background: rgba(255,255,255,0.03);
+  border-radius: 10rpx;
+}
+.reward-rank {
+  font-size: 26rpx;
+  color: #E2E8F0;
+}
+.reward-value {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #F59E0B;
+}
+
+/* 下届预告 */
+.next-season {
+  background: #1E293B;
+  border-radius: 20rpx;
+  padding: 24rpx;
+  text-align: center;
+  margin-bottom: 20rpx;
+}
+.next-season-text {
+  font-size: 26rpx;
+  color: #94A3B8;
+}
+
+/* ===== 空状态 ===== */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 80rpx 0;
+}
+.empty-icon {
+  font-size: 64rpx;
+  margin-bottom: 16rpx;
+}
+.empty-title {
+  font-size: 28rpx;
+  color: #94A3B8;
+  margin-bottom: 8rpx;
+}
+.empty-desc {
+  font-size: 24rpx;
+  color: #64748B;
+}

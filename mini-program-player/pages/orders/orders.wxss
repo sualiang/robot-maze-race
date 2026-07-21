@@ -1,0 +1,147 @@
+/* pages/orders/orders.wxss - 我的订单 */
+.page {
+  padding: 20rpx;
+  min-height: 100vh;
+  background: #0f0f23;
+  box-sizing: border-box;
+}
+
+/* 标题 */
+.header {
+  padding: 20rpx 0 16rpx;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.header-title {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #fff;
+}
+
+/* 月份滑动标签栏 */
+.month-tabs {
+  width: 100%;
+  white-space: nowrap;
+  margin-bottom: 24rpx;
+}
+.month-tabs-inner {
+  display: inline-flex;
+  gap: 14rpx;
+  padding: 4rpx 0 8rpx;
+}
+.month-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12rpx 28rpx;
+  font-size: 26rpx;
+  color: #888;
+  background: rgba(255,255,255,0.06);
+  border-radius: 32rpx;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+.month-tab-active {
+  color: #fff;
+  background: #e94560;
+  font-weight: 600;
+}
+
+/* 订单列表 */
+.order-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.order-card {
+  background: #1a1a2e;
+  border-radius: 16rpx;
+  padding: 24rpx;
+}
+
+.order-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16rpx;
+}
+
+.order-package {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #fff;
+}
+
+.order-status {
+  font-size: 24rpx;
+  padding: 4rpx 16rpx;
+  border-radius: 8rpx;
+}
+.status-paid {
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.1);
+}
+.status-pending {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.1);
+}
+.status-cancel {
+  color: #888;
+  background: rgba(136, 136, 136, 0.1);
+}
+
+.order-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 8rpx 0;
+}
+
+.order-label {
+  font-size: 24rpx;
+  color: #888;
+}
+
+.order-value {
+  font-size: 24rpx;
+  color: #ccc;
+}
+
+.order-amount {
+  color: #e94560;
+  font-weight: 600;
+}
+
+.order-discount {
+  color: #4ade80;
+  font-weight: 600;
+}
+
+/* 空态 */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding-top: 200rpx;
+}
+.empty-text {
+  font-size: 32rpx;
+  color: #666;
+  margin-bottom: 12rpx;
+}
+.empty-sub {
+  font-size: 26rpx;
+  color: #555;
+}
+
+/* 加载中 */
+.loading {
+  display: flex;
+  justify-content: center;
+  padding-top: 200rpx;
+  color: #666;
+  font-size: 28rpx;
+}

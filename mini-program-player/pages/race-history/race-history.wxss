@@ -1,0 +1,113 @@
+/* pages/race-history/race-history.wxss - 我的比赛记录 */
+.page {
+  min-height: 100vh;
+  background: #0f0f23;
+  padding: 20rpx;
+  box-sizing: border-box;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  padding: 20rpx 0 30rpx;
+}
+.header-back {
+  width: 60rpx;
+  height: 60rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.back-icon {
+  font-size: 48rpx;
+  color: #888;
+  line-height: 1;
+}
+.header-title {
+  flex: 1;
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #fff;
+  text-align: center;
+}
+.header-filter {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+  padding: 8rpx 20rpx;
+  background: rgba(255,255,255,0.08);
+  border-radius: 32rpx;
+}
+.filter-label {
+  font-size: 24rpx;
+  color: #aaa;
+}
+.filter-arrow {
+  font-size: 18rpx;
+  color: #888;
+}
+
+.record-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.record-card {
+  background: #1a1a2e;
+  border-radius: 16rpx;
+  padding: 24rpx;
+}
+
+.record-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12rpx;
+}
+
+.record-score {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #e94560;
+}
+
+.record-rank {
+  font-size: 28rpx;
+  color: #fbbf24;
+  font-weight: 600;
+}
+
+.record-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.record-date {
+  font-size: 24rpx;
+  color: #888;
+}
+
+.record-bonus {
+  font-size: 24rpx;
+  color: #4ade80;
+}
+
+.empty {
+  display: flex;
+  justify-content: center;
+  padding-top: 200rpx;
+}
+.empty-text {
+  font-size: 30rpx;
+  color: #666;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  padding-top: 100rpx;
+  color: #666;
+  font-size: 28rpx;
+}

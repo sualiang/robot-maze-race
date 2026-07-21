@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <defs>
+    <linearGradient id="g6" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF6F00"/>
+      <stop offset="40%" style="stop-color:#D50000"/>
+      <stop offset="100%" style="stop-color:#880E4F"/>
+    </linearGradient>
+    <radialGradient id="g6r" cx="50%" cy="30%" r="50%">
+      <stop offset="0%" style="stop-color:#FFD700"/>
+      <stop offset="100%" style="stop-color:#FF6F00"/>
+    </radialGradient>
+  </defs>
+  <!-- 皇冠 -->
+  <polygon points="20,18 25,38 40,25 50,15 60,25 75,38 80,18 75,38 65,38 60,45 50,40 40,45 35,38 25,38" fill="url(#g6r)"/>
+  <rect x="25" y="55" width="50" height="8" rx="2" fill="url(#g6)"/>
+  <rect x="30" y="63" width="40" height="5" rx="2" fill="url(#g6)"/>
+  <rect x="35" y="68" width="30" height="4" rx="2" fill="url(#g6)"/>
+  <rect x="42" y="35" width="16" height="22" rx="2" fill="url(#g6)"/>
+  <path d="M25 28 Q15 28 15 38 Q15 50 25 50" fill="none" stroke="url(#g6)" stroke-width="3"/>
+  <path d="M75 28 Q85 28 85 38 Q85 50 75 50" fill="none" stroke="url(#g6)" stroke-width="3"/>
+  <!-- 宝石 -->
+  <circle cx="34" cy="30" r="3" fill="#FF1744"/>
+  <circle cx="50" cy="22" r="3" fill="#FF1744"/>
+  <circle cx="66" cy="30" r="3" fill="#FF1744"/>
+</svg>

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>web</title>
+    <script>
+      // 微信内置浏览器缓存破坏：每次 index.html 加载时对比版本号
+      // version.json 由构建脚本生成，包含构建时间戳
+      (function() {
+        var STORAGE_KEY = '__app_version__';
+        try {
+          var xhr = new XMLHttpRequest();
+          xhr.open('GET', '/version.json?t=' + Date.now(), false); // 同步请求，阻塞渲染
+          xhr.send();
+          if (xhr.status === 200) {
+            var data = JSON.parse(xhr.responseText);
+            var remoteVersion = data.version || '';
+            var localVersion = localStorage.getItem(STORAGE_KEY);
+            if (localVersion !== remoteVersion) {
+              // 版本不一致：清除缓存并强制刷新
+              localStorage.setItem(STORAGE_KEY, remoteVersion);
+              // 尝试清除 Service Worker 缓存
+              if ('caches' in window) {
+                caches.keys().then(function(keys) {
+                  keys.forEach(function(k) { caches.delete(k); });
+                });
+              }
+              location.reload(true);
+            }
+          }
+        } catch(e) {
+          // 静默失败，不影响页面加载
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      // 最可靠的错误上报 — Image beacon，不依赖任何 JS 框架
+      (function() {
+        var BASE = '/api/v1/client-log';
+        function report(level, msg, src, detail) {
+          try {
+            var data = 'level='+encodeURIComponent(level||'error')+'&message='+encodeURIComponent(msg||'')+'&source='+encodeURIComponent(src||'')+'&detail='+encodeURIComponent(detail||'')+'&url='+encodeURIComponent(location.href);
+            // Image beacon — 100%可靠
+            new Image().src = BASE + '?beacon=1&' + data;
+          } catch(e) {}
+        }
+
+        window.onerror = function(msg, url, line, col, err) {
+          report('error', String(msg), url, (line||'')+':'+(col||'')+' '+(err&&err.stack||''));
+        };
+        window.addEventListener('unhandledrejection', function(e) {
+          var r = e.reason;
+          report('error', (r&&r.message)||String(r), '', (r&&r.stack)||'');
+        });
+
+        // 页面加载存活检测
+        setTimeout(function() { report('info', 'PAGE_LOADED', 'index.html', 'liveness'); }, 2000);
+
+        // 劫持 console.error
+        var ce = console.error;
+        console.error = function() {
+          var args = Array.prototype.slice.call(arguments);
+          var msg = args.map(function(a){return typeof a==='object'?(a&&(a.stack||a.message||JSON.stringify(a)))||''+a:String(a)}).join(' ');
+          report('error', msg, 'console.error');
+          ce.apply(console, args);
+        };
+      })();
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

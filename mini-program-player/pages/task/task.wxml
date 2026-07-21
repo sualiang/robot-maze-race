@@ -1,0 +1,70 @@
+<view class="page">
+  <!-- 页面标题 -->
+  <view class="page-header">
+    <text class="page-title">任务中心</text>
+  </view>
+
+  <!-- Tab 切换 -->
+  <view class="task-tabs">
+    <view
+      wx:for="{{tabs}}"
+      wx:key="key"
+      class="task-tab {{currentTab === item.key ? 'task-tab-active' : ''}}"
+      data-key="{{item.key}}"
+      bindtap="onTabChange"
+    >
+      {{item.label}}
+    </view>
+  </view>
+
+  <!-- 每日任务倒计时（仅每日任务 Tab 显示） -->
+  <view wx:if="{{currentTab === 'daily' && countdownText}}" class="countdown-bar card">
+    <text class="countdown-icon">⏰</text>
+    <text class="countdown-text">距重置：{{countdownText}}</text>
+  </view>
+
+  <!-- 任务列表 -->
+  <view class="task-list" wx:if="{{tasks.length > 0}}">
+    <view wx:for="{{tasks}}" wx:key="id" class="task-item card">
+      <view class="task-info">
+        <text class="task-name">{{item.name || item.taskName || '任务'}}</text>
+        <text class="task-condition">{{item.condition || item.description || ''}}</text>
+        <view class="task-progress">
+          <view class="progress-bar max">
+            <view class="progress-fill max" style="width: {{item.progressPercent || 0}}%"></view>
+          </view>
+          <text class="task-progress-text">{{item.currentProgress || 0}}/{{item.totalProgress || item.targetProgress || 100}}</text>
+        </view>
+        <view class="task-reward-preview">
+          <text wx:if="{{item.expReward}}" class="reward-exp">+{{item.expReward}}经验</text>
+          <text wx:if="{{item.pointsReward}}" class="reward-points">+{{item.pointsReward}}积分</text>
+        </view>
+      </view>
+      <view class="task-actions">
+        <!-- 可领取 -->
+        <view
+          wx:if="{{item.canClaim}}"
+          class="btn btn-primary btn-sm claim-btn"
+          data-id="{{item.id}}"
+          bindtap="onClaim"
+        >
+          领取
+        </view>
+        <!-- 已领取/已完成 -->
+        <view wx:elif="{{item.claimed || item.completed}}" class="claim-done">
+          <text class="claim-done-text">✓ 已完成</text>
+        </view>
+        <!-- 未完成 -->
+        <view wx:else class="claim-pending">
+          <text class="claim-pending-text">进行中</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view wx:else class="empty-state">
+    <text class="empty-icon">📋</text>
+    <text class="empty-desc">暂无任务</text>
+  </view>
+</view>

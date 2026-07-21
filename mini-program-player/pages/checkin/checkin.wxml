@@ -1,0 +1,69 @@
+<view class="page">
+  <!-- 赛场信息 -->
+  <view class="venue-header card-elevated">
+    <view class="venue-icon">🏟️</view>
+    <view class="venue-info">
+      <text class="venue-name">{{venue.name || '未知赛场'}}</text>
+      <text class="venue-address">{{venue.address || ''}}</text>
+    </view>
+  </view>
+
+  <!-- 排队状态 -->
+  <view class="queue-status card-elevated">
+    <view class="queue-header">
+      <text class="queue-label">当前排队情况</text>
+    </view>
+    <view class="queue-body">
+      <view class="queue-stat">
+        <text class="queue-num">{{venue.waitingCount || 0}}</text>
+        <text class="queue-desc">排队人数</text>
+      </view>
+      <view class="queue-stat">
+        <text class="queue-num">{{venue.estimatedWait || '-'}}min</text>
+        <text class="queue-desc">预计等待</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 参赛者信息 -->
+  <view class="info-card card">
+    <view class="info-row">
+      <text class="info-label">参赛编号</text>
+      <text class="info-value">{{playerId}}</text>
+    </view>
+    <view class="divider"></view>
+    <view class="info-row">
+      <text class="info-label">昵称</text>
+      <text class="info-value">{{userInfo.nickname || '未设置'}}</text>
+    </view>
+    <view class="divider"></view>
+    <view class="info-row">
+      <text class="info-label">剩余参赛次数</text>
+      <text class="info-value text-primary">{{userInfo.remainCount || userInfo.raceCount || 0}} 次</text>
+    </view>
+  </view>
+
+  <!-- 操作按钮 -->
+  <view class="actions">
+    <view class="btn btn-primary btn-lg" bindtap="onConfirmCheckin">
+      ✅ 确认签到并排队
+    </view>
+
+    <view class="btn btn-ghost cancel-btn" bindtap="onCancel">
+      取消，重新扫码
+    </view>
+  </view>
+
+  <!-- 次数不足提示 -->
+  <view wx:if="{{!hasRemainCount}}" class="no-count-card card">
+    <text class="no-count-text">参赛次数不足，请先购买参赛包</text>
+    <view class="btn btn-outline btn-sm" bindtap="onBuyPackages">
+      去购买参赛包
+    </view>
+  </view>
+
+  <!-- 加载遮罩 -->
+  <view wx:if="{{loading}}" class="loading-overlay">
+    <view class="spinner"></view>
+  </view>
+</view>

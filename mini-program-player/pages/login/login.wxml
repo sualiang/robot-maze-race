@@ -1,0 +1,22 @@
+<!-- pages/login/login.wxml — 微信登录 -->
+<view class="page">
+  <!-- Logo + 标题 -->
+  <view class="header">
+    <image class="logo" src="/assets/images/logo-avatar.png" mode="aspectFit" />
+    <text class="title">迷宫竞速</text>
+    <text class="subtitle">微信授权登录，开启竞速之旅</text>
+  </view>
+
+  <!-- 微信登录按钮 -->
+  <view class="login-area">
+    <button
+      class="weui-btn weui-btn_primary"
+      loading="{{loading}}"
+      disabled="{{loading}}"
+      bindtap="onLogin"
+    >
+      <image class="weui-btn_icon" src="/assets/images/wechat-icon.svg" mode="aspectFit" />
+      <text>{{loading ? '登录中...' : '微信登录'}}</text>
+    </button>
+  </view>
+</view>

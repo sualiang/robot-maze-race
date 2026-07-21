@@ -1,0 +1,68 @@
+<!-- 个人中心 -->
+<view class="page">
+
+  <!-- 模块1: 用户信息栏 -->
+  <view class="user-card" bindtap="onEditProfile">
+    <image class="user-avatar" src="{{userInfo.avatar_url || userInfo.avatarUrl || '/assets/images/logo-avatar.png'}}" mode="aspectFill" />
+    <view class="user-info">
+      <text class="user-nickname">{{userInfo.nickname || '未设置昵称'}}</text>
+      <text class="user-phone">{{userInfo.phone || ''}}</text>
+    </view>
+  </view>
+
+  <!-- 模块2: 赛季段位卡片（仅展示等级图标+等级名称） -->
+  <view wx:if="{{!seasonClosed}}" class="medal-card medal-card-simple">
+    <view class="medal-card-hd">
+      <view class="medal-icon-area">
+        <image class="medal-icon-badge trophy-icon" src="/assets/images/trophy-{{medalInfo.level}}.svg" mode="aspectFit" />
+      </view>
+      <view class="medal-title-area">
+        <text class="medal-level-name">{{medalInfo.levelName}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view wx:elif="{{seasonClosed}}" class="season-closed-card">
+    <image class="season-closed-icon" src="/assets/images/trophy-1.svg" mode="aspectFit" />
+    <text class="season-closed-text">赛季即将开启</text>
+    <text class="season-closed-desc">敬请期待</text>
+  </view>
+
+  <!-- 模块3: 福利资产卡片 -->
+  <view class="assets-card">
+    <view class="assets-col" bindtap="onGoPointsShop">
+      <text class="assets-number assets-number-red">{{userInfo.points || 0}}</text>
+      <text class="assets-label">积分兑换</text>
+      <text class="assets-subtext">礼品多多 快来兑换</text>
+    </view>
+    <view class="assets-divider"></view>
+    <view class="assets-col" bindtap="onCouponTap">
+      <text class="assets-number assets-number-gold">¥{{assets.couponTotal}}</text>
+      <text class="assets-label">商圈消费券</text>
+      <text class="assets-subtext">满减/兑换通用</text>
+    </view>
+  </view>
+
+  <!-- 模块4: 功能入口列表 -->
+  <view class="menu-section">
+    <view
+      wx:for="{{menuList}}"
+      wx:key="key"
+      class="menu-item"
+      data-key="{{item.key}}"
+      data-url="{{item.url}}"
+      bindtap="onMenuItemTap"
+    >
+      <text class="menu-icon">{{item.icon}}</text>
+      <text class="menu-label">{{item.label}}</text>
+      <text wx:if="{{item.rightText}}" class="menu-right-text">{{item.rightText}}</text>
+      <text class="menu-arrow">›</text>
+    </view>
+  </view>
+
+  <!-- 模块6: 退出登录按钮 -->
+  <view class="logout-area">
+    <view class="logout-btn" bindtap="onLogout">退出登录</view>
+  </view>
+
+</view>

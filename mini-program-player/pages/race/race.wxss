@@ -1,0 +1,483 @@
+/* pages/race/race.wxss - 比赛页样式 */
+/* 背景 #0F172A | 卡片 #1E293B | 强调色 #FF3B5C | 文字 #E2E8F0 */
+
+.race-page {
+  min-height: 100vh;
+  background: #0f0f23;
+  padding-bottom: 160rpx;
+}
+
+/* 加载态 */
+.loading-mask {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+.spinner {
+  width: 60rpx;
+  height: 60rpx;
+  border: 4rpx solid #334155;
+  border-top-color: #FF3B5C;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 顶部标题 */
+.race-header {
+  padding: 40rpx 32rpx 20rpx;
+  text-align: center;
+}
+
+.race-header-title {
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #fff;
+}
+
+/* 赛场名徽章 */
+.venue-badge {
+  display: flex;
+  align-items: center;
+  margin: 0 32rpx 24rpx;
+  padding: 12rpx 24rpx;
+  background: rgba(255, 59, 92, 0.1);
+  border: 1rpx solid rgba(255, 59, 92, 0.2);
+  border-radius: 16rpx;
+}
+
+.venue-badge-icon {
+  font-size: 24rpx;
+  margin-right: 8rpx;
+}
+
+.venue-badge-name {
+  font-size: 26rpx;
+  color: #94A3B8;
+}
+
+/* 状态1: 无上下文空态 */
+.action-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 80rpx 32rpx 40rpx;
+}
+
+.action-empty-illustration {
+  font-size: 120rpx;
+  margin-bottom: 40rpx;
+}
+
+.action-empty-title {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: #E2E8F0;
+  margin-bottom: 16rpx;
+  text-align: center;
+}
+
+.action-empty-desc {
+  font-size: 26rpx;
+  color: #64748B;
+  margin-bottom: 48rpx;
+  text-align: center;
+}
+
+.btn-scan {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 480rpx;
+  height: 88rpx;
+  background: #FF3B5C;
+  border-radius: 44rpx;
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+
+/* 最佳成绩卡片 */
+.best-card {
+  margin: 0 32rpx 32rpx;
+  padding: 40rpx 32rpx;
+  background: linear-gradient(135deg, #1E293B 0%, #1A2538 100%);
+  border: 1rpx solid #334155;
+  border-radius: 24rpx;
+}
+
+.best-card-label {
+  font-size: 24rpx;
+  color: #94A3B8;
+  margin-bottom: 12rpx;
+  display: block;
+}
+
+.best-card-score {
+  font-size: 64rpx;
+  font-weight: 800;
+  color: #FF3B5C;
+  margin-bottom: 16rpx;
+  display: block;
+}
+
+.best-card-desc {
+  font-size: 26rpx;
+  color: #CBD5E1;
+  margin-bottom: 8rpx;
+  display: block;
+}
+
+.best-card-tip {
+  font-size: 22rpx;
+  color: #64748B;
+  display: block;
+}
+
+/* 参赛行动按钮区 */
+.race-cta-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0 32rpx 40rpx;
+}
+
+.race-cta-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 96rpx;
+  background: #FF3B5C;
+  border-radius: 48rpx;
+  margin-bottom: 16rpx;
+}
+
+.race-cta-btn.race-cta-buy {
+  background: linear-gradient(135deg, #6366F1, #8B5CF6);
+}
+
+.race-cta-text {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+
+.race-cta-hint {
+  font-size: 24rpx;
+  color: #64748B;
+}
+
+.race-cta-hint-empty {
+  color: #EF4444;
+}
+
+/* 月份滑动标签栏（与订单页同） */
+.month-tabs {
+  width: 100%;
+  white-space: nowrap;
+  margin-bottom: 24rpx;
+}
+.month-tabs-inner {
+  display: inline-flex;
+  gap: 14rpx;
+  padding: 4rpx 0 8rpx;
+}
+.month-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12rpx 28rpx;
+  font-size: 26rpx;
+  color: #888;
+  background: rgba(255,255,255,0.06);
+  border-radius: 32rpx;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+.month-tab-active {
+  color: #fff;
+  background: #e94560;
+  font-weight: 600;
+}
+
+/* 历史记录区 — 卡片式，同订单页风格 */
+.history-section {
+  padding: 0 20rpx;
+}
+
+.history-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #E2E8F0;
+  margin-bottom: 20rpx;
+  display: block;
+}
+
+.history-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.history-skeleton-item {
+  height: 80rpx;
+  background: #1a1a2e;
+  border-radius: 16rpx;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  background: #1a1a2e;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin-bottom: 16rpx;
+}
+
+.history-left {
+  flex: 1;
+}
+
+.history-score {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #fff;
+  display: block;
+}
+
+.history-date {
+  font-size: 24rpx;
+  color: #888;
+  margin-top: 6rpx;
+  display: block;
+}
+
+.history-middle {
+  display: flex;
+  align-items: center;
+  margin: 0 20rpx;
+}
+
+.history-medal {
+  font-size: 40rpx;
+  margin-right: 8rpx;
+}
+
+.history-rank {
+  font-size: 28rpx;
+  color: #94A3B8;
+}
+
+.history-right {
+  flex-shrink: 0;
+}
+
+.history-bonus {
+  font-size: 24rpx;
+  color: #F59E0B;
+  background: rgba(245, 158, 11, 0.1);
+  padding: 6rpx 16rpx;
+  border-radius: 8rpx;
+}
+
+.history-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 80rpx 0;
+}
+
+.history-empty-text {
+  font-size: 26rpx;
+  color: #64748B;
+}
+
+/* 底部固定条 */
+.race-footer-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100rpx;
+  background: #1E293B;
+  border-top: 1rpx solid #334155;
+}
+
+.footer-bar-text {
+  font-size: 26rpx;
+  color: #94A3B8;
+}
+
+.footer-bar-highlight {
+  color: #FF3B5C;
+  font-weight: 600;
+}
+
+/* 排队列表样式 */
+.queue-section {
+  margin: 0 32rpx 32rpx;
+  padding: 24rpx;
+  background: #1E293B;
+  border: 1rpx solid #334155;
+  border-radius: 20rpx;
+}
+
+.queue-current-card {
+  display: flex;
+  align-items: center;
+  padding: 20rpx 16rpx;
+  background: rgba(255, 59, 92, 0.1);
+  border: 1rpx solid rgba(255, 59, 92, 0.25);
+  border-radius: 14rpx;
+  margin-bottom: 16rpx;
+}
+
+.queue-current-icon {
+  font-size: 40rpx;
+  margin-right: 16rpx;
+}
+
+.queue-current-info {
+  flex: 1;
+}
+
+.queue-current-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #FF3B5C;
+  display: block;
+}
+
+.queue-current-elapsed {
+  font-size: 24rpx;
+  color: #CBD5E1;
+  margin-top: 4rpx;
+  display: block;
+}
+
+.queue-item {
+  display: flex;
+  align-items: center;
+  padding: 16rpx 12rpx;
+  border-bottom: 1rpx solid #334155;
+}
+
+.queue-item:last-child {
+  border-bottom: none;
+}
+
+.queue-item-num {
+  font-size: 24rpx;
+  color: #64748B;
+  width: 64rpx;
+  flex-shrink: 0;
+}
+
+.queue-item-name {
+  font-size: 26rpx;
+  color: #E2E8F0;
+  flex: 1;
+}
+
+.queue-item-tag {
+  font-size: 20rpx;
+  color: #F59E0B;
+  background: rgba(245, 158, 11, 0.15);
+  padding: 2rpx 12rpx;
+  border-radius: 8rpx;
+  flex-shrink: 0;
+}
+
+/* ===== 历史记录查看全部 ===== */
+.history-view-all {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx 0;
+  font-size: 26rpx;
+  color: #aaa;
+  border-top: 1rpx solid rgba(255,255,255,0.06);
+  margin-top: 8rpx;
+}
+
+.history-view-all-arrow {
+  color: #60A5FA;
+  font-size: 24rpx;
+}
+
+/* ===== 历史记录弹窗（已废弃，保留样式以防残留引用） ===== */
+.history-modal-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 1000;
+  display: flex;
+  align-items: flex-end;
+}
+
+.history-modal-panel {
+  width: 100%;
+  max-height: 85vh;
+  background: #1E293B;
+  border-radius: 24rpx 24rpx 0 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.history-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 30rpx 32rpx 20rpx;
+  border-bottom: 1rpx solid rgba(255,255,255,0.08);
+}
+
+.history-modal-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #E2E8F0;
+}
+
+.history-modal-close {
+  font-size: 36rpx;
+  color: #94A3B8;
+  padding: 8rpx;
+}
+
+.history-month-bar {
+  white-space: nowrap;
+  padding: 20rpx 32rpx;
+}
+
+.history-month-tag {
+  display: inline-block;
+  font-size: 24rpx;
+  color: #94A3B8;
+  background: rgba(255,255,255,0.06);
+  padding: 10rpx 24rpx;
+  border-radius: 32rpx;
+  margin-right: 16rpx;
+}
+
+.history-month-active {
+  color: #E2E8F0;
+  background: #FF3B5C;
+}
+
+.history-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 16rpx 40rpx;
+}

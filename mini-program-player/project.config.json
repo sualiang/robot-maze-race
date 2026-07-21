@@ -1,0 +1,106 @@
+{
+  "description": "机器狗迷宫竞速赛事 - 玩家端小程序",
+  "packOptions": {
+    "ignore": [],
+    "include": []
+  },
+  "setting": {
+    "bundle": false,
+    "userConfirmedBundleSwitch": false,
+    "urlCheck": false,
+    "scopeDataCheck": false,
+    "coverView": true,
+    "es6": true,
+    "postcss": true,
+    "compileHotReLoad": true,
+    "lazyloadPlaceholderEnable": false,
+    "preloadBackgroundData": false,
+    "minified": false,
+    "autoAudits": false,
+    "newFeature": false,
+    "uglifyFileName": false,
+    "uploadWithSourceMap": true,
+    "useIsolateContext": true,
+    "nodeModules": false,
+    "enhance": true,
+    "useMultiFrameRuntime": true,
+    "useApiHook": true,
+    "useApiHostProcess": true,
+    "showShadowRootInWxmlPanel": true,
+    "packNpmManually": false,
+    "enableEngineNative": false,
+    "packNpmRelationList": [],
+    "minifyWXSS": false,
+    "showES6CompileOption": false,
+    "minifyWXML": false,
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    },
+    "compileWorklet": false,
+    "localPlugins": false,
+    "disableUseStrict": false,
+    "useCompilerPlugins": false,
+    "condition": true,
+    "swc": false,
+    "disableSWC": true
+  },
+  "compileType": "miniprogram",
+  "libVersion": "2.32.3",
+  "appid": "wx619c9f373868ab63",
+  "projectname": "robot-maze-race-player",
+  "condition": {
+    "miniprogram": {
+      "list": [
+        {
+          "name": "首页（无参数）",
+          "pathName": "pages/index/index",
+          "query": "",
+          "scene": null
+        },
+        {
+          "name": "扫码进入-带operator_id",
+          "pathName": "pages/index/index",
+          "query": "operator_id=dff0dfd5-891d-497e-a4e2-3a1aae471c0a",
+          "scene": null
+        },
+        {
+          "name": "比赛页",
+          "pathName": "pages/race/race",
+          "query": "",
+          "scene": null
+        },
+        {
+          "name": "排行榜",
+          "pathName": "pages/leaderboard/leaderboard",
+          "query": "",
+          "scene": null
+        },
+        {
+          "name": "个人中心",
+          "pathName": "pages/profile/profile",
+          "query": "",
+          "scene": null
+        },
+        {
+          "name": "参赛包购买",
+          "pathName": "pages/packages/packages",
+          "query": "",
+          "scene": null
+        },
+        {
+          "name": "签到页",
+          "pathName": "pages/checkin/checkin",
+          "query": "",
+          "scene": null
+        }
+      ]
+    }
+  },
+  "editorSetting": {
+    "tabIndent": "insertSpaces",
+    "tabSize": 2
+  },
+  "simulatorPluginLibVersion": {}
+}

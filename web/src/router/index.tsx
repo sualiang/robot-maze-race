@@ -1,0 +1,144 @@
+import React, { lazy } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import OperatorLayout from '../layouts/OperatorLayout';
+import ScreenLayout from '../layouts/ScreenLayout';
+import AdminLayout from '../layouts/AdminLayout';
+import RefereeLayout from '../layouts/RefereeLayout';
+import MerchantLayout from '../layouts/MerchantLayout';
+
+// 懒加载页面
+import VenueList from '../pages/operator/venues/VenueList';
+import VenueEdit from '../pages/operator/venues/VenueEdit';
+import RefereeList from '../pages/operator/referees/RefereeList';
+import PackageList from '../pages/operator/packages/PackageList';
+import MarketingConfig from '../pages/operator/marketing/MarketingConfig';
+import FinanceCenter from '../pages/operator/finance/FinanceCenter';
+
+import OperatorLoginPage from '../pages/operator/login/OperatorLoginPage';
+
+// 运营商新增页面（小程序的 H5 迁移）
+
+import AdminOperatorDashboard from '../pages/admin/dashboard/OperatorDashboard';
+import OperatorRbac from '../pages/operator/rbac/OperatorRbac';
+import OperatorProfile from '../pages/operator/profile/OperatorProfile';
+
+import ScreenLogin from '../pages/screen/login/ScreenLogin';
+import ScreenDisplay from '../pages/screen/display/ScreenDisplay';
+
+import AdminLoginPage from '../pages/admin/login/AdminLoginPage';
+import AdminFirstSetupPage from '../pages/admin/setup/AdminFirstSetupPage';
+import OperatorManage from '../pages/admin/operators/OperatorManage';
+import MarketingGlobal from '../pages/admin/marketing/MarketingGlobal';
+import FinanceGlobal from '../pages/admin/finance/FinanceGlobal';
+
+import AdminPlayers from '../pages/admin/players/AdminPlayers';
+import OperatorPlayers from '../pages/operator/players/OperatorPlayers';
+
+import SystemSettings from '../pages/admin/settings/SystemSettings';
+import AdminRBAC from '../pages/admin/rbac';
+import AdminProfile from '../pages/admin/profile/AdminProfile';
+
+// 总部后台新页面
+import AdminSeasonList from '../pages/admin/season/AdminSeasonList';
+import TaskList from '../pages/admin/task/TaskList';
+import MerchantManage from '../pages/admin/merchant/MerchantManage';
+
+// 运营后台新页面
+import OperatorMerchantList from '../pages/operator/merchant/MerchantList';
+
+// 裁判端页面
+const RefereeLoginPage = React.lazy(() => import('../pages/referee/LoginPage'));
+const RefereeMatchPage = React.lazy(() => import('../pages/referee/MatchPage'));
+const RefereeAttendancePage = React.lazy(() => import('../pages/referee/AttendancePage'));
+const RefereeHistoryPage = React.lazy(() => import('../pages/referee/HistoryPage'));
+const RefereeProfilePage = React.lazy(() => import('../pages/referee/ProfilePage'));
+const RefereeInviteGuidePage = React.lazy(() => import('../pages/referee/InviteGuidePage'));
+const RefereeRegisterPage = React.lazy(() => import('../pages/referee/RegisterFormPage'));
+const RefereeRegisterSuccessPage = React.lazy(() => import('../pages/referee/RegisterSuccessPage'));
+
+// 商家端页面（H5 移动端）
+import MerchantLoginPage from '../pages/merchant/login/LoginPage';
+import MerchantCouponManage from '../pages/merchant/coupon/CouponManage';
+import MerchantVerifyPage from '../pages/merchant/verify/VerifyPage';
+import MerchantVerifyLogPage from '../pages/merchant/verify/VerifyLogPage';
+import MerchantProfilePage from '../pages/merchant/profile/ProfilePage';
+
+function Suspended({ children }: { children: React.ReactNode }) {
+  return <React.Suspense fallback={<div style={{ color: '#fff', padding: 40, textAlign: 'center' }}>加载中...</div>}>{children}</React.Suspense>;
+}
+
+export default function AppRouter() {
+  return (
+    <Routes>
+      <Route path="/" element={<Navigate to="/operator/login" replace />} />
+
+      {/* 运营商登录页（无布局） */}
+      <Route path="/operator/login" element={<OperatorLoginPage />} />
+
+      {/* 运营商后台 */}
+      <Route path="/operator" element={<OperatorLayout />}>
+        <Route index element={<Navigate to="venues" replace />} />
+        <Route path="profile" element={<OperatorProfile />} />
+        <Route path="venues" element={<VenueList />} />
+        <Route path="venues/:id" element={<VenueEdit />} />
+        <Route path="referees" element={<RefereeList />} />
+        <Route path="packages" element={<PackageList />} />
+        <Route path="merchant" element={<OperatorMerchantList />} />
+        <Route path="marketing" element={<MarketingConfig />} />
+        <Route path="rbac" element={<OperatorRbac />} />
+        <Route path="players" element={<OperatorPlayers />} />
+        <Route path="finance" element={<FinanceCenter />} />
+      </Route>
+
+      {/* 大屏展示端 */}
+      <Route path="/screen" element={<ScreenLayout />}>
+        <Route index element={<ScreenDisplay />} />
+        <Route path="login" element={<ScreenLogin />} />
+        <Route path="display" element={<ScreenDisplay />} />
+      </Route>
+
+      {/* 总部管理后台 */}
+      <Route path="/admin/login" element={<AdminLoginPage />} />
+      <Route path="/admin/first-setup" element={<AdminFirstSetupPage />} />
+      <Route path="/admin" element={<AdminLayout />}>
+        <Route path="login" element={<Navigate to="/admin/login" replace />} />
+        <Route path="operators" element={<OperatorManage />} />
+        <Route path="marketing" element={<MarketingGlobal />} />
+        <Route path="dashboard" element={<AdminOperatorDashboard />} />
+        <Route path="finance" element={<FinanceGlobal />} />
+        <Route path="players" element={<AdminPlayers />} />
+        <Route path="rbac" element={<AdminRBAC />} />
+        <Route path="settings" element={<SystemSettings />} />
+        <Route path="profile" element={<AdminProfile />} />
+        <Route path="season" element={<AdminSeasonList />} />
+        <Route path="task" element={<TaskList />} />
+        <Route path="operators/:id/merchants" element={<MerchantManage />} />
+      </Route>
+
+      {/* 裁判端（移动端 H5） */}
+      {/* 邀请注册页面（独立页面，无底部Tab） */}
+      <Route path="/referee/invite" element={<Suspended><RefereeInviteGuidePage /></Suspended>} />
+      <Route path="/referee/register" element={<Suspended><RefereeRegisterPage /></Suspended>} />
+      <Route path="/referee/register-success" element={<Suspended><RefereeRegisterSuccessPage /></Suspended>} />
+
+      <Route path="/referee" element={<RefereeLayout />}>
+        <Route index element={<Navigate to="/referee/match" replace />} />
+        <Route path="login" element={<Suspended><RefereeLoginPage /></Suspended>} />
+        <Route path="match" element={<Suspended><RefereeMatchPage /></Suspended>} />
+        <Route path="attendance" element={<RefereeAttendancePage />} />
+        <Route path="history" element={<RefereeHistoryPage />} />
+        <Route path="profile" element={<Suspended><RefereeProfilePage /></Suspended>} />
+      </Route>
+
+      {/* 商家端（H5 移动端） */}
+      <Route path="/merchant/login" element={<MerchantLoginPage />} />
+      <Route path="/merchant" element={<MerchantLayout />}>
+        <Route index element={<Navigate to="coupon" replace />} />
+        <Route path="coupon" element={<MerchantCouponManage />} />
+        <Route path="verify" element={<MerchantVerifyPage />} />
+        <Route path="verify/log" element={<MerchantVerifyLogPage />} />
+        <Route path="profile" element={<MerchantProfilePage />} />
+      </Route>
+    </Routes>
+  );
+}

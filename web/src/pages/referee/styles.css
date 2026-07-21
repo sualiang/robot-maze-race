@@ -1,0 +1,1197 @@
+/* ==================== 裁判端 — 赛博科技风格 v2 ==================== */
+
+:root {
+  --ref-bg: #0a0e1a;
+  --ref-card-bg: rgba(255, 255, 255, 0.04);
+  --ref-card-border: rgba(255, 255, 255, 0.08);
+  --ref-accent: #00d4ff;
+  --ref-accent2: #7c3aed;
+  --ref-success: #10b981;
+  --ref-danger: #ef4444;
+  --ref-warning: #f59e0b;
+  --ref-text: #e8e8f0;
+  --ref-text-dim: rgba(255, 255, 255, 0.45);
+}
+
+.referee-layout {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background: var(--ref-bg);
+  background-image:
+    radial-gradient(ellipse at 20% 50%, rgba(0, 212, 255, 0.04) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 20%, rgba(124, 58, 237, 0.04) 0%, transparent 60%);
+  position: relative;
+  padding-bottom: 72px;
+  width: 100%;
+  max-width: 480px;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+/* =======================================================================
+   底部 TabBar — 大间距、圆角胶囊按钮
+   ======================================================================= */
+.referee-tabbar {
+  position: fixed;
+  bottom: 12px;
+  left: 12px;
+  right: 12px;
+  max-width: 456px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  background: rgba(12, 16, 35, 0.92);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 24px;
+  z-index: 1000;
+  padding: 6px 8px;
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+}
+
+.tabbar-item {
+  flex: 1;
+  max-width: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 4px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  outline: none;
+  gap: 4px;
+  position: relative;
+  border-radius: 16px;
+  transition: background 0.2s;
+}
+
+.tabbar-item:active { opacity: 0.7; }
+
+.tabbar-icon {
+  font-size: 24px;
+  line-height: 1;
+  transition: transform 0.2s;
+}
+
+.tabbar-item:hover .tabbar-icon {
+  transform: scale(1.1);
+}
+
+.tabbar-label {
+  font-size: 11px;
+  color: var(--ref-text-dim);
+  font-weight: 400;
+  transition: color 0.2s;
+  white-space: nowrap;
+}
+
+.tabbar-active {
+  background: rgba(0, 212, 255, 0.06);
+}
+
+.tabbar-active .tabbar-label {
+  color: var(--ref-accent);
+  font-weight: 600;
+}
+
+.tabbar-active .tabbar-icon {
+  filter: drop-shadow(0 0 6px rgba(0, 212, 255, 0.4));
+}
+
+/* =======================================================================
+   通用卡片 — 更通透的毛玻璃
+   ======================================================================= */
+.referee-card {
+  background: var(--ref-card-bg);
+  border: 1px solid var(--ref-card-border);
+  border-radius: 16px;
+  padding: 18px;
+  margin: 12px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: border-color 0.2s, box-shadow 0.3s;
+}
+
+.referee-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ref-text);
+  display: block;
+  margin-bottom: 12px;
+}
+
+/* =======================================================================
+   标签
+   ======================================================================= */
+.referee-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: 0.3px;
+}
+
+.referee-tag-success {
+  color: var(--ref-success);
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.referee-tag-warning {
+  color: var(--ref-warning);
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.referee-tag-danger {
+  color: #ff6b6b;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.referee-tag-info {
+  color: var(--ref-accent);
+  background: rgba(0, 212, 255, 0.1);
+  border: 1px solid rgba(0, 212, 255, 0.15);
+}
+
+/* =======================================================================
+   按钮 — 大圆角、充足间距、科技感
+   ======================================================================= */
+.referee-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 14px 20px;
+  transition: all 0.2s ease;
+  width: 100%;
+  gap: 8px;
+  letter-spacing: 0.5px;
+  position: relative;
+  overflow: hidden;
+}
+
+.referee-btn:active {
+  transform: scale(0.97);
+}
+
+.referee-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ------- 主要按钮（上场、再玩一次等） ------- */
+.referee-btn-primary {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  border-radius: 12px;
+  font-size: 13px;
+  padding: 10px 18px;
+  box-shadow: 0 2px 10px rgba(99, 102, 241, 0.25);
+}
+
+.referee-btn-primary:active {
+  box-shadow: 0 1px 4px rgba(99, 102, 241, 0.2);
+}
+
+/* ------- 成功/开始比赛 ------- */
+.referee-btn-success {
+  background: linear-gradient(135deg, #059669, #10b981);
+  color: #fff;
+  border-radius: 14px;
+  font-size: 16px;
+  padding: 16px 20px;
+  box-shadow: 0 3px 16px rgba(16, 185, 129, 0.3);
+}
+
+.referee-btn-success:active {
+  box-shadow: 0 1px 6px rgba(16, 185, 129, 0.2);
+}
+
+/* ------- 危险/结束比赛 ------- */
+.referee-btn-danger {
+  background: linear-gradient(135deg, #dc2626, #ef4444);
+  color: #fff;
+  border-radius: 14px;
+  font-size: 15px;
+  padding: 14px 20px;
+  box-shadow: 0 3px 16px rgba(239, 68, 68, 0.25);
+}
+
+/* ------- 轮廓按钮（故障、完成呼叫、再玩一次） ------- */
+.referee-btn-outline {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--ref-text);
+  border-radius: 12px;
+}
+
+.referee-btn-outline:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.referee-btn-outline:active {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* ------- 幽灵按钮（弃赛） ------- */
+.referee-btn-ghost {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: var(--ref-text-dim);
+  font-size: 13px;
+  font-weight: 400;
+  padding: 10px 14px;
+  border-radius: 10px;
+}
+
+/* ------- 尺寸修饰 ------- */
+.referee-btn-sm {
+  padding: 8px 16px;
+  font-size: 12px;
+  width: auto;
+  border-radius: 10px;
+}
+
+.referee-btn-lg {
+  padding: 14px 20px;
+  font-size: 16px;
+  border-radius: 14px;
+}
+
+/* ------- 按钮行（水平排列，带间隔） ------- */
+.referee-btn-row {
+  display: flex;
+  gap: 14px;
+  margin-top: 4px;
+}
+
+.referee-btn-row .referee-btn {
+  flex: 1;
+  min-width: 0;
+}
+
+/* =======================================================================
+   空状态
+   ======================================================================= */
+.referee-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 48px 0;
+}
+
+.referee-empty-icon { font-size: 40px; margin-bottom: 14px; }
+
+.referee-empty-text {
+  font-size: 14px;
+  color: var(--ref-text-dim);
+  letter-spacing: 0.3px;
+}
+
+/* =======================================================================
+   加载动画
+   ======================================================================= */
+.referee-loading-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--ref-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.referee-loading-spinner {
+  font-size: 14px;
+  color: var(--ref-accent);
+  animation: referee-pulse 1.2s ease-in-out infinite;
+}
+
+/* =======================================================================
+   页面通用
+   ======================================================================= */
+.referee-page {
+  padding: 14px;
+  padding-bottom: 84px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.referee-page-no-tab {
+  padding: 14px;
+  padding-bottom: 14px;
+}
+
+/* =======================================================================
+   动画
+   ======================================================================= */
+@keyframes referee-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@keyframes referee-blink {
+  from { opacity: 1; }
+  to { opacity: 0.5; }
+}
+
+@keyframes referee-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes referee-slide-up {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* =======================================================================
+   弹窗遮罩
+   ======================================================================= */
+.referee-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 24px;
+  animation: referee-fade-in 0.2s ease-out;
+}
+
+.referee-detail-card {
+  width: 100%;
+  max-width: 400px;
+  background: rgba(20, 25, 50, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 24px 20px;
+  animation: referee-slide-up 0.3s ease-out;
+  backdrop-filter: blur(20px);
+}
+
+/* =======================================================================
+   表单输入
+   ======================================================================= */
+.referee-input {
+  width: 100%;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  font-size: 15px;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+  color: var(--ref-text);
+}
+
+.referee-input:focus {
+  border-color: var(--ref-accent);
+  box-shadow: 0 0 8px rgba(0, 212, 255, 0.15);
+}
+
+.referee-input::placeholder { color: rgba(255, 255, 255, 0.25); }
+
+/* =======================================================================
+   列表行
+   ======================================================================= */
+.referee-row-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.referee-row-line:last-child { border-bottom: none; }
+
+.referee-row-label {
+  font-size: 13px;
+  color: var(--ref-text-dim);
+}
+
+.referee-row-value {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ref-text);
+  text-align: right;
+  max-width: 60%;
+}
+
+/* =======================================================================
+   响应式 — mobile-first
+   桌面端 (>480px): 居中 480px 宽度，两侧加边框
+   移动端 (≤480px): 全宽、紧凑间距、弹窗全屏、触控友好
+   ======================================================================= */
+
+/* --- 桌面端 (>480px) --- */
+@media (min-width: 481px) {
+  .referee-layout {
+    border-left: 1px solid rgba(255, 255, 255, 0.04);
+    border-right: 1px solid rgba(255, 255, 255, 0.04);
+  }
+}
+
+/* --- 移动端 (≤480px) --- */
+@media (max-width: 480px) {
+  /* 根容器 — 全宽、取消两侧留白、允许滚动 */
+  .referee-layout {
+    max-width: 100%;
+    border-left: none;
+    border-right: none;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* 页面通用 padding — 减小到安全区 */
+  .referee-page {
+    padding: 10px 12px 80px 12px;
+  }
+
+  .referee-page-no-tab {
+    padding: 16px 12px;
+  }
+
+  /* 卡片 — 紧凑但保留可读性 */
+  .referee-card {
+    margin: 8px 0;
+    padding: 14px 12px;
+    border-radius: 14px;
+  }
+
+  /* TabBar — 撑满底栏，胶囊风格 */
+  .referee-tabbar {
+    left: 8px;
+    right: 8px;
+    max-width: 100%;
+    border-radius: 20px;
+    padding: 4px 4px;
+    bottom: 8px;
+  }
+
+  .tabbar-item {
+    padding: 8px 2px;
+    gap: 2px;
+  }
+
+  .tabbar-icon {
+    font-size: 22px;
+  }
+
+  .tabbar-label {
+    font-size: 10px;
+  }
+
+  /* 弹窗 — 全屏/接近全屏 */
+  .referee-overlay {
+    padding: 0;
+    align-items: flex-end;
+    background: rgba(0, 0, 0, 0.7);
+  }
+
+  .referee-detail-card {
+    max-width: 100%;
+    width: 100%;
+    border-radius: 20px 20px 0 0;
+    padding: 20px 16px 28px 16px;
+    max-height: 85vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* 登录页 — 去掉固定定位，允许滚动 */
+  .referee-login-page {
+    position: relative;
+    top: auto;
+    left: auto;
+    width: 100%;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding: 24px 16px;
+  }
+
+  .referee-login-box {
+    max-width: 100%;
+  }
+
+  .referee-login-card {
+    padding: 24px 16px;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .referee-login-title {
+    font-size: 26px;
+  }
+
+  .referee-login-subtitle {
+    font-size: 14px;
+  }
+
+  .referee-login-input {
+    padding: 12px 14px;
+    font-size: 15px;
+  }
+
+  .referee-login-btn {
+    padding: 14px;
+    font-size: 16px;
+    letter-spacing: 3px;
+    max-width: calc(100vw - 32px);
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* 光晕 — 在小屏上缩小 */
+  .referee-login-glow-1 {
+    width: min(280px, 60vw);
+    height: min(280px, 60vw);
+    top: -60px;
+    left: -60px;
+  }
+
+  .referee-login-glow-2 {
+    width: min(320px, 70vw);
+    height: min(320px, 70vw);
+    bottom: -80px;
+    right: -80px;
+  }
+
+  /* 按钮 — 移动端触控友好 + 限制最大宽度 */
+  .referee-btn,
+  .referee-btn-primary,
+  .referee-btn-success,
+  .referee-btn-danger,
+  .referee-btn-warning,
+  .referee-btn-outline,
+  .referee-btn-ghost {
+    min-height: 44px;
+    font-size: 14px;
+    padding: 12px 16px;
+    max-width: calc(100vw - 32px);
+    box-sizing: border-box;
+  }
+
+  .referee-btn-sm {
+    min-height: 36px;
+    padding: 6px 14px;
+    font-size: 12px;
+    max-width: calc(100vw - 32px);
+  }
+
+  .referee-btn-lg {
+    min-height: 48px;
+    padding: 14px 20px;
+    font-size: 15px;
+    max-width: calc(100vw - 32px);
+  }
+
+  /* 按钮行 — 移动端允许换行 */
+  .referee-btn-row {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .referee-btn-row .referee-btn {
+    min-width: 100px;
+    flex: 1 1 auto;
+  }
+
+  /* 计时器 — 缩小字号防止溢出 */
+  .referee-timer-main {
+    font-size: 56px;
+  }
+
+  /* 选手信息 */
+  .referee-racer-info {
+    gap: 8px;
+  }
+
+  .referee-racer-avatar {
+    width: 36px;
+    height: 36px;
+    font-size: 20px;
+  }
+
+  .referee-racer-detail .text-one-line {
+    font-size: 15px;
+  }
+
+  /* 排队项 */
+  .referee-queue-item {
+    padding: 10px;
+  }
+
+  .referee-queue-index {
+    width: 30px;
+    height: 30px;
+    font-size: 12px;
+    margin-right: 8px;
+  }
+
+  .referee-queue-avatar {
+    width: 36px;
+    height: 36px;
+    font-size: 20px;
+    margin-right: 8px;
+  }
+
+  .referee-queue-name {
+    font-size: 14px;
+  }
+
+  /* Profile/History 行内标签 */
+  .referee-row-line {
+    padding: 10px 0;
+  }
+
+  .referee-row-label,
+  .referee-row-value {
+    font-size: 12px;
+  }
+
+  /* 表单输入 — 移动端全宽 */
+  .referee-input {
+    font-size: 14px;
+    padding: 12px;
+  }
+
+  /* 卡片标题 */
+  .referee-card-title {
+    font-size: 14px;
+    margin-bottom: 10px;
+  }
+
+  /* Section header */
+  .referee-section-header span:first-child {
+    font-size: 14px;
+  }
+
+  /* 空状态 */
+  .referee-empty {
+    padding: 32px 0;
+  }
+
+  .referee-empty-icon {
+    font-size: 36px;
+  }
+
+  /* 错误消息 — 允许换行 */
+  .referee-error-msg {
+    white-space: normal;
+    word-break: break-all;
+  }
+}
+
+/* =======================================================================
+   新加布局组件
+   ======================================================================= */
+
+/* WS 徽标 */
+.referee-ws-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  border-radius: 99px;
+  margin-bottom: 12px;
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
+}
+.referee-ws-badge span {
+  font-size: 12px;
+  color: var(--ref-text);
+}
+.referee-ws-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  transition: background 0.3s, box-shadow 0.3s;
+}
+.referee-ws-dot[data-connected="true"] {
+  background: #27ae60;
+  box-shadow: 0 0 8px rgba(39, 174, 96, 0.6);
+}
+.referee-ws-dot:not([data-connected="true"]) {
+  background: #999;
+}
+
+/* 计时器容器 */
+.referee-timer-card {
+  background: linear-gradient(135deg, rgba(26,26,46,0.95), rgba(26,26,46,0.85));
+  color: #fff;
+  padding: 16px 16px;
+  transition: background-color 0.3s;
+}
+
+/* 计时器数字 */
+.referee-timer-display {
+  padding: 8px 0;
+}
+.referee-timer-main {
+  font-size: 56px;
+  font-weight: 200;
+  font-family: 'SF Mono', Menlo, Monaco, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 2px;
+  color: #e94560;
+  transition: color 0.3s, text-shadow 0.3s;
+}
+.referee-timer-display[data-running="true"] .referee-timer-main {
+  color: #27ae60;
+  text-shadow: 0 0 24px rgba(39,174,96,0.35);
+}
+.referee-timer-display[data-danger="true"] .referee-timer-main {
+  color: #e74c3c;
+  text-shadow: 0 0 24px rgba(231,76,60,0.4);
+  animation: referee-blink 0.5s ease-in-out infinite alternate;
+}
+
+/* 进度条 */
+.referee-progress-bar {
+  height: 4px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 2px;
+  margin: 8px 0;
+  overflow: hidden;
+}
+.referee-progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.1s linear;
+  background: #27ae60;
+}
+.referee-progress-fill[data-danger="true"] {
+  background: #e74c3c;
+}
+
+/* 选手信息 */
+.referee-racer-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+.referee-racer-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  line-height: 1;
+  border: 2px solid rgba(255,255,255,0.2);
+}
+.referee-racer-detail {
+  text-align: left;
+  overflow: hidden;
+}
+.referee-racer-detail .text-one-line {
+  font-size: 17px;
+  font-weight: 600;
+}
+.referee-racer-remaining {
+  font-size: 12px;
+  color: rgba(255,255,255,0.5);
+}
+.referee-racer-remaining strong {
+  color: #e94560;
+  font-size: 14px;
+}
+
+/* 状态标签容器 */
+.referee-status-tag {
+  margin-top: 10px;
+}
+
+/* 按钮区域 */
+.referee-actions {
+  margin-top: 12px;
+}
+
+/* 超时提示 */
+.referee-timeout-hint {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #f39c12;
+}
+
+/* 错误消息 */
+.referee-error-msg {
+  background: rgba(233, 69, 96, 0.08);
+  color: #e94560;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  text-align: center;
+  margin-bottom: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: 1px solid rgba(233, 69, 96, 0.12);
+}
+
+/* 紧凑卡片 */
+.referee-card-compact {
+  background: var(--ref-card-bg);
+  border: 1px solid var(--ref-card-border);
+  border-radius: 16px;
+  backdrop-filter: blur(12px);
+}
+
+/* 分区标题 */
+.referee-section {
+  margin-top: 8px;
+}
+.referee-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 0 4px;
+}
+.referee-section-header span:first-child {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ref-text);
+}
+.referee-section-count {
+  font-size: 12px;
+  color: var(--ref-text-dim);
+}
+
+/* 排队卡片 */
+.referee-queue-item {
+  display: flex;
+  align-items: center;
+  padding: 14px;
+  margin: 0 0 10px 0;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.3s, background 0.2s;
+}
+.referee-queue-item[data-active="true"] {
+  border-color: #e94560;
+  box-shadow: 0 0 16px rgba(233,69,96,0.15);
+  background: linear-gradient(135deg, rgba(233,69,96,0.06), rgba(233,69,96,0.02));
+}
+.referee-queue-item[data-active="false"]:hover {
+  border-color: rgba(255,255,255,0.15);
+}
+
+/* 排队编号 */
+.referee-queue-index {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  margin-right: 12px;
+  flex-shrink: 0;
+  font-size: 13px;
+  background: #f5f5f5;
+  color: #999;
+}
+.referee-queue-index[data-current="true"] {
+  background: #e94560;
+  color: #fff;
+  font-size: 18px;
+}
+
+/* 排队头像 */
+.referee-queue-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  margin-right: 12px;
+  flex-shrink: 0;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  line-height: 1;
+  transition: border-color 0.2s;
+  border: 2px solid transparent;
+}
+.referee-queue-avatar[data-current="true"] {
+  border-color: #e94560;
+}
+
+/* 排队名字 */
+.referee-queue-name {
+  flex: 1;
+  overflow: hidden;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 500;
+}
+.referee-queue-name .text-one-line {
+  display: inline;
+}
+.referee-queue-remaining {
+  font-size: 12px;
+  color: var(--ref-text-dim);
+  font-weight: 400;
+  margin-left: 4px;
+}
+.referee-queue-remaining strong {
+  color: #e94560;
+  font-size: 14px;
+}
+
+/* 排队进行中标签 */
+.referee-queue-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+.referee-queue-dot {
+  color: #27ae60;
+  font-size: 12px;
+  animation: referee-pulse 1.5s ease-in-out infinite;
+}
+.referee-queue-badge span:last-child {
+  font-size: 10px;
+  color: #27ae60;
+}
+
+/* =======================================================================
+   登录页 — 全屏赛博风格
+   ======================================================================= */
+.referee-login-page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ref-bg);
+  background-image:
+    radial-gradient(ellipse at 30% 20%, rgba(0, 212, 255, 0.05) 0%, transparent 60%),
+    radial-gradient(ellipse at 70% 80%, rgba(124, 58, 237, 0.05) 0%, transparent 60%);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.referee-login-glow-1 {
+  position: absolute;
+  width: min(400px, 80vw);
+  height: min(400px, 80vw);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 212, 255, 0.06), transparent 70%);
+  top: -100px;
+  left: -100px;
+  pointer-events: none;
+}
+
+.referee-login-glow-2 {
+  position: absolute;
+  width: min(500px, 90vw);
+  height: min(500px, 90vw);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(124, 58, 237, 0.05), transparent 70%);
+  bottom: -150px;
+  right: -150px;
+  pointer-events: none;
+}
+
+.referee-login-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 440px;
+  z-index: 1;
+}
+
+.referee-login-logo {
+  margin-bottom: 16px;
+}
+
+.referee-login-brand {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.referee-login-title {
+  font-size: 30px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #00d4ff, #7c3aed);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: 2px;
+}
+
+.referee-login-subtitle {
+  font-size: 16px;
+  color: var(--ref-text-dim);
+  font-weight: 400;
+  letter-spacing: 1px;
+}
+
+.referee-login-role {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 16px;
+  background: rgba(0, 212, 255, 0.06);
+  border: 1px solid rgba(0, 212, 255, 0.12);
+  border-radius: 99px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ref-accent);
+  margin-bottom: 32px;
+}
+
+.referee-login-role-icon {
+  font-size: 16px;
+}
+
+.referee-login-card {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 20px;
+  padding: 28px 24px;
+  backdrop-filter: blur(16px);
+}
+
+.referee-login-field {
+  margin-bottom: 16px;
+}
+
+.referee-login-label {
+  display: block;
+  font-size: 13px;
+  color: var(--ref-text-dim);
+  margin-bottom: 8px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+.referee-login-input {
+  width: 100%;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  font-size: 16px;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  color: var(--ref-text);
+  letter-spacing: 1px;
+}
+
+.referee-login-input:focus {
+  border-color: var(--ref-accent);
+  box-shadow: 0 0 16px rgba(0, 212, 255, 0.12);
+}
+
+.referee-login-input::placeholder {
+  color: rgba(255, 255, 255, 0.2);
+  letter-spacing: 0;
+}
+
+.referee-login-error {
+  text-align: center;
+  color: var(--ref-danger);
+  font-size: 13px;
+  margin-bottom: 12px;
+  padding: 8px;
+  background: rgba(239, 68, 68, 0.06);
+  border-radius: 8px;
+}
+
+.referee-login-btn {
+  width: 100%;
+  padding: 16px;
+  border: none;
+  border-radius: 14px;
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  letter-spacing: 4px;
+  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.3);
+}
+
+.referee-login-btn:active {
+  transform: scale(0.97);
+}
+
+.referee-login-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.referee-login-loading {
+  letter-spacing: 2px;
+}
+
+.referee-login-dot-anim {
+  animation: referee-pulse 1.2s ease-in-out infinite;
+}
+
+.referee-login-hint {
+  text-align: center;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.25);
+  margin-top: 24px;
+  line-height: 1.6;
+}

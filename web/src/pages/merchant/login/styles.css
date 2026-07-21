@@ -1,0 +1,265 @@
+/* ==================== 商家端登录页 ==================== */
+
+:root {
+  --mch-bg: #0a0e1a;
+  --mch-card-bg: rgba(255, 255, 255, 0.03);
+  --mch-card-border: rgba(255, 255, 255, 0.06);
+  --mch-accent: #00d4ff;
+  --mch-accent2: #7c3aed;
+  --mch-danger: #ef4444;
+  --mch-text: #e8e8f0;
+  --mch-text-dim: rgba(255, 255, 255, 0.45);
+}
+
+.merchant-login-page {
+  min-height: 100vh;
+  width: 100vw;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--mch-bg);
+  background-image:
+    radial-gradient(ellipse at 30% 20%, rgba(0, 212, 255, 0.05) 0%, transparent 60%),
+    radial-gradient(ellipse at 70% 80%, rgba(124, 58, 237, 0.05) 0%, transparent 60%);
+  position: fixed;
+  top: 0;
+  left: 0;
+  overflow: hidden;
+  padding: 16px;
+}
+
+.merchant-login-glow-1 {
+  position: absolute;
+  width: min(400px, 80vw);
+  height: min(400px, 80vw);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 212, 255, 0.06), transparent 70%);
+  top: -100px;
+  left: -100px;
+  pointer-events: none;
+}
+
+.merchant-login-glow-2 {
+  position: absolute;
+  width: min(500px, 90vw);
+  height: min(500px, 90vw);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(124, 58, 237, 0.05), transparent 70%);
+  bottom: -150px;
+  right: -150px;
+  pointer-events: none;
+}
+
+.merchant-login-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 440px;
+  z-index: 1;
+}
+
+.merchant-login-logo {
+  margin-bottom: 16px;
+}
+
+.merchant-login-role {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 16px;
+  background: rgba(0, 212, 255, 0.06);
+  border: 1px solid rgba(0, 212, 255, 0.12);
+  border-radius: 99px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--mch-accent);
+  margin-bottom: 32px;
+}
+
+.merchant-login-role-icon {
+  font-size: 16px;
+}
+
+.merchant-login-card {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 20px;
+  padding: 28px 24px;
+  backdrop-filter: blur(16px);
+}
+
+.merchant-login-field {
+  margin-bottom: 16px;
+}
+
+.merchant-login-label {
+  display: block;
+  font-size: 13px;
+  color: var(--mch-text-dim);
+  margin-bottom: 8px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+.merchant-login-input {
+  width: 100%;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  font-size: 16px;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  color: var(--mch-text);
+  letter-spacing: 1px;
+}
+
+.merchant-login-input:focus {
+  border-color: var(--mch-accent);
+  box-shadow: 0 0 16px rgba(0, 212, 255, 0.12);
+}
+
+.merchant-login-input::placeholder {
+  color: rgba(255, 255, 255, 0.2);
+  letter-spacing: 0;
+}
+
+.merchant-login-error {
+  text-align: center;
+  color: var(--mch-danger);
+  font-size: 13px;
+  margin-bottom: 12px;
+  padding: 8px;
+  background: rgba(239, 68, 68, 0.06);
+  border-radius: 8px;
+}
+
+.merchant-login-btn {
+  width: 100%;
+  padding: 16px;
+  border: none;
+  border-radius: 14px;
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  letter-spacing: 4px;
+  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.3);
+}
+
+.merchant-login-btn:active {
+  transform: scale(0.97);
+}
+
+.merchant-login-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.merchant-login-loading {
+  letter-spacing: 2px;
+}
+
+.merchant-login-dot-anim {
+  animation: referee-pulse 1.2s ease-in-out infinite;
+}
+
+.merchant-login-tabs {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+.merchant-login-tab {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--mch-text-dim);
+  cursor: pointer;
+  padding-bottom: 6px;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+}
+.merchant-login-tab.active {
+  color: var(--mch-accent);
+  border-bottom-color: var(--mch-accent);
+}
+.merchant-login-hint {
+  text-align: center;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.25);
+  margin-top: 24px;
+  line-height: 1.6;
+}
+
+/* ==================== 首次登录改密弹窗 ==================== */
+.merchant-pwd-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.merchant-pwd-modal {
+  width: 100%;
+  max-width: 400px;
+  background: rgba(20, 24, 40, 0.95);
+  border: 1px solid rgba(0, 212, 255, 0.15);
+  border-radius: 20px;
+  padding: 32px 24px;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.merchant-pwd-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--mch-text);
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.merchant-pwd-field {
+  margin-bottom: 16px;
+}
+
+.merchant-pwd-field .merchant-login-label {
+  display: block;
+  font-size: 13px;
+  color: var(--mch-text-dim);
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.merchant-pwd-field .merchant-login-input {
+  width: 100%;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  font-size: 16px;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  color: var(--mch-text);
+  letter-spacing: 1px;
+}
+
+.merchant-pwd-field .merchant-login-input:focus {
+  border-color: var(--mch-accent);
+  box-shadow: 0 0 16px rgba(0, 212, 255, 0.12);
+}

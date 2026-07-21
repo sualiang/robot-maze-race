@@ -1,0 +1,38 @@
+<!-- pages/race-history/race-history.wxml - 历史参赛记录（全部） -->
+<view class="page">
+  <view class="header">
+    <view class="header-back" bindtap="onBack">
+      <text class="back-icon">‹</text>
+    </view>
+    <text class="header-title">我的比赛记录</text>
+    <picker mode="date" fields="month" value="{{pickerValue}}" bindchange="onMonthChange">
+      <view class="header-filter">
+        <text class="filter-label">{{monthLabel}}</text>
+        <text class="filter-arrow">▼</text>
+      </view>
+    </picker>
+  </view>
+
+  <view wx:if="{{records.length === 0 && !loading}}" class="empty">
+    <text class="empty-text">暂无参赛记录</text>
+  </view>
+
+  <view class="record-list">
+    <block wx:for="{{records}}" wx:key="id">
+      <view class="record-card">
+        <view class="record-top">
+          <text class="record-score {{item.medal || ''}}">{{item.scoreText}}</text>
+          <text wx:if="{{item.rank > 0}}" class="record-rank">第{{item.rank}}名</text>
+        </view>
+        <view class="record-meta">
+          <text class="record-date">{{item.dateText}}</text>
+          <text wx:if="{{item.bonusText}}" class="record-bonus">{{item.bonusText}}</text>
+        </view>
+      </view>
+    </block>
+  </view>
+
+  <view wx:if="{{loading}}" class="loading">
+    <text>加载中...</text>
+  </view>
+</view>

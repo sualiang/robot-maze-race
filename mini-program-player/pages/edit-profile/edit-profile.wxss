@@ -1,0 +1,146 @@
+/* 编辑资料页 — App深色主题 · 精致版 */
+page {
+  background-color: #0f0f23;
+}
+
+.page {
+  min-height: 100vh;
+  padding-top: 40rpx;
+  box-sizing: border-box;
+}
+
+/* ===== 头像区 — 顶部居中 120rpx 圆形 ===== */
+.avatar-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 40rpx;
+  padding: 0;
+}
+
+.avatar-circle {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 50%;
+  background-color: #1e293b;
+  border: 3rpx solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.3);
+}
+
+.avatar-hint {
+  font-size: 24rpx;
+  color: #475569;
+  margin-top: 16rpx;
+}
+
+/* ===== 表单卡片 ===== */
+.form-card {
+  margin: 0 24rpx;
+  background-color: #1a1a2e;
+  border-radius: 12rpx;
+  overflow: hidden;
+}
+
+.form-cell {
+  display: flex;
+  align-items: center;
+  padding: 28rpx 30rpx;
+  position: relative;
+  box-sizing: border-box;
+  font-size: 28rpx;
+}
+
+.form-cell::after {
+  content: '';
+  position: absolute;
+  left: 30rpx;
+  right: 30rpx;
+  bottom: 0;
+  height: 1rpx;
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.form-cell:last-child::after {
+  display: none;
+}
+
+.form-cell_tap:active {
+  background-color: #22223a;
+}
+
+.form-cell__hd {
+  color: #e2e8f0;
+  font-size: 28rpx;
+  flex-shrink: 0;
+  width: 140rpx;
+}
+
+.form-cell__bd {
+  flex: 1;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  font-size: 28rpx;
+}
+
+.form-cell__bd_right {
+  text-align: right;
+}
+
+.form-cell__value {
+  color: #e2e8f0;
+}
+
+.form-cell__value_muted {
+  color: #64748b;
+}
+
+.form-cell_disabled {
+  opacity: 0.55;
+}
+
+.form-cell__value--dim {
+  color: #64748b;
+}
+
+.form-cell__arrow {
+  flex-shrink: 0;
+  color: #475569;
+  font-size: 36rpx;
+  margin-left: 8rpx;
+}
+
+/* 昵称输入 */
+.form-input {
+  width: 100%;
+  text-align: right;
+  font-size: 28rpx;
+  color: #e2e8f0;
+  background: transparent;
+  border: none;
+  outline: none;
+}
+
+/* ===== 保存按钮 ===== */
+.btn-area {
+  padding: 80rpx 40rpx 0;
+}
+
+.save-btn {
+  width: 100%;
+  height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12rpx;
+  font-size: 32rpx;
+  font-weight: 500;
+  border: none;
+  background-color: #07C160;
+  color: #fff;
+}
+
+.save-btn:active {
+  background-color: #06ad56;
+}

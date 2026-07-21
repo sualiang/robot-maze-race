@@ -1,0 +1,162 @@
+<!-- pages/race/race.wxml - 比赛页 V3 三状态重构 -->
+<!-- 状态1: 无上下文 → 扫码引导 | 状态2: 有次数 → 立即参赛 | 状态3: 次数=0 → 购买参赛包 -->
+<view class="race-page">
+
+  <!-- 全局加载 -->
+  <view wx:if="{{pageLoading}}" class="loading-mask">
+    <view class="spinner"></view>
+  </view>
+
+  <block wx:else>
+
+    <!-- 顶部标题 -->
+    <view class="race-header">
+      <text class="race-header-title">我的比赛</text>
+    </view>
+
+    <!-- ============================================================ -->
+    <!-- 状态1: 无运营商上下文 → 扫码引导 -->
+    <!-- ============================================================ -->
+    <view wx:if="{{!hasContext}}" class="action-empty">
+      <view class="action-empty-illustration">🤖🏁</view>
+      <text class="action-empty-title">开启你的第一场竞技挑战</text>
+      <text class="action-empty-desc">前往附近赛场，扫描入口处小程序码即可参赛</text>
+    </view>
+
+    <!-- ============================================================ -->
+    <!-- 状态2 & 状态3: 有上下文 -->
+    <!-- ============================================================ -->
+    <block wx:else>
+
+      <!-- 赛场名标识 -->
+      <view class="venue-badge">
+        <text class="venue-badge-icon">📍</text>
+        <text class="venue-badge-name">{{venueName || '当前赛场'}}</text>
+      </view>
+
+      <!-- 实时排队列表 -->
+      <view wx:if="{{queueVisible}}" class="queue-section">
+        <text class="history-title" style="margin-bottom: 16rpx;">实时排队</text>
+
+        <!-- 当前选手 -->
+        <view wx:if="{{currentRacer}}" class="queue-current-card">
+          <view class="queue-current-icon">🏃</view>
+          <view class="queue-current-info">
+            <text class="queue-current-name">{{currentRacer.nickname || '选手'}} 进行中</text>
+            <text class="queue-current-elapsed">⏱ {{currentRacer.elapsedText || '0s'}}</text>
+          </view>
+        </view>
+
+        <!-- 排队列表 -->
+        <view wx:for="{{queueList}}" wx:key="id" class="queue-item">
+          <view class="queue-item-num">#{{item.queueNumber}}</view>
+          <view class="queue-item-name">{{item.nickname || '选手'}}</view>
+          <text wx:if="{{item.raceType === 'final'}}" class="queue-item-tag">决赛</text>
+        </view>
+
+        <view wx:if="{{currentRacer == null && queueList.length === 0}}" class="history-empty">
+          <text class="history-empty-text">暂无排队信息</text>
+        </view>
+      </view>
+
+      <!-- 赛季最佳成绩卡片（有记录时） -->
+      <view wx:if="{{hasSeasonBest}}" class="best-card" bindtap="onGoLeaderboard">
+        <text class="best-card-label">本赛季最佳成绩</text>
+        <text class="best-card-score">{{seasonBest.scoreText}}</text>
+        <text class="best-card-desc">
+          最佳排名 第{{seasonBest.rank}}名 · 已超 {{seasonBest.beatPercent}}% 玩家
+        </text>
+        <text class="best-card-tip">继续参赛刷新成绩，冲击决赛名额</text>
+      </view>
+
+      <!-- 无记录时的副标题 -->
+      <view wx:if="{{!hasSeasonBest}}" class="action-empty" style="padding-top: 40rpx;">
+        <text class="action-empty-title" style="font-size: 32rpx;">准备好上场了吗？</text>
+        <text class="action-empty-desc">创造你的最佳记录</text>
+      </view>
+
+      <!-- ============================================================ -->
+      <!-- 状态2: 有次数 → 立即参赛 -->
+      <!-- ============================================================ -->
+      <view wx:if="{{remainCount > 0}}" class="race-cta-wrap">
+        <view class="race-cta-btn" bindtap="onRaceNow">
+          <text class="race-cta-text">立即参赛（剩余 {{remainCount}} 次）</text>
+        </view>
+      </view>
+
+      <!-- ============================================================ -->
+      <!-- 状态3: 次数 = 0 → 购买参赛包 -->
+      <!-- ============================================================ -->
+      <view wx:if="{{remainCount <= 0}}" class="race-cta-wrap">
+        <view class="race-cta-btn race-cta-buy" bindtap="onBuyPackage">
+          <text class="race-cta-text">参赛次数不足，请购买参赛包</text>
+        </view>
+        <text class="race-cta-hint race-cta-hint-empty">当前无可用参赛次数</text>
+      </view>
+
+    </block>
+
+    <!-- ============================================================ -->
+    <!-- ============================================================ -->
+    <!-- 历史参赛记录 -->
+    <!-- ============================================================ -->
+    <view class="history-section">
+      <text class="history-title">历史参赛记录</text>
+
+      <!-- 月份滑动标签栏 -->
+      <scroll-view wx:if="{{historyMonths.length > 1}}" class="month-tabs" scroll-x="true" enhanced show-scrollbar="{{false}}">
+        <view class="month-tabs-inner">
+          <view
+            wx:for="{{historyMonths}}"
+            wx:key="value"
+            class="month-tab {{selectedMonth === item.value ? 'month-tab-active' : ''}}"
+            data-month="{{item.value}}"
+            bindtap="onSelectHistoryMonth"
+          >{{item.label}}</view>
+        </view>
+      </scroll-view>
+
+      <view wx:if="{{historyLoading && historyRecords.length === 0}}" class="history-loading">
+        <view class="history-skeleton-item"></view>
+        <view class="history-skeleton-item"></view>
+        <view class="history-skeleton-item"></view>
+      </view>
+
+      <view
+        wx:for="{{truncatedHistory}}"
+        wx:key="id"
+        class="history-item"
+        data-scoretext="{{item.scoreText}}"
+        data-ranktext="{{item.rankText}}"
+        data-datetext="{{item.dateText}}"
+        data-bonustext="{{item.bonusText}}"
+        bindtap="onTapHistoryRecord"
+      >
+        <view class="history-left">
+          <text class="history-score">{{item.scoreText}}</text>
+          <text class="history-date">{{item.dateText}}</text>
+        </view>
+        <view class="history-middle">
+          <text wx:if="{{item.medal}}" class="history-medal">{{item.medal}}</text>
+          <text class="history-rank">{{item.rankText || '-'}}</text>
+        </view>
+        <view wx:if="{{item.bonusText}}" class="history-right">
+          <text class="history-bonus">{{item.bonusText}}</text>
+        </view>
+      </view>
+
+      <!-- 查看全部按钮 -->
+      <view wx:if="{{historyRecords.length > 6}}" class="history-view-all" bindtap="onViewAllHistory">
+        <text>历史参赛记录</text>
+        <text class="history-view-all-arrow">查看全部 ></text>
+      </view>
+
+      <view wx:if="{{historyRecords.length === 0 && !historyLoading}}" class="history-empty">
+        <text class="history-empty-text">暂无参赛记录</text>
+      </view>
+    </view>
+
+  </block>
+
+
+</view>

@@ -1,0 +1,305 @@
+/* pages/packages/packages.wxss */
+/* 参赛包购买页样式 - 深色主题 #0f0f23 / 主色 #e94560 */
+
+/* ===== 顶部提示条 ===== */
+.top-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-base);
+  margin-bottom: var(--space-lg);
+  background: linear-gradient(135deg, rgba(233, 69, 96, 0.2), rgba(233, 69, 96, 0.08));
+  border-radius: var(--radius-base);
+  border: 1rpx solid rgba(233, 69, 96, 0.25);
+}
+
+.banner-icon {
+  font-size: var(--font-lg);
+  flex-shrink: 0;
+}
+
+.banner-text {
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.banner-count {
+  font-size: var(--font-lg);
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+/* ===== 参赛包列表 ===== */
+.package-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-base);
+}
+
+.package-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-lg);
+  overflow: hidden;
+}
+
+/* 标签 */
+.pkg-tag {
+  position: absolute;
+  top: 0;
+  right: 0;
+  font-size: var(--font-xs);
+  padding: 6rpx 20rpx;
+  border-radius: 0 var(--radius-base) 0 var(--radius-base);
+  font-weight: 700;
+  z-index: 1;
+}
+
+.tag-hot {
+  background: linear-gradient(135deg, #e94560, #ff6b81);
+  color: #fff;
+}
+
+.tag-recommend {
+  background: linear-gradient(135deg, #533483, #7c5fbf);
+  color: #fff;
+}
+
+/* 卡片主体 */
+.pkg-body {
+  margin-bottom: var(--space-base);
+}
+
+.pkg-name-area {
+  margin-bottom: var(--space-base);
+}
+
+.pkg-name {
+  font-size: var(--font-xl);
+  font-weight: 700;
+  color: var(--color-text);
+  display: block;
+  margin-bottom: var(--space-xs);
+}
+
+.pkg-desc {
+  font-size: var(--font-xs);
+  color: var(--color-text-secondary);
+  display: block;
+  line-height: 1.5;
+}
+
+/* 次数展示 */
+.pkg-count-area {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-sm);
+}
+
+.pkg-count-number {
+  font-size: var(--font-base);
+  font-weight: 400;
+  color: var(--color-primary);
+  line-height: 1;
+}
+
+.pkg-count-unit {
+  font-size: var(--font-base);
+  color: var(--color-primary);
+  font-weight: 400;
+}
+
+/* 有效期 */
+.pkg-meta {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+}
+
+.pkg-meta-icon {
+  font-size: var(--font-sm);
+}
+
+.pkg-meta-text {
+  font-size: var(--font-xs);
+  color: var(--color-text-light);
+}
+
+/* 底部：价格 + 按钮 */
+.pkg-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: var(--space-base);
+  border-top: 1rpx solid var(--color-border);
+}
+
+.pkg-price-area {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+}
+
+.price-symbol {
+  font-size: var(--font-sm);
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.price-number {
+  font-size: 52rpx;
+  font-weight: 900;
+  color: var(--color-primary);
+  line-height: 1;
+}
+
+.price-original {
+  font-size: var(--font-xs);
+  color: var(--color-text-light);
+  text-decoration: line-through;
+}
+
+.buy-btn {
+  width: 200rpx;
+  height: 72rpx;
+  font-size: var(--font-base);
+  border-radius: 36rpx;
+}
+
+.buy-btn::after {
+  border: none;
+}
+
+/* ===== 底部邀请助力区 ===== */
+.invite-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  margin-top: var(--space-xl);
+  margin-bottom: var(--space-lg);
+  padding: var(--space-base) var(--space-lg);
+  background: rgba(83, 52, 131, 0.15);
+  border-radius: var(--radius-base);
+  border: 1rpx solid rgba(83, 52, 131, 0.3);
+}
+
+.invite-icon {
+  font-size: var(--font-lg);
+}
+
+.invite-text {
+  font-size: var(--font-sm);
+  color: var(--color-accent-light);
+  font-weight: 500;
+}
+
+.invite-footer:active {
+  opacity: 0.7;
+}
+
+/* ===== 加载中 ===== */
+.loading-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 200rpx 0;
+}
+
+
+
+/* ===== 礼券展示 ===== */
+.pkg-reward-area {
+  margin: var(--space-sm) 0 var(--space-base);
+  padding: var(--space-sm) var(--space-base);
+  background: linear-gradient(135deg, rgba(82, 196, 26, 0.12), rgba(82, 196, 26, 0.05));
+  border-radius: var(--radius-sm);
+  border: 1rpx solid rgba(82, 196, 26, 0.2);
+}
+
+.reward-title {
+  font-size: var(--font-xs);
+  color: #52c41a;
+  font-weight: 600;
+  margin-bottom: 6rpx;
+  display: block;
+}
+
+.reward-total {
+  font-size: 36rpx;
+  font-weight: 800;
+  color: #52c41a;
+}
+
+.reward-coupon-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6rpx 0;
+  border-bottom: 1rpx solid rgba(82, 196, 26, 0.1);
+}
+
+.reward-coupon-item:last-child {
+  border-bottom: none;
+}
+
+.reward-coupon-name {
+  font-size: var(--font-xs);
+  color: rgba(255,255,255,0.75);
+  flex: 1;
+}
+
+.reward-coupon-merchant {
+  font-size: 20rpx;
+  color: rgba(255,255,255,0.35);
+  display: block;
+}
+
+.reward-coupon-value {
+  font-size: var(--font-sm);
+  color: #ff4d4f;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.tag-gift {
+  background: linear-gradient(135deg, #52c41a, #73d13d);
+  color: #fff;
+}
+
+/* ===== 积分抵扣开关 ===== */
+.points-deduction-bar {
+  margin: 16rpx 24rpx;
+  padding: 24rpx;
+  background: #1E293B;
+  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.deduction-info {
+  flex: 1;
+  margin-right: 16rpx;
+}
+
+.deduction-label {
+  display: block;
+  font-size: 28rpx;
+  color: #E2E8F0;
+  font-weight: 600;
+  margin-bottom: 4rpx;
+}
+
+.deduction-detail {
+  font-size: 22rpx;
+  color: #94A3B8;
+}
+
+.deduction-hl {
+  color: #F59E0B;
+  font-weight: 600;
+}

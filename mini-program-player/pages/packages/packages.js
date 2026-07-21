@@ -1,0 +1,311 @@
+// pages/packages/packages.js - 参赛包购买页
+var request = require('../../utils/request');
+
+Page({
+  data: {
+    // 用户信息
+    remainCount: 0,
+
+    // 参赛包列表
+    packageList: [],
+    loading: true,
+    empty: false,
+
+    // 当前选中的参赛包
+    pendingPackageId: null,
+    pendingPackageName: '',
+    pendingPackagePrice: 0,
+    pendingPackageCount: 0,
+
+    // 积分抵扣
+    pointsBalance: 0,
+    pointsDeductionChecked: false,
+    pointsDeductionCents: 0,
+    pointsDeductionYuan: 0,
+    pointsDeductionInfo: null,
+
+    // 扫码来源参数
+    venueId: null
+  },
+
+  onLoad: function (options) {
+    var that = this;
+    // 记录 venue_id 参数（可能为扫码来源）
+    if (options && options.venue_id) {
+      that.setData({ venueId: options.venue_id });
+    }
+
+    // 并行拉取参赛包列表 + 用户信息 + 积分抵扣信息
+    that.fetchAllData();
+    that.fetchPointsDeductionInfo();
+  },
+
+  onShow: function () {
+    var app = getApp();
+    if (app.globalData.pointsDeductionChecked !== undefined) {
+      this.setData({ pointsDeductionChecked: app.globalData.pointsDeductionChecked });
+    }
+  },
+
+  onPullDownRefresh: function () {
+    var that = this;
+    that.fetchAllData().then(function () {
+      wx.stopPullDownRefresh();
+    });
+  },
+
+  /**
+   * 并行获取所有数据
+   */
+  fetchAllData: function () {
+    var that = this;
+    that.setData({ loading: true });
+
+    return Promise.all([
+      that.fetchPackageList(),
+      that.fetchUserInfo()
+    ]).then(function () {
+      that.setData({ loading: false });
+    }).catch(function () {
+      that.setData({ loading: false });
+    });
+  },
+
+  /**
+   * 获取参赛包列表
+   * GET /player/packages
+   */
+  fetchPackageList: function () {
+    var that = this;
+    return request.get('/player/packages').then(function (res) {
+      var list = [];
+      if (Array.isArray(res)) list = res;
+      else if (res && res.code === 0 && Array.isArray(res.data)) list = res.data;
+      else if (res && Array.isArray(res.list)) list = res.list;
+      var items = list || [];
+      for (var i = 0; i < items.length; i++) {
+        var item = items[i];
+        // 格式化价格：分 → 元
+        item.salePrice = item.price || 0;
+        item.salePriceText = (item.price / 100).toFixed(2).replace(/\.?0+$/, '');
+        item.standardPriceText = item.standardPriceCents ? (item.standardPriceCents / 100).toFixed(2).replace(/\.?0+$/, '') : '';
+        // 格式化礼券价格
+        if (item.coupons && item.coupons.length > 0) {
+          for (var j = 0; j < item.coupons.length; j++) {
+            var c = item.coupons[j];
+            c.couponValueText = (c.denominationCents / 100).toFixed(0);
+          }
+          item.totalRewardValueText = (item.totalRewardValue / 100).toFixed(0);
+        }
+        // 标签
+        if (item.isHot) {
+          item.tag = '🔥 热门';
+          item.tagType = 'hot';
+        } else if (item.isRecommend) {
+          item.tag = '💎 推荐';
+          item.tagType = 'recommend';
+        }
+      }
+      that.setData({
+        packageList: items,
+        empty: items.length === 0
+      });
+    }).catch(function (err) {
+      console.error('获取参赛包列表失败', err);
+      that.setData({ empty: true });
+    });
+  },
+
+  /**
+   * 获取用户信息（剩余次数）
+   * GET /player/me/profile-check
+   */
+  fetchUserInfo: function () {
+    var that = this;
+    return request.get('/player/me/profile-check').then(function (profile) {
+      var remain = (profile && profile.remainCount != null) ? profile.remainCount : (profile.raceCount || 0);
+      that.setData({ remainCount: remain });
+    }).catch(function (err) {
+      console.error('获取用户信息失败', err);
+    });
+  },
+
+  /**
+   * 点击「立即购买」
+   */
+  onBuyPackage: function (e) {
+    var dataset = e.currentTarget.dataset;
+    var packageId = dataset.id;
+    var packageName = dataset.name;
+    var price = dataset.price;
+    var count = dataset.count;
+
+    if (!packageId) return;
+
+    // 缓存当前选中的参赛包
+    this.setData({
+      pendingPackageId: packageId,
+      pendingPackageName: packageName,
+      pendingPackagePrice: price,
+      pendingPackageCount: count
+    });
+
+    this.createOrder();
+  },
+
+  /**
+   * 下单 & 支付
+   */
+  createOrder: function () {
+    var that = this;
+    var packageId = this.data.pendingPackageId;
+    if (!packageId) return;
+
+    wx.showLoading({ title: '下单中...', mask: true });
+
+    request.post('/player/orders', {
+      packageId: packageId,
+      usePointsDeduction: that.data.pointsDeductionChecked
+    }).then(function (order) {
+      wx.hideLoading();
+
+      // 检查是否返回了支付参数（微信支付）
+      var pp = order && order.paymentParams;
+      if (pp) {
+        // 发起微信支付
+        that.requestPayment(pp, order);
+      } else {
+        // 无支付参数（可能免费或不需要支付），直接视为成功
+        that.onOrderSuccess(order);
+      }
+    }).catch(function (err) {
+      wx.hideLoading();
+      var msg = (err && err.message) || '下单失败，请重试';
+      console.error('下单失败', err);
+      if (msg.indexOf('取消') < 0) {
+        wx.showToast({ title: msg, icon: 'none' });
+      }
+    });
+  },
+
+  /**
+   * 调起微信支付
+   */
+  requestPayment: function (pp, order) {
+    var that = this;
+    wx.requestPayment({
+      timeStamp: String(pp.timeStamp || pp.timestamp || ''),
+      nonceStr: String(pp.nonceStr || ''),
+      package: String(pp.package || ''),
+      signType: pp.signType || 'MD5',
+      paySign: String(pp.paySign || ''),
+      success: function () {
+        that.onOrderSuccess(order);
+      },
+      fail: function (payErr) {
+        if (payErr && payErr.errMsg && payErr.errMsg.indexOf('cancel') >= 0) {
+          wx.showToast({ title: '已取消支付', icon: 'none' });
+        } else {
+          console.error('支付失败', payErr);
+          wx.showToast({ title: '支付失败，请重试', icon: 'none' });
+        }
+      }
+    });
+  },
+
+  /**
+   * 订单成功处理
+   */
+  onOrderSuccess: function (order) {
+    var that = this;
+
+    wx.showToast({
+      title: '购买成功！',
+      icon: 'success',
+      duration: 2000
+    });
+
+    // 2秒后跳转
+    setTimeout(function () {
+      var pages = getCurrentPages();
+      // 如果页面栈中已有 target 页，返回
+      var venueId = that.data.venueId;
+      var targetUrl;
+
+      if (venueId) {
+        // 有 venue_id → 跳转签到页
+        targetUrl = '/pages/checkin/checkin?venue_id=' + encodeURIComponent(venueId);
+        // 尝试检查签到页是否存在
+        wx.navigateTo({ url: targetUrl, fail: function () {
+          // 签到页不存在，走 redirect
+          wx.redirectTo({ url: targetUrl, fail: function () {
+            // 无论如何，兜底到首页
+            wx.switchTab({ url: '/pages/index/index' });
+          }});
+        }});
+      } else {
+        // 无 venue_id → 返回首页（Tab 页用 switchTab）
+        wx.switchTab({ url: '/pages/index/index' });
+      }
+
+      // 刷新本地数据（静默更新）
+      that.fetchUserInfo();
+      that.fetchPackageList();
+    }, 2000);
+  },
+
+  /**
+   * 点击底部邀请助力
+   */
+  onInviteFriend: function () {
+    wx.navigateTo({ url: '/pages/help/help' });
+  },
+
+  /**
+   * 获取积分抵扣信息
+   */
+  fetchPointsDeductionInfo: function () {
+    var that = this;
+    request.get('/player/points-deduction-info').then(function (data) {
+      var d = data && data.data ? data.data : data;
+      if (!d) return;
+      var balance = d.pointsBalance || 0;
+      var maxYuan = d.maxDeductionYuan || 0;
+      var maxPoints = Math.min(balance, d.maxDeductiblePoints || 0);
+      var maxCents = Math.min(d.maxDeductionCents || 0, Math.floor(balance * 100 / (d.deductionRate || 100)));
+      that.setData({
+        pointsBalance: balance,
+        pointsDeductionInfo: {
+          balance: balance,
+          maxYuan: maxYuan,
+          maxPoints: maxPoints,
+          rate: d.deductionRate || 100
+        },
+        pointsDeductionCents: maxCents,
+        pointsDeductionYuan: (maxCents / 100).toFixed(2)
+      });
+    }).catch(function () {});
+  },
+
+  /**
+   * 切换积分抵扣勾选
+   */
+  onTogglePointsDeduction: function (e) {
+    var checked = e.detail.value;
+    this.setData({ pointsDeductionChecked: checked });
+    getApp().globalData.pointsDeductionChecked = checked;
+  },
+
+  /**
+   * 空函数，阻止弹窗点击穿透
+   */
+  noop: function () {},
+
+  onShareAppMessage: function () {
+    return {
+      title: '🏁 参赛包限时抢购！机器狗迷宫竞速等你来战',
+      path: '/pages/packages/packages',
+      imageUrl: '/assets/images/share-package.png'
+    };
+  }
+});

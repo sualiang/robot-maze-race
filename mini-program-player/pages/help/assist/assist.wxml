@@ -1,0 +1,117 @@
+<!-- pages/help/assist/assist.wxml - 好友的助力落地页（无组件库，原生 view + wx:if） -->
+<view class="container">
+  <!-- ===== 加载中 ===== -->
+  <view wx:if="{{loading}}" class="loading-state">
+    <view class="loading-spinner"></view>
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <!-- ===== 未登录-提示登录 ===== -->
+  <view wx:elif="{{!loading && needLogin}}" class="login-state">
+    <text class="login-emoji">🔒</text>
+    <text class="login-title">请先登录</text>
+    <text class="login-desc">登录后即可为好友助力</text>
+    <view class="btn btn-login" bindtap="onGoLogin">
+      <text class="btn-login-text">去登录</text>
+    </view>
+  </view>
+
+  <!-- ===== 加载失败 ===== -->
+  <view wx:elif="{{!loading && loadError}}" class="error-state">
+    <text class="error-emoji">😵</text>
+    <text class="error-title">页面加载失败</text>
+    <text class="error-desc">{{errorMessage || '请稍后重试'}}</text>
+    <view class="btn btn-retry" bindtap="onRetryLoad">
+      <text class="btn-retry-text">重新加载</text>
+    </view>
+  </view>
+
+  <!-- ===== 活动信息加载成功 ===== -->
+  <block wx:elif="{{!loading && activity}}">
+    <!-- 顶部卡片 -->
+    <view class="invite-card">
+      <view class="invite-icon-row">
+        <text class="invite-icon">🤝</text>
+      </view>
+      <text class="invite-title">你的朋友 <text class="inviter-name">{{inviterName || activity.creatorNickname || '好友'}}</text> 邀请你帮他助力</text>
+      <view class="invite-progress-row">
+        <view class="invite-progress-bar-bg">
+          <view class="invite-progress-bar-fill" style="width: {{activity.progressPercent}}%"></view>
+        </view>
+        <text class="invite-progress-text">{{activity.currentHelpCount}}/{{activity.requiredHelpCount}}</text>
+      </view>
+    </view>
+
+    <!-- 已助力头像预览 -->
+    <view wx:if="{{activity.helpers && activity.helpers.length > 0}}" class="preview-card">
+      <text class="preview-title">已有 {{activity.helpers.length}} 位好友助力</text>
+      <view class="preview-avatar-row">
+        <block wx:for="{{activity.helpers}}" wx:key="id">
+          <image wx:if="{{item.avatar}}" class="preview-avatar"
+            src="{{item.avatar}}" mode="aspectFill"></image>
+          <view wx:else class="preview-avatar preview-avatar-placeholder">
+            <text class="preview-placeholder-text">{{item.nickname ? item.nickname.slice(0, 1) : '?'}}</text>
+          </view>
+        </block>
+      </view>
+    </view>
+
+    <!-- ===== 可以助力状态 ===== -->
+    <block wx:if="{{canHelp && activity.status === 'active'}}">
+      <!-- 「帮他助力」大按钮 -->
+      <view class="btn btn-assist" bindtap="onAssist">
+        <text class="btn-assist-icon">🤝</text>
+        <text class="btn-assist-text">帮他助力</text>
+      </view>
+
+      <!-- 我也要发起助力 -->
+      <view class="btn btn-own" bindtap="onStartOwn">
+        <text class="btn-own-text">我也要发起助力</text>
+      </view>
+
+      <!-- 底部提示 -->
+      <view class="assist-footer-tip">
+        <text>帮他助力，你也将获得奖励 🎫</text>
+      </view>
+    </block>
+
+    <!-- ===== 已助力过 ===== -->
+    <block wx:elif="{{!canHelp || activity.status === 'completed'}}">
+      <view class="assist-done-card">
+        <text class="assist-done-icon">🎉</text>
+        <text class="assist-done-title">助力成功</text>
+        <text wx:if="{{!canHelp && activity.status === 'active'}}" class="assist-done-desc">你已经帮好友助过力了，感谢你的支持！</text>
+        <text wx:elif="{{activity.status === 'completed'}}" class="assist-done-desc">目标已达成！</text>
+      </view>
+      <view class="btn btn-own" bindtap="onStartOwn">
+        <text class="btn-own-text">我也要发起助力</text>
+      </view>
+    </block>
+
+    <!-- ===== 已过期 ===== -->
+    <block wx:elif="{{activity.status === 'expired'}}">
+      <view class="assist-expired-card">
+        <text class="assist-done-icon">⏰</text>
+        <text class="assist-done-title">该助力已过期</text>
+        <text class="assist-done-desc">你可以自己发起一个新的助力活动</text>
+      </view>
+      <view class="btn btn-own" bindtap="onStartOwn">
+        <text class="btn-own-text">我也要发起助力</text>
+      </view>
+    </block>
+  </block>
+
+  <!-- ===== 助力成功弹窗 ===== -->
+  <view wx:if="{{showSuccessModal}}" class="modal-mask" bindtap="onCloseModal">
+    <view class="modal-content" catchtap="onModalPrevent">
+      <text class="modal-icon">🎉</text>
+      <text class="modal-title">助力成功！</text>
+      <text class="modal-desc">你帮助好友离目标更近了一步</text>
+      <view class="modal-btn-row">
+        <view class="modal-btn modal-btn-primary" bindtap="onStartOwn">我也要发起</view>
+        <view class="modal-btn modal-btn-secondary" bindtap="onBuyPackage">买参赛包</view>
+      </view>
+      <text class="modal-close" bindtap="onCloseModal">关闭</text>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,125 @@
+<!-- pages/index/index.wxml - 首页 V2重构版 -->
+<!-- 模块1: 顶部导航栏 | 模块2: 主视觉Banner | 模块3: 参赛状态&福利总览卡 -->
+<!-- 模块4: 今日专属福利条 | 模块5: 参赛包推荐区 | 模块6: 赛季竞技入口卡片 -->
+<view class="container">
+
+  <!-- ============================================================ -->
+  <!-- 模块1: 顶部导航栏 -->
+  <!-- ============================================================ -->
+  <view class="top-nav">
+    <text class="top-nav-title">铁甲快狗</text>
+    <view wx:if="{{venueName}}" class="top-nav-venue">
+      <text class="top-nav-venue-icon">📍</text>
+      <text class="top-nav-venue-name">{{venueName}}</text>
+    </view>
+  </view>
+
+  <!-- ============================================================ -->
+  <!-- 模块2: 主视觉Banner -->
+  <!-- ============================================================ -->
+  <view class="hero-banner-image">
+    <image class="hero-banner-img" src="/assets/images/home-banner.png" mode="widthFix" />
+  </view>
+
+  <!-- ============================================================ -->
+  <!-- 模块3: 参赛状态&福利总览卡 -->
+  <!-- ============================================================ -->
+  <view class="status-card">
+    <view class="status-card-body">
+      <!-- 左侧: 剩余参赛次数 -->
+      <view class="status-left">
+        <text class="status-label">剩余参赛次数</text>
+        <view class="status-number-wrap">
+          <text class="status-number-red">{{remainCount}}</text>
+          <text class="status-unit">次</text>
+        </view>
+      </view>
+
+      <!-- 分割线 -->
+      <view class="status-divider"></view>
+
+      <!-- 右侧: 我的福利 -->
+      <view class="status-right" bindtap="onGoCouponFromBenefits">
+        <text class="status-label">我的福利</text>
+        <view class="status-number-wrap">
+          <text class="status-number-gold">¥{{couponValue}}</text>
+          <text class="status-arrow">›</text>
+        </view>
+        <text class="status-subtext">含餐饮/游乐/兑换券</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- ============================================================ -->
+  <!-- 模块4: 今日专属福利条 - 跑马灯滚动 -->
+  <!-- ============================================================ -->
+  <view wx:if="{{promoText}}" class="promo-bar" bindtap="onScrollToPackages">
+    <view class="promo-marquee">
+      <text class="promo-text">{{promoText}}　　{{promoText}}</text>
+      <text class="promo-text promo-text-copy">{{promoText}}　　{{promoText}}</text>
+    </view>
+  </view>
+
+  <!-- ============================================================ -->
+  <!-- 模块5: 参赛包推荐区 -->
+  <!-- ============================================================ -->
+  <view id="packages-section" class="packages-section">
+    <view class="section-header">
+      <text class="section-title">选择参赛包</text>
+      <view class="section-more" bindtap="onViewAllPackages">
+        <text class="section-more-text">查看全部</text>
+        <text class="section-more-arrow">›</text>
+      </view>
+    </view>
+
+    <scroll-view
+      class="packages-scroll"
+      scroll-x
+      enhanced
+      show-scrollbar="{{false}}"
+      enable-flex
+    >
+      <view
+        wx:for="{{packages}}"
+        wx:key="id"
+        class="package-item"
+        data-id="{{item.id}}"
+        data-index="{{index}}"
+      >
+        <view class="package-card">
+          <!-- 标签 -->
+          <view wx:if="{{item.tag}}" class="pkg-tag">
+            <text class="pkg-tag-text">{{item.tag}}</text>
+          </view>
+
+          <!-- 名称 -->
+          <text class="pkg-name">{{item.name}}</text>
+
+          <!-- 价格：标准价划线 + 折后价主推 -->
+          <view class="pkg-price-row">
+            <text class="pkg-price">¥{{item.salePriceText}}</text>
+            <text wx:if="{{item.standardPriceText}}" class="pkg-original-price">¥{{item.standardPriceText}}</text>
+            <text class="pkg-times">{{item.times}}次</text>
+          </view>
+
+          <!-- 权益行 -->
+          <view wx:for="{{item.benefits}}" wx:for-item="benefit" wx:key="index" class="pkg-benefit-row">
+            <image class="pkg-benefit-icon" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E" mode="aspectFit" />
+            <text class="pkg-benefit-text">{{benefit}}</text>
+          </view>
+
+          <!-- 立即购买按钮 -->
+          <view class="pkg-buy-btn" data-id="{{item.id}}" data-index="{{index}}" bindtap="onBuyPackage">
+            <text class="pkg-buy-btn-text">立即购买</text>
+          </view>
+        </view>
+      </view>
+    </scroll-view>
+
+    <!-- 未登录或无参赛包时的占位 -->
+    <view wx:if="{{packagesLoaded && packages.length === 0}}" class="packages-empty">
+      <text class="packages-empty-text">{{isLoggedIn ? '暂无参赛包，敬请期待' : '参赛包仅在登录后可见'}}</text>
+    </view>
+  </view>
+
+</view>

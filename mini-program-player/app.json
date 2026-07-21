@@ -1,0 +1,73 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/race/race",
+    "pages/leaderboard/leaderboard",
+    "pages/profile/profile",
+    "pages/login/login",
+    "pages/register/register",
+    "pages/packages/packages",
+    "pages/checkin/checkin",
+    "pages/help/help",
+    "pages/help/assist/assist",
+    "pages/edit-profile/edit-profile",
+    "pages/coupon/coupon",
+    "pages/task/task",
+    "pages/evaluation/evaluation",
+    "pages/orders/orders",
+    "pages/points-shop/points-shop",
+    "pages/race-history/race-history"
+  ],
+  "window": {
+    "backgroundTextStyle": "dark",
+    "navigationBarBackgroundColor": "#0f0f23",
+    "navigationBarTitleText": "铁甲快狗·迷宫竞速",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#0f0f23",
+    "backgroundColorTop": "#0f0f23",
+    "backgroundColorBottom": "#0f0f23"
+  },
+  "tabBar": {
+    "color": "#666680",
+    "selectedColor": "#e94560",
+    "backgroundColor": "#1a1a2e",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页",
+        "iconPath": "assets/tabbar/home.png",
+        "selectedIconPath": "assets/tabbar/home-active.png"
+      },
+      {
+        "pagePath": "pages/race/race",
+        "text": "比赛",
+        "iconPath": "assets/tabbar/race.png",
+        "selectedIconPath": "assets/tabbar/race-active.png"
+      },
+      {
+        "pagePath": "pages/leaderboard/leaderboard",
+        "text": "排行",
+        "iconPath": "assets/tabbar/leaderboard.png",
+        "selectedIconPath": "assets/tabbar/leaderboard-active.png"
+      },
+      {
+        "pagePath": "pages/profile/profile",
+        "text": "我的",
+        "iconPath": "assets/tabbar/profile.png",
+        "selectedIconPath": "assets/tabbar/profile-active.png"
+      }
+    ]
+  },
+  "permission": {
+    "scope.userLocation": {
+      "desc": "用于签到定位验证"
+    }
+  },
+  "requiredPrivateInfos": [
+    "getLocation"
+  ],
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "__usePrivacyCheck__": false
+}

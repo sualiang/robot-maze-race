@@ -1,0 +1,54 @@
+<!-- pages/register/register.wxml — 新用户注册（头像+昵称+手机号） -->
+<view class="page">
+
+  <!-- 头像 — 顶部居中圆形 -->
+  <button class="avatar-area" bindtap="onChooseAvatar">
+    <image class="avatar-circle" src="{{avatar || '/assets/images/logo-avatar.png'}}" mode="aspectFill" />
+    <text class="avatar-hint">点击设置头像</text>
+  </button>
+
+  <!-- 表单卡片 -->
+  <view class="form-card">
+
+    <!-- 玩家昵称 -->
+    <view class="form-cell">
+      <text class="form-cell__hd">玩家昵称</text>
+      <view class="form-cell__bd form-cell__bd_right">
+        <input
+          class="form-input"
+          type="text"
+          value="{{nickname}}"
+          placeholder="请输入昵称"
+          placeholder-style="color:#475569"
+          maxlength="12"
+          bindinput="onNicknameInput"
+        />
+      </view>
+    </view>
+
+    <!-- 手机号码 -->
+    <view class="form-cell">
+      <text class="form-cell__hd">手机号码</text>
+      <view class="form-cell__bd form-cell__bd_right">
+        <input
+          class="form-input"
+          type="number"
+          value="{{phone}}"
+          placeholder="请输入手机号"
+          placeholder-style="color:#475569"
+          maxlength="11"
+          bindinput="onPhoneInput"
+        />
+      </view>
+    </view>
+
+  </view>
+
+  <!-- 保存按钮 -->
+  <view class="btn-area">
+    <button class="save-btn" loading="{{saving}}" disabled="{{saving}}" bindtap="onSubmit">
+      {{saving ? '保存中...' : '保存'}}
+    </button>
+  </view>
+
+</view>

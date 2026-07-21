@@ -1,0 +1,746 @@
+-- ============================================
+-- 铁甲快狗 (robot-maze-race) - MySQL Schema
+-- 用于 initSchema() 启动时自动建表
+-- ============================================
+
+-- ==================== 用户表 ====================
+CREATE TABLE IF NOT EXISTS users (
+  id VARCHAR(36) PRIMARY KEY,
+  openid VARCHAR(128) UNIQUE NOT NULL,
+  mp_openid VARCHAR(128) DEFAULT '',
+  unionid VARCHAR(128),
+  nickname VARCHAR(64),
+  avatar_url VARCHAR(512),
+  phone VARCHAR(20),
+  gender VARCHAR(10) DEFAULT '',
+  age INT DEFAULT 0,
+  role VARCHAR(20) NOT NULL DEFAULT 'player',
+  race_count INT DEFAULT 0,
+  total_race_time_ms INT DEFAULT 0,
+  best_score_ms INT,
+  level INT NOT NULL DEFAULT 1,
+  exp INT NOT NULL DEFAULT 0,
+  points INT NOT NULL DEFAULT 0,
+  password VARCHAR(128) DEFAULT '',
+  first_login INT DEFAULT 0,
+  subscribe_venue_id VARCHAR(128),
+  register_coupon_granted INT NOT NULL DEFAULT 0,
+  status VARCHAR(20) DEFAULT 'active',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX IF NOT EXISTS idx_users_openid ON users(openid);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
+
+-- ==================== 赛场表 ====================
+CREATE TABLE IF NOT EXISTS venues (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(128) NOT NULL,
+  address VARCHAR(512),
+  latitude DOUBLE,
+  longitude DOUBLE,
+  status VARCHAR(20) NOT NULL DEFAULT 'open',
+  qrcode_url VARCHAR(512),
+  checkin_radius_meters INT DEFAULT 100,
+  max_queue_size INT DEFAULT 50,
+  timeout_seconds INT DEFAULT 300,
+  open_time VARCHAR(20) DEFAULT '09:00:00',
+  close_time VARCHAR(20) DEFAULT '21:00:00',
+  city VARCHAR(64) DEFAULT '',
+  district VARCHAR(64) DEFAULT '',
+  description TEXT,
+  profit_share_rate DOUBLE DEFAULT 0,
+  operator_id VARCHAR(36),
+  maze_config TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX IF NOT EXISTS idx_venues_status ON venues(status);
+CREATE INDEX IF NOT EXISTS idx_venues_operator ON venues(operator_id);
+
+-- ==================== 裁判表 ====================
+CREATE TABLE IF NOT EXISTS referees (
+  id VARCHAR(36) PRIMARY KEY,
+  user_id VARCHAR(36) NOT NULL,
+  cert_status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  status VARCHAR(16) DEFAULT 'approved' COMMENT 'pending/approved/rejected',
+  venue_id VARCHAR(36),
+  phone VARCHAR(20),
+  id_number VARCHAR(18),
+  id_card_front VARCHAR(512),
+  id_card_back VARCHAR(512),
+  name VARCHAR(100),
+  cert_image VARCHAR(512),
+  apply_remark VARCHAR(255) DEFAULT '' COMMENT '申请备注',
+  review_remark VARCHAR(255) DEFAULT '' COMMENT '审核备注',
+  reviewed_at DATETIME DEFAULT NULL COMMENT '审核时间',
+  reviewed_by VARCHAR(64) DEFAULT '' COMMENT '审核人',
+  gps_lat DOUBLE,
+  gps_lng DOUBLE,
+  last_checkin_at DATETIME,
+  operator_id VARCHAR(36),
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX IF NOT EXISTS idx_referees_user ON referees(user_id);
+CREATE INDEX IF NOT EXISTS idx_referees_venue ON referees(venue_id);
+CREATE INDEX IF NOT EXISTS idx_referees_cert ON referees(cert_status);
+CREATE INDEX IF NOT EXISTS idx_referees_status ON referees(status);
+
+-- ==================== 参赛包表 ====================
+CREATE TABLE IF NOT EXISTS race_packages (
+  id VARCHAR(36) PRIMARY KEY,
+  operator_id VARCHAR(36),
+  name VARCHAR(128) NOT NULL,
+  description TEXT,
+  price_cents INT NOT NULL,
+  standard_price_cents INT DEFAULT 0,
+  discount_price_cents INT DEFAULT 0,
+  race_count INT NOT NULL DEFAULT 1,
+  valid_days INT DEFAULT 365,
+  status VARCHAR(20) NOT NULL DEFAULT 'active',
+  sort_order INT DEFAULT 0,
+  coupon_reward_min_cents INT DEFAULT 0,
+  coupon_reward_max_cents INT DEFAULT 0,
+  free_deduction_cents INT NOT NULL DEFAULT 0,
+  growth_value INT DEFAULT 0,
+  point_value INT DEFAULT 0,
+  season_id INT,
+  tag VARCHAR(64) DEFAULT '',
+  special_rights TEXT DEFAULT '',
+  is_active INT DEFAULT 1,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX IF NOT EXISTS idx_race_packages_status ON race_packages(status);
+
+-- ==================== 参赛包关联优惠券 ====================
+CREATE TABLE IF NOT EXISTS race_package_coupons (
+  id VARCHAR(36) PRIMARY KEY,
+  package_id VARCHAR(36) NOT NULL,
+  coupon_id VARCHAR(36) NOT NULL,
+  denomination_cents INT NOT NULL DEFAULT 0,
+  coupon_type INT NOT NULL DEFAULT 1,
+  merchant_name VARCHAR(128) DEFAULT '',
+  coupon_name VARCHAR(128) DEFAULT '',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (package_id) REFERENCES race_packages(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX IF NOT EXISTS idx_rpc_package_id ON race_package_coupons(package_id);
+CREATE INDEX IF NOT EXISTS idx_rpc_coupon_id ON race_package_coupons(coupon_id);
+
+-- ==================== 订单表 ====================
+CREATE TABLE IF NOT EXISTS orders (
+  id VARCHAR(36) PRIMARY KEY,
+  order_no VARCHAR(64) UNIQUE NOT NULL,
+  user_id VARCHAR(36) NOT NULL,
+  package_id VARCHAR(36) NOT NULL,
+  amount_cents INT NOT NULL,
+  discount_cents INT DEFAULT 0,
+  points_deduction_cents INT DEFAULT 0,
+  coupon_multiplier INT DEFAULT 1,
+  status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  payment_method VARCHAR(20),
+  prepay_id VARCHAR(64),
+  transaction_id VARCHAR(64),
+  refund_id VARCHAR(64),
+  refund_amount INT DEFAULT 0,
+  payment_remark VARCHAR(512),
+  remaining_times INT DEFAULT 0,
+  remaining_growth INT DEFAULT 0,
+  paid_at DATETIME,
+  operator_id VARCHAR(36),
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (package_id) REFERENCES race_packages(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id);
+CREATE INDEX IF NOT EXISTS idx_orders_no ON orders(order_no);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+
+-- ==================== 支付流水表 ====================
+CREATE TABLE IF NOT EXISTS payments (
+  id VARCHAR(36) PRIMARY KEY,
+  order_id VARCHAR(36) NOT NULL,
+  operator_id VARCHAR(36),
+  user_id VARCHAR(36),
+  transaction_id VARCHAR(128),
+  amount_cents INT NOT NULL,
+  channel VARCHAR(20) NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  raw_data TEXT,
+  paid_at DATETIME,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX IF NOT EXISTS idx_payments_order ON payments(order_id);
+CREATE INDEX IF NOT EXISTS idx_payments_transaction ON payments(transaction_id);
+
+-- ==================== 签到记录表 ====================
+CREATE TABLE IF NOT EXISTS checkins (
+  id VARCHAR(36) PRIMARY KEY,
+  user_id VARCHAR(36) NOT NULL,
+  venue_id VARCHAR(36) NOT NULL,
+  package_id VARCHAR(36),
+  queue_number INT,
+  status VARCHAR(20) NOT NULL DEFAULT 'queued',
+  checked_in_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  called_at DATETIME,
+  race_started_at DATETIME,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX IF NOT EXISTS idx_checkins_user ON checkins(user_id);
+CREATE INDEX IF NOT EXISTS idx_checkins_venue ON checkins(venue_id);
+CREATE INDEX IF NOT EXISTS idx_checkins_venue_queue ON checkins(venue_id, queue_number);
+CREATE INDEX IF NOT EXISTS idx_checkins_status ON checkins(status);
+
+-- ==================== 比赛成绩表 ====================
+CREATE TABLE IF NOT EXISTS race_results (
+  id VARCHAR(36) PRIMARY KEY,
+  checkin_id VARCHAR(36) NOT NULL,
+  user_id VARCHAR(36) NOT NULL,
+  venue_id VARCHAR(36) NOT NULL,
+  referee_id VARCHAR(36),
+  score_ms INT,
+  rank INT,
+  status VARCHAR(20) NOT NULL DEFAULT 'racing',
+  fault_reason TEXT,
+  race_type INT NOT NULL DEFAULT 1,
+  started_at DATETIME,
+  finished_at DATETIME,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX IF NOT EXISTS idx_race_results_user ON race_results(user_id);
+CREATE INDEX IF NOT EXISTS idx_race_results_venue ON race_results(venue_id);
+CREATE INDEX IF NOT EXISTS idx_race_results_score ON race_results(score_ms);
+CREATE INDEX IF NOT EXISTS idx_race_results_created ON race_results(created_at);
+
+-- ==================== 助力记录表 ====================
+CREATE TABLE IF NOT EXISTS helps (
+  id VARCHAR(36) PRIMARY KEY,
+  initiator_id VARCHAR(36) NOT NULL,
+  helper_id VARCHAR(36),
+  status VARCHAR(20) NOT NULL DEFAULT 'initiated',
+  target_package_id VARCHAR(36),
+  required_help_count INT NOT NULL DEFAULT 5,
+  current_help_count INT NOT NULL DEFAULT 0,
+  helper_device_id VARCHAR(128),
+  coupon_amount_cents INT DEFAULT 0,
+  initiated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  helped_at DATETIME,
+  expires_at DATETIME,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX IF NOT EXISTS idx_helps_initiator ON helps(initiator_id);
+CREATE INDEX IF NOT EXISTS idx_helps_helper ON helps(helper_id);
+CREATE INDEX IF NOT EXISTS idx_helps_status ON helps(status);
+
+-- ==================== 考勤记录表 ====================
+CREATE TABLE IF NOT EXISTS attendance (
+  id VARCHAR(36) PRIMARY KEY,
+  referee_id VARCHAR(36) NOT NULL,
+  user_id VARCHAR(36),
+  venue_id VARCHAR(36) NOT NULL,
+  checkin_at DATETIME NOT NULL,
+  checkout_at DATETIME,
+  gps_lat DOUBLE,
+  gps_lng DOUBLE,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX IF NOT EXISTS idx_attendance_referee ON attendance(referee_id);
+CREATE INDEX IF NOT EXISTS idx_attendance_venue ON attendance(venue_id);
+CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance(checkin_at);
+CREATE INDEX IF NOT EXISTS idx_attendance_user ON attendance(user_id);
+
+-- ==================== 结算记录表 ====================
+CREATE TABLE IF NOT EXISTS settlements (
+  id VARCHAR(36) PRIMARY KEY,
+  order_id VARCHAR(36) NOT NULL,
+  operator_id VARCHAR(36) NOT NULL,
+  amount_cents INT NOT NULL,
+  points_deduction_cents INT NOT NULL DEFAULT 0,
+  commission_cents INT NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  settled_at DATETIME,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX IF NOT EXISTS idx_settlements_operator ON settlements(operator_id);
+CREATE INDEX IF NOT EXISTS idx_settlements_status ON settlements(status);
+
+-- ==================== 营销配置表 ====================
+CREATE TABLE IF NOT EXISTS marketing_config (
+  id VARCHAR(36) PRIMARY KEY,
+  venue_id VARCHAR(36),
+  `key` VARCHAR(64) NOT NULL,
+  value TEXT NOT NULL,
+  description TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE(venue_id, `key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ==================== 系统配置表 ====================
+CREATE TABLE IF NOT EXISTS system_config (
+  id VARCHAR(36) PRIMARY KEY,
+  `key` VARCHAR(64) UNIQUE NOT NULL,
+  value TEXT NOT NULL,
+  description TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ==================== 幂等键表 ====================
+CREATE TABLE IF NOT EXISTS idempotency_keys (
+  id VARCHAR(36) PRIMARY KEY,
+  `key` VARCHAR(128) UNIQUE NOT NULL,
+  response TEXT NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX IF NOT EXISTS idx_idempotency_keys_key ON idempotency_keys(`key`);
+
+-- ==================== 运营商表 ====================
+CREATE TABLE IF NOT EXISTS operators (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(128) NOT NULL,
+  phone VARCHAR(20),
+  email VARCHAR(128),
+  company_name VARCHAR(256),
+  status VARCHAR(20) NOT NULL DEFAULT 'active',
+  venue_count INT DEFAULT 0,
+  total_revenue INT DEFAULT 0,
+  profit_share_rate INT NOT NULL DEFAULT 80,
+  bank_account VARCHAR(64),
+  bank_name VARCHAR(128),
+  contact_person VARCHAR(64),
+  province VARCHAR(64) DEFAULT '',
+  city VARCHAR(64) DEFAULT '',
+  district VARCHAR(64) DEFAULT '',
+  company_address VARCHAR(512) DEFAULT '',
+  contact_phone VARCHAR(20),
+  scope VARCHAR(64),
+  role VARCHAR(32) DEFAULT 'admin',
+  created_by VARCHAR(36),
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ==================== 系统设置表 ====================
+CREATE TABLE IF NOT EXISTS settings (
+  id VARCHAR(36) PRIMARY KEY,
+  setting_key VARCHAR(100) NOT NULL UNIQUE,
+  setting_value TEXT NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ==================== 后台管理员角色表 ====================
+CREATE TABLE IF NOT EXISTS admin_roles (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(64) NOT NULL UNIQUE,
+  label VARCHAR(64) NOT NULL,
+  permissions TEXT NOT NULL DEFAULT '[]',
+  scope VARCHAR(32) NOT NULL DEFAULT 'admin',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ==================== 后台管理员账号表 ====================
+CREATE TABLE IF NOT EXISTS admin_users (
+  id VARCHAR(36) PRIMARY KEY,
+  username VARCHAR(64) NOT NULL UNIQUE,
+  password VARCHAR(256) NOT NULL,
+  nickname VARCHAR(64),
+  email VARCHAR(128) DEFAULT '',
+  phone VARCHAR(20) DEFAULT '',
+  role_id VARCHAR(36) NOT NULL,
+  operator_id VARCHAR(36),
+  first_login INT DEFAULT 1,
+  status VARCHAR(20) NOT NULL DEFAULT 'active',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX IF NOT EXISTS idx_admin_users_username ON admin_users(username);
+CREATE INDEX IF NOT EXISTS idx_admin_users_role ON admin_users(role_id);
+CREATE INDEX IF NOT EXISTS idx_admin_users_operator ON admin_users(operator_id);
+
+-- ==================== 客户端日志表 ====================
+CREATE TABLE IF NOT EXISTS client_logs (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  level VARCHAR(16),
+  message TEXT,
+  source VARCHAR(64),
+  detail TEXT,
+  url VARCHAR(512),
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ==================== 运营商成员表 ====================
+CREATE TABLE IF NOT EXISTS operator_members (
+  id VARCHAR(36) PRIMARY KEY,
+  operator_id VARCHAR(36),
+  name VARCHAR(64),
+  phone VARCHAR(20),
+  password_hash VARCHAR(256),
+  role VARCHAR(32) DEFAULT 'member',
+  status VARCHAR(20) DEFAULT 'active',
+  first_login INT DEFAULT 1,
+  created_at DATETIME,
+  updated_at DATETIME
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ==================== 运营商会话表 ====================
+CREATE TABLE IF NOT EXISTS operator_sessions (
+  id VARCHAR(36) PRIMARY KEY,
+  operator_id VARCHAR(36),
+  member_id VARCHAR(36),
+  member_name VARCHAR(64),
+  token VARCHAR(512),
+  created_at DATETIME,
+  expires_at DATETIME
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ==================== 比赛表 ====================
+CREATE TABLE IF NOT EXISTS races (
+  id VARCHAR(36) PRIMARY KEY,
+  venue_id VARCHAR(36),
+  name VARCHAR(256),
+  status VARCHAR(20) DEFAULT 'draft',
+  max_participants INT,
+  entry_fee INT,
+  start_time DATETIME,
+  end_time DATETIME,
+  operator_id VARCHAR(36),
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted_at DATETIME
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ==================== 比赛记录表 ====================
+CREATE TABLE IF NOT EXISTS race_records (
+  id VARCHAR(36) PRIMARY KEY,
+  race_id VARCHAR(36),
+  player_id VARCHAR(36),
+  score DOUBLE,
+  duration_seconds INT,
+  status VARCHAR(20),
+  started_at DATETIME,
+  finished_at DATETIME,
+  operator_id VARCHAR(36),
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ==================== 比赛签到表 ====================
+CREATE TABLE IF NOT EXISTS race_attendance (
+  id VARCHAR(36) PRIMARY KEY,
+  race_id VARCHAR(36),
+  player_id VARCHAR(36),
+  check_in_at DATETIME,
+  status VARCHAR(20)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ==================== 排队队列表 ====================
+CREATE TABLE IF NOT EXISTS race_queues (
+  id VARCHAR(36) PRIMARY KEY,
+  venue_id VARCHAR(36) NOT NULL,
+  user_id VARCHAR(36) NOT NULL,
+  queue_number INT NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'waiting' COMMENT 'waiting | called | racing | paused | finished | timeout | skipped | forfeit | malfunction | invalid',
+  remaining_races INT NOT NULL DEFAULT 1,
+  avatar_url VARCHAR(512),
+  race_type VARCHAR(64) DEFAULT 'normal' COMMENT 'normal | final',
+  checkin_id VARCHAR(36),
+  referee_id VARCHAR(36),
+  start_time_ms BIGINT,
+  paused_elapsed_ms BIGINT DEFAULT 0,
+  finish_time_ms BIGINT,
+  finish_status VARCHAR(20) COMMENT 'finished | timeout | forfeit | invalid',
+  fault_reason TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX IF NOT EXISTS idx_race_queues_venue ON race_queues(venue_id);
+CREATE INDEX IF NOT EXISTS idx_race_queues_user ON race_queues(user_id);
+CREATE INDEX IF NOT EXISTS idx_race_queues_status ON race_queues(status);
+CREATE INDEX IF NOT EXISTS idx_race_queues_venue_queue ON race_queues(venue_id, queue_number);
+
+-- ==================== 票券兑换表 ====================
+CREATE TABLE IF NOT EXISTS ticket_redemptions (
+  id VARCHAR(36) PRIMARY KEY,
+  ticket_id VARCHAR(36),
+  player_id VARCHAR(36),
+  redeemed_at DATETIME,
+  reward VARCHAR(256),
+  status VARCHAR(20),
+  operator_id VARCHAR(36)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ==================== 赛季表 ====================
+CREATE TABLE IF NOT EXISTS seasons (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(128) NOT NULL,
+  description TEXT DEFAULT '',
+  start_time DATETIME,
+  end_time DATETIME,
+  status INT NOT NULL DEFAULT 0,
+  sort_order INT DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ==================== 赛季用户信息表 ====================
+CREATE TABLE IF NOT EXISTS season_user_info (
+  id VARCHAR(36) PRIMARY KEY,
+  user_id VARCHAR(36) NOT NULL,
+  season_id VARCHAR(36) NOT NULL,
+  level INT NOT NULL DEFAULT 1,
+  exp INT NOT NULL DEFAULT 0,
+  points INT NOT NULL DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE(user_id, season_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX IF NOT EXISTS idx_season_user_info_user ON season_user_info(user_id);
+CREATE INDEX IF NOT EXISTS idx_season_user_info_season ON season_user_info(season_id);
+
+-- ==================== 战斗力表 ====================
+CREATE TABLE IF NOT EXISTS combat_power (
+  id VARCHAR(36) PRIMARY KEY,
+  user_id VARCHAR(36) NOT NULL,
+  total_power INT NOT NULL DEFAULT 0,
+  dimension_1_name VARCHAR(64) DEFAULT '',
+  dimension_1_score INT DEFAULT 0,
+  dimension_2_name VARCHAR(64) DEFAULT '',
+  dimension_2_score INT DEFAULT 0,
+  dimension_3_name VARCHAR(64) DEFAULT '',
+  dimension_3_score INT DEFAULT 0,
+  dimension_4_name VARCHAR(64) DEFAULT '',
+  dimension_4_score INT DEFAULT 0,
+  dimension_5_name VARCHAR(64) DEFAULT '',
+  dimension_5_score INT DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE(user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX IF NOT EXISTS idx_combat_power_user ON combat_power(user_id);
+
+-- ==================== 积分交易记录表 ====================
+CREATE TABLE IF NOT EXISTS points_transactions (
+  id VARCHAR(36) PRIMARY KEY,
+  user_id VARCHAR(36) NOT NULL,
+  points INT NOT NULL,
+  type VARCHAR(32) NOT NULL,
+  remark TEXT DEFAULT '',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX IF NOT EXISTS idx_points_transactions_user ON points_transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_points_transactions_created ON points_transactions(created_at);
+
+-- ==================== 商家优惠券模板表 ====================
+CREATE TABLE IF NOT EXISTS merchant_coupons (
+  id VARCHAR(36) PRIMARY KEY,
+  merchant_id VARCHAR(36) NOT NULL,
+  name VARCHAR(128) NOT NULL,
+  description TEXT DEFAULT '',
+  denomination_cents INT NOT NULL DEFAULT 0,
+  min_consume_cents INT NOT NULL DEFAULT 0,
+  total_count INT NOT NULL DEFAULT 0,
+  remain_count INT NOT NULL DEFAULT 0,
+  valid_start DATETIME,
+  valid_end DATETIME,
+  status INT NOT NULL DEFAULT 1,
+  sort_order INT DEFAULT 0,
+  audit_status INT NOT NULL DEFAULT 0,
+  audit_remark TEXT,
+  audit_time DATETIME,
+  auditor_id VARCHAR(36),
+  version INT DEFAULT 1,
+  put_channels TEXT DEFAULT '{}',
+  coupon_type INT NOT NULL DEFAULT 1,
+  discount_percent INT DEFAULT 0,
+  max_per_user INT NOT NULL DEFAULT 1,
+  available_start DATETIME,
+  available_end DATETIME,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX IF NOT EXISTS idx_merchant_coupons_merchant ON merchant_coupons(merchant_id);
+
+-- ==================== 用户优惠券表 ====================
+CREATE TABLE IF NOT EXISTS user_coupons (
+  id VARCHAR(36) PRIMARY KEY,
+  user_id VARCHAR(36) NOT NULL,
+  coupon_id VARCHAR(36) NOT NULL,
+  merchant_id VARCHAR(36) NOT NULL,
+  name VARCHAR(128) DEFAULT '',
+  description TEXT DEFAULT '',
+  denomination_cents INT NOT NULL DEFAULT 0,
+  min_consume_cents INT NOT NULL DEFAULT 0,
+  status INT NOT NULL DEFAULT 1,
+  used_at DATETIME,
+  valid_start DATETIME,
+  valid_end DATETIME,
+  coupon_type INT DEFAULT 1,
+  discount_percent INT DEFAULT 0,
+  extra_data TEXT DEFAULT '{}',
+  verify_code VARCHAR(64),
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX IF NOT EXISTS idx_user_coupons_user ON user_coupons(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_coupons_status ON user_coupons(status);
+
+-- ==================== 任务模板表 ====================
+CREATE TABLE IF NOT EXISTS tasks (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(128) NOT NULL,
+  description TEXT DEFAULT '',
+  task_type VARCHAR(32) NOT NULL DEFAULT '',
+  target_value TEXT DEFAULT '',
+  reward_type VARCHAR(32) NOT NULL DEFAULT '',
+  reward_value INT NOT NULL DEFAULT 0,
+  status INT NOT NULL DEFAULT 1,
+  sort_order INT DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+
+-- ==================== 用户任务进度表 ====================
+CREATE TABLE IF NOT EXISTS user_tasks (
+  id VARCHAR(36) PRIMARY KEY,
+  user_id VARCHAR(36) NOT NULL,
+  task_id VARCHAR(36) NOT NULL,
+  progress_value TEXT DEFAULT '',
+  status INT NOT NULL DEFAULT 0,
+  rewarded_at DATETIME,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE(user_id, task_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX IF NOT EXISTS idx_user_tasks_user ON user_tasks(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_tasks_status ON user_tasks(status);
+
+-- ==================== 商家表 ====================
+CREATE TABLE IF NOT EXISTS merchants (
+  id VARCHAR(36) PRIMARY KEY,
+  merchant_name VARCHAR(128) NOT NULL,
+  merchant_address VARCHAR(512) DEFAULT '',
+  longitude DOUBLE DEFAULT 0,
+  latitude DOUBLE DEFAULT 0,
+  contact_phone VARCHAR(20) DEFAULT '',
+  logo_url VARCHAR(512) DEFAULT '',
+  status INT NOT NULL DEFAULT 1,
+  operator_id VARCHAR(36),
+  region VARCHAR(64) DEFAULT '',
+  business_hours VARCHAR(128) DEFAULT '',
+  description TEXT,
+  qrcode_url VARCHAR(512) DEFAULT '',
+  audit_status INT NOT NULL DEFAULT 0,
+  audit_remark TEXT,
+  audit_time DATETIME,
+  auditor_id VARCHAR(36),
+  contact_name VARCHAR(64) DEFAULT '',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX IF NOT EXISTS idx_merchants_status ON merchants(status);
+
+-- ==================== 参赛抵扣金表 ====================
+CREATE TABLE IF NOT EXISTS entry_deductions (
+  id VARCHAR(36) PRIMARY KEY,
+  user_id VARCHAR(36) NOT NULL,
+  amount_cents INT NOT NULL DEFAULT 0,
+  source VARCHAR(64) NOT NULL DEFAULT '',
+  status VARCHAR(20) NOT NULL DEFAULT 'available',
+  order_id VARCHAR(36),
+  race_package_id VARCHAR(36),
+  expires_at DATETIME,
+  used_at DATETIME,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX IF NOT EXISTS idx_entry_deductions_user ON entry_deductions(user_id);
+CREATE INDEX IF NOT EXISTS idx_entry_deductions_status ON entry_deductions(status);
+
+-- ==================== 积分商城表 ====================
+CREATE TABLE IF NOT EXISTS point_shop (
+  id VARCHAR(36) PRIMARY KEY,
+  item_type VARCHAR(32) NOT NULL,
+  item_id VARCHAR(36) NOT NULL,
+  name VARCHAR(128) NOT NULL,
+  description TEXT DEFAULT '',
+  need_points INT NOT NULL DEFAULT 0,
+  sort_weight INT DEFAULT 0,
+  status INT NOT NULL DEFAULT 1,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ==================== 通知发送日志表 ====================
+CREATE TABLE IF NOT EXISTS notification_logs (
+  id VARCHAR(36) PRIMARY KEY,
+  scene VARCHAR(64) NOT NULL,
+  user_id VARCHAR(36) NOT NULL,
+  openid VARCHAR(128) NOT NULL,
+  template_id VARCHAR(64),
+  content TEXT,
+  status VARCHAR(16) DEFAULT 'success',
+  error_msg TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX IF NOT EXISTS idx_notification_logs_scene ON notification_logs(scene);
+CREATE INDEX IF NOT EXISTS idx_notification_logs_user ON notification_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_notification_logs_created ON notification_logs(created_at);
+
+-- ==================== 裁判邀请表 ====================
+CREATE TABLE IF NOT EXISTS referee_invites (
+  id VARCHAR(36) PRIMARY KEY,
+  operator_id VARCHAR(36) NOT NULL,
+  phone VARCHAR(20),
+  venue_id VARCHAR(36),
+  token VARCHAR(64) UNIQUE NOT NULL,
+  note TEXT,
+  status ENUM('active','used','expired') DEFAULT 'active',
+  expires_at DATETIME NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_token (token),
+  KEY idx_operator (operator_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ==================== 帮助助力记录表 ====================
+CREATE TABLE IF NOT EXISTS help_helpers (
+  id VARCHAR(36) PRIMARY KEY,
+  help_id VARCHAR(36) NOT NULL,
+  user_id VARCHAR(36) NOT NULL,
+  device_id VARCHAR(128),
+  helped_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX IF NOT EXISTS idx_help_helpers_help ON help_helpers(help_id);
+CREATE INDEX IF NOT EXISTS idx_help_helpers_user ON help_helpers(user_id);
+
+-- ==================== 种子数据 ====================
+
+-- 运营商角色（scope='operator'）
+INSERT IGNORE INTO admin_roles (id, name, label, permissions, scope) VALUES
+  (UUID(), 'op_super_admin', '运营商超管', '["*"]', 'operator'),
+  (UUID(), 'op_admin', '运营', '["venues:read","venues:create","venues:edit","referees:read","referees:create","referees:edit","packages:read","packages:create","packages:edit","marketing:read","marketing:create","marketing:edit","players:read","dashboard:read"]', 'operator'),
+  (UUID(), 'op_finance', '财务', '["finance:read","finance:withdraw","finance:history","dashboard:read"]', 'operator'),
+  (UUID(), 'op_support', '客服', '["players:read","referees:read","venues:read","marketing:read","dashboard:read","rbac:read"]', 'operator');
+
+-- 总部角色（scope='admin'）
+INSERT IGNORE INTO admin_roles (id, name, label, permissions, scope) VALUES
+  (UUID(), 'role-super-admin', '超级管理员', '["*"]', 'admin'),
+  (UUID(), 'role-admin', '总管理员', '["operators:read","operators:list","operators:create","operators:edit","operators:delete","players:list","dashboard:read","dashboard:list","marketing:read","finance:read","finance:withdraw","finance:history"]', 'admin'),
+  (UUID(), 'ops_admin', '运营管理员', '["operators:read","operators:create","operators:edit","players:list","dashboard:read","dashboard:list"]', 'admin'),
+  (UUID(), 'finance_admin', '财务管理员', '["finance:read","finance:withdraw","finance:history"]', 'admin');
+
+-- 默认超管账号 (admin / admin123)
+INSERT IGNORE INTO admin_users (id, username, password, nickname, role_id, first_login, status) VALUES
+  (UUID(), 'admin', '$2b$10$8K1p/a0dL1LXMIgoEDFrwOfMQkf9NcyhLrf2FxoH5dR4PWvP5FhKC', '超级管理员', 'role-super-admin', 0, 'active');
