@@ -11,9 +11,9 @@
     </view>
   </view>
 
-  <!-- 商品网格 -->
+  <!-- 商品列表（一行一个） -->
   <view class="section" wx:if="{{items.length > 0}}">
-    <view class="item-grid">
+    <view class="item-list">
       <view
         wx:for="{{items}}"
         wx:key="id"
@@ -22,18 +22,15 @@
         bindtap="onExchange"
       >
         <view class="card-image-area">
-          <image wx:if="{{item.image}}" class="card-image" src="{{item.image}}" mode="aspectFill" />
+          <image wx:if="{{item.image}}" class="card-image" src="{{item.image}}" mode="aspectFit" />
           <view class="card-type-badge" style="background:{{item._badgeColor}}">{{item._badgeText}}</view>
         </view>
         <view class="card-info">
           <text class="card-name">{{item.name}}</text>
           <text class="card-desc">{{item.description || ''}}</text>
-          <view class="card-meta">
-            <view class="card-points-badge">
-              <text class="card-points-icon">⭐</text>
-              <text>{{item.needPoints}}分</text>
-            </view>
-            <view class="exchange-arrow">→</view>
+          <view class="card-points-badge">
+            <text class="card-points-num">{{item.needPoints}}</text>
+            <text class="card-points-label">积分</text>
           </view>
         </view>
       </view>

@@ -1,62 +1,74 @@
 /* 积分商城 */
 
+page {
+  background: #f0f2f5;
+}
+
 /* 顶部积分条 */
 .user-points-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 40rpx 32rpx;
-  background: linear-gradient(135deg, #1a1a2e 0%, #2a1a3e 100%);
-  border-radius: 0 0 32rpx 32rpx;
-  margin-bottom: 32rpx;
+  padding: 36rpx 32rpx;
+  background: #fff;
+  margin-bottom: 20rpx;
+}
+.points-left {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
 }
 .points-label {
   font-size: 26rpx;
-  color: #a0a0b8;
+  color: #999;
 }
 .points-value {
-  font-size: 64rpx;
+  font-size: 56rpx;
   font-weight: 900;
-  color: #ffd700;
+  color: #e8453c;
   line-height: 1;
 }
 .points-unit {
-  font-size: 28rpx;
-  color: #ffd700;
-  margin-left: 4rpx;
+  font-size: 26rpx;
+  color: #e8453c;
 }
 
-/* 商品格子 */
+/* 单列列表 */
 .section {
   padding: 0 24rpx;
-  margin-bottom: 24rpx;
 }
-.item-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+.item-list {
+  display: flex;
+  flex-direction: column;
   gap: 20rpx;
 }
 
-/* 商品卡片 */
+/* 商品卡片 - 横向布局 */
 .item-card {
-  width: 100%;
-  box-sizing: border-box;
-  background: linear-gradient(180deg, #1e1e36 0%, #1a1a2e 100%);
+  display: flex;
+  background: #fff;
   border-radius: 20rpx;
   overflow: hidden;
-  border: 1rpx solid rgba(255,255,255,0.06);
+  padding: 20rpx;
+  gap: 20rpx;
 }
 .item-card:active {
-  transform: scale(0.97);
+  transform: scale(0.98);
+  opacity: 0.9;
 }
 
-/* 图片区 */
+/* 左侧图片区 */
 .card-image-area {
   position: relative;
-  width: 100%;
+  width: 200rpx;
   height: 200rpx;
+  flex-shrink: 0;
+  background: #f7f8fa;
+  border-radius: 12rpx;
   overflow: hidden;
-  background: linear-gradient(135deg, #252540, #1e1e36);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .card-image {
   width: 100%;
@@ -73,74 +85,54 @@
   font-weight: 500;
 }
 
-/* 卡片信息 */
+/* 右侧信息区 */
 .card-info {
-  padding: 20rpx 20rpx 18rpx;
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 10rpx;
+  justify-content: space-between;
+  min-width: 0;
 }
 .card-name {
-  font-size: 28rpx;
-  font-weight: 700;
-  color: #fff;
-  line-height: 1.3;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #222;
+  line-height: 1.45;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
 }
 .card-desc {
-  font-size: 22rpx;
-  color: #888;
+  font-size: 24rpx;
+  color: #aaa;
   line-height: 1.4;
-  min-height: 32rpx;
+  margin-top: 8rpx;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 1;
   overflow: hidden;
-}
-.card-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 4rpx;
+  min-height: 34rpx;
 }
 .card-points-badge {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 4rpx;
+  margin-top: 12rpx;
+}
+.card-points-num {
+  font-size: 40rpx;
+  font-weight: 800;
+  color: #e8453c;
+  line-height: 1;
+}
+.card-points-label {
   font-size: 24rpx;
-  font-weight: 700;
-  color: #ffd700;
-}
-.card-points-icon {
-  font-size: 22rpx;
-}
-.exchange-arrow {
-  width: 48rpx;
-  height: 48rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 28rpx;
-  color: #e94560;
-  background: rgba(233, 69, 96, 0.1);
-  border-radius: 50%;
-  font-weight: 700;
+  color: #e8453c;
+  font-weight: 500;
 }
 
-/* 隐藏旧样式 */
-.card-value,
-.face-value,
-.card-footer,
-.card-points,
-.card-points-text,
-.exchange-btn {
-  display: none;
-}
-
-/* 弹窗 */
+/* 弹窗 - 保持不变 */
 .modal-mask {
   position: fixed;
   top: 0;
@@ -157,7 +149,7 @@
   top: 50%;
   transform: translate(-50%, -50%);
   width: 580rpx;
-  background: var(--color-bg-card);
+  background: #fff;
   border-radius: 24rpx;
   z-index: 101;
   display: none;
@@ -182,21 +174,21 @@
   font-size: 34rpx;
   font-weight: 700;
   text-align: center;
-  color: var(--color-text);
+  color: #222;
 }
 .modal-body {
   font-size: 28rpx;
-  color: var(--color-text-secondary);
+  color: #666;
   text-align: center;
   line-height: 1.5;
 }
 .highlight {
-  color: var(--color-warning);
+  color: #e8453c;
   font-weight: 700;
 }
 .modal-btns {
   display: flex;
-  border-top: 1rpx solid var(--color-border);
+  border-top: 1rpx solid #eee;
 }
 .modal-btn {
   flex: 1;
@@ -205,17 +197,17 @@
   font-size: 30rpx;
   border-radius: 0;
   background: transparent;
-  color: var(--color-text);
+  color: #333;
 }
 .modal-btn::after {
   border: none;
 }
 .modal-btn-cancel {
-  color: var(--color-text-secondary);
-  border-right: 1rpx solid var(--color-border);
+  color: #999;
+  border-right: 1rpx solid #eee;
 }
 .modal-btn-confirm {
-  color: var(--color-primary);
+  color: #e8453c;
   font-weight: 600;
 }
 .modal-btn[disabled] {
@@ -242,11 +234,6 @@
 }
 
 /* 兑换记录弹窗 */
-.points-left {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-}
 .points-right {
   margin-left: auto;
 }
@@ -260,7 +247,7 @@
   left: 0;
   width: 100%;
   height: 70%;
-  background: var(--color-bg-card);
+  background: #fff;
   border-radius: 32rpx 32rpx 0 0;
   z-index: 101;
   display: none;
@@ -274,12 +261,12 @@
   align-items: center;
   justify-content: space-between;
   padding: 32rpx 32rpx 16rpx;
-  border-bottom: 1rpx solid var(--color-border);
+  border-bottom: 1rpx solid #eee;
 }
 .records-modal-title {
   font-size: 32rpx;
   font-weight: 700;
-  color: var(--color-text);
+  color: #222;
 }
 .records-filter-btn {
   font-size: 24rpx;
@@ -299,7 +286,7 @@
   align-items: center;
   gap: 16rpx;
   padding: 20rpx 0;
-  border-bottom: 1rpx solid rgba(255,255,255,0.05);
+  border-bottom: 1rpx solid #f0f0f0;
 }
 .records-item-info {
   flex: 1;
@@ -309,11 +296,11 @@
 }
 .records-item-name {
   font-size: 28rpx;
-  color: var(--color-text);
+  color: #333;
 }
 .records-item-time {
   font-size: 22rpx;
-  color: var(--color-text-light);
+  color: #bbb;
 }
 .records-item-points {
   font-size: 28rpx;
@@ -325,15 +312,15 @@
   display: flex;
   justify-content: center;
   padding: 80rpx 0;
-  color: var(--color-text-light);
+  color: #bbb;
   font-size: 28rpx;
 }
 .records-close-btn {
   text-align: center;
   padding: 24rpx;
   font-size: 30rpx;
-  color: var(--color-text-secondary);
-  border-top: 1rpx solid var(--color-border);
+  color: #999;
+  border-top: 1rpx solid #eee;
 }
 
 /* 空状态 */
@@ -350,12 +337,12 @@
 .empty-title {
   font-size: 30rpx;
   font-weight: 600;
-  color: var(--color-text);
+  color: #333;
   margin-bottom: 8rpx;
 }
 .empty-desc {
   font-size: 26rpx;
-  color: var(--color-text-light);
+  color: #bbb;
 }
 
 /* ========== 实物礼品详情浮层 ========== */
@@ -372,7 +359,7 @@
 .detail-panel {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: var(--color-bg, #0f0f23);
+  background: #0f0f23;
   z-index: 210;
   display: flex;
   flex-direction: column;
