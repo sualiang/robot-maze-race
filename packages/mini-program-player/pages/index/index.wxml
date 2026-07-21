@@ -7,12 +7,9 @@
   <!-- ============================================================ -->
   <!-- 模块1: 顶部导航栏 -->
   <!-- ============================================================ -->
-  <view class="top-nav">
-    <text class="top-nav-title">铁甲快狗</text>
-    <view wx:if="{{venueName}}" class="top-nav-venue">
-      <text class="top-nav-venue-icon">📍</text>
-      <text class="top-nav-venue-name">{{venueName}}</text>
-    </view>
+  <view class="top-nav" wx:if="{{venueName}}">
+    <text class="top-nav-venue-icon">📍</text>
+    <text class="top-nav-venue-name">{{venueName}}</text>
   </view>
 
   <!-- ============================================================ -->

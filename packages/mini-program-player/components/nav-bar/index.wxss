@@ -7,12 +7,16 @@
   background: #0f0f23;
 }
 .nav-inner {
+  position: relative;
   display: flex;
   align-items: center;
+  justify-content: center;
   height: 88rpx;
   padding: 0 32rpx;
 }
 .nav-logo {
+  position: absolute;
+  left: 32rpx;
   height: 44rpx;
   width: auto;
 }
