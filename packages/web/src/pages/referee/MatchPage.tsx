@@ -83,6 +83,10 @@ export default function MatchPage() {
     checkedInRef.current = checkedIn;
     const wasIn = prevCheckedInRef.current;
     prevCheckedInRef.current = checkedIn;
+    // 大屏恢复连接 自动关闭弹窗
+    if (wsConnected && checkedIn === true && showDcAlert) {
+      setShowDcAlert(false);
+    }
     if (wasIn === true && checkedIn === false) {
       clearTimer();
       setQueue([]);
@@ -418,24 +422,18 @@ export default function MatchPage() {
       {showDcAlert && (
         <div style={{
           position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
-          background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999,
-        }} onClick={() => setShowDcAlert(false)}>
+          background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999,
+        }}>
           <div style={{
             width: '80%', maxWidth: 360, padding: 28, background: '#fff', borderRadius: 12, textAlign: 'center',
-          }} onClick={(e) => e.stopPropagation()}>
+          }}>
             <div style={{ fontSize: 48, marginBottom: 12 }}>🔌</div>
             <div style={{ fontSize: 18, fontWeight: 700, color: '#333', marginBottom: 8 }}>大屏未连接</div>
             <div style={{ fontSize: 14, color: '#666', lineHeight: 1.6, marginBottom: 20 }}>大屏已掉线或关闭<br/>请前往签到页重新激活赛场</div>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button
-                style={{ flex: 1, padding: '10px 0', border: '1px solid #ddd', borderRadius: 8, background: '#f5f5f5', color: '#333', fontSize: 14, cursor: 'pointer' }}
-                onClick={() => setShowDcAlert(false)}
-              >知道了</button>
-              <button
-                style={{ flex: 1, padding: '10px 0', border: 'none', borderRadius: 8, background: '#27ae60', color: '#fff', fontSize: 14, cursor: 'pointer' }}
-                onClick={() => { setShowDcAlert(false); navigate('/referee/attendance'); }}
-              >前往签到</button>
-            </div>
+            <button
+              style={{ width: '100%', padding: '12px 0', border: 'none', borderRadius: 8, background: '#27ae60', color: '#fff', fontSize: 15, fontWeight: 600, cursor: 'pointer' }}
+              onClick={() => navigate('/referee/attendance')}
+            >前往签到页激活</button>
           </div>
         </div>
       )}
