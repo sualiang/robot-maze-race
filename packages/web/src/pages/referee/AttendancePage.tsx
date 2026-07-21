@@ -264,9 +264,8 @@ export default function AttendancePage() {
             </div>
             <div style={{ display: 'flex', gap: 12 }}>
               <button
-                className="referee-btn referee-btn-ghost"
                 onClick={() => setShowClearConfirm(false)}
-                style={{ flex: 1 }}
+                style={{ flex: 1, background: '#fff', color: '#333', border: '1px solid #d9d9d9', borderRadius: 8, padding: '10px 0', fontSize: 15, cursor: 'pointer' }}
               >取消</button>
               <button
                 className="referee-btn"
