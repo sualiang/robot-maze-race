@@ -40,6 +40,12 @@ export default function ProfilePage() {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
   const [historyDate, setHistoryDate] = useState(new Date().toISOString().split('T')[0]);
   const [historyRecords, setHistoryRecords] = useState<AttendanceRecord[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -178,7 +184,7 @@ export default function ProfilePage() {
           <div style={{ fontSize: 14, color: 'var(--ref-text-dim)', textAlign: 'center', padding: 20 }}>暂无签到记录</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {records.slice(0, 10).map((r) => (
+            {records.slice(0, 5).map((r) => (
               <div key={r.id} style={{
                 display: 'flex', alignItems: 'flex-start',
                 padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.04)',
@@ -202,6 +208,11 @@ export default function ProfilePage() {
 
       {/* 功能按钮区 */}
       <div className="referee-card" style={{ padding: 16, marginTop: 16 }}>
+        <button
+          className="referee-btn"
+          style={{ width: '100%', background: '#1890ff', color: '#fff', marginBottom: 12 }}
+          onClick={() => { setShowPasswordModal(true); setPasswordError(''); setOldPassword(''); setNewPassword(''); setConfirmPassword(''); }}
+        >🔑 修改密码</button>
         <button
           className="referee-btn"
           style={{ width: '100%', background: '#e74c3c', color: '#fff' }}
@@ -268,6 +279,71 @@ export default function ProfilePage() {
               style={{ width: '100%', marginTop: 12, padding: '10px 0', border: '1px solid #ddd', borderRadius: 8, background: '#f5f5f5', color: '#333', fontSize: 14, cursor: 'pointer' }}
               onClick={() => setShowHistoryModal(false)}
             >关闭</button>
+          </div>
+        </div>
+      )}
+
+      {/* 修改密码弹窗 */}
+      {showPasswordModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+          background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999,
+        }} onClick={() => setShowPasswordModal(false)}>
+          <div style={{
+            width: '85%', maxWidth: 380, padding: 24, background: '#fff', borderRadius: 12,
+          }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#333', marginBottom: 16 }}>🔑 修改密码</div>
+            {passwordError && <div style={{ fontSize: 13, color: '#e74c3c', marginBottom: 12, background: '#fff5f5', padding: '8px 12px', borderRadius: 6 }}>{passwordError}</div>}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <input
+                type="password"
+                placeholder="请输入旧密码"
+                value={oldPassword}
+                onChange={(e) => setOldPassword(e.target.value)}
+                style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14, outline: 'none' }}
+              />
+              <input
+                type="password"
+                placeholder="请输入新密码（8位以上，含大小写字母+数字）"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14, outline: 'none' }}
+              />
+              <input
+                type="password"
+                placeholder="请再次输入新密码"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14, outline: 'none' }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
+              <button
+                style={{ flex: 1, padding: '10px 0', border: '1px solid #ddd', borderRadius: 8, background: '#f5f5f5', color: '#333', fontSize: 14, cursor: 'pointer' }}
+                onClick={() => setShowPasswordModal(false)}
+              >取消</button>
+              <button
+                style={{ flex: 1, padding: '10px 0', border: 'none', borderRadius: 8, background: '#1890ff', color: '#fff', fontSize: 14, cursor: 'pointer' }}
+                onClick={async () => {
+                  setPasswordError('');
+                  if (!oldPassword) { setPasswordError('请输入旧密码'); return; }
+                  if (!newPassword) { setPasswordError('请输入新密码'); return; }
+                  if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(newPassword)) { setPasswordError('密码需至少8位，包含大小写字母和数字'); return; }
+                  if (newPassword !== confirmPassword) { setPasswordError('两次输入的新密码不一致'); return; }
+                  setPasswordLoading(true);
+                  try {
+                    await api.post('/auth/member/change-password', { oldPassword, newPassword });
+                    setShowPasswordModal(false);
+                    alert('密码修改成功');
+                  } catch (e: any) {
+                    setPasswordError(e?.message || '修改失败，请检查旧密码是否正确');
+                  } finally {
+                    setPasswordLoading(false);
+                  }
+                }}
+                disabled={passwordLoading}
+              >{passwordLoading ? '修改中...' : '确认修改'}</button>
+            </div>
           </div>
         </div>
       )}
