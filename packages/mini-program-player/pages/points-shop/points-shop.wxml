@@ -11,12 +11,11 @@
     </view>
   </view>
 
-  <!-- 所有商品（参赛抵扣卡 + 商家消费券/实物） -->
-  <view class="section" wx:if="{{entryItems.length > 0 || couponItems.length > 0}}">
+  <!-- 商品网格 -->
+  <view class="section" wx:if="{{items.length > 0}}">
     <view class="item-grid">
-      <!-- 参赛抵扣金区块 -->
       <view
-        wx:for="{{entryItems}}"
+        wx:for="{{items}}"
         wx:key="id"
         class="item-card"
         data-id="{{item.id}}"
@@ -24,31 +23,7 @@
       >
         <view class="card-image-area">
           <image wx:if="{{item.image}}" class="card-image" src="{{item.image}}" mode="aspectFill" />
-          <view class="card-type-badge badge-entry">参赛抵扣</view>
-        </view>
-        <view class="card-info">
-          <text class="card-name">{{item.name}}</text>
-          <text class="card-desc">{{item.description || ''}}</text>
-          <view class="card-meta">
-            <view class="card-points-badge">
-              <text class="card-points-icon">⭐</text>
-              <text>{{item.needPoints}}分</text>
-            </view>
-            <view class="exchange-arrow">→</view>
-          </view>
-        </view>
-      </view>
-      <!-- 商家消费券/实物礼品区块 -->
-      <view
-        wx:for="{{couponItems}}"
-        wx:key="id"
-        class="item-card"
-        data-id="{{item.id}}"
-        bindtap="onExchange"
-      >
-        <view class="card-image-area">
-          <image wx:if="{{item.image}}" class="card-image" src="{{item.image}}" mode="aspectFill" />
-          <view class="card-type-badge badge-coupon">消费券</view>
+          <view class="card-type-badge">实物礼品</view>
         </view>
         <view class="card-info">
           <text class="card-name">{{item.name}}</text>
@@ -66,7 +41,7 @@
   </view>
 
   <!-- 空状态 -->
-  <view wx:if="{{entryItems.length === 0 && couponItems.length === 0}}" class="empty-state">
+  <view wx:if="{{items.length === 0}}" class="empty-state">
     <text class="empty-icon">🛍️</text>
     <text class="empty-title">积分商城</text>
     <text class="empty-desc">暂无兑换商品</text>
@@ -126,7 +101,6 @@
         <text class="detail-points-icon">⭐</text>
         <text class="detail-points-text">需要 {{detailItem.needPoints}} 积分</text>
       </view>
-      <!-- 兑换提醒 -->
       <view class="detail-reminder">
         <text class="detail-reminder-title">⚠️ 兑换提醒</text>
         <text class="detail-reminder-text">积分兑换礼品</text>

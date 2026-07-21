@@ -4,9 +4,8 @@ var request = require('../../utils/request');
 Page({
   data: {
     userPoints: 0,
-    entryItems: [],
-    couponItems: [],
-    // 老弹窗（抵扣卡/消费券）
+    items: [],
+    // 兑换弹窗
     showConfirm: false,
     targetItem: null,
     exchanging: false,
@@ -40,10 +39,7 @@ Page({
         var userPoints = res.userPoints || 0;
         that.setData({
           userPoints: userPoints,
-          entryItems: items.filter(function (i) { return i.itemType === 'entry_deduction'; }),
-          couponItems: items.filter(function (i) {
-            return i.itemType === 'merchant_coupon' || i.itemType === 'physical_gift';
-          })
+          items: items
         });
       }
     }).catch(function (e) {
@@ -54,10 +50,10 @@ Page({
   // ==== 商品卡片点击 ====
   onExchange: function (e) {
     var id = e.currentTarget.dataset.id;
-    var allItems = this.data.entryItems.concat(this.data.couponItems);
+    var items = this.data.items;
     var item = null;
-    for (var i = 0; i < allItems.length; i++) {
-      if (allItems[i].id === id) { item = allItems[i]; break; }
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].id === id) { item = items[i]; break; }
     }
     if (!item) return;
     if (this.data.userPoints < item.needPoints) {
@@ -65,7 +61,7 @@ Page({
       return;
     }
 
-    // physical_gift → 打开详情浮层
+    // 实物礼品 → 打开详情浮层
     if (item.itemType === 'physical_gift') {
       this.setData({ showDetail: true, detailItem: item });
       return;
@@ -115,7 +111,6 @@ Page({
   },
 
   onRedeemCodeInput: function (e) {
-    // 限制4位数字
     var val = (e.detail.value || '').replace(/[^0-9]/g, '').slice(0, 4);
     this.setData({ redeemCodeInput: val });
   },
@@ -133,7 +128,6 @@ Page({
       redeemCode: code
     }).then(function (res) {
       that.setData({ redeeming: false });
-      // request.js 在 code===0 时 resolve(body.data)，所以 res 已经有 exchangeId/itemName 表示成功
       if (res && res.exchangeId) {
         var needPoints = (res.needPoints) || item.needPoints || 0;
         that.setData({

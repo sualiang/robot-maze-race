@@ -71,12 +71,7 @@
   border-radius: 20rpx;
   color: #fff;
   font-weight: 500;
-}
-.badge-entry {
   background: rgba(233, 69, 96, 0.85);
-}
-.badge-coupon {
-  background: rgba(83, 52, 131, 0.85);
 }
 
 /* 卡片信息 */
