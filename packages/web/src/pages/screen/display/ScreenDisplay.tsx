@@ -36,6 +36,33 @@ export default function ScreenDisplay() {
   const [searchParams] = useSearchParams();
   const venueId = searchParams.get('venueId') || '';
   const urlVenueName = searchParams.get('venueName') || '';
+  const theme = searchParams.get('theme') || 'dark'; // 'dark' | 'light'
+  const isLight = theme === 'light';
+
+  // 配色方案
+  const colors = {
+    bg: isLight ? '#ffffff' : '#0a0a1a',
+    containerBg: isLight ? '#ffffff' : 'linear-gradient(135deg, #0a0a1a 0%, #1a1040 50%, #0d0d2b 100%)',
+    cardBg: isLight ? '#f5f5f5' : 'rgba(255,255,255,0.05)',
+    text: isLight ? '#1a1a1a' : '#fff',
+    textSecondary: '#888',
+    textTertiary: '#666',
+    timerActive: isLight ? '#e65100' : '#ff6b35',
+    timerInactive: isLight ? '#ccc' : '#444',
+    border: isLight ? '#e0e0e0' : 'rgba(255,255,255,0.08)',
+    topbarBg: isLight ? '#fafafa' : 'rgba(255,255,255,0.03)',
+    topbarDivider: isLight ? '#e0e0e0' : 'rgba(255,255,255,0.1)',
+    goldHighlight: isLight ? '#b8860b' : '#ffd700',
+    chartTitle: isLight ? '#1a1a1a' : '#fff',
+    overlayBg: isLight ? '#ffffff' : '#0a0a1a',
+    overlayText: isLight ? '#1a1a1a' : '#fff',
+    overlaySubText: isLight ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.5)',
+    overlayDotText: isLight ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.3)',
+    fullscreenBtnBg: isLight ? '#f0f0f0' : 'rgba(255,255,255,0.08)',
+    fullscreenBtnBorder: isLight ? '#d0d0d0' : 'rgba(255,255,255,0.2)',
+    fullscreenBtnColor: isLight ? '#333' : '#fff',
+    fullscreenBtnHover: isLight ? '#e0e0e0' : 'rgba(255,255,255,0.15)',
+  };
 
   // 激活状态跟踪：不再依赖 sessionStorage，由 WS screen_data 的 venue_status 决定
   const [isActivated, setIsActivated] = useState(false);
@@ -343,6 +370,7 @@ export default function ScreenDisplay() {
 
   // 注入全局样式覆盖：大屏全屏时去掉 #root 的背景/边框/宽度限制
   useEffect(() => {
+    const bg = isLight ? '#ffffff' : '#0a0a1a';
     const style = document.createElement('style');
     style.id = 'screen-display-override';
     style.textContent = `
@@ -358,7 +386,7 @@ export default function ScreenDisplay() {
       body {
         margin: 0 !important;
         padding: 0 !important;
-        background: #0a0a1a !important;
+        background: ${bg} !important;
       }
       /* 大屏全局文字截断：最多一行，超出显示… */
       .screen-display * {
@@ -386,15 +414,15 @@ export default function ScreenDisplay() {
     `;
     document.head.appendChild(style);
     return () => { const s = document.getElementById('screen-display-override'); if (s) s.remove(); };
-  }, []);
+  }, [isLight]);
 
   return (
-    <div className="screen-display" style={{ height: '100vh', width: '100vw', background: 'linear-gradient(135deg, #0a0a1a 0%, #1a1040 50%, #0d0d2b 100%)', fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", color: '#fff', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+    <div className="screen-display" style={{ height: '100vh', width: '100vw', background: colors.containerBg, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", color: colors.text, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
       {/* 赛场未激活状态 */}
       {!isActivated && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: '#0a0a1a', zIndex: 9999,
+          background: colors.overlayBg, zIndex: 9999,
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           gap: 24,
         }}>
@@ -412,20 +440,20 @@ export default function ScreenDisplay() {
                 fontSize: 72, fontFamily: 'monospace', fontWeight: 800,
                 letterSpacing: 16, color: '#ff6b35', paddingLeft: 16,
               }}>{activationCode}</div>
-              <div style={{ fontSize: 18, color: 'rgba(255,255,255,0.5)', letterSpacing: 1 }}>
+              <div style={{ fontSize: 18, color: colors.overlaySubText, letterSpacing: 1 }}>
                 裁判输入上方激活码激活大屏
               </div>
             </>
           ) : (
             <>
-              <div style={{ fontSize: 32, fontWeight: 700, color: '#fff' }}>赛场未激活</div>
-              <div style={{ fontSize: 18, color: 'rgba(255,255,255,0.5)', letterSpacing: 1 }}>
+              <div style={{ fontSize: 32, fontWeight: 700, color: colors.overlayText }}>赛场未激活</div>
+              <div style={{ fontSize: 18, color: colors.overlaySubText, letterSpacing: 1 }}>
                 等待裁判签到激活…
               </div>
             </>
           )}
           {connected && (
-            <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.3)' }}>
+            <div style={{ fontSize: 14, color: colors.overlayDotText }}>
               已连接，等待裁判扫码
             </div>
           )}
@@ -442,8 +470,8 @@ export default function ScreenDisplay() {
       {/* 顶栏 */}
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        padding: '20px 48px', borderBottom: '1px solid rgba(255,255,255,0.1)',
-        background: 'rgba(255,255,255,0.03)',
+        padding: '20px 48px', borderBottom: `1px solid ${colors.topbarDivider}`,
+        background: colors.topbarBg,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <img src="/iron-dog-logo.png" alt="铁甲快狗" style={{ height: 50, width: 'auto' }} />
@@ -464,12 +492,12 @@ export default function ScreenDisplay() {
               }
             }}
             style={{
-              background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)',
-              color: '#fff', borderRadius: 8, padding: '4px 12px', fontSize: 13,
+              background: colors.fullscreenBtnBg, border: `1px solid ${colors.fullscreenBtnBorder}`,
+              color: colors.fullscreenBtnColor, borderRadius: 8, padding: '4px 12px', fontSize: 13,
               cursor: 'pointer', marginLeft: 12, transition: 'all 0.2s',
             }}
-            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+            onMouseEnter={e => e.currentTarget.style.background = colors.fullscreenBtnHover}
+            onMouseLeave={e => e.currentTarget.style.background = colors.fullscreenBtnBg}
           >⛶ 全屏</button>
         </div>
       </div>
@@ -484,12 +512,12 @@ export default function ScreenDisplay() {
               ? 'linear-gradient(135deg, rgba(255,215,0,0.25), rgba(255,215,0,0.1))'
               : (isRacing
                 ? 'linear-gradient(135deg, rgba(255,107,53,0.2), rgba(255,154,60,0.1))'
-                : 'rgba(255,255,255,0.05)'),
+                : colors.cardBg),
             borderRadius: 20, padding: '40px 32px',
             textAlign: 'center',
             border: highlightTime
               ? '2px solid rgba(255,215,0,0.6)'
-              : (isRacing ? '2px solid rgba(255,107,53,0.5)' : '1px solid rgba(255,255,255,0.1)'),
+              : (isRacing ? '2px solid rgba(255,107,53,0.5)' : `1px solid ${colors.border}`),
             boxShadow: highlightTime
               ? '0 0 50px rgba(255,215,0,0.3)'
               : (isRacing ? '0 0 40px rgba(255,107,53,0.2)' : 'none'),
@@ -499,7 +527,7 @@ export default function ScreenDisplay() {
             {!highlightTime && (
               <div style={{
                 fontSize: 16, marginBottom: 8,
-                color: '#888',
+                color: colors.textSecondary,
               }}>
                 <ClockCircleOutlined /> 当前选手
               </div>
@@ -522,9 +550,9 @@ export default function ScreenDisplay() {
                 <span style={{ fontSize: 40, lineHeight: 1, marginRight: 4 }}>🏆</span>
                 {/* 选手名字 */}
                 <div className="text-one-line" style={{
-                  fontSize: 36, fontWeight: 700, color: '#ffd700',
+                  fontSize: 36, fontWeight: 700, color: colors.goldHighlight,
                   fontFamily: 'monospace',
-                  textShadow: '0 0 20px rgba(255,215,0,0.5)',
+                  textShadow: `0 0 20px ${isLight ? 'rgba(184,134,11,0.3)' : 'rgba(255,215,0,0.5)'}`,
                   maxWidth: 400,
                 }}>
                   {displayData.last_result?.racerName || ''}
@@ -548,7 +576,7 @@ export default function ScreenDisplay() {
               </div>
             )}
             {!isRacing && !highlightTime && !isOnArena && !forfeitMessage && (
-              <div style={{ fontSize: 32, fontWeight: 500, color: '#666' }}>
+              <div style={{ fontSize: 32, fontWeight: 500, color: colors.textTertiary }}>
                 等待参赛...
               </div>
             )}
@@ -558,9 +586,9 @@ export default function ScreenDisplay() {
               letterSpacing: -2,
               fontVariantNumeric: 'tabular-nums',
               lineHeight: 1.2,
-              color: highlightTime ? '#ffd700' : (isRacing ? '#ff6b35' : '#444'),
+              color: highlightTime ? colors.goldHighlight : (isRacing ? colors.timerActive : colors.timerInactive),
               textShadow: highlightTime
-                ? '0 0 40px rgba(255,215,0,0.7)'
+                ? `0 0 40px ${isLight ? 'rgba(184,134,11,0.5)' : 'rgba(255,215,0,0.7)'}`
                 : (isRacing ? '0 0 30px rgba(255,107,53,0.5)' : 'none'),
               transition: 'all 0.3s ease',
               animation: highlightTime ? 'highlightPulse 1.5s ease-in-out infinite' : 'none',
@@ -577,13 +605,13 @@ export default function ScreenDisplay() {
 
           {/* 排队列表 */}
           <div style={{
-            background: 'rgba(255,255,255,0.05)', borderRadius: 16,
+            background: colors.cardBg, borderRadius: 16,
             padding: 20, flex: 1,
-            border: '1px solid rgba(255,255,255,0.08)',
+            border: `1px solid ${colors.border}`,
             display: 'flex', flexDirection: 'column',
           }}>
             <div style={{ fontSize: 20, fontWeight: 600, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <UserOutlined /> 等待队列 <span style={{ fontSize: 14, color: '#888' }}>({displayData.queue.length}人)</span>
+              <UserOutlined /> 等待队列 <span style={{ fontSize: 14, color: colors.textSecondary }}>({displayData.queue.length}人)</span>
             </div>
             {displayData.queue.length > 0 ? (
               <>
@@ -613,7 +641,7 @@ export default function ScreenDisplay() {
                         marginBottom: 0,
                       }}>👇 下一个</div>
                     ) : (
-                      <div style={{ fontSize: 12, color: '#666', marginBottom: 0 }}>&nbsp;</div>
+                      <div style={{ fontSize: 12, color: colors.textTertiary, marginBottom: 0 }}>&nbsp;</div>
                     )}
                     <div style={{ fontSize: 17, fontWeight: 600, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', wordBreak: 'break-all' }}>{q.nickname}</div>
                   </div>
@@ -641,35 +669,37 @@ export default function ScreenDisplay() {
 
         {/* 右侧：排行榜 */}
         <div style={{
-          flex: '0 0 40%', background: 'rgba(255,255,255,0.05)',
+          flex: '0 0 40%', background: colors.cardBg,
           borderRadius: 16, padding: 24,
-          border: '1px solid rgba(255,255,255,0.08)',
+          border: `1px solid ${colors.border}`,
         }}>
           <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <TrophyOutlined style={{ color: '#ffd700' }} /> 本场实时排行榜
-            <span style={{ fontSize: 14, fontWeight: 400, color: 'rgba(255,255,255,0.5)' }}>
+            <TrophyOutlined style={{ color: colors.goldHighlight }} /> 本场实时排行榜
+            <span style={{ fontSize: 14, fontWeight: 400, color: colors.textSecondary }}>
               （{new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })}）
             </span>
           </div>
           {displayData.leaderboard.length > 0 ? (
             <div>
               {/* 表头 */}
-              <div style={{ display: 'flex', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.1)', fontSize: 14, color: '#888', fontWeight: 500 }}>
+              <div style={{ display: 'flex', padding: '8px 0', borderBottom: `1px solid ${colors.border}`, fontSize: 14, color: colors.textSecondary, fontWeight: 500 }}>
                 <div style={{ width: 50 }}>排名</div>
                 <div style={{ flex: 1, textAlign: 'left', paddingLeft: 20 }}>选手</div>
                 <div style={{ width: 120, textAlign: 'left' }}>用时</div>
               </div>
               {displayData.leaderboard.slice(0, 10).map((entry, i) => {
                 const rankColors: Record<number, string> = {
-                  1: '#ffd700', 2: '#c0c0c0', 3: '#cd7f32',
+                  1: colors.goldHighlight, 2: '#c0c0c0', 3: '#cd7f32',
                 };
                 const bgColors: Record<number, string> = {
-                  1: 'rgba(255,215,0,0.08)', 2: 'rgba(192,192,192,0.06)', 3: 'rgba(205,127,50,0.06)',
+                  1: isLight ? 'rgba(184,134,11,0.08)' : 'rgba(255,215,0,0.08)',
+                  2: isLight ? 'rgba(192,192,192,0.08)' : 'rgba(192,192,192,0.06)',
+                  3: isLight ? 'rgba(205,127,50,0.08)' : 'rgba(205,127,50,0.06)',
                 };
                 return (
                   <div key={i} style={{
                     display: 'flex', padding: '10px 0',
-                    borderBottom: '1px solid rgba(255,255,255,0.12)',
+                    borderBottom: `1px solid ${colors.border}`,
                     alignItems: 'center',
                     background: bgColors[entry.rank],
                     borderRadius: i < 3 ? 6 : 0,
@@ -679,7 +709,7 @@ export default function ScreenDisplay() {
                   }}>
                     <div style={{
                       width: 50, fontSize: 20, fontWeight: 700,
-                      color: rankColors[entry.rank] || '#fff',
+                      color: rankColors[entry.rank] || colors.text,
                     }}>
                       {entry.rank <= 3 ? ['🥇', '🥈', '🥉'][entry.rank - 1] : entry.rank}
                     </div>
@@ -689,7 +719,7 @@ export default function ScreenDisplay() {
                     <div style={{
                       width: 120, fontSize: 16, textAlign: 'right',
                       fontFamily: 'monospace',
-                      color: entry.rank <= 3 ? '#ffd700' : '#aaa',
+                      color: entry.rank <= 3 ? colors.goldHighlight : colors.textSecondary,
                     }}>
                       {formatTimeMs(entry.finish_time_ms)}
                     </div>

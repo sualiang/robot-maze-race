@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Card, Table, Button, Space, Tag, Modal, Form, Input, InputNumber, Select, Tabs, message, Popconfirm, Cascader } from 'antd';
+import { Card, Table, Button, Space, Tag, Modal, Form, Input, InputNumber, Select, Tabs, message, Popconfirm, Cascader, Segmented } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined, EditOutlined, ReloadOutlined, StopOutlined, PlayCircleOutlined, UserSwitchOutlined, MonitorOutlined, QrcodeOutlined, DownloadOutlined } from '@ant-design/icons';
 import { VenueStatus } from '@robot-race/shared';
@@ -78,6 +78,11 @@ function VenueTab() {
   const [qrcodeVenue, setQrcodeVenue] = useState<VenueItem | null>(null);
   const [qrcodeImage, setQrcodeImage] = useState('');
   const [qrcodeLoading, setQrcodeLoading] = useState(false);
+
+  // 大屏链接弹窗
+  const [screenModalOpen, setScreenModalOpen] = useState(false);
+  const [screenVenue, setScreenVenue] = useState<VenueItem | null>(null);
+  const [screenTheme, setScreenTheme] = useState<'indoor' | 'outdoor'>('indoor');
 
   // 绑定裁判员
   const [bindRefereeModalOpen, setBindRefereeModalOpen] = useState(false);
@@ -241,48 +246,15 @@ function VenueTab() {
   };
 
   const handleScreenUrl = (record: VenueItem) => {
-    const url = `https://dog.amberrobot.com.cn/screen?venueId=${record.id}&venueName=${encodeURIComponent(record.name)}`;
-    const modal = Modal.info({
-      title: `现场大屏 — ${record.name}`,
-      content: (
-        <div>
-          <p style={{ marginBottom: 12, color: '#333' }}>大屏激活流程：</p>
-          <ol style={{ paddingLeft: 20, marginBottom: 12, color: '#666', lineHeight: 2 }}>
-            <li>浏览器打开下方地址，进入大屏登录页</li>
-            <li>页面自动生成 <strong style={{ color: '#ff6b35' }}>6位数字激活码</strong></li>
-            <li>裁判员在裁判端输入该激活码完成绑定</li>
-            <li>激活后大屏自动跳转至赛场画面</li>
-          </ol>
-          <div style={{
-            background: '#f5f5f5',
-            padding: '8px 12px',
-            borderRadius: 6,
-            wordBreak: 'break-all',
-            fontSize: 13,
-            marginBottom: 12,
-          }}>{url}</div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Button
-              type="primary"
-              onClick={() => {
-                navigator.clipboard.writeText(url).then(() => {
-                  message.success('链接已复制');
-                  modal.destroy();
-                });
-              }}
-            >
-              复制链接
-            </Button>
-            <Button onClick={() => window.open(url, '_blank')}>
-              打开大屏
-            </Button>
-          </div>
-        </div>
-      ),
-      okText: '关闭',
-      onOk: () => modal.destroy(),
-    });
+    setScreenVenue(record);
+    setScreenTheme('indoor');
+    setScreenModalOpen(true);
   };
+
+  const screenBaseUrl = screenVenue
+    ? `https://dog.amberrobot.com.cn/screen?venueId=${screenVenue.id}&venueName=${encodeURIComponent(screenVenue.name)}`
+    : '';
+  const screenDisplayUrl = screenTheme === 'outdoor' ? `${screenBaseUrl}&theme=light` : screenBaseUrl;
 
   const handleVenueQrcode = async (record: VenueItem) => {
     setQrcodeVenue(record);
@@ -486,6 +458,60 @@ function VenueTab() {
             label: `${r.name}（${r.phone || '无电话'}）`,
           }))}
         />
+      </Modal>
+
+      {/* 大屏链接弹窗 */}
+      <Modal
+        title={screenVenue ? `现场大屏 — ${screenVenue.name}` : '现场大屏'}
+        open={screenModalOpen}
+        onCancel={() => setScreenModalOpen(false)}
+        footer={
+          <Button onClick={() => setScreenModalOpen(false)}>关闭</Button>
+        }
+        width={540}
+      >
+        <p style={{ marginBottom: 12, color: '#333' }}>大屏激活流程：</p>
+        <ol style={{ paddingLeft: 20, marginBottom: 12, color: '#666', lineHeight: 2 }}>
+          <li>浏览器打开下方地址，进入大屏登录页</li>
+          <li>页面自动生成 <strong style={{ color: '#ff6b35' }}>6位数字激活码</strong></li>
+          <li>裁判员在裁判端输入该激活码完成绑定</li>
+          <li>激活后大屏自动跳转至赛场画面</li>
+        </ol>
+        <div style={{ marginBottom: 12 }}>
+          <span style={{ marginRight: 8, color: '#333' }}>显示模式：</span>
+          <Segmented
+            options={[
+              { label: '🏠 室内', value: 'indoor' },
+              { label: '☀️ 室外', value: 'outdoor' },
+            ]}
+            value={screenTheme}
+            onChange={(val) => setScreenTheme(val as 'indoor' | 'outdoor')}
+          />
+        </div>
+        <div style={{
+          background: '#f5f5f5',
+          padding: '8px 12px',
+          borderRadius: 6,
+          wordBreak: 'break-all',
+          fontSize: 13,
+          marginBottom: 12,
+        }}>{screenDisplayUrl}</div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Button
+            type="primary"
+            onClick={() => {
+              navigator.clipboard.writeText(screenDisplayUrl).then(() => {
+                message.success('链接已复制');
+                setScreenModalOpen(false);
+              });
+            }}
+          >
+            复制链接
+          </Button>
+          <Button onClick={() => { window.open(screenDisplayUrl, '_blank'); setScreenModalOpen(false); }}>
+            打开大屏
+          </Button>
+        </div>
       </Modal>
     </>
   );
