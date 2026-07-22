@@ -1,7 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { IncomingMessage } from 'http';
 import { Server } from 'http';
-import { getCurrentScreenData, broadcastAfterUpdate, getCachedVenueId, getCachedVenueName, fetchLeaderboardFromDb } from '../routes/referees';
+import { getCurrentScreenData, broadcastAfterUpdate, getCachedVenueId, getCachedVenueName, fetchLeaderboardFromDb, fetchScreenDataFromDb } from '../routes/referees';
 import { setTempToken, getTempToken, listTempTokensWithData, deleteTempToken } from '../utils/temp-token';
 
 // 存储所有连接的客户端，按房间分组
@@ -99,7 +99,7 @@ function handleMessage(ws: WebSocket, msg: any) {
       break;
 
     case 'get_screen_data': {
-      // 客户端主动请求当前数据，从 DB 恢复排行榜
+      // 客户端主动请求当前数据，从 DB 恢复状态
       (async () => {
         const data = getCurrentScreenData();
         const cachedVId = data.venue_id || getCachedVenueId();
@@ -112,7 +112,11 @@ function handleMessage(ws: WebSocket, msg: any) {
           data.leaderboard = [];
         } else if (cachedVId) {
           try {
-            const leaderboard = await fetchLeaderboardFromDb(cachedVId);
+            // 并行查 leaderboard 和赛场状态（racing/paused/finished）
+            const [leaderboard, screenData] = await Promise.all([
+              fetchLeaderboardFromDb(cachedVId),
+              fetchScreenDataFromDb(cachedVId),
+            ]);
             data.leaderboard = leaderboard.map((e: any) => ({
               rank: e.rank,
               nickname: e.name,
@@ -120,8 +124,16 @@ function handleMessage(ws: WebSocket, msg: any) {
               status: e.status,
               avatar_url: e.avatar || undefined,
             }));
+            // 用 DB 中的真实状态覆盖 getCurrentScreenData 的默认值
+            data.race_status = screenData.race_status;
+            data.current_racer = screenData.current_racer;
+            data.elapsed_ms = screenData.elapsed_ms;
+            data.start_time = screenData.start_time;
+            data.next_racer = screenData.next_racer;
+            data.queue = screenData.queue;
+            data.last_result = screenData.last_result;
           } catch (e: any) {
-            console.error('[WS] get_screen_data leaderboard fetch error:', e.message);
+            console.error('[WS] get_screen_data fetch error:', e.message);
           }
         }
         ws.send(JSON.stringify({ type: 'screen_data', data }));

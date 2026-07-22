@@ -1680,6 +1680,99 @@ export async function fetchLeaderboardFromDb(venueId: string): Promise<any[]> {
   }
 }
 
+/**
+ * 从 DB 查询赛场完整数据（不含 leaderboard）
+ * 用于大屏重连 / get_screen_data 恢复 race_status/current_racer/elapsed_ms/last_result
+ */
+export async function fetchScreenDataFromDb(venueId: string): Promise<{
+  race_status: string;
+  current_racer: { nickname: string; queue_number: number; avatar_url?: string } | null;
+  elapsed_ms: number;
+  start_time: number | null;
+  next_racer: { nickname: string; queue_number: number; avatar_url?: string } | null;
+  queue: { queue_number: number; nickname: string; status: string; avatar_url?: string }[];
+  last_result: { racerName: string; racerAvatar?: string; elapsed: number } | undefined;
+}> {
+  const { queryOpOne, queryOp } = require('../config/database');
+  const defaultResult = { race_status: 'idle', current_racer: null, elapsed_ms: 0, start_time: null, next_racer: null, queue: [], last_result: undefined };
+
+  try {
+    const currentRow = await queryOpOne(
+      `SELECT rq.* FROM race_queues rq WHERE rq.venue_id = $1 AND rq.status IN ('racing','paused') ORDER BY rq.created_at DESC LIMIT 1`,
+      [venueId]
+    );
+
+    const lastFinished = await queryOpOne(
+      `SELECT rq.* FROM race_queues rq WHERE rq.venue_id = $1 AND rq.status = 'finished' AND rq.finish_status != 'invalid' ORDER BY rq.updated_at DESC LIMIT 1`,
+      [venueId]
+    );
+
+    const queueRows: any[] = await queryOp(
+      `SELECT rq.* FROM race_queues rq WHERE rq.venue_id = $1 AND rq.status IN ('waiting','called','skipped') ORDER BY rq.queue_number ASC`,
+      [venueId]
+    );
+
+    // 查用户昵称/头像
+    const allUserIds = [
+      ...(currentRow ? [currentRow.user_id] : []),
+      ...(lastFinished ? [lastFinished.user_id] : []),
+      ...queueRows.map((r: any) => r.user_id),
+    ].filter(Boolean);
+    const userMap = new Map<string, { nickname: string; avatar_url: string }>();
+    if (allUserIds.length > 0) {
+      try {
+        const { query } = require('../config/database');
+        const placeholders = allUserIds.map(() => '?').join(',');
+        const userRows: any[] = await query(
+          `SELECT id, nickname, avatar_url FROM users WHERE id IN (${placeholders})`,
+          allUserIds
+        );
+        for (const u of (userRows || [])) {
+          userMap.set(u.id, { nickname: u.nickname, avatar_url: u.avatar_url });
+        }
+      } catch (e: any) {
+        console.warn('[fetchScreenDataFromDb] query users error:', e.message);
+      }
+    }
+
+    const currentRacer = currentRow ? {
+      nickname: userMap.get(currentRow.user_id)?.nickname || '选手',
+      queue_number: currentRow.queue_number,
+      avatar_url: userMap.get(currentRow.user_id)?.avatar_url || undefined,
+    } : null;
+
+    const elapsed_ms = !currentRow ? 0
+      : currentRow.status === 'racing' && currentRow.start_time_ms
+        ? Date.now() - (currentRow.start_time_ms || 0)
+        : (currentRow.paused_elapsed_ms || 0);
+
+    const hasJustFinished = !currentRow && lastFinished && lastFinished.finish_time_ms != null;
+    const raceStatus = currentRow?.status === 'racing' ? 'racing'
+      : currentRow?.status === 'paused' ? 'paused'
+      : hasJustFinished ? 'finished'
+      : queueRows.length > 0 ? 'waiting' : 'idle';
+
+    const lastResult = lastFinished?.finish_time_ms != null ? {
+      racerName: userMap.get(lastFinished.user_id)?.nickname || '选手',
+      racerAvatar: userMap.get(lastFinished.user_id)?.avatar_url || undefined,
+      elapsed: lastFinished.finish_time_ms,
+    } : undefined;
+
+    return {
+      race_status: raceStatus,
+      current_racer: currentRacer,
+      elapsed_ms,
+      start_time: currentRow?.start_time_ms || null,
+      next_racer: queueRows.length > 0 ? { nickname: userMap.get(queueRows[0].user_id)?.nickname || '选手', queue_number: queueRows[0].queue_number } : null,
+      queue: queueRows.map((q: any) => ({ queue_number: q.queue_number, nickname: userMap.get(q.user_id)?.nickname || '选手', status: q.status, avatar_url: userMap.get(q.user_id)?.avatar_url || undefined })),
+      last_result: lastResult,
+    };
+  } catch (e: any) {
+    console.error('[fetchScreenDataFromDb] error:', e.message);
+    return defaultResult;
+  }
+}
+
 /** 从 DB 查询当前状态并广播 screen_data 到大屏 */
 export async function broadcastAfterUpdate(req: Request) {
   if (!cachedVenueId) return;
