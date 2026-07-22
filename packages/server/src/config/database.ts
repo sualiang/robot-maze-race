@@ -57,7 +57,7 @@ export function getBaseOptions(): mysql.PoolOptions {
   };
 }
 
-function getCommonPool(): mysql.Pool {
+export function getCommonPool(): mysql.Pool {
   if (!commonPool) {
     commonPool = mysql.createPool({ ...getBaseOptions(), database: COMMON_DB_NAME });
     console.log('[DB] Common pool created:', COMMON_DB_NAME);

@@ -2,7 +2,7 @@ import app from './index';
 import http from 'http';
 import { config } from './config';
 import { setupWebSocket } from './ws/handler';
-import { initVenueCache } from './routes/referees';
+import { initVenueCache, startRaceTimeoutChecker } from './routes/referees';
 
 const PORT = config.port || 3000;
 const server = http.createServer(app);
@@ -14,6 +14,9 @@ setupWebSocket(server);
 initVenueCache().then(() => {
   console.log('📍 赛场缓存已初始化');
 });
+
+// 启动服务端超时兜底检查（自动结束超时比赛）
+startRaceTimeoutChecker();
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🐕 机器狗竞速赛事服务已启动 http://localhost:${PORT}`);

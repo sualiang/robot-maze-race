@@ -56,8 +56,6 @@ export default function MatchPage() {
   const [checkingStatus, setCheckingStatus] = useState(true);
   const [showDcAlert, setShowDcAlert] = useState(false);
   const { hasContext, loading: contextLoading } = useOperatorContext();
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const elapsedRef = useRef(0);
   const destroyedRef = useRef(false);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -74,7 +72,7 @@ export default function MatchPage() {
     connectWebSocket();
     // 定期检查签到状态（兼容签到页签到后不刷新页面的场景）
     const checkinPoll = setInterval(() => { checkAttendanceStatus(); }, 2000);
-    return () => { destroyedRef.current = true; clearTimer(); clearInterval(checkinPoll); if (wsRef.current) { wsRef.current.onclose = null; wsRef.current.onerror = null; wsRef.current.onmessage = null; wsRef.current.onopen = null; wsRef.current.close(); wsRef.current = null; } if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current); };
+    return () => { destroyedRef.current = true; clearInterval(checkinPoll); if (wsRef.current) { wsRef.current.onclose = null; wsRef.current.onerror = null; wsRef.current.onmessage = null; wsRef.current.onopen = null; wsRef.current.close(); wsRef.current = null; } if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -88,7 +86,6 @@ export default function MatchPage() {
       setShowDcAlert(false);
     }
     if (wasIn === true && checkedIn === false) {
-      clearTimer();
       setQueue([]);
       setCurrentRacer(null);
       setStatus('idle');
@@ -121,14 +118,8 @@ export default function MatchPage() {
             case 'queue_update': setQueue(msg.data.queue || []); setCurrentRacer(msg.data.currentRacer || null); break;
             case 'timer_sync':
               if (typeof msg.data.elapsed === 'number') {
-                const serverElapsed = msg.data.elapsed;
+                setElapsed(msg.data.elapsed);
                 setStatus(msg.data.status);
-                // 收到服务端同步，重启本地动画基准
-                if (msg.data.status === 'running') {
-                  startTimerAnimation(serverElapsed);
-                } else {
-                  setElapsed(serverElapsed);
-                }
               }
               break;
             case 'result_push': setErrorMsg(msg.data.nickname + ': ' + formatFullTime(msg.data.finishTimeMs) + (msg.data.isTimeout ? ' (超时)' : '')); setTimeout(() => setErrorMsg(''), 2500); loadQueue(true); break;
@@ -143,7 +134,7 @@ export default function MatchPage() {
             case 'venue_closed':
               setCheckedIn(false);
               sessionStorage.removeItem('referee_checkin_status');
-              clearTimer();
+              // 赛场关闭，停止计时
               setQueue([]);
               setCurrentRacer(null);
               setStatus('idle');
@@ -217,22 +208,6 @@ export default function MatchPage() {
     catch {} finally { setActionLoading(false); }
   };
 
-  const clearTimer = () => { if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; } };
-
-  // 启动本地计时动画：以最近一次 WS timer_sync 为基准，50ms 刷新显示
-  const startTimerAnimation = (baseElapsed: number) => {
-    clearTimer();
-    const base = Date.now();
-    setElapsed(baseElapsed);
-    timerRef.current = setInterval(() => {
-      if (destroyedRef.current) { clearTimer(); return; }
-      const e = baseElapsed + (Date.now() - base);
-      elapsedRef.current = e;
-      if (maxTimeout > 0 && e >= maxTimeout * 1000) { setElapsed(e); clearTimer(); handleTimeout(); return; }
-      setElapsed(e);
-    }, 50);
-  };
-
   const startRace = async () => {
     if (!currentRacer) { setErrorMsg('请先选择比赛选手'); return; }
     if (status === 'running') { setErrorMsg('比赛已在进行中'); return; }
@@ -242,20 +217,19 @@ export default function MatchPage() {
       loadQueue();
       setStatus('running');
       setPausedElapsed(0);
-      // 启动本地动画（用当前 elapsed 为基准，后续 WS timer_sync 会纠正）
-      startTimerAnimation(elapsed);
+      setElapsed(0);
     } catch {} finally { setActionLoading(false); }
   };
 
-  const pauseRace = async () => { if (status !== 'running') return; clearTimer(); setStatus('paused'); setPausedElapsed(elapsed); try { await api.post('/referees/match/pause', { racerId: currentRacer?.id, elapsed }); loadQueue(); } catch {}; setErrorMsg('⏸ 已暂停'); setTimeout(() => setErrorMsg(''), 1500); };
+  const pauseRace = async () => { if (status !== 'running') return; setStatus('paused'); setPausedElapsed(elapsed); try { await api.post('/referees/match/pause', { racerId: currentRacer?.id, elapsed }); loadQueue(); } catch {}; setErrorMsg('⏸ 已暂停'); setTimeout(() => setErrorMsg(''), 1500); };
 
   const endRace = async () => {
-    if (status !== 'running' && status !== 'paused') return; clearTimer();
-    const finalTime = elapsedRef.current || elapsed; const isTimeout = maxTimeout > 0 && finalTime >= maxTimeout * 1000; const raceStatus = isTimeout ? 'timeout' : 'finished';
+    if (status !== 'running' && status !== 'paused') return;
+    const finalTime = elapsed;
     setActionLoading(true);
     try {
-      await api.post('/referees/match/end', { racerId: currentRacer?.id, status: raceStatus });
-      setErrorMsg(isTimeout ? '⏰ 超时！' + formatFullTime(finalTime) : '🏁 ' + formatFullTime(finalTime));
+      await api.post('/referees/match/end', { racerId: currentRacer?.id, status: 'finished' });
+      setErrorMsg('🏁 ' + formatFullTime(finalTime));
       setTimeout(() => setErrorMsg(''), 2500);
       setStatus('finished');
       setPausedElapsed(0);
@@ -270,24 +244,10 @@ export default function MatchPage() {
     finally { setActionLoading(false); }
   };
 
-  const handleTimeout = async () => {
-    const ri = currentRacer?.id; if (!ri) return;
-    const racerName = currentRacer?.nickname || currentRacer?.name || '选手';
-    // 超时 → 跳过此选手（排到下一位后面）
-    try {
-      await api.post('/referees/match/end', { racerId: ri, status: 'timeout' });
-      await api.post('/referees/match/skip', { racerId: ri });
-    } catch {}
-    setErrorMsg('⏰ ' + racerName + ' 超时，已自动跳过');
-    setTimeout(() => setErrorMsg(''), 2500);
-    setStatus('finished');
-    loadQueue();
-  };
-
   const handleMalfunction = () => {
-    if (!currentRacer) return; clearTimer();
-    const racerName = currentRacer.nickname || currentRacer.name; const ce = elapsed; const ri = currentRacer.id;
-    if (!window.confirm(racerName + ' 的机器狗发生故障？\n\n• 选手保留参赛次数\n• 计时归零重新开始\n• 当前计时作废')) { if (!destroyedRef.current) { setStatus('running'); startTimerAnimation(ce); } return; }
+    if (!currentRacer) return;
+    const racerName = currentRacer.nickname || currentRacer.name; const ri = currentRacer.id;
+    if (!window.confirm(racerName + ' 的机器狗发生故障？\n\n• 选手保留参赛次数\n• 计时归零重新开始\n• 当前计时作废')) { if (!destroyedRef.current) { setStatus('running'); } return; }
     setActionLoading(true);
     api.post('/referees/match/malfunction', { racerId: ri }).then(() => {
       setElapsed(0);
@@ -299,9 +259,9 @@ export default function MatchPage() {
   };
 
   const handleForfeit = () => {
-    if (!currentRacer) return; clearTimer();
+    if (!currentRacer) return;
     const racerName = currentRacer.nickname || currentRacer.name; const ri = currentRacer.id;
-    if (!window.confirm('确认 ' + racerName + ' 弃赛？\n\n将消耗一次参赛次数。')) { if (status === 'running' && !destroyedRef.current) startTimerAnimation(elapsed); return; }
+    if (!window.confirm('确认 ' + racerName + ' 弃赛？\n\n将消耗一次参赛次数。')) { if (status === 'running' && !destroyedRef.current) return; }
     setActionLoading(true);
     api.post('/referees/match/forfeit', { racerId: ri }).then(() => { setErrorMsg(racerName + ' 弃赛'); resetMatch(); loadQueue(); }).catch(() => { setErrorMsg('网络异常，操作已缓存'); resetMatch(); }).finally(() => setActionLoading(false));
   };
@@ -322,7 +282,7 @@ export default function MatchPage() {
     api.post('/referees/match/skip', { racerId: ri }).then(() => { setErrorMsg('⏭ ' + racerName + ' 已跳过'); resetMatch(); loadQueue(); }).catch(() => { setErrorMsg('网络异常，操作失败'); }).finally(() => setActionLoading(false));
   };
 
-  const resetMatch = () => { clearTimer(); setStatus('idle'); setElapsed(0); setPausedElapsed(0); setCurrentRacer(null); setActionLoading(false); };
+  const resetMatch = () => { setStatus('idle'); setElapsed(0); setPausedElapsed(0); setCurrentRacer(null); setActionLoading(false); };
   const isTimeoutDanger = maxTimeout > 0 && elapsed >= (maxTimeout - 10) * 1000;
   const timeoutPercent = maxTimeout > 0 ? Math.min(100, (elapsed / (maxTimeout * 1000)) * 100) : 0;
 

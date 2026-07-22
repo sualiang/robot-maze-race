@@ -4,7 +4,7 @@ import { hashSync } from 'bcryptjs';
 import { broadcastToScreen, validateActivationCode } from '../ws/handler';
 import { WebSocket } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
-import { query, queryOne, execute, queryOp, queryOpOne, executeOp } from '../config/database';
+import { query, queryOne, execute, queryOp, queryOpOne, executeOp, getOperatorPool, getCommonPool } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import {
   ApiResponse,
@@ -1893,5 +1893,202 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response<ApiRespo
     return res.status(500).json({ code: 500, message: '更新裁判信息失败', data: null });
   }
 });
+
+// ============================================================
+// 服务端超时兜底检查（每 5 秒扫描一次，自动结束超时比赛）
+// ============================================================
+
+let timeoutCheckerInterval: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * 启动服务端超时检查器
+ * 遍历所有运营商库，自动将超时的 racing 记录标记为 timeout finished
+ */
+export function startRaceTimeoutChecker(): void {
+  if (timeoutCheckerInterval) return; // 防止重复启动
+
+  console.log('[TimeoutChecker] 启动超时检查器 (每5秒)');
+
+  const checkTimeout = async () => {
+    try {
+      const common = getCommonPool();
+      const [opRows] = await common.query<any[]>(
+        `SELECT db_name FROM operators_registry WHERE db_name IS NOT NULL`
+      );
+      if (!opRows || opRows.length === 0) return;
+
+      // 读取全局默认超时时间
+      let defaultTimeout = 300;
+      try {
+        const [row] = await common.query<any[]>(
+          `SELECT config_value FROM system_config WHERE config_key = 'cfg_default_timeout_seconds'`
+        );
+        if (row && row.length > 0) {
+          const v = parseInt(row[0].config_value, 10);
+          if (!isNaN(v) && v > 0) defaultTimeout = v;
+        }
+      } catch { /* ignore */ }
+
+      for (const opReg of opRows) {
+        if (!opReg.db_name) continue;
+        try {
+          const pool = getOperatorPool(opReg.db_name);
+
+          // 查该运营商所有正在比赛的记录
+          const [racingRows] = await pool.execute(
+            `SELECT id, user_id, venue_id, start_time_ms, paused_elapsed_ms
+             FROM race_queues WHERE status = 'racing' AND start_time_ms IS NOT NULL`
+          ) as any;
+          if (!racingRows || !Array.isArray(racingRows) || racingRows.length === 0) continue;
+
+          for (const r of racingRows as any[]) {
+            const now = Date.now();
+            const startMs = Number(r.start_time_ms) || 0;
+            const elapsed = now - startMs;
+
+            // 读取该 venue 的超时配置
+            let timeoutSec = defaultTimeout;
+            try {
+              const [venueRows] = await pool.execute(
+                `SELECT timeout_seconds FROM venues WHERE id = ?`,
+                [r.venue_id]
+              ) as any;
+              if (venueRows && Array.isArray(venueRows) && venueRows.length > 0) {
+                const vt = parseInt(venueRows[0].timeout_seconds, 10);
+                if (!isNaN(vt) && vt > 0) timeoutSec = vt;
+              }
+            } catch { /* use default */ }
+
+            if (elapsed < timeoutSec * 1000) continue; // 未超时
+
+            console.log(`[TimeoutChecker] 自动结束超时比赛: racerId=${r.id} elapsed=${elapsed}ms timeout=${timeoutSec}s`);
+
+            // 超时 → 结束比赛
+            await pool.execute(
+              `UPDATE race_queues SET status = 'finished', finish_time_ms = ?,
+               finish_status = 'timeout', remaining_races = GREATEST(remaining_races - 1, 0),
+               start_time_ms = NULL, paused_elapsed_ms = 0
+               WHERE id = ?`,
+              [elapsed, r.id]
+            );
+
+            // 同步写入 race_records
+            await pool.execute(
+              `INSERT INTO race_records (id, race_id, player_id, score, duration_seconds,
+               status, started_at, finished_at, operator_id)
+               VALUES (?, NULL, ?, ?, ?, 'timeout',
+               DATE_SUB(NOW(), INTERVAL ?/1000 SECOND), NOW(), 'system_timeout')`,
+              [uuidv4(), r.user_id, elapsed, Math.round(elapsed / 1000), elapsed]
+            );
+
+            // 同步写入 race_results（需要 referee_id，超时场景填 system）
+            try {
+              const [existing] = await pool.execute(
+                `SELECT id FROM race_results WHERE user_id = ? AND created_at > NOW() - INTERVAL 10 SECOND`,
+                [r.user_id]
+              ) as any;
+              if (!existing || (Array.isArray(existing) && existing.length === 0)) {
+                await pool.execute(
+                  `INSERT INTO race_results (id, checkin_id, user_id, venue_id, referee_id,
+                   score_ms, status, race_type, finished_at)
+                   VALUES (?, NULL, ?, ?, 'system_timeout', ?, 'completed', 1, NOW())`,
+                  [uuidv4(), r.user_id, r.venue_id, elapsed]
+                );
+              }
+            } catch { /* 不阻塞主流程 */ }
+
+            // 查 nickname 用于推送
+            let nickname = '';
+            try {
+              const [userRows] = await common.query<any[]>(
+                `SELECT nickname FROM users WHERE id = ?`,
+                [r.user_id]
+              );
+              if (userRows && userRows.length > 0) nickname = userRows[0].nickname || '';
+            } catch { /* ignore */ }
+
+            // 通知前端
+            broadcastToScreen(r.venue_id || '', {
+              event: 'result_push',
+              data: {
+                racerId: r.id,
+                nickname: nickname || '选手',
+                finishTimeMs: elapsed,
+                isTimeout: true,
+              },
+            });
+
+            // 广播更新后的数据
+            await tryBroadcastTimeout(r.venue_id, pool, common);
+          }
+        } catch (dbErr: any) {
+          // 单个运营商的库异常不阻塞其他运营商
+          console.warn(`[TimeoutChecker] 检查运营商 ${opReg.db_name} 失败:`, dbErr.message);
+        }
+      }
+    } catch (e: any) {
+      console.warn('[TimeoutChecker] 扫描异常:', e.message);
+    }
+  };
+
+  timeoutCheckerInterval = setInterval(checkTimeout, 5000);
+  // 启动时立即执行一次
+  checkTimeout();
+}
+
+/** 超时后广播简化数据 */
+async function tryBroadcastTimeout(
+  venueId: string,
+  pool: any,
+  common: any
+): Promise<void> {
+  try {
+    const [queueRows] = await pool.execute(
+      `SELECT * FROM race_queues WHERE venue_id = ? AND status IN ('waiting','called','skipped')
+       ORDER BY queue_number ASC`,
+      [venueId]
+    );
+    const [currentRows] = await pool.execute(
+      `SELECT * FROM race_queues WHERE venue_id = ? AND status IN ('racing','paused')
+       ORDER BY created_at DESC LIMIT 1`,
+      [venueId]
+    );
+    const [leaderboard] = await pool.execute(
+      `SELECT * FROM race_queues WHERE venue_id = ? AND status = 'finished'
+       AND finish_status != 'invalid' ORDER BY finish_time_ms ASC LIMIT 10`,
+      [venueId]
+    );
+
+    const currentRacer = currentRows?.[0] ? {
+      nickname: currentRows[0].nickname || '选手',
+      queue_number: currentRows[0].queue_number,
+      avatar_url: undefined as string | undefined,
+    } : null;
+
+    const elapsed_ms = currentRows?.[0]?.status === 'racing' && currentRows?.[0]?.start_time_ms
+      ? Date.now() - Number(currentRows[0].start_time_ms) : 0;
+
+    broadcastToScreen(venueId, {
+      race_status: currentRows?.[0]?.status === 'racing' ? 'racing' : 'idle',
+      current_racer: currentRacer,
+      elapsed_ms,
+      start_time: currentRows?.[0]?.start_time_ms || null,
+      next_racer: queueRows?.[0] ? { nickname: queueRows[0].nickname || '选手', queue_number: queueRows[0].queue_number } : null,
+      queue: (queueRows || []).map((q: any) => ({ queue_number: q.queue_number, nickname: q.nickname || '选手', status: q.status, avatar_url: undefined })),
+      venue_name: '',
+      venue_id: venueId,
+      leaderboard: (leaderboard || []).map((r: any, i: number) => ({
+        rank: i + 1,
+        nickname: r.nickname || '选手',
+        finish_time_ms: r.finish_time_ms || 0,
+        status: r.finish_status || 'finished',
+      })),
+      last_result: null,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (e: any) {
+    console.warn('[TimeoutChecker] 广播异常:', e.message);
+  }
+}
 
 export default router;
