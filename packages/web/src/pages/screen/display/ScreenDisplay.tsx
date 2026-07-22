@@ -188,7 +188,7 @@ export default function ScreenDisplay() {
               }
             }, 50);
           } else if (screenData.race_status === 'finished') {
-            const finalElapsed = screenData.elapsed_ms || 0;
+            const finalElapsed = screenData.last_result?.elapsed || 0;
             setElapsed(finalElapsed);
             
             // 自动判断进榜：如果成绩有效且能进前 10，插入榜单
