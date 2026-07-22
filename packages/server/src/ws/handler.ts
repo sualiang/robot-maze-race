@@ -1,7 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { IncomingMessage } from 'http';
 import { Server } from 'http';
-import { getCurrentScreenData, broadcastAfterUpdate, getCachedVenueId, getCachedVenueName, fetchLeaderboardFromDb, fetchScreenDataFromDb } from '../routes/referees';
+import { getCurrentScreenData, broadcastAfterUpdate, getCachedVenueId, getCachedVenueName, fetchLeaderboardFromDb, fetchScreenDataFromDb, getStartTimeMsByVenueId } from '../routes/referees';
 import { setTempToken, getTempToken, listTempTokensWithData, deleteTempToken } from '../utils/temp-token';
 
 // 存储所有连接的客户端，按房间分组
@@ -15,6 +15,43 @@ const refereeClients = new Set<WebSocket>();
 // 激活码关联的 WebSocket（用于激活后回推通知）
 // Redis 存 data，内存存 ws 引用（ws 不能序列化）
 const activationCodeWs = new Map<string, WebSocket>();
+
+// ========== 裁判端 timer_sync 定时推送 ==========
+const timerSyncIntervals = new Map<string, ReturnType<typeof setInterval>>();
+const TIMER_SYNC_MS = 200;
+
+export function startTimerSync(venueId: string) {
+  if (timerSyncIntervals.has(venueId)) return;
+  const interval = setInterval(async () => {
+    try {
+      const startTimeMs = await getStartTimeMsByVenueId(venueId);
+      if (startTimeMs == null) {
+        stopTimerSync(venueId);
+        return;
+      }
+      const elapsed = Date.now() - startTimeMs;
+      const msg = JSON.stringify({ event: 'timer_sync', data: { elapsed, status: 'racing' } });
+      refereeClients.forEach((ws) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(msg);
+        }
+      });
+    } catch {
+      // ignore
+    }
+  }, TIMER_SYNC_MS);
+  timerSyncIntervals.set(venueId, interval);
+  console.log(`[WS] timer_sync started for venue ${venueId}`);
+}
+
+export function stopTimerSync(venueId: string) {
+  const interval = timerSyncIntervals.get(venueId);
+  if (interval) {
+    clearInterval(interval);
+    timerSyncIntervals.delete(venueId);
+    console.log(`[WS] timer_sync stopped for venue ${venueId}`);
+  }
+}
 
 export async function validateActivationCode(code: string): Promise<{ valid: boolean; ws?: WebSocket; venueId?: string; venueName?: string }> {
   const data = await getTempToken<{ venueId?: string; venueName?: string }>('activation_code', code);
@@ -320,4 +357,12 @@ export function broadcastToScreen(venueId: string, data: any) {
     }
   });
   console.log(`[WS] 已广播 ${isRaw ? data.event : 'screen_data'} venueId=${venueId || 'all'} 给 ${screenCount} 个大屏 + ${refereeCount} 个裁判客户端`);
+
+  // race_status 为 racing 时启动裁判端 timer_sync
+  const raceStatus = data.race_status || (data.data?.race_status);
+  if (raceStatus === 'racing' && venueId) {
+    startTimerSync(venueId);
+  } else if (raceStatus && raceStatus !== 'racing' && venueId) {
+    stopTimerSync(venueId);
+  }
 }

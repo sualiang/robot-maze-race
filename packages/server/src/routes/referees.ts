@@ -1638,6 +1638,30 @@ export function getCurrentScreenData() {
 }
 
 /** 从 DB 查询 leaderboard 并填充到 screen_data（用于大屏重连恢复） */
+/**
+ * 查询 venue 当前 racing 记录的 start_time_ms
+ * 返回 null 表示没有 racing 状态的记录（比赛已结束）
+ * 用于 handler.ts 的裁判端 timer_sync 定时推送
+ */
+export async function getStartTimeMsByVenueId(venueId: string): Promise<number | null> {
+  try {
+    const { resolveOperatorDbByVenueId, doQueryOne } = require('../config/database');
+    const opPool = await resolveOperatorDbByVenueId(venueId);
+    if (!opPool) return null;
+    const row = await doQueryOne(opPool,
+      `SELECT start_time_ms FROM race_queues WHERE venue_id = ? AND status = 'racing' ORDER BY created_at DESC LIMIT 1`,
+      [venueId]
+    );
+    if (row?.start_time_ms) {
+      return Number(row.start_time_ms);
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** 从 DB 查询 leaderboard 并填充到 screen_data（用于大屏重连恢复） */
 export async function fetchLeaderboardFromDb(venueId: string): Promise<any[]> {
   try {
     const { resolveOperatorDbByVenueId, doQuery, getCommonPool } = require('../config/database');
