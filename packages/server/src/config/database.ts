@@ -214,7 +214,7 @@ export function expandParams(text: string, params: any[]): any[] {
   return r.length > 0 ? r : params;
 }
 
-async function doQuery(pool: mysql.Pool, text: string, params?: any[]): Promise<any[]> {
+export async function doQuery(pool: mysql.Pool, text: string, params?: any[]): Promise<any[]> {
   const sql = convertSql(text);
   const ep = params ? expandParams(text, params) : undefined;
   const trimmed = sql.trimStart();
@@ -266,6 +266,40 @@ export async function executeOp(req: Request, text: string, params?: any[]): Pro
   const dbName = await resolveOperatorDb(req);
   if (!dbName) return { changes: 0, lastInsertRowid: 0 };
   return doExecute(getOperatorPool(dbName), text, params);
+}
+
+/**
+ * 通过 venueId 遍历所有运营商库查找 venue 所在的数据库 pool
+ * 用于大屏重连等无 req 上下文的场景
+ */
+export async function resolveOperatorDbByVenueId(venueId: string): Promise<mysql.Pool | null> {
+  if (!venueId) return null;
+  const common = getCommonPool();
+  let allOps: any[];
+  try {
+    const [rows] = await common.query<any[]>(
+      `SELECT db_name FROM operators_registry WHERE db_name IS NOT NULL`
+    );
+    allOps = rows || [];
+  } catch {
+    return null;
+  }
+  for (const opReg of allOps) {
+    if (!opReg.db_name) continue;
+    try {
+      const pool = getOperatorPool(opReg.db_name);
+      const [rows] = await pool.execute(
+        `SELECT id FROM venues WHERE id = ? LIMIT 1`,
+        [venueId]
+      );
+      if (rows && (Array.isArray(rows) ? rows.length > 0 : true)) {
+        return pool;
+      }
+    } catch {
+      // 跳过连接失败的库
+    }
+  }
+  return null;
 }
 
 /**
@@ -530,4 +564,4 @@ export function generateSecurePassword(length = 12): string {
   return pw.split('').sort(() => Math.random() - 0.5).join('');
 }
 
-export default { query, queryOne, execute, transaction, queryOp, queryOpOne, executeOp, executeOpByOrder, initSchema, createOperatorDatabase, generateSecurePassword, resolveOperatorDb, resolveOperatorDbForOrder, resolveOperatorDbForUserId };
+export default { query, queryOne, execute, transaction, queryOp, queryOpOne, executeOp, executeOpByOrder, initSchema, createOperatorDatabase, generateSecurePassword, resolveOperatorDb, resolveOperatorDbForOrder, resolveOperatorDbForUserId, resolveOperatorDbByVenueId };

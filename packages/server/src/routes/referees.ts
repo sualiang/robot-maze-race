@@ -1640,30 +1640,38 @@ export function getCurrentScreenData() {
 /** 从 DB 查询 leaderboard 并填充到 screen_data（用于大屏重连恢复） */
 export async function fetchLeaderboardFromDb(venueId: string): Promise<any[]> {
   try {
-    const { queryOp, query } = require('../config/database');
-    const [rows] = await Promise.all([
-      queryOp(
-        `SELECT rq.* FROM race_queues rq
-         WHERE rq.venue_id = $1 AND rq.status = 'finished' AND rq.finish_status != 'invalid' AND DATE(rq.created_at) = CURDATE()
-         ORDER BY rq.finish_time_ms ASC LIMIT 10`,
-        [venueId]
-      ),
-    ]);
+    const { resolveOperatorDbByVenueId, doQuery, getCommonPool } = require('../config/database');
+    const opPool = await resolveOperatorDbByVenueId(venueId);
+    if (!opPool) {
+      console.warn('[Match] fetchLeaderboardFromDb: no operator pool for venueId', venueId);
+      return [];
+    }
 
-    const leaderboardRows: any[] = rows;
+    const leaderboardRows: any[] = await doQuery(opPool,
+      `SELECT rq.* FROM race_queues rq
+       WHERE rq.venue_id = ? AND rq.status = 'finished' AND rq.finish_status != 'invalid' AND DATE(rq.created_at) = CURDATE()
+       ORDER BY rq.finish_time_ms ASC LIMIT 10`,
+      [venueId]
+    );
+
     if (!leaderboardRows?.length) return [];
 
-    // 批量查 users
+    // 批量查 users（common 库）
     const allUserIds = leaderboardRows.map((r: any) => r.user_id).filter(Boolean);
     const userMap = new Map<string, { nickname: string; avatar_url: string }>();
     if (allUserIds.length > 0) {
-      const placeholders = allUserIds.map(() => '?').join(',');
-      const userRows: any[] = await query(
-        `SELECT id, nickname, avatar_url FROM users WHERE id IN (${placeholders})`,
-        allUserIds
-      );
-      for (const u of (userRows || [])) {
-        userMap.set(u.id, { nickname: u.nickname, avatar_url: u.avatar_url });
+      try {
+        const commonPool = getCommonPool();
+        const placeholders = allUserIds.map(() => '?').join(',');
+        const [userRows] = await commonPool.execute(
+          `SELECT id, nickname, avatar_url FROM users WHERE id IN (${placeholders})`,
+          allUserIds
+        );
+        for (const u of (userRows as any[] || [])) {
+          userMap.set(u.id, { nickname: u.nickname, avatar_url: u.avatar_url });
+        }
+      } catch (e: any) {
+        console.warn('[fetchLeaderboardFromDb] query users error:', e.message);
       }
     }
 
@@ -1693,26 +1701,32 @@ export async function fetchScreenDataFromDb(venueId: string): Promise<{
   queue: { queue_number: number; nickname: string; status: string; avatar_url?: string }[];
   last_result: { racerName: string; racerAvatar?: string; elapsed: number } | undefined;
 }> {
-  const { queryOpOne, queryOp } = require('../config/database');
+  const { resolveOperatorDbByVenueId, doQueryOne, doQuery, getCommonPool } = require('../config/database');
   const defaultResult = { race_status: 'idle', current_racer: null, elapsed_ms: 0, start_time: null, next_racer: null, queue: [], last_result: undefined };
 
   try {
-    const currentRow = await queryOpOne(
-      `SELECT rq.* FROM race_queues rq WHERE rq.venue_id = $1 AND rq.status IN ('racing','paused') ORDER BY rq.created_at DESC LIMIT 1`,
+    const opPool = await resolveOperatorDbByVenueId(venueId);
+    if (!opPool) {
+      console.warn('[fetchScreenDataFromDb] no operator pool for venueId', venueId);
+      return defaultResult;
+    }
+
+    const currentRow = await doQueryOne(opPool,
+      `SELECT * FROM race_queues WHERE venue_id = ? AND status IN ('racing','paused') ORDER BY created_at DESC LIMIT 1`,
       [venueId]
     );
 
-    const lastFinished = await queryOpOne(
-      `SELECT rq.* FROM race_queues rq WHERE rq.venue_id = $1 AND rq.status = 'finished' AND rq.finish_status != 'invalid' ORDER BY rq.updated_at DESC LIMIT 1`,
+    const lastFinished = await doQueryOne(opPool,
+      `SELECT * FROM race_queues WHERE venue_id = ? AND status = 'finished' AND finish_status != 'invalid' ORDER BY updated_at DESC LIMIT 1`,
       [venueId]
     );
 
-    const queueRows: any[] = await queryOp(
-      `SELECT rq.* FROM race_queues rq WHERE rq.venue_id = $1 AND rq.status IN ('waiting','called','skipped') ORDER BY rq.queue_number ASC`,
+    const queueRows: any[] = await doQuery(opPool,
+      `SELECT * FROM race_queues WHERE venue_id = ? AND status IN ('waiting','called','skipped') ORDER BY queue_number ASC`,
       [venueId]
     );
 
-    // 查用户昵称/头像
+    // 查用户昵称/头像（common 库）
     const allUserIds = [
       ...(currentRow ? [currentRow.user_id] : []),
       ...(lastFinished ? [lastFinished.user_id] : []),
@@ -1721,13 +1735,13 @@ export async function fetchScreenDataFromDb(venueId: string): Promise<{
     const userMap = new Map<string, { nickname: string; avatar_url: string }>();
     if (allUserIds.length > 0) {
       try {
-        const { query } = require('../config/database');
+        const commonPool = getCommonPool();
         const placeholders = allUserIds.map(() => '?').join(',');
-        const userRows: any[] = await query(
+        const [userRows] = await commonPool.execute(
           `SELECT id, nickname, avatar_url FROM users WHERE id IN (${placeholders})`,
           allUserIds
         );
-        for (const u of (userRows || [])) {
+        for (const u of (userRows as any[] || [])) {
           userMap.set(u.id, { nickname: u.nickname, avatar_url: u.avatar_url });
         }
       } catch (e: any) {
