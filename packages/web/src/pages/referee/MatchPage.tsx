@@ -116,7 +116,11 @@ export default function MatchPage() {
       ws.onmessage = (event) => {
         try { const msg = JSON.parse(event.data); if (destroyedRef.current) return;
           switch (msg.event) {
-            case 'queue_update': setQueue(msg.data.queue || []); setCurrentRacer(msg.data.currentRacer || null); break;
+            case 'queue_update':
+              if (!msg.data.currentRacer || msg.data.currentRacer.status !== 'racing') {
+                if (localTimerRef.current) { clearInterval(localTimerRef.current); localTimerRef.current = null; }
+              }
+              setQueue(msg.data.queue || []); setCurrentRacer(msg.data.currentRacer || null); break;
             case 'timer_sync':
               if (typeof msg.data.elapsed === 'number') {
                 const newStatus = msg.data.status;
