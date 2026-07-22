@@ -115,34 +115,22 @@ export default function MatchPage() {
       };
       ws.onmessage = (event) => {
         try { const msg = JSON.parse(event.data); if (destroyedRef.current) return;
-          // 通用兜底：非 racing 状态清除本地计时器
-          // screen_data 用 msg.type（broadcastToScreen 发的），timer_sync/queue_update 用 msg.event
-          const raceStatus = msg.type === 'screen_data' ? msg.data?.race_status : msg.event !== 'timer_sync' ? msg.data?.currentRacer?.status ?? msg.data?.race_status : 'racing';
-          if (raceStatus && raceStatus !== 'racing') {
+          // screen_data 非 racing 时清除本地定时器兜底
+          if (msg.type === 'screen_data' && msg.data?.race_status !== 'racing') {
             if (localTimerRef.current) { clearInterval(localTimerRef.current); localTimerRef.current = null; }
           }
           switch (msg.event) {
             case 'queue_update':
               setQueue(msg.data.queue || []); setCurrentRacer(msg.data.currentRacer || null); break;
             case 'timer_sync':
+              // 直接使用服务端 elapsed，不做本地动画补偿（保持三端一致）
               if (typeof msg.data.elapsed === 'number') {
-                const newStatus = msg.data.status;
-                if (newStatus === 'running') {
-                  // 本地 50ms 动画补偿：服务端瞬时值为基准，客户端帧间累加
-                  const serverElapsed = msg.data.elapsed;
-                  const localStart = Date.now();
-                  setElapsed(serverElapsed);
-                  setStatus('running');
-                  // 清除旧定时器，启动新的
-                  if (localTimerRef.current) clearInterval(localTimerRef.current);
-                  localTimerRef.current = setInterval(() => {
-                    setElapsed(serverElapsed + (Date.now() - localStart));
-                  }, 50);
-                } else {
-                  // 非 running 状态：停本地定时器，设最终值
-                  if (localTimerRef.current) { clearInterval(localTimerRef.current); localTimerRef.current = null; }
-                  setElapsed(msg.data.elapsed);
-                  setStatus(newStatus);
+                setElapsed(msg.data.elapsed);
+                if (msg.data.status) setStatus(msg.data.status);
+                // 非 running 清除本地定时器
+                if (msg.data.status !== 'running' && localTimerRef.current) {
+                  clearInterval(localTimerRef.current);
+                  localTimerRef.current = null;
                 }
               }
               break;
