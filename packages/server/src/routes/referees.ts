@@ -1661,6 +1661,23 @@ export async function getStartTimeMsByVenueId(venueId: string): Promise<number |
   }
 }
 
+/** DB 真实 finish_time_ms，用于 stopTimerSync 覆盖裁判端本地动画 */
+export async function getLastFinishedElapsed(venueId: string): Promise<number | null> {
+  try {
+    const { resolveOperatorDbByVenueId, doQueryOne } = require('../config/database');
+    const opPool = await resolveOperatorDbByVenueId(venueId);
+    if (!opPool) return null;
+    const row = await doQueryOne(opPool,
+      `SELECT finish_time_ms FROM race_queues WHERE venue_id = ? AND status IN ('finished','timeout') ORDER BY created_at DESC LIMIT 1`,
+      [venueId]
+    );
+    if (row?.finish_time_ms != null) return Number(row.finish_time_ms);
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 /** 从 DB 查询 leaderboard 并填充到 screen_data（用于大屏重连恢复） */
 export async function fetchLeaderboardFromDb(venueId: string): Promise<any[]> {
   try {

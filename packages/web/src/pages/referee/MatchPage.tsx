@@ -123,14 +123,23 @@ export default function MatchPage() {
             case 'queue_update':
               setQueue(msg.data.queue || []); setCurrentRacer(msg.data.currentRacer || null); break;
             case 'timer_sync':
-              // 直接使用服务端 elapsed，不做本地动画补偿（保持三端一致）
               if (typeof msg.data.elapsed === 'number') {
-                setElapsed(msg.data.elapsed);
-                if (msg.data.status) setStatus(msg.data.status);
-                // 非 running 清除本地定时器
-                if (msg.data.status !== 'running' && localTimerRef.current) {
-                  clearInterval(localTimerRef.current);
-                  localTimerRef.current = null;
+                const newStatus = msg.data.status;
+                if (newStatus === 'running') {
+                  // 本地 50ms 动画补偿：服务端瞬时值为基准，客户端帧间累加
+                  const serverElapsed = msg.data.elapsed;
+                  const localStart = Date.now();
+                  setElapsed(serverElapsed);
+                  setStatus('running');
+                  if (localTimerRef.current) clearInterval(localTimerRef.current);
+                  localTimerRef.current = setInterval(() => {
+                    setElapsed(serverElapsed + (Date.now() - localStart));
+                  }, 50);
+                } else {
+                  // 非 running：停动画，用服务端最终值
+                  if (localTimerRef.current) { clearInterval(localTimerRef.current); localTimerRef.current = null; }
+                  setElapsed(msg.data.elapsed);
+                  setStatus(newStatus);
                 }
               }
               break;

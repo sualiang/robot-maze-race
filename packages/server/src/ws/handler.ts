@@ -18,7 +18,6 @@ const activationCodeWs = new Map<string, WebSocket>();
 
 // ========== 裁判端 timer_sync 定时推送 ==========
 const timerSyncIntervals = new Map<string, ReturnType<typeof setInterval>>();
-const timerSyncStartTimes = new Map<string, number>();
 const TIMER_SYNC_MS = 200;
 
 export function startTimerSync(venueId: string) {
@@ -30,7 +29,6 @@ export function startTimerSync(venueId: string) {
         stopTimerSync(venueId);
         return;
       }
-      timerSyncStartTimes.set(venueId, startTimeMs);
       const elapsed = Date.now() - startTimeMs;
       const msg = JSON.stringify({ event: 'timer_sync', data: { elapsed, status: 'running' } });
       refereeClients.forEach((ws) => {
@@ -49,20 +47,21 @@ export function startTimerSync(venueId: string) {
 export function stopTimerSync(venueId: string, finalStatus?: string) {
   const interval = timerSyncIntervals.get(venueId);
   if (interval) {
-    // 推最后一次真实 elapsed 值对齐三端时间
-    try {
-      const startTimeMs = timerSyncStartTimes?.get(venueId);
-      if (startTimeMs) {
-        const elapsed = Date.now() - startTimeMs;
-        const msg = JSON.stringify({ event: 'timer_sync', data: { elapsed, status: finalStatus || 'finished' } });
-        refereeClients.forEach((ws) => {
-          if (ws.readyState === WebSocket.OPEN) ws.send(msg);
-        });
-      }
-    } catch { /* ignore */ }
     clearInterval(interval);
     timerSyncIntervals.delete(venueId);
-    timerSyncStartTimes?.delete(venueId);
+    // 从 DB 取真实 finish_time_ms 推给裁判端，覆盖本地动画
+    (async () => {
+      try {
+        const { getLastFinishedElapsed } = await import('../routes/referees');
+        const dbElapsed = await getLastFinishedElapsed(venueId);
+        if (dbElapsed != null) {
+          const msg = JSON.stringify({ event: 'timer_sync', data: { elapsed: dbElapsed, status: finalStatus || 'finished' } });
+          refereeClients.forEach((ws) => {
+            if (ws.readyState === WebSocket.OPEN) ws.send(msg);
+          });
+        }
+      } catch { /* ignore */ }
+    })();
     console.log(`[WS] timer_sync stopped for venue ${venueId}`);
   }
 }
