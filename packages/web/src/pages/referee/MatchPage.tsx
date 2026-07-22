@@ -51,7 +51,7 @@ export default function MatchPage() {
   const [pageLoading, setPageLoading] = useState(true);
   const [wsConnected, setWsConnected] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  const [maxTimeout] = useState(180);
+  const [maxTimeout] = useState(300);
   const [checkedIn, setCheckedIn] = useState<boolean | null>(null);
   const [checkingStatus, setCheckingStatus] = useState(true);
   const [showDcAlert, setShowDcAlert] = useState(false);
@@ -380,7 +380,7 @@ export default function MatchPage() {
           {status === 'running' && <div className="referee-btn-row"><button className="referee-btn referee-btn-danger" onClick={endRace}>⏹ 结束比赛</button></div>}
           {status === 'paused' && <div className="referee-btn-row"><button className="referee-btn referee-btn-success" onClick={startRace} disabled={actionLoading}>▶ 继续比赛</button><button className="referee-btn referee-btn-danger" onClick={endRace}>⏹ 结束比赛</button></div>}
         </div>
-        {status === 'running' && maxTimeout > 0 && <div className="referee-timeout-hint">⏰ 超时限制3分钟 · 超时将自动记录</div>}
+        {status === 'running' && maxTimeout > 0 && <div className="referee-timeout-hint">⏰ 超时限制5分钟 · 超时将自动记录</div>}
       </div>
       {errorMsg && <div className="referee-error-msg" dangerouslySetInnerHTML={{ __html: errorMsg.replace(/\*\*(.+?)\*\*/g, '<strong style="color:#27ae60">$1</strong>') }} />}
       {checkedIn === true && currentRacer && (status === 'running' || status === 'paused') && <div className="referee-card referee-card-compact" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16, padding: 16 }}><button className="referee-btn referee-btn-outline" onClick={handleMalfunction} disabled={actionLoading}>机器狗故障 · 保留次数重新排队</button><button className="referee-btn referee-btn-danger-outline" onClick={handleForfeit} disabled={actionLoading}>🚫 弃赛</button></div>}
