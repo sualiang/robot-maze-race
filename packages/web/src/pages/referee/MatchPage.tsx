@@ -55,6 +55,7 @@ export default function MatchPage() {
   const [checkedIn, setCheckedIn] = useState<boolean | null>(null);
   const [checkingStatus, setCheckingStatus] = useState(true);
   const [showDcAlert, setShowDcAlert] = useState(false);
+  const localTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { hasContext, loading: contextLoading } = useOperatorContext();
   const destroyedRef = useRef(false);
   const wsRef = useRef<WebSocket | null>(null);
@@ -72,7 +73,7 @@ export default function MatchPage() {
     connectWebSocket();
     // 定期检查签到状态（兼容签到页签到后不刷新页面的场景）
     const checkinPoll = setInterval(() => { checkAttendanceStatus(); }, 2000);
-    return () => { destroyedRef.current = true; clearInterval(checkinPoll); if (wsRef.current) { wsRef.current.onclose = null; wsRef.current.onerror = null; wsRef.current.onmessage = null; wsRef.current.onopen = null; wsRef.current.close(); wsRef.current = null; } if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current); };
+    return () => { destroyedRef.current = true; clearInterval(checkinPoll); if (wsRef.current) { wsRef.current.onclose = null; wsRef.current.onerror = null; wsRef.current.onmessage = null; wsRef.current.onopen = null; wsRef.current.close(); wsRef.current = null; } if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current); if (localTimerRef.current) { clearInterval(localTimerRef.current); localTimerRef.current = null; } };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -118,8 +119,24 @@ export default function MatchPage() {
             case 'queue_update': setQueue(msg.data.queue || []); setCurrentRacer(msg.data.currentRacer || null); break;
             case 'timer_sync':
               if (typeof msg.data.elapsed === 'number') {
-                setElapsed(msg.data.elapsed);
-                setStatus(msg.data.status);
+                const newStatus = msg.data.status;
+                if (newStatus === 'running') {
+                  // 本地 50ms 动画补偿：服务端瞬时值为基准，客户端帧间累加
+                  const serverElapsed = msg.data.elapsed;
+                  const localStart = Date.now();
+                  setElapsed(serverElapsed);
+                  setStatus('running');
+                  // 清除旧定时器，启动新的
+                  if (localTimerRef.current) clearInterval(localTimerRef.current);
+                  localTimerRef.current = setInterval(() => {
+                    setElapsed(serverElapsed + (Date.now() - localStart));
+                  }, 50);
+                } else {
+                  // 非 running 状态：停本地定时器，设最终值
+                  if (localTimerRef.current) { clearInterval(localTimerRef.current); localTimerRef.current = null; }
+                  setElapsed(msg.data.elapsed);
+                  setStatus(newStatus);
+                }
               }
               break;
             case 'result_push': setErrorMsg(msg.data.nickname + ': ' + formatFullTime(msg.data.finishTimeMs) + (msg.data.isTimeout ? ' (超时)' : '')); setTimeout(() => setErrorMsg(''), 2500); loadQueue(true); break;
@@ -135,6 +152,7 @@ export default function MatchPage() {
               setCheckedIn(false);
               sessionStorage.removeItem('referee_checkin_status');
               // 赛场关闭，停止计时
+              if (localTimerRef.current) { clearInterval(localTimerRef.current); localTimerRef.current = null; }
               setQueue([]);
               setCurrentRacer(null);
               setStatus('idle');
