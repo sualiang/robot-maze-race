@@ -842,13 +842,13 @@ router.post('/match/resume', authMiddleware, async (req: Request, res: Response)
  */
 router.post('/match/end', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const { racerId, finishTimeMs, status: raceStatus } = req.body;
+    const { racerId, status: raceStatus } = req.body;
     if (!racerId) {
       return res.status(400).json({ code: 400, message: '缺少 racerId', data: null });
     }
 
     let row = await queryOpOne<RacerRow>(req,
-      `SELECT id, user_id, venue_id, remaining_races FROM race_queues
+      `SELECT id, user_id, venue_id, remaining_races, start_time_ms FROM race_queues
        WHERE id = $1`,
       [racerId]
     );
@@ -864,7 +864,7 @@ router.post('/match/end', authMiddleware, async (req: Request, res: Response) =>
     row.nickname = userInfo.nickname || '';
     row.avatar_url = userInfo.avatar_url || '';
 
-    const elapsed = finishTimeMs || 0;
+    const elapsed = Date.now() - (row.start_time_ms || Date.now());
     const finishStatus = raceStatus === 'timeout' ? 'timeout' : 'finished';
     const newRemaining = Math.max(0, row.remaining_races - 1);
 
