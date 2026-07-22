@@ -30,7 +30,7 @@ export function startTimerSync(venueId: string) {
         return;
       }
       const elapsed = Date.now() - startTimeMs;
-      const msg = JSON.stringify({ event: 'timer_sync', data: { elapsed, status: 'racing' } });
+      const msg = JSON.stringify({ event: 'timer_sync', data: { elapsed, status: 'running' } });
       refereeClients.forEach((ws) => {
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(msg);
