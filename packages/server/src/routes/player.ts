@@ -117,7 +117,7 @@ router.get('/packages', optionalAuth, async (req: Request, res: Response) => {
 /**
  * GET /player/leaderboard/live
  * 大屏实时排行榜数据（小程序排行Tab用）
- * 从 operator 库 race_queues 查询，与大屏完全一致
+ * 从 operator 库 race_results 查询
  */
 router.get('/leaderboard/live', authMiddleware, async (req: Request, res: Response) => {
   try {
@@ -146,14 +146,14 @@ router.get('/leaderboard/live', authMiddleware, async (req: Request, res: Respon
     // 时间过滤：日榜取今天，周榜取本周一至今
     let timeFilter = '';
     if (period === 'weekly') {
-      timeFilter = `AND rq.updated_at >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)`;
+      timeFilter = `AND updated_at >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)`;
     } else {
-      timeFilter = `AND rq.updated_at >= CURDATE()`;
+      timeFilter = `AND DATE(created_at) = CURDATE()`;
     }
 
     // 排行榜 top 20
     const leaderRows = await queryOp<any>(req,
-      `SELECT rq.* FROM race_queues rq WHERE rq.venue_id = $1 AND rq.status = 'finished' AND rq.finish_status != 'invalid' ${timeFilter} ORDER BY rq.finish_time_ms ASC LIMIT 20`,
+      `SELECT * FROM race_results WHERE venue_id = $1 AND status = 'completed' ${timeFilter} ORDER BY score_ms ASC LIMIT 20`,
       [venueId]
     );
 
@@ -181,8 +181,8 @@ router.get('/leaderboard/live', authMiddleware, async (req: Request, res: Respon
           rank: i + 1,
           nickname: (userMap.get(r.user_id)?.nickname || '选手'),
           avatar_url: userMap.get(r.user_id)?.avatar_url || '',
-          finish_time_ms: r.finish_time_ms || 0,
-          status: r.finish_status || 'finished',
+          finish_time_ms: r.score_ms || 0,
+          status: r.status || 'completed',
         })),
         venueName: venue?.name || '',
         date: dateStr,

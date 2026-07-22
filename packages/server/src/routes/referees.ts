@@ -1689,9 +1689,9 @@ export async function fetchLeaderboardFromDb(venueId: string): Promise<any[]> {
     }
 
     const leaderboardRows: any[] = await doQuery(opPool,
-      `SELECT rq.* FROM race_queues rq
-       WHERE rq.venue_id = ? AND rq.status = 'finished' AND rq.finish_status != 'invalid' AND DATE(rq.created_at) = CURDATE()
-       ORDER BY rq.finish_time_ms ASC LIMIT 10`,
+      `SELECT * FROM race_results
+       WHERE venue_id = ? AND status = 'completed' AND DATE(created_at) = CURDATE()
+       ORDER BY score_ms ASC LIMIT 10`,
       [venueId]
     );
 
@@ -1720,8 +1720,8 @@ export async function fetchLeaderboardFromDb(venueId: string): Promise<any[]> {
       rank: i + 1,
       name: userMap.get(r.user_id)?.nickname || '选手',
       avatar: userMap.get(r.user_id)?.avatar_url || undefined,
-      elapsed: r.finish_time_ms || 0,
-      status: r.finish_status || 'finished',
+      elapsed: r.score_ms || 0,
+      status: r.status || 'completed',
     }));
   } catch (e: any) {
     console.error('[Match] fetchLeaderboardFromDb error:', e.message);
@@ -1857,10 +1857,10 @@ export async function broadcastAfterUpdate(req: Request) {
       [venueId]
     );
 
-    const leaderboardRows = await queryOp<RacerRow>(req,
-      `SELECT rq.* FROM race_queues rq
-       WHERE rq.venue_id = $1 AND rq.status = 'finished' AND rq.finish_status != 'invalid'
-       ORDER BY rq.finish_time_ms ASC LIMIT 10`,
+    const leaderboardRows = await queryOp<any>(req,
+      `SELECT * FROM race_results
+       WHERE venue_id = $1 AND status = 'completed' AND DATE(created_at) = CURDATE()
+       ORDER BY score_ms ASC LIMIT 10`,
       [venueId]
     );
 
@@ -1928,8 +1928,8 @@ export async function broadcastAfterUpdate(req: Request) {
         rank: i + 1,
         nickname: r.nickname || '选手',
         avatar: r.avatar_url || undefined,
-        finish_time_ms: r.finish_time_ms || 0,
-        status: r.finish_status || 'finished',
+        finish_time_ms: r.score_ms || 0,
+        status: r.status || 'completed',
       })),
       last_result: lastResult,
       timestamp: new Date().toLocaleString('zh-CN'),
