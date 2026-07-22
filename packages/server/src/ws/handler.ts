@@ -181,13 +181,28 @@ function handleMessage(ws: WebSocket, msg: any) {
             // venueId 匹配，直接推送当前数据
             ws.send(JSON.stringify({ type: 'screen_data', data: screenData }));
           }
-          // 异步拉 DB 排行榜
+          // 异步拉 DB 排行榜 + 赛场状态，覆盖 getCurrentScreenData 的 inactive 默认值
           setImmediate(() => {
-            fetchLeaderboardFromDb(venueId).then((leaderboard) => {
-              const data = { ...(screenData || {}), leaderboard: leaderboard || [], venue_id: venueId, venue_name: venueName || '' };
+            Promise.all([
+              fetchLeaderboardFromDb(venueId),
+              fetchScreenDataFromDb(venueId),
+            ]).then(([leaderboard, statusData]) => {
+              const data = {
+                ...(screenData || {}),
+                leaderboard: leaderboard || [],
+                venue_id: venueId,
+                venue_name: venueName || '',
+                race_status: statusData.race_status,
+                current_racer: statusData.current_racer,
+                elapsed_ms: statusData.elapsed_ms,
+                start_time: statusData.start_time,
+                next_racer: statusData.next_racer,
+                queue: statusData.queue,
+                last_result: statusData.last_result,
+              };
               ws.send(JSON.stringify({ type: 'screen_data', data }));
             }).catch(() => {});
-        });
+          });
         })();
       }
       setTempToken('activation_code', code, { venueId, venueName }, 300).catch((err) =>

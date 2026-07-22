@@ -2158,14 +2158,39 @@ async function tryBroadcastTimeout(
       avatar_url: undefined as string | undefined,
     } : null;
 
-    const elapsed_ms = currentRows?.[0]?.status === 'racing' && currentRows?.[0]?.start_time_ms
-      ? Date.now() - Number(currentRows[0].start_time_ms) : 0;
+    const currentRow = currentRows?.[0];
+    // paused 状态下恢复暂停时累计耗时
+    const elapsed_ms = currentRow?.status === 'racing' && currentRow?.start_time_ms
+      ? Date.now() - Number(currentRow.start_time_ms)
+      : currentRow?.status === 'paused' ? (currentRow.paused_elapsed_ms || 0) : 0;
+
+    // finished 分支：没有 currentRow 但 leaderboard 里有刚跑完的记录
+    const hasJustFinished = !currentRow && leaderboard?.length > 0;
+    const raceStatus = currentRow?.status === 'racing' ? 'racing'
+      : currentRow?.status === 'paused' ? 'paused'
+      : hasJustFinished ? 'finished'
+      : (queueRows?.length || 0) > 0 ? 'waiting' : 'idle';
+
+    // last_result：从 leaderboard 中取最近完成的（或从 DB 查到最近一条 finished 记录）
+    let lastResult = null;
+    if (hasJustFinished) {
+      // timeout 场景下刚超时的记录是 leaderboard 里最新的（finish_time_ms 最大的）
+      const sorted = [...(leaderboard || [])].sort((a: any, b: any) => (b.finish_time_ms || 0) - (a.finish_time_ms || 0));
+      const latest = sorted[0];
+      if (latest) {
+        lastResult = {
+          racerName: latest.nickname || '选手',
+          racerAvatar: undefined,
+          elapsed: latest.finish_time_ms || 0,
+        };
+      }
+    }
 
     broadcastToScreen(venueId, {
-      race_status: currentRows?.[0]?.status === 'racing' ? 'racing' : 'idle',
+      race_status: raceStatus,
       current_racer: currentRacer,
       elapsed_ms,
-      start_time: currentRows?.[0]?.start_time_ms || null,
+      start_time: currentRow?.start_time_ms || null,
       next_racer: queueRows?.[0] ? { nickname: queueRows[0].nickname || '选手', queue_number: queueRows[0].queue_number } : null,
       queue: (queueRows || []).map((q: any) => ({ queue_number: q.queue_number, nickname: q.nickname || '选手', status: q.status, avatar_url: undefined })),
       venue_name: '',
@@ -2176,7 +2201,7 @@ async function tryBroadcastTimeout(
         finish_time_ms: r.finish_time_ms || 0,
         status: r.finish_status || 'finished',
       })),
-      last_result: null,
+      last_result: lastResult,
       timestamp: new Date().toISOString(),
     });
   } catch (e: any) {
