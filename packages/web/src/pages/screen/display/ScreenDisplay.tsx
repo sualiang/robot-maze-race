@@ -55,14 +55,9 @@ export default function ScreenDisplay() {
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 记录上一个 race_status，用于判断是否刚结束比赛
   const prevStatusRef = useRef<string>('idle');
-  // elapsed 的 ref，避免闭包捕获过期值
-  const elapsedRef = useRef(0);
-  // 同步 state 到 ref
-  elapsedRef.current = elapsed;
   // 标记比赛已结束，阻止后续任何 setInterval
   const raceEndedRef = useRef(false);
   const MAX_TIMEOUT_SEC = 180;
-  const timeoutMsRef = useRef(0);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const connect = useCallback(() => {
@@ -147,32 +142,26 @@ export default function ScreenDisplay() {
             setForfeitHint('');
           }
 
-          // 管理计时器 — 用 start_time 基准计算偏移
-          if (timerRef.current) clearInterval(timerRef.current);
+          // 计时统一用服务端 WS 推送的 elapsed_ms
+          if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
 
-          if (screenData.race_status === 'racing' && screenData.start_time && !raceEndedRef.current) {
-            console.log('[大屏WS] 开始计时, start_time:', screenData.start_time, 'elapsed_ms:', screenData.elapsed_ms);
-            // 记录 start_time 用于超时检测
-            timeoutMsRef.current = screenData.start_time;
-            // 实时计时：以 start_time 为基准，客户端自己跑
+          if (screenData.race_status === 'racing' && !raceEndedRef.current) {
+            // 以服务端推送的 elapsed_ms 为基准，客户端 50ms 刷新（保证秒数跳动）
+            const serverElapsed = screenData.elapsed_ms || 0;
+            const startNow = Date.now();
+            setElapsed(serverElapsed);
             timerRef.current = setInterval(() => {
-              const now = Date.now();
-              const diff = now - screenData.start_time;
-              // 超时自停（180 秒），无需等待后端广播
-              if (MAX_TIMEOUT_SEC > 0 && diff >= MAX_TIMEOUT_SEC * 1000) {
-                console.log('[大屏WS] 超时自停, diff:', diff);
-                if (timerRef.current) clearInterval(timerRef.current);
-                timerRef.current = null;
+              const e = serverElapsed + (Date.now() - startNow);
+              if (MAX_TIMEOUT_SEC > 0 && e >= MAX_TIMEOUT_SEC * 1000) {
+                if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
                 raceEndedRef.current = true;
                 setElapsed(MAX_TIMEOUT_SEC * 1000);
               } else {
-                setElapsed(diff);
+                setElapsed(e);
               }
             }, 50);
           } else if (screenData.race_status === 'finished') {
-            console.log('[大屏WS] 比赛结束, backend elapsed_ms:', screenData.elapsed_ms, 'client elapsed:', elapsedRef.current);
-            // 优先用客户端自己计时的值，兜底用后端 elapsed_ms（如果后端为 0 则忽略）
-            const finalElapsed = elapsedRef.current > 0 ? elapsedRef.current : (screenData.elapsed_ms || 0);
+            const finalElapsed = screenData.elapsed_ms || 0;
             setElapsed(finalElapsed);
             
             // 自动判断进榜：如果成绩有效且能进前 10，插入榜单
@@ -201,8 +190,8 @@ export default function ScreenDisplay() {
                 setData(prev => prev ? { ...prev, leaderboard: newBoard } : prev);
               }
             }
-          } else if (screenData.race_status === 'idle' || screenData.race_status === 'waiting') {
-            // 闲置：固定显示 elapsed_ms
+          } else {
+            // idle / waiting / paused: 直接展示服务端推送的 elapsed_ms
             setElapsed(screenData.elapsed_ms || 0);
           }
         } else if (msg.type === 'activated') {
