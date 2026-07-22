@@ -116,6 +116,13 @@ export default function MatchPage() {
       ws.onmessage = (event) => {
         try { const msg = JSON.parse(event.data); if (destroyedRef.current) return;
           switch (msg.event) {
+            case 'screen_data':
+              // 裁判端从 broadcastToScreen 收到的画面数据
+              // 非 racing 时清除本地计时器（timer_sync 停止推送后兜底）
+              if (msg.data.race_status !== 'racing') {
+                if (localTimerRef.current) { clearInterval(localTimerRef.current); localTimerRef.current = null; }
+              }
+              break;
             case 'queue_update':
               if (!msg.data.currentRacer || msg.data.currentRacer.status !== 'racing') {
                 if (localTimerRef.current) { clearInterval(localTimerRef.current); localTimerRef.current = null; }
