@@ -115,18 +115,14 @@ export default function MatchPage() {
       };
       ws.onmessage = (event) => {
         try { const msg = JSON.parse(event.data); if (destroyedRef.current) return;
+          // 通用兜底：非 racing 状态清除本地计时器
+          // screen_data 用 msg.type（broadcastToScreen 发的），timer_sync/queue_update 用 msg.event
+          const raceStatus = msg.type === 'screen_data' ? msg.data?.race_status : msg.event !== 'timer_sync' ? msg.data?.currentRacer?.status ?? msg.data?.race_status : 'racing';
+          if (raceStatus && raceStatus !== 'racing') {
+            if (localTimerRef.current) { clearInterval(localTimerRef.current); localTimerRef.current = null; }
+          }
           switch (msg.event) {
-            case 'screen_data':
-              // 裁判端从 broadcastToScreen 收到的画面数据
-              // 非 racing 时清除本地计时器（timer_sync 停止推送后兜底）
-              if (msg.data.race_status !== 'racing') {
-                if (localTimerRef.current) { clearInterval(localTimerRef.current); localTimerRef.current = null; }
-              }
-              break;
             case 'queue_update':
-              if (!msg.data.currentRacer || msg.data.currentRacer.status !== 'racing') {
-                if (localTimerRef.current) { clearInterval(localTimerRef.current); localTimerRef.current = null; }
-              }
               setQueue(msg.data.queue || []); setCurrentRacer(msg.data.currentRacer || null); break;
             case 'timer_sync':
               if (typeof msg.data.elapsed === 'number') {
