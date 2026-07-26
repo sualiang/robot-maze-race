@@ -300,6 +300,11 @@ export async function transaction<T>(fn: (executor: any) => T): Promise<T> {
 // ==================== Schema 初始化 ====================
 
 export async function initSchema(): Promise<void> {
+  // 生产环境不自动执行 DDL，由运维手动管理 migration
+  if (process.env.NODE_ENV === 'production') {
+    console.log('[DB] 生产环境跳过自动 schema 初始化');
+    return;
+  }
   // 公共库 schema
   const commonPath = path.join(__dirname, '../db/common.sql');
   const conn = getCommonPool();
@@ -419,9 +424,13 @@ export async function initSchema(): Promise<void> {
                   await pool.execute(`ALTER TABLE \`${tbl}\` ADD COLUMN \`${col}\` ${typ}`);
                   console.log(`[DB]  Added ${tbl}.${col} for ${reg.db_name}`);
                 }
-              } catch {}
+              } catch {
+                // 跳过该列（表可能不存在或列已存在）
+              }
             }
-          } catch {}
+          } catch (e: any) {
+            console.warn(`[DB] Skipped operator DB ${reg.db_name}: ${e.message?.substring(0, 100)}`);
+          }
         }
 
         // 2. Re-run operator.sql for missing tables

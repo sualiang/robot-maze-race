@@ -11,12 +11,12 @@ export const config = {
   // 运行环境
   nodeEnv: process.env.NODE_ENV || 'development',
 
-  // 数据库
+  // 数据库（仅供引用，实际连接由 database.ts 中 DATABASE_URL 控制）
   db: {
     host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '5432', 10),
+    port: parseInt(process.env.DB_PORT || '3308', 10),
     database: process.env.DB_NAME || 'robot_maze_race',
-    user: process.env.DB_USER || 'postgres',
+    user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
     max: parseInt(process.env.DB_POOL_MAX || '20', 10),
     idleTimeoutMillis: parseInt(process.env.DB_POOL_IDLE_TIMEOUT || '30000', 10),
@@ -32,7 +32,14 @@ export const config = {
 
   // JWT
   jwt: {
-    secret: process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? '' : 'robot-maze-race-dev-secret'),
+    secret: (() => {
+      const s = process.env.JWT_SECRET || '';
+      if (!s) {
+        console.warn('[Config] 警告：JWT_SECRET 未配置，使用开发环境默认值，生产环境建议尽快配置');
+        return 'robot-maze-race-dev-secret';
+      }
+      return s;
+    })(),
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
   },
 

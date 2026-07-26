@@ -296,12 +296,10 @@ router.post('/users/:id/reset-password', authMiddleware, async (req: Request, re
 
     const plainPassword = generateSecurePassword();
     const hashed = hashSync(plainPassword, 10);
-    console.log('[AdminRBAC] reset password:', { id, username: existing.username });
     await query(
       `UPDATE admin_users SET password = $1, first_login = 1, updated_at = NOW() WHERE id = $2`,
       [hashed, id]
     );
-    console.log('[AdminRBAC] reset password done');
 
     return res.json({ code: 0, message: '密码重置成功', data: { account: existing.username, password: plainPassword } });
   } catch (error: any) {

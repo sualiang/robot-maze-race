@@ -297,10 +297,7 @@ router.post('/admin-login', async (req: Request, res: Response) => {
     }
 
     // 使用 bcrypt 验证密码
-    console.log('[AUTH-D] body password:', JSON.stringify(password), 'type:', typeof password, 'len:', password.length);
-    console.log('[AUTH-D] db password hash:', user.password?.substring(0, 15), '... len:', user.password?.length, 'starts2b:', user.password?.startsWith?.('$2b$'));
     const cmpResult = compareSync(password, user.password);
-    console.log('[AUTH-D] compareSync result:', cmpResult);
     if (!cmpResult) {
       return res.status(401).json({ code: 401, message: '用户名或密码错误', data: null });
     }

@@ -1,7 +1,7 @@
 // 玩家端 - API请求封装
-// 本地开发：连接本地后端；发布前改回线上地址
+// 本地开发连 localhost，发布前需改为线上地址
+// 发布地址: https://dog.amberrobot.com.cn/api/v1
 const BASE_URL = 'http://localhost:3000/api/v1';
-// const BASE_URL = 'https://dog.amberrobot.com.cn/api/v1';
 
 var loadingCount = 0;
 

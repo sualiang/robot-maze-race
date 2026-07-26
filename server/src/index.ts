@@ -130,7 +130,6 @@ app.use('/api/v1/merchant/auth', merchantAuthRoutes);
 app.use('/api/v1/merchant/coupon', merchantCouponRoutes);
 app.use('/api/v1/merchant/verify', merchantVerifyRoutes);
 app.use('/api/v1/player', merchantRoutes);
-app.use('/api/v1/merchant/verify', merchantVerifyRoutes);
 app.use('/api/v1/operator', operatorMerchantRoutes);
 app.use('/api/v1/task', taskRoutes);
 app.use('/api/v1/admin/seasons', adminSeasonRoutes);
@@ -162,7 +161,6 @@ import wechatCallbackRoutes from './routes/wechat-callback';
 import wechatEventRoutes from './routes/wechat-event';
 app.use('/api/v1/wechat', wechatCallbackRoutes);
 app.use('/api/v1/wechat', wechatEventRoutes);
-app.use('/api/v1/referee', refereeApplyRoutes);
 
 // 微信服务号 OAuth 登录
 import wxMpLoginRoutes from './routes/wx-mp-login';
